@@ -3,6 +3,8 @@
 Prototipo de sandbox de supervivencia con mundo procedural infinito, pensado
 para crecer hacia multijugador online y, mas adelante, una version nativa.
 
+**Jugar: https://drako05.github.io/ClaudeTest/**
+
 El nombre es provisional.
 
 ## Arrancar
@@ -19,10 +21,18 @@ npm test         # tests del nucleo (Node, sin navegador)
 npm run typecheck
 npm run build    # build estatico del cliente
 npm run smoke    # construye y juega el build en Chromium headless
+npm run artifact # build de un solo fichero autocontenido
 npx vite-node tools/analyze-world.ts   # estadisticas del mundo generado
 ```
 
 La semilla se puede fijar por URL: `?seed=12345`. Sin ella se elige una al azar.
+
+`npm run smoke` tambien puede verificar un despliegue ya publicado en vez del
+build local:
+
+```bash
+VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
+```
 
 ## Controles
 

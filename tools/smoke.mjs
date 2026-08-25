@@ -53,8 +53,13 @@ function fail(msg) {
   process.exitCode = 1;
 }
 
-const { server, port } = await serve(DIST);
-const browser = await chromium.launch();
+// VERDANT_URL verifica un despliegue ya publicado en vez del build local.
+const remote = process.env.VERDANT_URL;
+const { server, port } = remote ? { server: null, port: 0 } : await serve(DIST);
+const baseUrl = remote ?? `http://127.0.0.1:${port}`;
+// Al verificar un despliegue remoto puede haber un proxy de salida obligatorio.
+const proxyUrl = remote ? (process.env.HTTPS_PROXY ?? process.env.https_proxy) : undefined;
+const browser = await chromium.launch(proxyUrl ? { proxy: { server: proxyUrl } } : {});
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 
 const problems = [];
@@ -63,7 +68,8 @@ page.on('console', (m) => {
 });
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
 
-await page.goto(`http://127.0.0.1:${port}/?seed=${SEED}`, { waitUntil: 'load' });
+console.log(`probando ${baseUrl}`);
+await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
 
 // Esperar a que el bucle haya corrido de verdad, no solo a que cargue el HTML.
 await page.waitForFunction(() => window.__verdant && window.__verdant.tick > 90, null, {
@@ -116,6 +122,6 @@ if (problems.length) {
 }
 
 await browser.close();
-server.close();
+server?.close();
 
 console.log(process.exitCode ? 'HUMO: FALLIDO' : 'HUMO: OK');
