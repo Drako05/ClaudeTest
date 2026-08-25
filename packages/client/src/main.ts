@@ -92,18 +92,38 @@ async function main(): Promise<void> {
 
   let accumulator = 0;
   let last = performance.now();
-  let fpsAccum = 0;
-  let fpsFrames = 0;
   let hudTimer = 0;
+
+  // Medicion de FPS sobre una ventana de UN SEGUNDO.
+  //
+  // Antes se promediaba cada 0.1 s: a 60 Hz son apenas seis frames, asi que un
+  // solo frame lento hacia saltar el numero decenas de unidades y era ilegible.
+  // El resto del HUD se sigue refrescando a 10 Hz para que las barras respondan.
+  let fpsWindow = 0;
+  let fpsFrames = 0;
+  let worstFrame = 0;
+  let fps = 0;
+  let worstFrameMs = 0;
 
   renderer.app.ticker.add(() => {
     const now = performance.now();
-    let frame = (now - last) / 1000;
+    const rawFrame = (now - last) / 1000;
     last = now;
-    if (frame > MAX_FRAME_SECONDS) frame = MAX_FRAME_SECONDS;
+    // El peor frame se mide SIN recortar: recortarlo ocultaria justo el tiron
+    // que interesa detectar.
+    if (rawFrame > worstFrame) worstFrame = rawFrame;
 
-    fpsAccum += frame;
+    const frame = Math.min(rawFrame, MAX_FRAME_SECONDS);
+
+    fpsWindow += frame;
     fpsFrames++;
+    if (fpsWindow >= 1) {
+      fps = fpsFrames / fpsWindow;
+      worstFrameMs = worstFrame * 1000;
+      fpsWindow = 0;
+      fpsFrames = 0;
+      worstFrame = 0;
+    }
 
     accumulator += frame;
     while (accumulator >= TICK_DT) {
@@ -117,10 +137,8 @@ async function main(): Promise<void> {
 
     hudTimer += frame;
     if (hudTimer >= 0.1) {
-      updateHud(state, fpsFrames / Math.max(fpsAccum, 1e-6));
+      updateHud(state, fps);
       hudTimer = 0;
-      fpsAccum = 0;
-      fpsFrames = 0;
     }
   });
 
@@ -134,6 +152,9 @@ async function main(): Promise<void> {
       // de verdad, en vez de asumirlo mirando pixeles.
       tilesOnScreen: renderer.tilesVisible,
       objects: renderer.objectCount,
+      fps,
+      /** Frame mas lento del ultimo segundo: es lo que delata un tiron. */
+      worstFrameMs,
       chunks: state.world.loadedChunkCount,
       x: state.entities.x[state.playerId],
       y: state.entities.y[state.playerId],
@@ -161,7 +182,8 @@ function updateHud(state: GameState, fps: number): void {
   el.seed.textContent = String(state.world.seed);
   el.pos.textContent = `${Math.floor(entities.x[playerId])}, ${Math.floor(entities.y[playerId])}`;
   el.chunks.textContent = String(state.world.loadedChunkCount);
-  el.fps.textContent = String(Math.round(fps));
+  // Hasta que cierre la primera ventana de medicion no hay dato que mostrar.
+  el.fps.textContent = fps > 0 ? String(Math.round(fps)) : '—';
 
   el.dead.classList.toggle('show', entities.alive[playerId] === 0);
 }
