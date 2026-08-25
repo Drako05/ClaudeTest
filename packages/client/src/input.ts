@@ -44,6 +44,8 @@ export class Input {
 
   private readonly stick: StickState = { touchId: null, originX: 0, originY: 0, x: 0, y: 0 };
   private pinchDistance = 0;
+  /** Toques activos fuera de la interfaz. Con dos o mas se entra en modo zoom. */
+  private readonly surfaceTouches = new Set<number>();
 
   private readonly stickEl: HTMLElement | null;
   private readonly knobEl: HTMLElement | null;
@@ -109,6 +111,8 @@ export class Input {
     window.addEventListener('blur', () => {
       this.held.clear();
       this.releaseHarvest();
+      this.surfaceTouches.clear();
+      this.pinchDistance = 0;
       this.endStick();
     });
   }
@@ -164,7 +168,21 @@ export class Input {
     }
   }
 
-  /** Joystick flotante: nace donde se apoye el pulgar, fuera de la interfaz. */
+  /** True si el toque cae en interfaz (botones, HUD) y no en el mundo. */
+  private static isUiTouch(touch: Touch): boolean {
+    const target = touch.target as Element | null;
+    return Boolean(target?.closest?.(UI_SELECTOR));
+  }
+
+  /**
+   * Joystick flotante y pellizco para zoom.
+   *
+   * El reparto entre ambos es la parte delicada: el joystick solo nace en la
+   * MITAD IZQUIERDA, y en cuanto hay un segundo dedo sobre el mundo el pellizco
+   * tiene prioridad y le arrebata el control. Sin esa cesion el zoom es
+   * inalcanzable, porque el primer dedo se queda siempre con el joystick y la
+   * condicion del pellizco no llega a cumplirse nunca.
+   */
   private bindTouch(): void {
     window.addEventListener(
       'touchstart',
@@ -172,12 +190,23 @@ export class Input {
         this.revealTouchUi();
 
         for (const touch of Array.from(e.changedTouches)) {
-          const target = touch.target as Element | null;
-          if (target?.closest?.(UI_SELECTOR)) continue;
-          if (this.stick.touchId !== null) continue;
-          this.beginStick(touch);
-          e.preventDefault();
-          break;
+          if (Input.isUiTouch(touch)) continue;
+          this.surfaceTouches.add(touch.identifier);
+
+          if (this.surfaceTouches.size >= 2) {
+            // Segundo dedo sobre el mundo: se cede al zoom.
+            this.endStick();
+            this.pinchDistance = 0;
+            e.preventDefault();
+            continue;
+          }
+
+          // Solo la mitad izquierda invoca el joystick. La derecha queda libre
+          // para el pellizco y para los botones de accion.
+          if (this.stick.touchId === null && touch.clientX < window.innerWidth / 2) {
+            this.beginStick(touch);
+            e.preventDefault();
+          }
         }
       },
       { passive: false },
@@ -186,11 +215,12 @@ export class Input {
     window.addEventListener(
       'touchmove',
       (e) => {
-        // Pellizcar para hacer zoom, solo si no se esta usando el joystick: asi
-        // un segundo dedo mientras se camina no provoca zooms accidentales.
-        if (this.stick.touchId === null && e.touches.length >= 2) {
-          this.updatePinch(e.touches[0], e.touches[1]);
-          e.preventDefault();
+        if (this.surfaceTouches.size >= 2) {
+          const [a, b] = this.activeSurfaceTouches(e);
+          if (a && b) {
+            this.updatePinch(a, b);
+            e.preventDefault();
+          }
           return;
         }
 
@@ -207,13 +237,23 @@ export class Input {
     );
 
     const end = (e: TouchEvent) => {
-      if (e.touches.length < 2) this.pinchDistance = 0;
       for (const touch of Array.from(e.changedTouches)) {
+        this.surfaceTouches.delete(touch.identifier);
         if (touch.identifier === this.stick.touchId) this.endStick();
       }
+      if (this.surfaceTouches.size < 2) this.pinchDistance = 0;
+      // Al salir del pellizco no se reanuda el joystick con el dedo que quede:
+      // reaparecer bajo un dedo que ya estaba apoyado daria un salto brusco.
+      if (this.surfaceTouches.size < 2 && this.stick.touchId === null) this.endStick();
     };
     window.addEventListener('touchend', end);
     window.addEventListener('touchcancel', end);
+  }
+
+  /** Los dos primeros toques vivos que estan sobre el mundo, no sobre botones. */
+  private activeSurfaceTouches(e: TouchEvent): [Touch | null, Touch | null] {
+    const live = Array.from(e.touches).filter((t) => this.surfaceTouches.has(t.identifier));
+    return [live[0] ?? null, live[1] ?? null];
   }
 
   private updatePinch(a: Touch, b: Touch): void {

@@ -80,35 +80,52 @@ async function waitForLoop(page) {
 }
 
 /**
- * Despacha un evento tactil sintetico. Playwright solo ofrece taps, y aqui hace
- * falta arrastrar el joystick, asi que se construyen Touch/TouchEvent a mano.
+ * Despacha un evento tactil sintetico con varios dedos.
+ *
+ * Playwright solo ofrece taps de un dedo, y aqui hace falta arrastrar el
+ * joystick y pellizcar con dos, asi que se construyen Touch/TouchEvent a mano.
+ *
+ * `points` son todos los dedos apoyados; `changed` los que provocan este evento.
  */
-async function touch(page, type, { id = 1, x, y, selector }) {
+async function touchEvent(page, type, points, changed = points) {
   await page.evaluate(
-    ({ type, id, x, y, selector }) => {
-      const target = selector ? document.querySelector(selector) : document.body;
-      if (!target) throw new Error(`sin destino para el toque: ${selector}`);
-      const point = new Touch({
-        identifier: id,
-        target,
-        clientX: x,
-        clientY: y,
-        pageX: x,
-        pageY: y,
-      });
-      const live = type === 'touchend' || type === 'touchcancel' ? [] : [point];
+    ({ type, points, changed }) => {
+      const make = (p) => {
+        const target = p.selector ? document.querySelector(p.selector) : document.body;
+        if (!target) throw new Error(`sin destino para el toque: ${p.selector}`);
+        return new Touch({
+          identifier: p.id,
+          target,
+          clientX: p.x,
+          clientY: p.y,
+          pageX: p.x,
+          pageY: p.y,
+        });
+      };
+      const live = points.map(make);
+      const moved = changed.map(make);
+      const target = changed[0]?.selector
+        ? document.querySelector(changed[0].selector)
+        : document.body;
       target.dispatchEvent(
         new TouchEvent(type, {
           touches: live,
           targetTouches: live,
-          changedTouches: [point],
+          changedTouches: moved,
           bubbles: true,
           cancelable: true,
         }),
       );
     },
-    { type, id, x, y, selector },
+    { type, points, changed },
   );
+}
+
+/** Atajo de un solo dedo. */
+async function touch(page, type, { id = 1, x, y, selector }) {
+  const point = { id, x, y, selector };
+  const live = type === 'touchend' || type === 'touchcancel' ? [] : [point];
+  await touchEvent(page, type, live, [point]);
 }
 
 // ---------------------------------------------------------------- escritorio
@@ -153,8 +170,20 @@ async function desktopPass(browser, baseUrl) {
   const total = gathered.inventory.reduce((a, b) => a + b, 0);
   check(total > 0, 'mantener Espacio no recolecto nada');
 
+  // El zoom por teclado tiene que cambiar el encuadre de verdad, no solo no fallar.
+  const beforeZoom = (await waitForLoop(page)).tilesOnScreen;
   for (let i = 0; i < 7; i++) await page.keyboard.press('Minus');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(300);
+  const zoomedOut = (await waitForLoop(page)).tilesOnScreen;
+  check(zoomedOut > beforeZoom, `alejar no cambio el zoom (${beforeZoom} -> ${zoomedOut})`);
+
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Equal');
+  await page.waitForTimeout(300);
+  const zoomedIn = (await waitForLoop(page)).tilesOnScreen;
+  check(zoomedIn < zoomedOut, `acercar no cambio el zoom (${zoomedOut} -> ${zoomedIn})`);
+
+  for (let i = 0; i < 5; i++) await page.keyboard.press('Minus');
+  await page.waitForTimeout(400);
   await page.screenshot({ path: join(SHOTS, '03-mundo-amplio.png') });
 
   await page.close();
@@ -186,6 +215,58 @@ async function mobilePass(browser, baseUrl) {
   );
 
   await page.screenshot({ path: join(SHOTS, '04-movil-spawn.png') });
+
+  // REGRESION del fallo reportado: el joystick nacia en cualquier punto de la
+  // pantalla. Un arrastre en la mitad DERECHA no debe crear joystick ni mover.
+  const beforeRight = await waitForLoop(page);
+  await touch(page, 'touchstart', { x: 300, y: 640 });
+  await touch(page, 'touchmove', { x: 360, y: 640 });
+  await page.waitForTimeout(500);
+  const afterRight = await waitForLoop(page);
+  await touch(page, 'touchend', { x: 360, y: 640 });
+  check(
+    !(await page.isVisible('#stick.active')),
+    'el joystick aparecio al tocar la mitad derecha',
+  );
+  check(
+    Math.abs(afterRight.x - beforeRight.x) < 1e-6 && Math.abs(afterRight.y - beforeRight.y) < 1e-6,
+    'tocar la mitad derecha movio al jugador',
+  );
+
+  // REGRESION del fallo reportado: el zoom no funcionaba en movil porque el
+  // primer dedo se quedaba con el joystick y el pellizco nunca se activaba.
+  const zoomStart = (await waitForLoop(page)).tilesOnScreen;
+  let a = { id: 11, x: 140, y: 500 };
+  let b = { id: 12, x: 250, y: 500 };
+  await touchEvent(page, 'touchstart', [a], [a]);
+  await touchEvent(page, 'touchstart', [a, b], [b]);
+  for (let step = 1; step <= 6; step++) {
+    a = { ...a, x: 140 - step * 12 };
+    b = { ...b, x: 250 + step * 12 };
+    await touchEvent(page, 'touchmove', [a, b], [a, b]);
+  }
+  await page.waitForTimeout(150);
+  const zoomedIn = (await waitForLoop(page)).tilesOnScreen;
+  await touchEvent(page, 'touchend', [b], [a]);
+  await touchEvent(page, 'touchend', [], [b]);
+  console.log(`  pellizco: ${zoomStart.toFixed(1)} -> ${zoomedIn.toFixed(1)} tiles`);
+  check(zoomedIn < zoomStart, `separar los dedos no acerco la camara (${zoomStart} -> ${zoomedIn})`);
+
+  // Y el gesto contrario tiene que alejar.
+  a = { id: 21, x: 60, y: 500 };
+  b = { id: 22, x: 330, y: 500 };
+  await touchEvent(page, 'touchstart', [a], [a]);
+  await touchEvent(page, 'touchstart', [a, b], [b]);
+  for (let step = 1; step <= 6; step++) {
+    a = { ...a, x: 60 + step * 18 };
+    b = { ...b, x: 330 - step * 18 };
+    await touchEvent(page, 'touchmove', [a, b], [a, b]);
+  }
+  await page.waitForTimeout(150);
+  const zoomedOut = (await waitForLoop(page)).tilesOnScreen;
+  await touchEvent(page, 'touchend', [b], [a]);
+  await touchEvent(page, 'touchend', [], [b]);
+  check(zoomedOut > zoomedIn, `juntar los dedos no alejo la camara (${zoomedIn} -> ${zoomedOut})`);
 
   // Arrastrar el joystick tiene que llegar hasta la simulacion.
   //

@@ -130,6 +130,10 @@ async function main(): Promise<void> {
     get: () => ({
       tick: state.tick,
       seed: state.world.seed,
+      // Expuesto para que la prueba de humo pueda comprobar que el zoom cambia
+      // de verdad, en vez de asumirlo mirando pixeles.
+      tilesOnScreen: renderer.tilesVisible,
+      objects: renderer.objectCount,
       chunks: state.world.loadedChunkCount,
       x: state.entities.x[state.playerId],
       y: state.entities.y[state.playerId],

@@ -1,51 +1,76 @@
 /**
- * Renderizador. Es la unica parte del proyecto que sabe que existe un navegador.
+ * Renderizador isometrico. Es la unica parte del proyecto que sabe que existe
+ * un navegador.
  *
- * Estrategia: un sprite por chunk. Cada chunk se pinta una vez en un canvas 2D,
- * se sube como textura y solo se repinta si su revision cambia (por ejemplo al
- * talar un arbol). Dibujar el mundo cuesta entonces ~25 sprites por frame en vez
- * de decenas de miles, que es lo que permite que esto vaya fluido en el navegador.
+ * Tres capas, y el reparto entre ellas es lo que hace que la vista funcione:
+ *
+ *  1. Terreno: un sprite por chunk visible, pre-pintado en rombos. Es plano y no
+ *     cambia nunca, asi que su textura se genera una vez.
+ *  2. Marcador: el reticulo del tile apuntado, siempre sobre el suelo.
+ *  3. Objetos: features, personaje y todo lo que tenga altura, ORDENADO POR
+ *     PROFUNDIDAD. Sin ese orden el personaje apareceria por delante de un arbol
+ *     que tiene detras, que es exactamente lo que destruye la ilusion de volumen.
  */
 
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import { CHUNK_SIZE } from '@verdant/shared';
+import { CHUNK_SIZE, Feature } from '@verdant/shared';
 import type { Chunk, GameState } from '@verdant/sim';
 import { targetTile } from '@verdant/sim';
-import { CHUNK_PX, paintChunk, TILE_PX } from './tiles.js';
+import { depthOf, TILE_H, TILE_W, worldToScreen } from './projection.js';
+import {
+  CHUNK_TEX_H,
+  CHUNK_TEX_OFFSET_X,
+  CHUNK_TEX_W,
+  makeFeatureArt,
+  makePlayerArt,
+  paintChunkTerrain,
+} from './tiles.js';
 
 interface ChunkView {
-  sprite: Sprite;
+  terrain: Sprite;
   texture: Texture;
-  canvas: HTMLCanvasElement;
+  /** Sprites de las features de este chunk, para poder retirarlos en bloque. */
+  features: Sprite[];
   revision: number;
 }
+
+const FEATURE_KINDS = [Feature.Tree, Feature.RockNode, Feature.BerryBush];
 
 export class Renderer {
   readonly app: Application;
   private readonly camera = new Container();
   private readonly terrainLayer = new Container();
-  private readonly overlayLayer = new Container();
+  private readonly markerLayer = new Container();
+  private readonly objectLayer = new Container();
   private readonly views = new Map<string, ChunkView>();
-  private readonly player = new Graphics();
+  private readonly featureTextures = new Map<
+    Feature,
+    { texture: Texture; ax: number; ay: number; rise: number; halfWidth: number }
+  >();
+  /** Indice de features por tile, para resolver oclusion sin recorrerlas todas. */
+  private readonly featureByTile = new Map<string, Sprite>();
+  /** Camino inverso del indice, para poder limpiarlo al destruir un chunk. */
+  private readonly featureKeys = new Map<Sprite, string>();
+  /** Features atenuadas este frame, para poder restaurarlas en el siguiente. */
+  private readonly faded: Sprite[] = [];
+  private player!: Sprite;
+  private playerRise = 0;
   private readonly reticle = new Graphics();
+
   /**
-   * Tiles visibles a lo largo del EJE MENOR de la pantalla. Controla el zoom.
-   *
-   * Medir contra el eje menor y no contra la altura es lo que hace que el
-   * encuadre funcione en vertical: en apaisado el eje menor sigue siendo la
-   * altura, asi que el encuadre de escritorio no cambia, pero en un movil en
-   * vertical deja de quedar cerradisimo.
+   * Filas de tiles visibles a lo largo del eje menor de la pantalla.
+   * Medir contra el eje menor hace que el encuadre funcione igual en vertical
+   * que en apaisado.
    */
-  private tilesOnScreen = 26;
+  private tilesOnScreen = 22;
 
   private constructor(app: Application) {
     this.app = app;
-    this.camera.addChild(this.terrainLayer);
-    this.camera.addChild(this.overlayLayer);
+    this.objectLayer.sortableChildren = true;
+    this.camera.addChild(this.terrainLayer, this.markerLayer, this.objectLayer);
     this.app.stage.addChild(this.camera);
-    this.overlayLayer.addChild(this.reticle);
-    this.overlayLayer.addChild(this.player);
-    this.drawPlayerSprite();
+    this.markerLayer.addChild(this.reticle);
+    this.buildTextures();
   }
 
   static async create(): Promise<Renderer> {
@@ -55,9 +80,8 @@ export class Renderer {
       resizeTo: window,
       antialias: false,
       // Con resolution 1 el canvas se dibuja en pixeles CSS y el navegador lo
-      // reescala suavizado: en un movil de densidad 3x el arte pixelado se ve
-      // borroso. Se sigue la densidad real, con tope de 2 para no pagar 9x de
-      // relleno en pantallas 3x a cambio de una nitidez que ya no se aprecia.
+      // reescala suavizado: en un movil de densidad 3x se ve borroso. El tope de
+      // 2 evita pagar 9x de relleno en pantallas 3x.
       resolution: Math.min(window.devicePixelRatio || 1, 2),
       autoDensity: true,
       preference: 'webgl',
@@ -66,21 +90,38 @@ export class Renderer {
     return new Renderer(app);
   }
 
-  zoomBy(factor: number): void {
-    this.tilesOnScreen = Math.min(70, Math.max(12, this.tilesOnScreen * factor));
+  /** Cada tipo de objeto se dibuja una vez y su textura se reutiliza en todos. */
+  private buildTextures(): void {
+    for (const kind of FEATURE_KINDS) {
+      const art = makeFeatureArt(kind);
+      if (!art) continue;
+      const texture = Texture.from(art.canvas);
+      texture.source.scaleMode = 'nearest';
+      this.featureTextures.set(kind, {
+        texture,
+        ax: art.anchorX,
+        ay: art.anchorY,
+        rise: art.riseAbove,
+        halfWidth: art.canvas.width / 2,
+      });
+    }
+
+    const playerArt = makePlayerArt();
+    if (!playerArt) throw new Error('No se pudo dibujar el personaje');
+    const playerTexture = Texture.from(playerArt.canvas);
+    playerTexture.source.scaleMode = 'nearest';
+    this.player = new Sprite(playerTexture);
+    this.player.anchor.set(playerArt.anchorX, playerArt.anchorY);
+    this.playerRise = playerArt.riseAbove;
+    this.objectLayer.addChild(this.player);
   }
 
-  private drawPlayerSprite(): void {
-    this.player.clear();
-    this.player
-      .ellipse(1, 6, 6, 2.6)
-      .fill({ color: 0x000000, alpha: 0.28 })
-      .circle(0, 0, 6.2)
-      .fill(0x1a2740)
-      .circle(0, 0, 5)
-      .fill(0xf2d7b0)
-      .circle(0, -1.4, 2.2)
-      .fill(0x2b3d5e);
+  get tilesVisible(): number {
+    return this.tilesOnScreen;
+  }
+
+  zoomBy(factor: number): void {
+    this.tilesOnScreen = Math.min(60, Math.max(9, this.tilesOnScreen * factor));
   }
 
   /**
@@ -90,84 +131,221 @@ export class Renderer {
    */
   render(state: GameState, prevX: number, prevY: number, alpha: number): void {
     const { entities, playerId } = state;
-    const px = prevX + (entities.x[playerId] - prevX) * alpha;
-    const py = prevY + (entities.y[playerId] - prevY) * alpha;
+    const wx = prevX + (entities.x[playerId] - prevX) * alpha;
+    const wy = prevY + (entities.y[playerId] - prevY) * alpha;
 
-    // app.screen son pixeles logicos (CSS). renderer.width/height pueden venir
-    // en pixeles de dispositivo cuando autoDensity esta activo, y usarlos aqui
-    // descentraria la camara en pantallas de densidad alta.
+    // app.screen son pixeles logicos. renderer.width/height vienen en pixeles de
+    // dispositivo con autoDensity activo, y descentrarian la camara.
     const view = this.app.screen;
     const minAxis = Math.min(view.width, view.height);
-    const scale = minAxis / (this.tilesOnScreen * TILE_PX);
+    const scale = minAxis / (this.tilesOnScreen * TILE_H);
     this.camera.scale.set(scale);
+
+    const focus = worldToScreen(wx, wy);
     this.camera.position.set(
-      view.width / 2 - px * TILE_PX * scale,
-      view.height / 2 - py * TILE_PX * scale,
+      view.width / 2 - focus.x * scale,
+      view.height / 2 - focus.y * scale,
     );
 
-    this.syncChunks(state);
+    this.syncChunks(state, view.width, view.height, scale);
 
-    this.player.position.set(px * TILE_PX, py * TILE_PX);
+    const playerScreen = worldToScreen(wx, wy);
+    this.player.position.set(playerScreen.x, playerScreen.y);
+    this.player.zIndex = depthOf(wx, wy);
 
-    const target = targetTile(entities, playerId);
-    this.reticle.clear();
-    this.reticle
-      .rect(target.x * TILE_PX, target.y * TILE_PX, TILE_PX, TILE_PX)
-      .stroke({ width: 1, color: 0xffffff, alpha: 0.42 });
+    this.fadeOccluders(wx, wy, playerScreen);
+    this.drawReticle(entities, playerId);
   }
 
-  /** Crea sprites para los chunks cargados, repinta los sucios y descarta el resto. */
-  private syncChunks(state: GameState): void {
+  /**
+   * Atenua los objetos que tapan al personaje.
+   *
+   * Es el problema clasico de la isometrica: un arbol una casilla por delante
+   * oculta al jugador por completo, y el juego se vuelve injugable. La solucion
+   * habitual, y la que usa la referencia que pidio el usuario, es volver
+   * translucido lo que estorba en vez de moverlo o recortarlo.
+   *
+   * Solo se examinan las pocas casillas que geometricamente PUEDEN tapar: las
+   * que estan por delante en profundidad y a un par de filas de distancia.
+   */
+  private fadeOccluders(wx: number, wy: number, playerScreen: { x: number; y: number }): void {
+    for (const sprite of this.faded) sprite.alpha = 1;
+    this.faded.length = 0;
+
+    const playerDepth = depthOf(wx, wy);
+    const playerTop = playerScreen.y - this.playerRise;
+    const tileX = Math.floor(wx);
+    const tileY = Math.floor(wy);
+
+    for (let dy = 0; dy <= 3; dy++) {
+      for (let dx = 0; dx <= 3; dx++) {
+        const tx = tileX + dx;
+        const ty = tileY + dy;
+        const sprite = this.featureByTile.get(`${tx},${ty}`);
+        if (!sprite || sprite.zIndex <= playerDepth) continue;
+
+        const foot = worldToScreen(tx + 0.5, ty + 0.5);
+        const rise = sprite.texture.height * sprite.anchor.y;
+        const halfWidth = sprite.texture.width / 2;
+
+        // Solapa horizontalmente con el cuerpo del jugador, y su copa llega lo
+        // bastante arriba como para cubrirlo.
+        if (Math.abs(foot.x - playerScreen.x) > halfWidth + TILE_W / 2) continue;
+        if (foot.y - rise > playerScreen.y) continue;
+        if (foot.y < playerTop) continue;
+
+        sprite.alpha = 0.34;
+        this.faded.push(sprite);
+      }
+    }
+  }
+
+  private drawReticle(entities: GameState['entities'], playerId: number): void {
+    const target = targetTile(entities, playerId);
+    const p = worldToScreen(target.x, target.y);
+    this.reticle.clear();
+    this.reticle
+      .moveTo(p.x, p.y)
+      .lineTo(p.x + TILE_W / 2, p.y + TILE_H / 2)
+      .lineTo(p.x, p.y + TILE_H)
+      .lineTo(p.x - TILE_W / 2, p.y + TILE_H / 2)
+      .closePath()
+      .stroke({ width: 1.5, color: 0xffffff, alpha: 0.5 });
+  }
+
+  /** True si el rombo de un chunk toca la pantalla. */
+  private chunkVisible(cx: number, cy: number, w: number, h: number, scale: number): boolean {
+    const origin = worldToScreen(cx * CHUNK_SIZE, cy * CHUNK_SIZE);
+    const left = this.camera.x + (origin.x - CHUNK_TEX_OFFSET_X) * scale;
+    const top = this.camera.y + origin.y * scale;
+    const margin = TILE_W * scale; // holgura para objetos altos que sobresalen
+    return (
+      left + CHUNK_TEX_W * scale > -margin &&
+      left < w + margin &&
+      top + CHUNK_TEX_H * scale > -margin * 4 &&
+      top < h + margin
+    );
+  }
+
+  /**
+   * Materializa solo los chunks que se ven.
+   *
+   * Antes se creaba una textura para cada chunk CARGADO (49) aunque solo se
+   * vieran unos pocos. En isometrica la caja de un chunk pasa de 512x512 a
+   * 1024x512, asi que hacerlo asi rondaria los 100 MB de texturas: inviable en
+   * un movil.
+   */
+  private syncChunks(state: GameState, w: number, h: number, scale: number): void {
     const seen = new Set<string>();
 
     state.world.eachLoadedChunk((chunk: Chunk) => {
+      if (!this.chunkVisible(chunk.cx, chunk.cy, w, h, scale)) return;
+
       const key = `${chunk.cx},${chunk.cy}`;
       seen.add(key);
-      let view = this.views.get(key);
+      const view = this.views.get(key);
 
       if (!view) {
-        const canvas = document.createElement('canvas');
-        canvas.width = CHUNK_PX;
-        canvas.height = CHUNK_PX;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) throw new Error('No se pudo obtener el contexto 2D del chunk');
-        paintChunk(chunk, ctx, state.world.seed);
-
-        const texture = Texture.from(canvas);
-        texture.source.scaleMode = 'nearest';
-        const sprite = new Sprite(texture);
-        sprite.position.set(chunk.cx * CHUNK_SIZE * TILE_PX, chunk.cy * CHUNK_SIZE * TILE_PX);
-        this.terrainLayer.addChild(sprite);
-
-        view = { sprite, texture, canvas, revision: chunk.revision };
-        this.views.set(key, view);
+        this.views.set(key, this.buildChunkView(chunk, state.world.seed));
         return;
       }
 
+      // El terreno no cambia nunca; solo las features pueden desaparecer al
+      // recolectarlas, asi que basta con rehacer los sprites de este chunk.
       if (view.revision !== chunk.revision) {
-        const ctx = view.canvas.getContext('2d');
-        if (ctx) {
-          paintChunk(chunk, ctx, state.world.seed);
-          view.texture.source.update();
-        }
+        this.clearFeatures(view);
+        view.features = this.buildFeatures(chunk);
         view.revision = chunk.revision;
       }
     });
 
     for (const [key, view] of this.views) {
       if (seen.has(key)) continue;
-      view.sprite.destroy();
+      this.clearFeatures(view);
+      view.terrain.destroy();
       view.texture.destroy(true);
       this.views.delete(key);
     }
   }
 
-  /** Tira todos los sprites de chunk. Se usa al empezar un mundo nuevo. */
+  private buildChunkView(chunk: Chunk, seed: number): ChunkView {
+    const canvas = document.createElement('canvas');
+    canvas.width = CHUNK_TEX_W;
+    canvas.height = CHUNK_TEX_H;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No se pudo obtener el contexto 2D del chunk');
+    paintChunkTerrain(chunk, ctx, seed);
+
+    const texture = Texture.from(canvas);
+    texture.source.scaleMode = 'nearest';
+    const terrain = new Sprite(texture);
+    const origin = worldToScreen(chunk.cx * CHUNK_SIZE, chunk.cy * CHUNK_SIZE);
+    terrain.position.set(origin.x - CHUNK_TEX_OFFSET_X, origin.y);
+    this.terrainLayer.addChild(terrain);
+
+    return { terrain, texture, features: this.buildFeatures(chunk), revision: chunk.revision };
+  }
+
+  /** Un sprite por feature del chunk, con su profundidad ya fijada. */
+  private buildFeatures(chunk: Chunk): Sprite[] {
+    const sprites: Sprite[] = [];
+    const baseX = chunk.cx * CHUNK_SIZE;
+    const baseY = chunk.cy * CHUNK_SIZE;
+
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        const feature = chunk.feature[ly * CHUNK_SIZE + lx] as Feature;
+        if (feature === Feature.None) continue;
+        const art = this.featureTextures.get(feature);
+        if (!art) continue;
+
+        const wx = baseX + lx;
+        const wy = baseY + ly;
+        // El objeto se apoya en el CENTRO del tile, no en su esquina norte.
+        const p = worldToScreen(wx + 0.5, wy + 0.5);
+        const sprite = new Sprite(art.texture);
+        sprite.anchor.set(art.ax, art.ay);
+        sprite.position.set(p.x, p.y);
+        sprite.zIndex = depthOf(wx + 0.5, wy + 0.5);
+        this.objectLayer.addChild(sprite);
+        const tileKey = `${wx},${wy}`;
+        this.featureByTile.set(tileKey, sprite);
+        this.featureKeys.set(sprite, tileKey);
+        sprites.push(sprite);
+      }
+    }
+    return sprites;
+  }
+
+  private clearFeatures(view: ChunkView): void {
+    for (const sprite of view.features) {
+      const key = this.featureKeys.get(sprite);
+      if (key) {
+        this.featureByTile.delete(key);
+        this.featureKeys.delete(sprite);
+      }
+      sprite.destroy();
+    }
+    view.features.length = 0;
+    // Una feature atenuada que acaba de destruirse no debe quedar en la lista.
+    this.faded.length = 0;
+  }
+
+  /** Tira todo lo dibujado. Se usa al empezar un mundo nuevo. */
   reset(): void {
     for (const view of this.views.values()) {
-      view.sprite.destroy();
+      this.clearFeatures(view);
+      view.terrain.destroy();
       view.texture.destroy(true);
     }
     this.views.clear();
+    this.featureByTile.clear();
+    this.featureKeys.clear();
+    this.faded.length = 0;
+  }
+
+  /** Numero de objetos dibujados. Util para vigilar el coste del ordenado. */
+  get objectCount(): number {
+    return this.objectLayer.children.length;
   }
 }

@@ -19,7 +19,14 @@ Esto es el resumen operativo.
    enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
    nucleo.
-6. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
+6. **La vista es isometrica y vive solo en el cliente.** La transformacion esta
+   entera en `packages/client/src/projection.ts`. El mundo es una rejilla
+   cuadrada: si algo del nucleo necesita saber como se proyecta, es que esta mal
+   puesto.
+7. **Todo lo que tenga altura va en la capa ordenada por profundidad**
+   (`depthOf`), nunca horneado en la textura del chunk; si no, el personaje
+   aparecera por delante de cosas que tiene detras.
+8. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
    interpolacion para el render es cosa del cliente.
 
 ## Antes de dar algo por bueno

@@ -55,6 +55,11 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Boton COMER | Comer bayas |
 | Pellizcar con dos dedos | Zoom |
 
+El joystick solo nace en la **mitad izquierda**: la derecha queda libre para los
+botones y para el pellizco. Si apoyas un segundo dedo sobre el mundo, el
+pellizco tiene prioridad y le quita el control al joystick; sin esa cesion el
+zoom seria inalcanzable, porque el primer dedo se queda siempre con el joystick.
+
 El joystick es analogico: la velocidad es proporcional a cuanto se desplace el
 pulgar, con una zona muerta para que el dedo simplemente apoyado no haga derivar
 al personaje.
@@ -98,6 +103,22 @@ es averiguar si el juego es divertido. El criterio para portar esta fijado de
 antemano: si el tick supera ~8 ms con la carga objetivo, se porta el modulo
 caliente detras de la misma interfaz. `tests/performance.test.ts` vigila ese
 numero (linea base actual: unas 3 milesimas de milisegundo).
+
+**La vista es isometrica, y eso no toco la simulacion.** El mundo sigue siendo
+una rejilla cuadrada; solo cambia como se proyecta a pantalla
+(`packages/client/src/projection.ts`). Ni una regla, colision o test del nucleo
+cambio al pasar de cenital a isometrica: esa es exactamente la separacion que
+justifica toda la arquitectura.
+
+Dos consecuencias que si son del render y no se pueden esquivar:
+
+- **Las features no se hornean en la textura del chunk.** Arboles, rocas y
+  personaje van en una capa ordenada por profundidad (`depthOf = wx + wy`), para
+  que el jugador pueda pasar por detras de un arbol. Horneadas en el suelo no
+  podrian ordenarse contra el personaje.
+- **Lo que tapa al jugador se vuelve translucido.** En isometrica un arbol una
+  casilla por delante oculta al personaje por completo. Se atenuan solo las
+  casillas que geometricamente pueden taparlo, no todas.
 
 **El input tactil no rompe la frontera del nucleo.** El joystick y los botones
 son una segunda fuente que produce la misma `Intent` que el teclado; el nucleo
