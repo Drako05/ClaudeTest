@@ -26,6 +26,11 @@ jobs:
       - run: npm ci
       - run: npm run build
       - uses: actions/configure-pages@v5
+        with:
+          # Crea el sitio de Pages si aun no existe, en vez de fallar pidiendo
+          # que se active a mano en los ajustes del repositorio. Requiere el
+          # permiso pages: write que ya esta declarado arriba.
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: packages/client/dist
