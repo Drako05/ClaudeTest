@@ -36,13 +36,28 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 
 ## Controles
 
+**Teclado**
+
 | Tecla | Accion |
 |---|---|
 | `WASD` / flechas | Moverse |
-| `Espacio` | Recolectar el tile marcado |
+| `Espacio` | Recolectar el tile marcado (mantener repite) |
 | `E` | Comer bayas |
 | `R` | Mundo nuevo |
 | `+` / `-` | Zoom |
+
+**Tactil** (aparece solo en dispositivos de puntero grueso, o al primer toque)
+
+| Gesto | Accion |
+|---|---|
+| Apoyar y arrastrar en la mitad izquierda | Joystick flotante, analogico |
+| Boton RECOGER | Recolectar; mantener repite 4 veces por segundo |
+| Boton COMER | Comer bayas |
+| Pellizcar con dos dedos | Zoom |
+
+El joystick es analogico: la velocidad es proporcional a cuanto se desplace el
+pulgar, con una zona muerta para que el dedo simplemente apoyado no haga derivar
+al personaje.
 
 ## Estructura
 
@@ -83,6 +98,13 @@ es averiguar si el juego es divertido. El criterio para portar esta fijado de
 antemano: si el tick supera ~8 ms con la carga objetivo, se porta el modulo
 caliente detras de la misma interfaz. `tests/performance.test.ts` vigila ese
 numero (linea base actual: unas 3 milesimas de milisegundo).
+
+**El input tactil no rompe la frontera del nucleo.** El joystick y los botones
+son una segunda fuente que produce la misma `Intent` que el teclado; el nucleo
+no se entera de que existe una pantalla tactil. La unica adaptacion en el nucleo
+fue que `moveEntity` respete la MAGNITUD del vector (acotada a 1) ademas de su
+direccion, que es lo que hace analogico al joystick y no cambia nada para el
+teclado.
 
 **Un sprite por chunk, no por tile.** Cada chunk se pinta una vez en un canvas 2D
 y se sube como una textura, y solo se repinta si cambia. Dibujar el terreno

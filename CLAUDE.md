@@ -16,7 +16,9 @@ Esto es el resumen operativo.
 4. **Las mutaciones del jugador van al overlay** de `World.setFeature`, nunca
    escribiendo el array del chunk directamente: el chunk es cache desechable.
 5. **El input produce `Intent`; nunca muta el estado.** Es lo que permitira
-   enviar esa misma Intent por red sin reescribir nada.
+   enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
+   fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
+   nucleo.
 6. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
    interpolacion para el render es cosa del cliente.
 
@@ -28,7 +30,19 @@ npm run typecheck && npm test && npm run smoke
 
 `npm run smoke` construye el cliente y lo juega en Chromium headless leyendo el
 estado real por `window.__verdant`. Los tests unitarios no detectan que el juego
-no arranque; esto si.
+no arranque; esto si. Hace dos pasadas, escritorio con teclado y movil con
+eventos tactiles sinteticos; si tocas los controles, ambas tienen que seguir
+pasando.
+
+Reparto de responsabilidades entre las dos capas de test, que conviene respetar:
+la prueba de humo verifica **integracion** (que un toque llega a producir una
+Intent y el mundo reacciona), y los tests unitarios verifican **numeros**. Medir
+la escala analogica del joystick en el navegador daria un resultado contaminado
+por las colisiones con arboles y agua; por eso se mide en
+`tests/simulation.test.ts`, sobre una zona abierta verificada.
+
+Ojo con los FPS que reporta la pasada movil: en headless se renderiza por
+software a 3x, asi que ese numero no dice nada del rendimiento en un movil real.
 
 ## Si tocas la generacion del mundo
 

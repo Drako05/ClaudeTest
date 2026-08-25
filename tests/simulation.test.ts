@@ -3,11 +3,13 @@ import {
   BODY_RADIUS,
   createGame,
   EntityKind,
+  EntityStore,
   HUNGER_DECAY_PER_SEC,
+  moveEntity,
   step,
   World,
 } from '@verdant/sim';
-import { emptyIntent, Feature, Resource, TICK_HZ, type Intent } from '@verdant/shared';
+import { emptyIntent, Feature, Resource, TICK_DT, TICK_HZ, type Intent } from '@verdant/shared';
 
 function intent(over: Partial<Intent> = {}): Intent {
   return { ...emptyIntent(), ...over };
@@ -144,5 +146,73 @@ describe('simulacion', () => {
     runTicks(state, TICK_HZ * 40, intent({ moveX: 1 }));
     const maxChunks = (2 * 5 + 1) ** 2; // radio de descarte
     expect(state.world.loadedChunkCount).toBeLessThanOrEqual(maxChunks);
+  });
+});
+
+/**
+ * El movimiento analogico existe para el joystick tactil: apenas desplazado,
+ * el personaje camina despacio. El teclado tiene que seguir comportandose
+ * exactamente igual que antes, y eso es lo que mas importa proteger aqui.
+ */
+describe('movimiento analogico', () => {
+  /** Centro de una zona 7x7 sin nada solido: asi ninguna colision falsea la medida. */
+  function openSpot(world: World): { x: number; y: number } {
+    for (let radius = 0; radius < 240; radius++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+          let clear = true;
+          for (let ty = -3; ty <= 3 && clear; ty++) {
+            for (let tx = -3; tx <= 3; tx++) {
+              if (world.isSolidAt(dx + tx, dy + ty)) {
+                clear = false;
+                break;
+              }
+            }
+          }
+          if (clear) return { x: dx + 0.5, y: dy + 0.5 };
+        }
+      }
+    }
+    throw new Error('no se encontro una zona abierta en el mundo de prueba');
+  }
+
+  /** Distancia recorrida en `ticks` empujando con el vector dado. */
+  function travel(moveX: number, moveY: number, ticks = 30): number {
+    const world = new World(2468);
+    const spot = openSpot(world);
+    const store = new EntityStore(4);
+    const id = store.spawn(EntityKind.Player, spot.x, spot.y);
+    for (let i = 0; i < ticks; i++) moveEntity(world, store, id, moveX, moveY, TICK_DT);
+    return Math.hypot(store.x[id] - spot.x, store.y[id] - spot.y);
+  }
+
+  it('media deflexion recorre la mitad de distancia', () => {
+    const full = travel(1, 0);
+    const half = travel(0.5, 0);
+    expect(full).toBeGreaterThan(0);
+    expect(half / full).toBeCloseTo(0.5, 3);
+  });
+
+  it('la velocidad escala de forma continua con la deflexion', () => {
+    const full = travel(1, 0);
+    for (const magnitude of [0.25, 0.4, 0.75]) {
+      expect(travel(magnitude, 0) / full).toBeCloseTo(magnitude, 3);
+    }
+  });
+
+  it('una magnitud mayor que 1 se acota a velocidad maxima', () => {
+    // El teclado en diagonal produce longitud raiz de 2; no debe correr mas.
+    expect(travel(3, 0)).toBeCloseTo(travel(1, 0), 6);
+    expect(travel(1, 1)).toBeCloseTo(travel(1, 0), 6);
+  });
+
+  it('el teclado sigue recorriendo lo mismo en diagonal que en ortogonal', () => {
+    expect(travel(0, 1)).toBeCloseTo(travel(1, 0), 6);
+    expect(travel(-1, -1)).toBeCloseTo(travel(1, 0), 6);
+  });
+
+  it('por debajo del umbral de ruido no hay movimiento', () => {
+    expect(travel(1e-9, 0)).toBe(0);
   });
 });

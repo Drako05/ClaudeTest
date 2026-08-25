@@ -35,24 +35,27 @@ export function moveEntity(
   moveY: number,
   dt: number,
 ): void {
-  // Normalizar para que la diagonal no sea mas rapida que la ortogonal.
   const len = Math.hypot(moveX, moveY);
-  if (len > 1e-6) {
-    moveX /= len;
-    moveY /= len;
-    store.facingX[id] = moveX;
-    store.facingY[id] = moveY;
-  } else {
-    return;
-  }
+  if (len <= 1e-6) return;
 
-  const step = WALK_SPEED * dt;
+  // La direccion siempre se normaliza (asi la diagonal no es mas rapida que la
+  // ortogonal), pero la MAGNITUD, acotada a 1, escala la velocidad. Es lo que
+  // hace analogico un joystick: apenas desplazado, se camina despacio.
+  // El teclado no nota el cambio: un eje da len = 1 y la diagonal da len = raiz
+  // de 2, y ambos se acotan a 1.
+  const dirX = moveX / len;
+  const dirY = moveY / len;
+  store.facingX[id] = dirX;
+  store.facingY[id] = dirY;
+
+  const magnitude = Math.min(1, len);
+  const step = WALK_SPEED * magnitude * dt;
   const curX = store.x[id];
   const curY = store.y[id];
 
-  const nextX = curX + moveX * step;
+  const nextX = curX + dirX * step;
   if (!collides(world, nextX, curY)) store.x[id] = nextX;
 
-  const nextY = curY + moveY * step;
+  const nextY = curY + dirY * step;
   if (!collides(world, store.x[id], nextY)) store.y[id] = nextY;
 }

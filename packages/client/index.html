@@ -6,7 +6,15 @@
     <title>Verdant — prototipo</title>
     <style>
       * { box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1020; }
+      html, body {
+        margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1020;
+        /* Sin esto, arrastrar el joystick desplaza o hace rebotar la pagina. */
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+      }
       body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #e8eef7; }
       canvas { display: block; }
 
@@ -48,6 +56,70 @@
         font: inherit; color: #0b1020; background: #8fc4ff; border: 0;
         padding: 9px 20px; border-radius: 8px; cursor: pointer; font-weight: 700;
       }
+
+      /* ---- Controles tactiles ---------------------------------------------
+         Ocultos por defecto: se revelan al detectar un puntero grueso o al
+         primer toque, anadiendo .touch-active al body. */
+      #stick {
+        position: fixed; z-index: 12; width: 116px; height: 116px;
+        margin: -58px 0 0 -58px; border-radius: 50%;
+        border: 2px solid rgba(180, 215, 255, 0.30);
+        background: radial-gradient(circle, rgba(20,34,60,.42), rgba(20,34,60,.16));
+        opacity: 0; visibility: hidden; transition: opacity .12s ease;
+        pointer-events: none;
+      }
+      #stick.active { opacity: 1; visibility: visible; }
+      #stickKnob {
+        position: absolute; left: 50%; top: 50%;
+        width: 46px; height: 46px; border-radius: 50%;
+        background: rgba(143, 196, 255, .58);
+        border: 2px solid rgba(226, 240, 255, .72);
+        transform: translate(-50%, -50%);
+      }
+
+      #touchButtons {
+        position: fixed; z-index: 12;
+        right: calc(14px + env(safe-area-inset-right));
+        bottom: calc(20px + env(safe-area-inset-bottom));
+        display: none; align-items: flex-end; gap: 12px;
+      }
+      body.touch-active #touchButtons { display: flex; }
+
+      .touch-btn {
+        -webkit-appearance: none; appearance: none;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 2px; font: inherit; color: #e8eef7; cursor: pointer;
+        border-radius: 50%; touch-action: none;
+        border: 2px solid rgba(180, 215, 255, .34);
+        background: rgba(20, 34, 60, .46);
+        backdrop-filter: blur(4px);
+        transition: transform .08s ease, background .08s ease;
+      }
+      .touch-btn .glyph { font-size: 21px; line-height: 1; }
+      .touch-btn .label { font-size: 9px; letter-spacing: .1em; opacity: .8; }
+      .touch-btn.pressed, .touch-btn:active {
+        transform: scale(.93); background: rgba(60, 104, 168, .62);
+      }
+      .touch-btn:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
+
+      #btnHarvest { width: 92px; height: 92px; }
+      #btnEat { width: 64px; height: 64px; margin-bottom: 8px; }
+
+      /* En tactil los atajos de teclado no sirven de nada. */
+      body.touch-active #help { display: none; }
+
+      /* Pantallas estrechas: el HUD se compacta pero conserva los FPS, que es
+         justo el numero que interesa medir en el movil real. */
+      @media (max-width: 560px) {
+        #hud { top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left));
+               padding: 8px 10px; font-size: 11px; min-width: 148px; }
+        #hud h1 { font-size: 10px; margin-bottom: 5px; }
+        #help { font-size: 10px; padding: 7px 10px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #stick, .touch-btn, .bar > i { transition: none; }
+      }
     </style>
   </head>
   <body>
@@ -70,6 +142,19 @@
     <div id="help">
       <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> recolectar &nbsp; <kbd>E</kbd> comer bayas<br />
       <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
+    </div>
+
+    <div id="stick" aria-hidden="true"><i id="stickKnob"></i></div>
+
+    <div id="touchButtons">
+      <button id="btnEat" class="touch-btn" type="button" aria-label="Comer bayas">
+        <span class="glyph" aria-hidden="true">&#127827;</span>
+        <span class="label">COMER</span>
+      </button>
+      <button id="btnHarvest" class="touch-btn" type="button" aria-label="Recolectar">
+        <span class="glyph" aria-hidden="true">&#9874;</span>
+        <span class="label">RECOGER</span>
+      </button>
     </div>
 
     <div id="dead">

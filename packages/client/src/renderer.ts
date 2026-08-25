@@ -28,8 +28,15 @@ export class Renderer {
   private readonly views = new Map<string, ChunkView>();
   private readonly player = new Graphics();
   private readonly reticle = new Graphics();
-  /** Tiles visibles a lo alto de la pantalla. Controla el zoom. */
-  private tilesOnScreen = 34;
+  /**
+   * Tiles visibles a lo largo del EJE MENOR de la pantalla. Controla el zoom.
+   *
+   * Medir contra el eje menor y no contra la altura es lo que hace que el
+   * encuadre funcione en vertical: en apaisado el eje menor sigue siendo la
+   * altura, asi que el encuadre de escritorio no cambia, pero en un movil en
+   * vertical deja de quedar cerradisimo.
+   */
+  private tilesOnScreen = 26;
 
   private constructor(app: Application) {
     this.app = app;
@@ -47,9 +54,12 @@ export class Renderer {
       background: 0x0b1020,
       resizeTo: window,
       antialias: false,
-      // El juego es pixelado: subir la resolucion no aporta nada y cuesta relleno.
-      resolution: 1,
-      autoDensity: false,
+      // Con resolution 1 el canvas se dibuja en pixeles CSS y el navegador lo
+      // reescala suavizado: en un movil de densidad 3x el arte pixelado se ve
+      // borroso. Se sigue la densidad real, con tope de 2 para no pagar 9x de
+      // relleno en pantallas 3x a cambio de una nitidez que ya no se aprecia.
+      resolution: Math.min(window.devicePixelRatio || 1, 2),
+      autoDensity: true,
       preference: 'webgl',
     });
     document.body.appendChild(app.canvas);
@@ -57,7 +67,7 @@ export class Renderer {
   }
 
   zoomBy(factor: number): void {
-    this.tilesOnScreen = Math.min(80, Math.max(14, this.tilesOnScreen * factor));
+    this.tilesOnScreen = Math.min(70, Math.max(12, this.tilesOnScreen * factor));
   }
 
   private drawPlayerSprite(): void {
@@ -83,11 +93,16 @@ export class Renderer {
     const px = prevX + (entities.x[playerId] - prevX) * alpha;
     const py = prevY + (entities.y[playerId] - prevY) * alpha;
 
-    const scale = this.app.renderer.height / (this.tilesOnScreen * TILE_PX);
+    // app.screen son pixeles logicos (CSS). renderer.width/height pueden venir
+    // en pixeles de dispositivo cuando autoDensity esta activo, y usarlos aqui
+    // descentraria la camara en pantallas de densidad alta.
+    const view = this.app.screen;
+    const minAxis = Math.min(view.width, view.height);
+    const scale = minAxis / (this.tilesOnScreen * TILE_PX);
     this.camera.scale.set(scale);
     this.camera.position.set(
-      this.app.renderer.width / 2 - px * TILE_PX * scale,
-      this.app.renderer.height / 2 - py * TILE_PX * scale,
+      view.width / 2 - px * TILE_PX * scale,
+      view.height / 2 - py * TILE_PX * scale,
     );
 
     this.syncChunks(state);
