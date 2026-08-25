@@ -1,29 +1,45 @@
 /**
- * Recoleccion: el jugador cosecha el tile que tiene delante.
+ * Recoleccion y siembra.
+ *
+ * Recolectar RETIRA la instancia: el tile queda vacio y sera el ecosistema quien
+ * decida mas adelante donde brota una nueva, que puede ser cualquier otro tile
+ * apto del chunk. Sembrar es el camino rapido para devolver vida a una zona, y
+ * el que el autor quiere como forma principal de mantener el equilibrio.
  */
 
-import { Feature, harvestOf, isPlant, regrowTicksOf, Resource } from '@verdant/shared';
+import {
+  BALANCED_HARVEST_BONUS,
+  biomeOfTerrain,
+  densityOfKind,
+  Feature,
+  harvestOf,
+  isRare,
+  isTerrainSolid,
+  LifeKind,
+  MAX_SEEDS_PER_HARVEST,
+  Resource,
+  saplingOf,
+  seedFor,
+  speciesFor,
+} from '@verdant/shared';
 import type { EntityStore } from '../entities.js';
-import type { World } from '../world.js';
+import { hash2DFloat } from '../rng.js';
+import { toChunkCoord, type World } from '../world.js';
 
 /** Alcance en tiles desde el centro del jugador. */
 export const REACH = 1.1;
-/**
- * Vida que se resta al chunk por planta recolectada.
- *
- * Es lo que convierte la tala en un hecho regional y no solo local: vaciar una
- * zona entera hunde su vegetacion y tarda en recuperarse, tal y como exige que
- * «los ecosistemas tiendan hacia estados dinamicos de equilibrio» en vez de
- * reponerse al instante.
- */
-export const VEGETATION_COST = 0.012;
-/** Bayas consumidas por comida y hambre que restaura cada una. */
 export const BERRIES_PER_MEAL = 1;
 export const HUNGER_PER_BERRY = 14;
 
 export interface HarvestResult {
   resource: Resource;
   amount: number;
+  /** Semillas obtenidas, de cero a MAX_SEEDS_PER_HARVEST. */
+  seeds: number;
+  seedResource: Resource | null;
+  rare: boolean;
+  /** True si el bioma estaba equilibrado y hubo bonus. */
+  rewarded: boolean;
   tileX: number;
   tileY: number;
 }
@@ -37,31 +53,81 @@ export function targetTile(store: EntityStore, id: number): { x: number; y: numb
 }
 
 /**
- * Intenta recolectar el tile apuntado. Devuelve lo obtenido, o null si no habia
- * nada. Muta el mundo a traves de setFeature, que registra el cambio en el
- * overlay de mutaciones.
+ * Recolecta el tile apuntado.
+ *
+ * El rendimiento sube un porcentaje fijo si el bioma esta equilibrado: es la
+ * recompensa por cuidarlo. Las semillas se sortean con un hash de posicion y
+ * tiempo, no con un generador con estado, para no romper el determinismo.
  */
 export function tryHarvest(
   world: World,
   store: EntityStore,
   id: number,
   inventory: Int32Array,
+  tick: number,
 ): HarvestResult | null {
   const { x, y } = targetTile(store, id);
   const feature = world.featureAt(x, y);
   const yield_ = harvestOf(feature);
   if (!yield_) return null;
 
-  // Renovable o finito segun su naturaleza, como dice el capitulo II: lo que
-  // vuelve a crecer deja solo una marca temporal; lo que se agota de verdad
-  // (la piedra) se borra para siempre.
-  if (regrowTicksOf(feature) > 0) {
-    world.recordHarvest(x, y, feature, isPlant(feature) ? VEGETATION_COST : 0);
-  } else {
-    world.setFeature(x, y, Feature.None);
+  const rewarded = world.isBiomeBalanced(toChunkCoord(x), toChunkCoord(y));
+  const amount = Math.round(yield_.amount * (1 + (rewarded ? BALANCED_HARVEST_BONUS : 0)));
+
+  world.setFeature(x, y, Feature.None);
+  inventory[yield_.resource] += amount;
+
+  let seeds = 0;
+  if (yield_.seed !== null) {
+    const roll = hash2DFloat(world.seed ^ 0x6d1b8f2b, x * 92837111 + tick, y);
+    seeds = Math.floor(roll * (MAX_SEEDS_PER_HARVEST + 1));
+    inventory[yield_.seed] += seeds;
   }
-  inventory[yield_.resource] += yield_.amount;
-  return { resource: yield_.resource, amount: yield_.amount, tileX: x, tileY: y };
+
+  return {
+    resource: yield_.resource,
+    amount,
+    seeds,
+    seedResource: yield_.seed,
+    rare: isRare(feature),
+    rewarded,
+    tileX: x,
+    tileY: y,
+  };
+}
+
+/**
+ * Siembra en el tile apuntado la especie que corresponde a ese terreno.
+ *
+ * No hay menu de seleccion: la semilla se elige sola segun lo que el sitio
+ * sostenga y lo que el jugador lleve encima.
+ */
+export function tryPlant(
+  world: World,
+  store: EntityStore,
+  id: number,
+  inventory: Int32Array,
+): Feature | null {
+  const { x, y } = targetTile(store, id);
+  if (world.featureAt(x, y) !== Feature.None) return null;
+
+  const terrain = world.terrainAt(x, y);
+  if (isTerrainSolid(terrain)) return null;
+  const biome = biomeOfTerrain(terrain);
+
+  for (const kind of [LifeKind.Tree, LifeKind.Plant]) {
+    if (densityOfKind(terrain, kind) <= 0) continue;
+    const seed = seedFor(kind);
+    if (seed === null || inventory[seed] <= 0) continue;
+
+    const sapling = saplingOf(speciesFor(biome, kind));
+    if (sapling === Feature.None) continue;
+
+    inventory[seed]--;
+    world.plantSapling(x, y, sapling);
+    return sapling;
+  }
+  return null;
 }
 
 /** Come bayas del inventario si hay y si hace falta. Devuelve true si comio. */

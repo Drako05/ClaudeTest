@@ -103,7 +103,8 @@
       .touch-btn:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
 
       #btnHarvest { width: 92px; height: 92px; }
-      #btnEat { width: 64px; height: 64px; margin-bottom: 8px; }
+      #btnEat { width: 58px; height: 58px; margin-bottom: 6px; }
+      #btnPlant { width: 70px; height: 70px; margin-bottom: 2px; }
 
       /* En tactil los atajos de teclado no sirven de nada. */
       body.touch-active #help { display: none; }
@@ -115,6 +116,79 @@
                padding: 8px 10px; font-size: 11px; min-width: 148px; }
         #hud h1 { font-size: 10px; margin-bottom: 5px; }
         #help { font-size: 10px; padding: 7px 10px; }
+      }
+
+
+      /* ---- Panel del entorno (esquina superior derecha) ------------------- */
+      #statsToggle {
+        position: fixed; z-index: 13;
+        top: calc(12px + env(safe-area-inset-top));
+        right: calc(12px + env(safe-area-inset-right));
+        width: 46px; height: 46px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px; line-height: 1; cursor: pointer;
+        color: #e8eef7; background: rgba(8, 14, 28, 0.78);
+        border: 1px solid rgba(140, 190, 255, 0.22);
+        backdrop-filter: blur(6px); touch-action: manipulation;
+      }
+      #statsToggle:active { transform: scale(.94); }
+      #statsToggle:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
+      #statsToggle.open { background: rgba(60, 104, 168, .72); }
+
+      #statsPanel {
+        position: fixed; z-index: 13;
+        top: calc(66px + env(safe-area-inset-top));
+        right: calc(12px + env(safe-area-inset-right));
+        width: 260px; max-width: calc(100vw - 24px);
+        max-height: calc(100vh - 90px); overflow-y: auto;
+        padding: 12px 14px; border-radius: 12px; font-size: 12px;
+        background: rgba(8, 14, 28, 0.86);
+        border: 1px solid rgba(140, 190, 255, 0.22);
+        backdrop-filter: blur(6px);
+      }
+      #statsPanel[hidden] { display: none; }
+      #statsPanel h2 {
+        margin: 0 0 2px; font-size: 11px; letter-spacing: .14em;
+        text-transform: uppercase; color: #8fc4ff; font-weight: 600;
+      }
+      #statsPanel .group { margin-bottom: 12px; }
+      #statsPanel .group:last-child { margin-bottom: 0; }
+      #statsPanel .sub { color: #8b9bb4; margin-bottom: 7px; font-size: 11px; }
+
+      .statRow { margin-bottom: 7px; }
+      .statRow .label {
+        display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px;
+      }
+      .statRow .state { color: #8b9bb4; font-size: 10px; letter-spacing: .06em; }
+      .statRow .state.ok { color: #7fd396; }
+      .statRow .state.low { color: #ffc46b; }
+      .statRow .state.high { color: #ff8f6b; }
+      /* La barra llega hasta 1.5x del referente; la franja marca el rango sano. */
+      .track {
+        position: relative; height: 9px; border-radius: 5px;
+        background: rgba(255,255,255,.10); overflow: hidden;
+      }
+      .band {
+        position: absolute; top: 0; bottom: 0;
+        left: 56.7%; width: 20%;
+        background: rgba(127, 211, 150, .22);
+        border-left: 1px solid rgba(127, 211, 150, .55);
+        border-right: 1px solid rgba(127, 211, 150, .55);
+      }
+      .fill { position: relative; height: 100%; border-radius: 5px; background: #8fc4ff; }
+      .fill.ok { background: linear-gradient(90deg, #4f9e6a, #7fd396); }
+      .fill.low { background: linear-gradient(90deg, #b8862f, #ffc46b); }
+      .fill.high { background: linear-gradient(90deg, #b84f2f, #ff8f6b); }
+
+      #rewardState {
+        margin-top: 8px; padding: 6px 8px; border-radius: 7px;
+        font-size: 11px; line-height: 1.4;
+      }
+      #rewardState.on { background: rgba(79,158,106,.20); color: #a7e6bb; }
+      #rewardState.off { background: rgba(184,79,47,.18); color: #ffb9a3; }
+
+      @media (max-width: 560px) {
+        #statsPanel { width: 224px; font-size: 11px; }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -132,6 +206,8 @@
       <div class="row"><span>Madera</span><span id="wood" class="dim">0</span></div>
       <div class="row"><span>Piedra</span><span id="stone" class="dim">0</span></div>
       <div class="row"><span>Bayas</span><span id="berries" class="dim">0</span></div>
+      <div class="row"><span>Sem. arbol</span><span id="treeSeed" class="dim">0</span></div>
+      <div class="row"><span>Sem. planta</span><span id="plantSeed" class="dim">0</span></div>
       <hr style="border:0;border-top:1px solid rgba(255,255,255,.1);margin:9px 0" />
       <div class="row"><span>Hora</span><span id="clock">00:00</span></div>
       <div class="row dim"><span>Dia</span><span id="day">1</span></div>
@@ -144,7 +220,24 @@
 
     <div id="help">
       <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> recolectar &nbsp; <kbd>E</kbd> comer bayas<br />
-      <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
+      <kbd>F</kbd> sembrar &nbsp; <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
+    </div>
+
+    <button id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"
+            aria-label="Estado del entorno">&#127807;</button>
+
+    <div id="statsPanel" hidden>
+      <div class="group">
+        <h2 id="biomeName">Bioma</h2>
+        <div class="sub" id="biomeScope">—</div>
+        <div id="biomeBars"></div>
+        <div id="rewardState" class="off">—</div>
+      </div>
+      <div class="group">
+        <h2>Chunk actual</h2>
+        <div class="sub" id="chunkScope">—</div>
+        <div id="chunkBars"></div>
+      </div>
     </div>
 
     <div id="stick" aria-hidden="true"><i id="stickKnob"></i></div>
@@ -153,6 +246,10 @@
       <button id="btnEat" class="touch-btn" type="button" aria-label="Comer bayas">
         <span class="glyph" aria-hidden="true">&#127827;</span>
         <span class="label">COMER</span>
+      </button>
+      <button id="btnPlant" class="touch-btn" type="button" aria-label="Sembrar">
+        <span class="glyph" aria-hidden="true">&#127793;</span>
+        <span class="label">SEMBRAR</span>
       </button>
       <button id="btnHarvest" class="touch-btn" type="button" aria-label="Recolectar">
         <span class="glyph" aria-hidden="true">&#9874;</span>

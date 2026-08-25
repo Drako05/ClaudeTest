@@ -13,8 +13,12 @@ Esto es el resumen operativo.
 3. **La generacion del mundo es pura.** `generateChunk(gen, cx, cy)` no puede
    depender del orden en que se llame ni de estado previo. Un chunk se descarta y
    se regenera constantemente.
-4. **Las mutaciones del jugador van al overlay** de `World.setFeature`, nunca
-   escribiendo el array del chunk directamente: el chunk es cache desechable.
+4. **Las mutaciones van al overlay** de `World.setFeature`, nunca escribiendo el
+   array del chunk directamente: el chunk es cache desechable. Lo que hay en un
+   tile es `override ?? potencial`, y esa es la **unica fuente de verdad**: la
+   usan por igual el dibujo, la colision y la recoleccion. Que el renderer leyera
+   el potencial crudo por su cuenta fue justo el bug de las plantas que no
+   desaparecian al recolectarlas.
 5. **El input produce `Intent`; nunca muta el estado.** Es lo que permitira
    enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
@@ -28,6 +32,27 @@ Esto es el resumen operativo.
    aparecera por delante de cosas que tiene detras.
 8. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
    interpolacion para el render es cosa del cliente.
+
+## Regla de trabajo con el autor
+
+**La interpretacion de las leyes es del autor, no del agente.** Antes de escribir
+codigo que implemente o toque una ley del libro, hay que consultarle:
+
+- como se interpreta la ley,
+- que mecanicas internas la realizan,
+- como fluye en el tiempo (ritmos, curvas, duraciones),
+- con que otros sistemas interactua,
+- y que valor toma cada parametro.
+
+Esto surgio de un error real: en la primera tanda de vida vegetal el agente fijo
+por su cuenta la forma de la curva de crecimiento, los tiempos de rebrote y que
+la piedra fuera finita. Eran decisiones de diseno del autor, no de
+implementacion, y varias no coincidian con lo que el tenia en mente.
+
+Proponer interpretaciones es bienvenido; darlas por aprobadas no. Cuando una
+decision se tome por deduccion (por ejemplo, derivar una tasa a partir de unos
+tiempos que dio el autor), hay que decirlo explicitamente para que pueda
+corregirla.
 
 ## El libro del mundo
 
@@ -87,6 +112,15 @@ npx vite-node tools/analyze-world.ts
 y ajusta los umbrales en `packages/sim/src/worldgen.ts` a la distribucion nueva.
 `tests/world-quality.test.ts` falla si algun bioma desaparece, si el jugador
 queda encerrado o si el bosque se vuelve intransitable.
+
+## Ciclos de importacion
+
+`packages/shared/src/base.ts` y `packages/sim/src/coords.ts` existen solo para
+romper ciclos: `index.ts` reexporta `ecology.ts`, y `world.ts` usa `biome.ts`.
+Con el ciclo puesto los tests pasan igual, pero el bundle del navegador revienta
+con «Cannot access X before initialization», que solo detecta `npm run smoke`.
+Si anades un modulo que necesiten dos partes que ya se referencian, ponlo en su
+propio fichero sin dependencias en vez de importarlo cruzado.
 
 ## Presupuesto de rendimiento
 

@@ -41,6 +41,7 @@ export class Input {
   private harvestHeld = false;
   private harvestTicks = 0;
   private eatQueued = false;
+  private plantQueued = false;
 
   private readonly stick: StickState = { touchId: null, originX: 0, originY: 0, x: 0, y: 0 };
   private pinchDistance = 0;
@@ -84,6 +85,9 @@ export class Input {
           break;
         case 'KeyE':
           this.eatQueued = true;
+          break;
+        case 'KeyF':
+          this.plantQueued = true;
           break;
         case 'KeyR':
           this.actions.onRestart();
@@ -155,15 +159,20 @@ export class Input {
       harvest.addEventListener('pointerleave', release);
     }
 
-    if (eat) {
+    // Comer y sembrar son acciones de un solo toque: no repiten al mantener.
+    for (const [element, run] of [
+      [eat, () => (this.eatQueued = true)],
+      [document.getElementById('btnPlant'), () => (this.plantQueued = true)],
+    ] as Array<[HTMLElement | null, () => void]>) {
+      if (!element) continue;
       const press = (e: Event) => {
         e.preventDefault();
         this.revealTouchUi();
-        this.eatQueued = true;
+        run();
       };
-      eat.addEventListener('touchstart', press, { passive: false });
-      eat.addEventListener('pointerdown', (e) => {
-        if (e.pointerType !== 'touch') press(e);
+      element.addEventListener('touchstart', press, { passive: false });
+      element.addEventListener('pointerdown', (e) => {
+        if ((e as PointerEvent).pointerType !== 'touch') press(e);
       });
     }
   }
@@ -339,6 +348,8 @@ export class Input {
 
     intent.eat = this.eatQueued;
     this.eatQueued = false;
+    intent.plant = this.plantQueued;
+    this.plantQueued = false;
 
     return intent;
   }

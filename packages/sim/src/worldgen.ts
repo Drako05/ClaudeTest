@@ -7,7 +7,17 @@
  * identico. Esto es lo que hace viable un mundo infinito con memoria acotada.
  */
 
-import { CHUNK_SIZE, Feature, Terrain } from '@verdant/shared';
+import {
+  biomeOfTerrain,
+  CHUNK_SIZE,
+  densityFor,
+  Feature,
+  LifeKind,
+  RARE_CHANCE,
+  rareOf,
+  speciesFor,
+  Terrain,
+} from '@verdant/shared';
 import { hash2DFloat, SimplexNoise } from './rng.js';
 
 /** Escalas de muestreo del ruido, en tiles. Mayor = accidentes geograficos mas grandes. */
@@ -107,36 +117,51 @@ export class WorldGen {
   }
 
   /**
-   * Feature de un tile. Decidido con hash puro por-tile, no con un PRNG en
-   * secuencia: asi no depende del orden en que se recorran los tiles.
+   * Feature de un tile.
+   *
+   * Decidido con un hash puro por-tile, no con un PRNG en secuencia: asi no
+   * depende del orden en que se recorran los tiles y cualquier tile puede
+   * evaluarse aislado.
+   *
+   * Las frecuencias salen de `densityFor`, en @verdant/shared, que es la MISMA
+   * tabla que usa el sistema de equilibrio para saber cuanta vida deberia haber.
+   * Si el generador tuviera la suya propia, el mundo naceria desequilibrado en
+   * cuanto las dos se separasen.
    */
   featureAt(wx: number, wy: number, terrain: Terrain): Feature {
-    const r = hash2DFloat(this.seed ^ 0x51ed270b, wx, wy);
-    switch (terrain) {
-      case Terrain.Forest:
-        // Densidad deliberadamente por debajo del 42% inicial: los arboles
-        // bloquean el paso, y a esa densidad el bosque era un muro impenetrable
-        // en vez de un lugar por el que moverse.
-        if (r < 0.3) return Feature.Tree;
-        if (r < 0.36) return Feature.BerryBush;
-        return Feature.None;
-      case Terrain.Grass:
-        if (r < 0.045) return Feature.Tree;
-        if (r < 0.075) return Feature.BerryBush;
-        if (r < 0.09) return Feature.RockNode;
-        return Feature.None;
-      case Terrain.Snow:
-        return r < 0.04 ? Feature.Tree : Feature.None;
-      case Terrain.Tundra:
-        if (r < 0.07) return Feature.Tree;
-        if (r < 0.1) return Feature.RockNode;
-        if (r < 0.12) return Feature.BerryBush;
-        return Feature.None;
-      case Terrain.Sand:
-        return r < 0.02 ? Feature.RockNode : Feature.None;
-      default:
-        return Feature.None;
-    }
+    const density = densityFor(terrain);
+    const roll = hash2DFloat(this.seed ^ 0x51ed270b, wx, wy);
+    const biome = biomeOfTerrain(terrain);
+
+    let threshold = density.tree;
+    if (roll < threshold) return this.speciesAt(biome, LifeKind.Tree, wx, wy);
+
+    threshold += density.plant;
+    if (roll < threshold) return this.speciesAt(biome, LifeKind.Plant, wx, wy);
+
+    threshold += density.rock;
+    if (roll < threshold) return Feature.RockNode;
+
+    return Feature.None;
+  }
+
+  /**
+   * Especie concreta que corresponde a un bioma, comun o rara.
+   *
+   * El mundo nace equilibrado, asi que se gana sus variantes raras desde el
+   * primer momento: la rareza al generar usa la misma probabilidad que la que
+   * gobierna lo que brota despues en un bioma sano.
+   */
+  private speciesAt(
+    biome: ReturnType<typeof biomeOfTerrain>,
+    kind: LifeKind,
+    wx: number,
+    wy: number,
+  ): Feature {
+    const species = speciesFor(biome, kind);
+    if (species === Feature.None) return Feature.None;
+    const rare = hash2DFloat(this.seed ^ 0x2f9a13c7, wx, wy);
+    return rare < RARE_CHANCE ? rareOf(species) : species;
   }
 }
 

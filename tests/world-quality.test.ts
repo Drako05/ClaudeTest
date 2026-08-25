@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame, reachableArea, World } from '@verdant/sim';
-import { Feature, Terrain } from '@verdant/shared';
+import { LifeKind, lifeKindOf, Terrain } from '@verdant/shared';
 
 const SEEDS = [12345, 7, 999, 4242, 31337];
 
@@ -65,7 +65,7 @@ describe('calidad del mundo generado', () => {
       for (let x = -R; x < R; x += 2) {
         if (world.terrainAt(x, y) !== Terrain.Forest) continue;
         forest++;
-        if (world.featureAt(x, y) === Feature.Tree) blocked++;
+        if (lifeKindOf(world.featureAt(x, y)) === LifeKind.Tree) blocked++;
       }
     }
     expect(forest).toBeGreaterThan(100);
@@ -81,7 +81,7 @@ describe('calidad del mundo generado', () => {
     const sy = Math.floor(game.entities.y[game.playerId]);
     for (let y = sy - 60; y < sy + 60; y++) {
       for (let x = sx - 60; x < sx + 60; x++) {
-        if (game.world.featureAt(x, y) === Feature.BerryBush) bushes++;
+        if (lifeKindOf(game.world.featureAt(x, y)) === LifeKind.Plant) bushes++;
       }
     }
     expect(bushes, 'sin bayas cerca el jugador muere de hambre sin opciones').toBeGreaterThan(10);

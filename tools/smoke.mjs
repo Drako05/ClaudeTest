@@ -202,6 +202,38 @@ async function desktopPass(browser, baseUrl) {
   const zoomedIn = (await waitForLoop(page)).tilesOnScreen;
   check(zoomedIn < zoomedOut, `acercar no cambio el zoom (${zoomedOut} -> ${zoomedIn})`);
 
+  // El panel del entorno se despliega y se repliega con el mismo boton.
+  await page.click('#statsToggle');
+  check(await page.isVisible('#statsPanel'), 'el panel del entorno no se desplego');
+  const bars = await page.evaluate(() => ({
+    biome: document.querySelectorAll('#biomeBars .statRow').length,
+    chunk: document.querySelectorAll('#chunkBars .statRow').length,
+    reward: (document.getElementById('rewardState') || {}).textContent || '',
+  }));
+  console.log(`  panel: ${bars.biome} barras de bioma, ${bars.chunk} de chunk`);
+  check(bars.biome === 3 && bars.chunk === 3, `barras inesperadas: ${JSON.stringify(bars)}`);
+  check(bars.reward.length > 10, 'el panel no explica el estado de las recompensas');
+  await page.screenshot({ path: join(SHOTS, '08-panel.png') });
+  await page.click('#statsToggle');
+  check(!(await page.isVisible('#statsPanel')), 'el panel no se replego al volver a pulsar');
+
+  // Sembrar: recolectar deja semillas y F las planta.
+  const withSeeds = await waitForLoop(page);
+  const seeds = withSeeds.inventory[3] + withSeeds.inventory[4];
+  console.log(`  semillas tras recolectar: ${seeds}`);
+  check(seeds > 0, 'recolectar no dejo ninguna semilla');
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press('KeyF');
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(120);
+    await page.keyboard.up('KeyW');
+  }
+  const afterPlanting = await waitForLoop(page);
+  check(
+    afterPlanting.inventory[3] + afterPlanting.inventory[4] < seeds,
+    'sembrar no consumio ninguna semilla',
+  );
+
   for (let i = 0; i < 5; i++) await page.keyboard.press('Minus');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(SHOTS, '03-mundo-amplio.png') });
@@ -358,6 +390,14 @@ async function mobilePass(browser, baseUrl) {
     await touch(page, 'touchend', { x: originX + dx, y: originY + dy });
   }
   await touch(page, 'touchend', { id: 2, x: 330, y: 760, selector: '#btnHarvest' });
+
+  // El panel y el boton de sembrar tienen que funcionar tambien al tacto.
+  await page.tap('#statsToggle');
+  check(await page.isVisible('#statsPanel'), 'el panel no se abrio al tocarlo en movil');
+  await page.screenshot({ path: join(SHOTS, '09-movil-panel.png') });
+  await page.tap('#statsToggle');
+  await touch(page, 'touchstart', { id: 3, x: 250, y: 745, selector: '#btnPlant' });
+  await touch(page, 'touchend', { id: 3, x: 250, y: 745, selector: '#btnPlant' });
 
   const gathered = await waitForLoop(page);
   console.log('  inventario tras recolectar:', JSON.stringify(gathered.inventory));

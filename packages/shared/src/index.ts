@@ -1,123 +1,251 @@
 /**
- * Constantes y tipos compartidos entre sim, client y (a futuro) server.
- * No contiene logica: solo el vocabulario comun del proyecto.
+ * Vocabulario comun entre sim, client y (a futuro) server.
+ * No contiene logica de juego: solo los tipos y las constantes del proyecto.
  */
 
-/** Lado de un chunk, en tiles. Potencia de 2 para permitir >> y & en vez de / y %. */
-export const CHUNK_SIZE = 32;
-export const CHUNK_SHIFT = 5;
-export const CHUNK_MASK = CHUNK_SIZE - 1;
+export * from './base.js';
+export * from './ecology.js';
 
-/** Frecuencia logica de la simulacion. El render va desacoplado de esto. */
-export const TICK_HZ = 60;
-export const TICK_DT = 1 / TICK_HZ;
-
-/** Duracion de un dia completo del mundo: 8 minutos reales. */
-export const DAY_TICKS = 8 * 60 * TICK_HZ;
+import {
+  CHUNK_SIZE,
+  LifeKind,
+  Terrain,
+} from './base.js';
 
 /**
- * Cada cuantos ticks avanza la vida vegetal.
+ * Que hay sobre un tile.
  *
- * Que sea un paso FIJO y global no es un detalle de rendimiento: es lo que hace
- * que ponerse al dia de golpe y simular continuamente den exactamente el mismo
- * resultado, y por tanto lo que sostiene la ley de que el mundo existe
- * independientemente de cualquier observador.
+ * Cada bioma con vegetacion tiene su arbol y su planta caracteristicos, mas una
+ * variante rara de cada uno. Los brotes son lo que siembra el jugador antes de
+ * madurar. La roca es inerte: no es vida y queda fuera del equilibrio.
  */
-export const LIFE_STEP_TICKS = 300;
-
-/** Capa de terreno. */
-export enum Terrain {
-  DeepWater = 0,
-  Water = 1,
-  Sand = 2,
-  Grass = 3,
-  Forest = 4,
-  Rock = 5,
-  Snow = 6,
-  Tundra = 7,
-}
-
-/** Capa de features: lo que se puede recolectar o estorba el paso. */
 export enum Feature {
   None = 0,
-  Tree = 1,
-  RockNode = 2,
-  BerryBush = 3,
+  RockNode = 1,
+
+  ForestTree = 2,
+  ForestTreeRare = 3,
+  ForestPlant = 4,
+  ForestPlantRare = 5,
+
+  MeadowTree = 6,
+  MeadowTreeRare = 7,
+  MeadowPlant = 8,
+  MeadowPlantRare = 9,
+
+  ForestTreeSapling = 10,
+  ForestPlantSapling = 11,
+  MeadowTreeSapling = 12,
+  MeadowPlantSapling = 13,
 }
 
-export enum Resource {
-  Wood = 0,
-  Stone = 1,
-  Berries = 2,
+/** Agrupacion de terrenos en biomas. Es la unidad que se equilibra. */
+export enum BiomeKind {
+  Ocean = 0,
+  Coast = 1,
+  Meadow = 2,
+  Forest = 3,
+  Highland = 4,
+}
+export const BIOME_NAMES: readonly string[] = [
+  'Oceano',
+  'Costa',
+  'Pradera',
+  'Bosque',
+  'Tierras altas',
+];
+
+export function biomeOfTerrain(t: Terrain): BiomeKind {
+  switch (t) {
+    case Terrain.DeepWater:
+    case Terrain.Water:
+      return BiomeKind.Ocean;
+    case Terrain.Sand:
+      return BiomeKind.Coast;
+    case Terrain.Forest:
+      return BiomeKind.Forest;
+    case Terrain.Rock:
+      return BiomeKind.Highland;
+    default:
+      // Tundra y nieve heredan de momento las especies de pradera.
+      return BiomeKind.Meadow;
+  }
 }
 
-export const RESOURCE_COUNT = 3;
+/** Especie adulta que corresponde a un bioma. None si ahi no crece esa vida. */
+export function speciesFor(biome: BiomeKind, kind: LifeKind): Feature {
+  if (biome === BiomeKind.Forest) {
+    if (kind === LifeKind.Tree) return Feature.ForestTree;
+    if (kind === LifeKind.Plant) return Feature.ForestPlant;
+  }
+  if (biome === BiomeKind.Meadow) {
+    if (kind === LifeKind.Tree) return Feature.MeadowTree;
+    if (kind === LifeKind.Plant) return Feature.MeadowPlant;
+  }
+  return Feature.None;
+}
 
-export const RESOURCE_NAMES: readonly string[] = ['Madera', 'Piedra', 'Bayas'];
+/** Variante rara de una especie comun, si la tiene. */
+export function rareOf(f: Feature): Feature {
+  switch (f) {
+    case Feature.ForestTree:
+      return Feature.ForestTreeRare;
+    case Feature.ForestPlant:
+      return Feature.ForestPlantRare;
+    case Feature.MeadowTree:
+      return Feature.MeadowTreeRare;
+    case Feature.MeadowPlant:
+      return Feature.MeadowPlantRare;
+    default:
+      return f;
+  }
+}
+
+export function isRare(f: Feature): boolean {
+  return (
+    f === Feature.ForestTreeRare ||
+    f === Feature.ForestPlantRare ||
+    f === Feature.MeadowTreeRare ||
+    f === Feature.MeadowPlantRare
+  );
+}
+
+/** Brote que precede a una especie adulta. */
+export function saplingOf(f: Feature): Feature {
+  switch (f) {
+    case Feature.ForestTree:
+      return Feature.ForestTreeSapling;
+    case Feature.ForestPlant:
+      return Feature.ForestPlantSapling;
+    case Feature.MeadowTree:
+      return Feature.MeadowTreeSapling;
+    case Feature.MeadowPlant:
+      return Feature.MeadowPlantSapling;
+    default:
+      return Feature.None;
+  }
+}
+
+/** En que se convierte un brote al madurar. None si no es un brote. */
+export function maturesInto(f: Feature): Feature {
+  switch (f) {
+    case Feature.ForestTreeSapling:
+      return Feature.ForestTree;
+    case Feature.ForestPlantSapling:
+      return Feature.ForestPlant;
+    case Feature.MeadowTreeSapling:
+      return Feature.MeadowTree;
+    case Feature.MeadowPlantSapling:
+      return Feature.MeadowPlant;
+    default:
+      return Feature.None;
+  }
+}
+
+export function isSapling(f: Feature): boolean {
+  return maturesInto(f) !== Feature.None;
+}
+
+/**
+ * A que tipo de vida pertenece una feature. `null` para lo inerte.
+ * La roca devuelve null a proposito: el autor pidio que lo no renovable quede
+ * fuera del sistema de equilibrio.
+ */
+export function lifeKindOf(f: Feature): LifeKind | null {
+  switch (f) {
+    case Feature.ForestTree:
+    case Feature.ForestTreeRare:
+    case Feature.MeadowTree:
+    case Feature.MeadowTreeRare:
+    case Feature.ForestTreeSapling:
+    case Feature.MeadowTreeSapling:
+      return LifeKind.Tree;
+    case Feature.ForestPlant:
+    case Feature.ForestPlantRare:
+    case Feature.MeadowPlant:
+    case Feature.MeadowPlantRare:
+    case Feature.ForestPlantSapling:
+    case Feature.MeadowPlantSapling:
+      return LifeKind.Plant;
+    default:
+      return null;
+  }
+}
 
 /** Terrenos que bloquean el paso. */
 export function isTerrainSolid(t: Terrain): boolean {
   return t === Terrain.DeepWater || t === Terrain.Water || t === Terrain.Rock;
 }
 
-/** Features que bloquean el paso. */
+/** Features que bloquean el paso. Los brotes no estorban: aun son pequenos. */
 export function isFeatureSolid(f: Feature): boolean {
-  return f === Feature.Tree || f === Feature.RockNode;
+  if (isSapling(f)) return false;
+  return f === Feature.RockNode || lifeKindOf(f) === LifeKind.Tree;
 }
 
-/** Que recurso entrega recolectar cada feature, y cuanto. */
+export enum Resource {
+  Wood = 0,
+  Stone = 1,
+  Berries = 2,
+  TreeSeed = 3,
+  PlantSeed = 4,
+}
+export const RESOURCE_COUNT = 5;
+export const RESOURCE_NAMES: readonly string[] = [
+  'Madera',
+  'Piedra',
+  'Bayas',
+  'Semilla de arbol',
+  'Semilla de planta',
+];
+
 export interface Harvest {
   resource: Resource;
   amount: number;
+  /** Semilla que puede caer. None si no la hay. */
+  seed: Resource | null;
 }
 
 /**
- * Ticks que tarda un recurso en volver tras recolectarlo.
- *
- * Cero significa que NO vuelve. El libro dice que los recursos, «segun su
- * naturaleza, pueden ser finitos, consumibles y renovables»: la madera y las
- * bayas se renuevan, la piedra no.
+ * Que entrega recolectar cada feature.
+ * Los brotes no se recolectan: aun no han madurado.
  */
-export function regrowTicksOf(f: Feature): number {
-  switch (f) {
-    case Feature.Tree:
-      return DAY_TICKS * 2;
-    case Feature.BerryBush:
-      return Math.round(DAY_TICKS * 0.6);
-    default:
-      return 0;
-  }
-}
-
-/** True si la feature forma parte del reino vegetal y depende del ecosistema. */
-export function isPlant(f: Feature): boolean {
-  return f === Feature.Tree || f === Feature.BerryBush;
-}
-
 export function harvestOf(f: Feature): Harvest | null {
-  switch (f) {
-    case Feature.Tree:
-      return { resource: Resource.Wood, amount: 3 };
-    case Feature.RockNode:
-      return { resource: Resource.Stone, amount: 2 };
-    case Feature.BerryBush:
-      return { resource: Resource.Berries, amount: 4 };
+  if (isSapling(f)) return null;
+  const rare = isRare(f);
+  switch (lifeKindOf(f)) {
+    case LifeKind.Tree:
+      return { resource: Resource.Wood, amount: rare ? 6 : 3, seed: Resource.TreeSeed };
+    case LifeKind.Plant:
+      return { resource: Resource.Berries, amount: rare ? 8 : 4, seed: Resource.PlantSeed };
     default:
-      return null;
+      break;
   }
+  if (f === Feature.RockNode) {
+    // Inerte y finita: da piedra y no deja semilla ni cuenta para el equilibrio.
+    return { resource: Resource.Stone, amount: 2, seed: null };
+  }
+  return null;
 }
 
-/** Intencion del jugador para un tick. El cliente produce esto; nunca muta el sim. */
+/** Semilla que hace falta para sembrar cada tipo de vida. */
+export function seedFor(kind: LifeKind): Resource | null {
+  if (kind === LifeKind.Tree) return Resource.TreeSeed;
+  if (kind === LifeKind.Plant) return Resource.PlantSeed;
+  return null;
+}
+
+/** Intencion del jugador para un tick. El cliente produce esto; nunca muta el estado. */
 export interface Intent {
-  /** Direccion deseada, componentes en [-1, 1]. */
+  /** Direccion deseada. La magnitud, acotada a 1, escala la velocidad. */
   moveX: number;
   moveY: number;
-  /** Recolectar el tile mirado este tick. */
   harvest: boolean;
-  /** Consumir bayas este tick. */
   eat: boolean;
+  /** Sembrar en el tile mirado. */
+  plant: boolean;
 }
 
 export function emptyIntent(): Intent {
-  return { moveX: 0, moveY: 0, harvest: false, eat: false };
+  return { moveX: 0, moveY: 0, harvest: false, eat: false, plant: false };
 }

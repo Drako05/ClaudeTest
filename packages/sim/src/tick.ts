@@ -11,7 +11,7 @@ import { CHUNK_SIZE, DAY_TICKS, RESOURCE_COUNT, TICK_DT, type Intent } from '@ve
 import { EntityKind, EntityStore } from './entities.js';
 import { moveEntity } from './systems/movement.js';
 import { updateSurvival } from './systems/survival.js';
-import { tryEat, tryHarvest, type HarvestResult } from './systems/gathering.js';
+import { tryEat, tryHarvest, tryPlant, type HarvestResult } from './systems/gathering.js';
 import { toChunkCoord, World } from './world.js';
 
 /** Radio de chunks mantenidos cargados alrededor del jugador. */
@@ -91,7 +91,10 @@ export function step(state: GameState, intent: Intent): void {
   if (entities.alive[playerId]) {
     moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT);
     if (intent.harvest) {
-      state.lastHarvest = tryHarvest(world, entities, playerId, inventory);
+      state.lastHarvest = tryHarvest(world, entities, playerId, inventory, state.tick);
+    }
+    if (intent.plant) {
+      tryPlant(world, entities, playerId, inventory);
     }
     if (intent.eat) {
       tryEat(entities, playerId, inventory);

@@ -7,8 +7,22 @@
  * la simulacion determinista y el movimiento suave al mismo tiempo.
  */
 
-import { clockLabel, createGame, dayNumber, step, type GameState } from '@verdant/sim';
-import { Resource, TICK_DT } from '@verdant/shared';
+import {
+  clockLabel,
+  createGame,
+  dayNumber,
+  step,
+  toChunkCoord,
+  type GameState,
+} from '@verdant/sim';
+import {
+  BIOME_NAMES,
+  EQUILIBRIUM_BAND,
+  LIFE_KIND_NAMES,
+  LifeKind,
+  Resource,
+  TICK_DT,
+} from '@verdant/shared';
 import { Input } from './input.js';
 import { Renderer } from './renderer.js';
 
@@ -24,6 +38,16 @@ const el = {
   wood: byId('wood'),
   stone: byId('stone'),
   berries: byId('berries'),
+  treeSeed: byId('treeSeed'),
+  plantSeed: byId('plantSeed'),
+  statsToggle: byId('statsToggle'),
+  statsPanel: byId('statsPanel'),
+  biomeName: byId('biomeName'),
+  biomeScope: byId('biomeScope'),
+  biomeBars: byId('biomeBars'),
+  rewardState: byId('rewardState'),
+  chunkScope: byId('chunkScope'),
+  chunkBars: byId('chunkBars'),
   clock: byId('clock'),
   day: byId('day'),
   seed: byId('seed'),
@@ -105,6 +129,15 @@ async function main(): Promise<void> {
   });
   el.restart.addEventListener('click', restart);
 
+  // El panel del entorno se despliega y repliega con el mismo boton.
+  el.statsToggle.addEventListener('click', () => {
+    const open = el.statsPanel.hidden;
+    el.statsPanel.hidden = !open;
+    el.statsToggle.classList.toggle('open', open);
+    el.statsToggle.setAttribute('aria-expanded', String(open));
+    if (open) updateStats(state);
+  });
+
   let accumulator = 0;
   let last = performance.now();
   let hudTimer = 0;
@@ -153,6 +186,7 @@ async function main(): Promise<void> {
     hudTimer += frame;
     if (hudTimer >= 0.1) {
       updateHud(state, fps);
+      updateStats(state);
       hudTimer = 0;
     }
   });
@@ -168,7 +202,11 @@ async function main(): Promise<void> {
       tilesOnScreen: renderer.tilesVisible,
       objects: renderer.objectCount,
       clock: clockLabel(state.tick),
-      disturbed: state.world.life.disturbedCount,
+      tracked: state.world.trackedChunkCount,
+      balanced: state.world.isBiomeBalanced(
+        toChunkCoord(Math.floor(state.entities.x[state.playerId])),
+        toChunkCoord(Math.floor(state.entities.y[state.playerId])),
+      ),
       fps,
       /** Frame mas lento del ultimo segundo: es lo que delata un tiron. */
       worstFrameMs,
@@ -180,6 +218,112 @@ async function main(): Promise<void> {
       inventory: Array.from(state.inventory),
     }),
   });
+}
+
+/**
+ * Una fila de barra del panel, reutilizada entre refrescos.
+ *
+ * Se construye una vez y despues solo se actualizan sus valores: reconstruir el
+ * DOM diez veces por segundo provocaria parpadeos y basura innecesaria.
+ */
+interface StatRow {
+  root: HTMLElement;
+  fill: HTMLElement;
+  state: HTMLElement;
+}
+
+function makeStatRow(container: HTMLElement, label: string): StatRow {
+  const root = document.createElement('div');
+  root.className = 'statRow';
+  root.innerHTML =
+    `<div class="label"><span>${label}</span><span class="state">—</span></div>` +
+    '<div class="track"><div class="band"></div><div class="fill"></div></div>';
+  container.appendChild(root);
+  return {
+    root,
+    fill: root.querySelector('.fill') as HTMLElement,
+    state: root.querySelector('.state') as HTMLElement,
+  };
+}
+
+/** La barra llega hasta 1.5x del referente; el rango sano se marca encima. */
+const BAR_SCALE = 1.5;
+
+function updateStatRow(row: StatRow, count: number, reference: number): void {
+  if (reference <= 0) {
+    row.fill.style.width = '0%';
+    row.fill.className = 'fill';
+    row.state.className = 'state';
+    row.state.textContent = 'sin presencia';
+    return;
+  }
+  const ratio = count / reference;
+  row.fill.style.width = `${Math.min(ratio / BAR_SCALE, 1) * 100}%`;
+
+  let mood = 'ok';
+  let text = 'en equilibrio';
+  if (ratio < 1 - EQUILIBRIUM_BAND) {
+    mood = 'low';
+    text = 'por debajo';
+  } else if (ratio > 1 + EQUILIBRIUM_BAND) {
+    mood = 'high';
+    text = 'saturado';
+  }
+  row.fill.className = `fill ${mood}`;
+  row.state.className = `state ${mood}`;
+  row.state.textContent = text;
+}
+
+const KINDS: readonly LifeKind[] = [LifeKind.Tree, LifeKind.Plant, LifeKind.Animal];
+const biomeRows: StatRow[] = [];
+const chunkRows: StatRow[] = [];
+
+/**
+ * Vuelca el estado del entorno en el panel.
+ *
+ * No se muestran cantidades absolutas a proposito: con el bioma a medio generar
+ * no serian significativas. Lo que se ve es cuanto se desvia lo que hay del
+ * equilibrio con el que nacio, con el rango sano marcado sobre la barra.
+ */
+function updateStats(state: GameState): void {
+  if (el.statsPanel.hidden) return;
+
+  const { entities, playerId, world } = state;
+  const cx = toChunkCoord(Math.floor(entities.x[playerId]));
+  const cy = toChunkCoord(Math.floor(entities.y[playerId]));
+
+  if (biomeRows.length === 0) {
+    for (const kind of KINDS) {
+      biomeRows.push(makeStatRow(el.biomeBars, LIFE_KIND_NAMES[kind]));
+      chunkRows.push(makeStatRow(el.chunkBars, LIFE_KIND_NAMES[kind]));
+    }
+  }
+
+  const biome = world.biomeStats(cx, cy);
+  el.biomeName.textContent = BIOME_NAMES[biome.kind] ?? 'Bioma';
+  el.biomeScope.textContent =
+    `${biome.chunks} chunk${biome.chunks === 1 ? '' : 's'} explorado` +
+    `${biome.chunks === 1 ? '' : 's'}${biome.truncated ? ' (parcial)' : ''}`;
+
+  KINDS.forEach((kind, i) => {
+    updateStatRow(biomeRows[i], biome.count[kind], biome.reference[kind]);
+    updateStatRow(chunkRows[i], world.countOf(cx, cy, kind), world.referenceOf(cx, cy, kind));
+  });
+
+  if (biome.balanced) {
+    el.rewardState.className = 'on';
+    el.rewardState.textContent = 'Bioma equilibrado: recolectar rinde mas y brotan variantes raras.';
+  } else if (biome.overcrowded > 0) {
+    el.rewardState.className = 'off';
+    el.rewardState.textContent =
+      `${biome.overcrowded} chunk${biome.overcrowded === 1 ? '' : 's'} saturado` +
+      `${biome.overcrowded === 1 ? '' : 's'}: sin recompensas hasta que la competencia lo corrija.`;
+  } else {
+    el.rewardState.className = 'off';
+    el.rewardState.textContent = 'Bioma fuera de rango: siembra para recuperar las recompensas.';
+  }
+
+  el.chunkScope.textContent = `${cx}, ${cy}`;
 }
 
 function updateHud(state: GameState, fps: number): void {
@@ -195,6 +339,8 @@ function updateHud(state: GameState, fps: number): void {
   el.wood.textContent = String(inventory[Resource.Wood]);
   el.stone.textContent = String(inventory[Resource.Stone]);
   el.berries.textContent = String(inventory[Resource.Berries]);
+  el.treeSeed.textContent = String(inventory[Resource.TreeSeed]);
+  el.plantSeed.textContent = String(inventory[Resource.PlantSeed]);
 
   el.clock.textContent = clockLabel(state.tick);
   el.day.textContent = String(dayNumber(state.tick));

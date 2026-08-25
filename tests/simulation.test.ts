@@ -9,7 +9,7 @@ import {
   step,
   World,
 } from '@verdant/sim';
-import { emptyIntent, Feature, Resource, TICK_DT, TICK_HZ, type Intent } from '@verdant/shared';
+import { emptyIntent, Feature, LifeKind, lifeKindOf, Resource, TICK_DT, TICK_HZ, type Intent } from '@verdant/shared';
 
 function intent(over: Partial<Intent> = {}): Intent {
   return { ...emptyIntent(), ...over };
@@ -100,7 +100,7 @@ describe('simulacion', () => {
     let found: { x: number; y: number } | null = null;
     for (let y = -60; y < 60 && !found; y++) {
       for (let x = -60; x < 60; x++) {
-        if (world.featureAt(x, y) === Feature.Tree) {
+        if (lifeKindOf(world.featureAt(x, y)) === LifeKind.Tree) {
           found = { x, y };
           break;
         }
@@ -110,7 +110,7 @@ describe('simulacion', () => {
 
     const inventory = new Int32Array(3);
     const before = world.featureAt(found!.x, found!.y);
-    expect(before).toBe(Feature.Tree);
+    expect(lifeKindOf(before)).toBe(LifeKind.Tree);
 
     world.setFeature(found!.x, found!.y, Feature.None);
     inventory[Resource.Wood] += 3;
@@ -126,7 +126,7 @@ describe('simulacion', () => {
     let tree: { x: number; y: number } | null = null;
     for (let y = 0; y < 80 && !tree; y++) {
       for (let x = 0; x < 80; x++) {
-        if (world.featureAt(x, y) === Feature.Tree) {
+        if (lifeKindOf(world.featureAt(x, y)) === LifeKind.Tree) {
           tree = { x, y };
           break;
         }

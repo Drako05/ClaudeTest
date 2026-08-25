@@ -14,7 +14,7 @@
 
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { CHUNK_SIZE, Feature } from '@verdant/shared';
-import type { Chunk, GameState } from '@verdant/sim';
+import type { Chunk, GameState, World } from '@verdant/sim';
 import { daylight, targetTile } from '@verdant/sim';
 import { depthOf, TILE_H, TILE_W, worldToScreen } from './projection.js';
 import {
@@ -34,7 +34,25 @@ interface ChunkView {
   revision: number;
 }
 
-const FEATURE_KINDS = [Feature.Tree, Feature.RockNode, Feature.BerryBush];
+/** Todo lo que puede haber sobre un tile y necesita sprite propio. */
+const FEATURE_KINDS: readonly Feature[] = [
+  Feature.RockNode,
+  Feature.ForestTree,
+  Feature.ForestTreeRare,
+  Feature.ForestPlant,
+  Feature.ForestPlantRare,
+  Feature.MeadowTree,
+  Feature.MeadowTreeRare,
+  Feature.MeadowPlant,
+  Feature.MeadowPlantRare,
+  Feature.ForestTreeSapling,
+  Feature.ForestPlantSapling,
+  Feature.MeadowTreeSapling,
+  Feature.MeadowPlantSapling,
+];
+
+/** Buffer reutilizado al leer las features efectivas de un chunk. */
+const featureScratch = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
 
 export class Renderer {
   readonly app: Application;
@@ -272,7 +290,7 @@ export class Renderer {
       const view = this.views.get(key);
 
       if (!view) {
-        this.views.set(key, this.buildChunkView(chunk, state.world.seed));
+        this.views.set(key, this.buildChunkView(state.world, chunk));
         return;
       }
 
@@ -280,7 +298,7 @@ export class Renderer {
       // recolectarlas, asi que basta con rehacer los sprites de este chunk.
       if (view.revision !== chunk.revision) {
         this.clearFeatures(view);
-        view.features = this.buildFeatures(chunk);
+        view.features = this.buildFeatures(state.world, chunk);
         view.revision = chunk.revision;
       }
     });
@@ -294,13 +312,13 @@ export class Renderer {
     }
   }
 
-  private buildChunkView(chunk: Chunk, seed: number): ChunkView {
+  private buildChunkView(world: World, chunk: Chunk): ChunkView {
     const canvas = document.createElement('canvas');
     canvas.width = CHUNK_TEX_W;
     canvas.height = CHUNK_TEX_H;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No se pudo obtener el contexto 2D del chunk');
-    paintChunkTerrain(chunk, ctx, seed);
+    paintChunkTerrain(chunk, ctx, world.seed);
 
     const texture = Texture.from(canvas);
     texture.source.scaleMode = 'nearest';
@@ -309,18 +327,26 @@ export class Renderer {
     terrain.position.set(origin.x - CHUNK_TEX_OFFSET_X, origin.y);
     this.terrainLayer.addChild(terrain);
 
-    return { terrain, texture, features: this.buildFeatures(chunk), revision: chunk.revision };
+    return { terrain, texture, features: this.buildFeatures(world, chunk), revision: chunk.revision };
   }
 
-  /** Un sprite por feature del chunk, con su profundidad ya fijada. */
-  private buildFeatures(chunk: Chunk): Sprite[] {
+  /**
+   * Un sprite por feature del chunk, con su profundidad ya fijada.
+   *
+   * Lee lo que hay REALMENTE en cada tile, no el potencial del generador. Antes
+   * leia el potencial mientras la colision consultaba la version efectiva, y por
+   * eso una planta recolectada seguia dibujada aunque ya no existiera para el
+   * juego. Una sola fuente de verdad cierra ese fallo por construccion.
+   */
+  private buildFeatures(world: World, chunk: Chunk): Sprite[] {
     const sprites: Sprite[] = [];
     const baseX = chunk.cx * CHUNK_SIZE;
     const baseY = chunk.cy * CHUNK_SIZE;
+    world.readFeatures(chunk, featureScratch);
 
     for (let ly = 0; ly < CHUNK_SIZE; ly++) {
       for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-        const feature = chunk.feature[ly * CHUNK_SIZE + lx] as Feature;
+        const feature = featureScratch[ly * CHUNK_SIZE + lx] as Feature;
         if (feature === Feature.None) continue;
         const art = this.featureTextures.get(feature);
         if (!art) continue;

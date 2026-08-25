@@ -11,7 +11,7 @@
  * pasar por detras de un arbol, y algo horneado en el suelo no puede hacer eso.
  */
 
-import { CHUNK_SIZE, Feature, Terrain } from '@verdant/shared';
+import { CHUNK_SIZE, Feature, isSapling, maturesInto, Terrain } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
 import type { Chunk } from '@verdant/sim';
 import { TILE_H, TILE_W, worldToScreen } from './projection.js';
@@ -95,109 +95,212 @@ export interface FeatureArt {
   riseAbove: number;
 }
 
-/**
- * Dibuja cada feature una sola vez a un lienzo propio, que luego se reutiliza
- * como textura en todos los sprites de ese tipo.
- *
- * En isometrica los objetos tienen altura: se dibujan hacia ARRIBA desde su
- * punto de apoyo, que es el centro del tile. De ahi viene la sensacion de
- * volumen sin necesidad de 3D real.
- */
-export function makeFeatureArt(feature: Feature): FeatureArt | null {
-  const width = 40;
-  const height = 52;
+/** Paleta de una especie. Basta esto para distinguirlas de un vistazo. */
+interface SpeciesLook {
+  /** Silueta: los arboles de bosque son altos y estrechos; los de pradera, anchos. */
+  readonly form: 'conifer' | 'broadleaf' | 'bush';
+  readonly trunk: string;
+  readonly dark: string;
+  readonly mid: string;
+  readonly light: string;
+  /** Color de los frutos, si la especie los tiene. */
+  readonly fruit?: string;
+  /** Las variantes raras se dibujan algo mas grandes ademas de con otro color. */
+  readonly rare: boolean;
+}
+
+const LOOKS: Partial<Record<Feature, SpeciesLook>> = {
+  [Feature.ForestTree]: {
+    form: 'conifer', trunk: '#4a3420', dark: '#1d4419', mid: '#2a5f23', light: '#3d7d31', rare: false,
+  },
+  [Feature.ForestTreeRare]: {
+    form: 'conifer', trunk: '#5a3f26', dark: '#7a5410', mid: '#a8761a', light: '#d9a531', rare: true,
+  },
+  [Feature.MeadowTree]: {
+    form: 'broadleaf', trunk: '#6b4a2c', dark: '#2f6b28', mid: '#438a33', light: '#5aa844', rare: false,
+  },
+  [Feature.MeadowTreeRare]: {
+    form: 'broadleaf', trunk: '#6b4a2c', dark: '#8e3567', mid: '#bd5a8e', light: '#e08cb4', rare: true,
+  },
+  [Feature.ForestPlant]: {
+    form: 'bush', trunk: '#3a5a24', dark: '#24501f', mid: '#33682a', light: '#457f36', fruit: '#c8384a', rare: false,
+  },
+  [Feature.ForestPlantRare]: {
+    form: 'bush', trunk: '#3a5a24', dark: '#1f4650', mid: '#2a6878', light: '#3f93a6', fruit: '#5fd8f0', rare: true,
+  },
+  [Feature.MeadowPlant]: {
+    form: 'bush', trunk: '#4a6b2c', dark: '#2f5a28', mid: '#3f7534', light: '#57944a', fruit: '#c8384a', rare: false,
+  },
+  [Feature.MeadowPlantRare]: {
+    form: 'bush', trunk: '#4a6b2c', dark: '#5a5220', mid: '#8a7a2c', light: '#c4b04a', fruit: '#ffd75e', rare: true,
+  },
+};
+
+function newCanvas(width: number, height: number): [HTMLCanvasElement, CanvasRenderingContext2D] | null {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
+  return ctx ? [canvas, ctx] : null;
+}
 
-  // Punto de apoyo: centro horizontal, cerca del borde inferior.
+function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number): void {
+  ctx.fillStyle = 'rgba(0,0,0,0.26)';
+  ctx.beginPath();
+  ctx.ellipse(x, y, (TILE_W / 2.6) * scale, (TILE_H / 2.6) * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Dibuja cada especie una sola vez a un lienzo propio, que luego se reutiliza
+ * como textura en todos los sprites de ese tipo.
+ *
+ * En isometrica los objetos tienen altura: se dibujan hacia ARRIBA desde su
+ * punto de apoyo, que es el centro del tile. De ahi viene la sensacion de
+ * volumen sin necesidad de 3D real. La luz entra siempre por el noroeste, para
+ * que todas las especies se lean como parte del mismo mundo.
+ */
+export function makeFeatureArt(feature: Feature): FeatureArt | null {
+  if (feature === Feature.RockNode) return makeRockArt();
+  if (isSapling(feature)) return makeSaplingArt(feature);
+
+  const look = LOOKS[feature];
+  if (!look) return null;
+
+  const width = 44;
+  const height = 58;
+  const made = newCanvas(width, height);
+  if (!made) return null;
+  const [canvas, ctx] = made;
+
   const footX = width / 2;
   const footY = height - 6;
+  const grow = look.rare ? 1.15 : 1;
 
-  const shadow = () => {
-    ctx.fillStyle = 'rgba(0,0,0,0.26)';
+  drawShadow(ctx, footX, footY, look.form === 'bush' ? 0.8 : 1);
+
+  if (look.form === 'bush') {
+    ctx.fillStyle = look.dark;
     ctx.beginPath();
-    ctx.ellipse(footX, footY, TILE_W / 2.6, TILE_H / 2.6, 0, 0, Math.PI * 2);
+    ctx.ellipse(footX, footY - 7 * grow, 11 * grow, 9 * grow, 0, 0, Math.PI * 2);
     ctx.fill();
-  };
-
-  switch (feature) {
-    case Feature.Tree: {
-      shadow();
-      ctx.fillStyle = '#5a3f26';
-      ctx.fillRect(footX - 2.5, footY - 16, 5, 16);
-      ctx.fillStyle = '#24501f';
-      ctx.beginPath();
-      ctx.arc(footX, footY - 24, 13, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#31672a';
-      ctx.beginPath();
-      ctx.arc(footX, footY - 30, 10.5, 0, Math.PI * 2);
-      ctx.fill();
-      // Luz por el noroeste, coherente en todas las features.
-      ctx.fillStyle = '#488c39';
-      ctx.beginPath();
-      ctx.arc(footX - 4, footY - 33, 6.5, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    }
-    case Feature.RockNode: {
-      shadow();
-      ctx.fillStyle = '#6f6f78';
-      ctx.beginPath();
-      ctx.moveTo(footX - 11, footY);
-      ctx.lineTo(footX - 5, footY - 15);
-      ctx.lineTo(footX + 4, footY - 12);
-      ctx.lineTo(footX + 11, footY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#9a9aa4';
-      ctx.beginPath();
-      ctx.moveTo(footX - 5, footY - 15);
-      ctx.lineTo(footX + 4, footY - 12);
-      ctx.lineTo(footX - 1, footY);
-      ctx.lineTo(footX - 11, footY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#b8b8c2';
-      ctx.beginPath();
-      ctx.moveTo(footX - 5, footY - 15);
-      ctx.lineTo(footX - 1, footY - 6);
-      ctx.lineTo(footX - 8, footY - 4);
-      ctx.closePath();
-      ctx.fill();
-      break;
-    }
-    case Feature.BerryBush: {
-      shadow();
-      ctx.fillStyle = '#2f5a28';
-      ctx.beginPath();
-      ctx.ellipse(footX, footY - 7, 11, 9, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#3f7534';
-      ctx.beginPath();
-      ctx.ellipse(footX - 2.5, footY - 10, 7, 5.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#c8384a';
-      for (const [dx, dy] of [
-        [-5, -6],
-        [4, -9],
-        [1, -3],
-        [7, -4],
-      ]) {
+    ctx.fillStyle = look.mid;
+    ctx.beginPath();
+    ctx.ellipse(footX - 2, footY - 10 * grow, 7.5 * grow, 6 * grow, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = look.light;
+    ctx.beginPath();
+    ctx.ellipse(footX - 3.5, footY - 12 * grow, 4 * grow, 3 * grow, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (look.fruit) {
+      ctx.fillStyle = look.fruit;
+      for (const [dx, dy] of [[-5, -6], [4, -9], [1, -3], [7, -5]]) {
         ctx.beginPath();
-        ctx.arc(footX + dx, footY + dy, 2.1, 0, Math.PI * 2);
+        ctx.arc(footX + dx, footY + dy * grow, 2.1 * grow, 0, Math.PI * 2);
         ctx.fill();
       }
-      break;
     }
-    default:
-      return null;
+  } else if (look.form === 'conifer') {
+    ctx.fillStyle = look.trunk;
+    ctx.fillRect(footX - 2.5, footY - 14 * grow, 5, 14 * grow);
+    // Tres pisos que estrechan hacia arriba: silueta alta y puntiaguda.
+    const tiers: Array<[number, number, string]> = [
+      [14 * grow, 13 * grow, look.dark],
+      [21 * grow, 10 * grow, look.mid],
+      [28 * grow, 6.5 * grow, look.light],
+    ];
+    for (const [rise, halfWidth, color] of tiers) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(footX, footY - rise - 11 * grow);
+      ctx.lineTo(footX + halfWidth, footY - rise + 2);
+      ctx.lineTo(footX - halfWidth, footY - rise + 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+  } else {
+    ctx.fillStyle = look.trunk;
+    ctx.fillRect(footX - 3, footY - 17 * grow, 6, 17 * grow);
+    ctx.fillStyle = look.dark;
+    ctx.beginPath();
+    ctx.arc(footX, footY - 25 * grow, 15 * grow, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = look.mid;
+    ctx.beginPath();
+    ctx.arc(footX - 2, footY - 29 * grow, 11 * grow, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = look.light;
+    ctx.beginPath();
+    ctx.arc(footX - 5, footY - 32 * grow, 6.5 * grow, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   return { canvas, anchorX: footX / width, anchorY: footY / height, riseAbove: footY };
+}
+
+/** Brote recien sembrado: pequeno, sin fruto y sin estorbar el paso. */
+function makeSaplingArt(feature: Feature): FeatureArt | null {
+  const adult = maturesInto(feature);
+  const look = LOOKS[adult];
+  const made = newCanvas(28, 26);
+  if (!made) return null;
+  const [canvas, ctx] = made;
+
+  const footX = 14;
+  const footY = 21;
+  drawShadow(ctx, footX, footY, 0.5);
+
+  ctx.strokeStyle = look?.trunk ?? '#4a6b2c';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(footX, footY);
+  ctx.lineTo(footX, footY - 7);
+  ctx.stroke();
+
+  ctx.fillStyle = look?.mid ?? '#3f7534';
+  ctx.beginPath();
+  ctx.ellipse(footX - 3.5, footY - 8, 3.6, 2.2, -0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(footX + 3.5, footY - 9.5, 3.6, 2.2, 0.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  return { canvas, anchorX: footX / 28, anchorY: footY / 26, riseAbove: footY };
+}
+
+function makeRockArt(): FeatureArt | null {
+  const made = newCanvas(40, 40);
+  if (!made) return null;
+  const [canvas, ctx] = made;
+  const footX = 20;
+  const footY = 34;
+
+  drawShadow(ctx, footX, footY, 0.9);
+  ctx.fillStyle = '#6f6f78';
+  ctx.beginPath();
+  ctx.moveTo(footX - 11, footY);
+  ctx.lineTo(footX - 5, footY - 15);
+  ctx.lineTo(footX + 4, footY - 12);
+  ctx.lineTo(footX + 11, footY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#9a9aa4';
+  ctx.beginPath();
+  ctx.moveTo(footX - 5, footY - 15);
+  ctx.lineTo(footX + 4, footY - 12);
+  ctx.lineTo(footX - 1, footY);
+  ctx.lineTo(footX - 11, footY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#b8b8c2';
+  ctx.beginPath();
+  ctx.moveTo(footX - 5, footY - 15);
+  ctx.lineTo(footX - 1, footY - 6);
+  ctx.lineTo(footX - 8, footY - 4);
+  ctx.closePath();
+  ctx.fill();
+
+  return { canvas, anchorX: footX / 40, anchorY: footY / 40, riseAbove: footY };
 }
 
 /** El personaje, con el mismo criterio de apoyo y luz que las features. */
