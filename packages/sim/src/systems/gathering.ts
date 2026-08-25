@@ -2,12 +2,21 @@
  * Recoleccion: el jugador cosecha el tile que tiene delante.
  */
 
-import { Feature, harvestOf, Resource } from '@verdant/shared';
+import { Feature, harvestOf, isPlant, regrowTicksOf, Resource } from '@verdant/shared';
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 
 /** Alcance en tiles desde el centro del jugador. */
 export const REACH = 1.1;
+/**
+ * Vida que se resta al chunk por planta recolectada.
+ *
+ * Es lo que convierte la tala en un hecho regional y no solo local: vaciar una
+ * zona entera hunde su vegetacion y tarda en recuperarse, tal y como exige que
+ * «los ecosistemas tiendan hacia estados dinamicos de equilibrio» en vez de
+ * reponerse al instante.
+ */
+export const VEGETATION_COST = 0.012;
 /** Bayas consumidas por comida y hambre que restaura cada una. */
 export const BERRIES_PER_MEAL = 1;
 export const HUNGER_PER_BERRY = 14;
@@ -43,7 +52,14 @@ export function tryHarvest(
   const yield_ = harvestOf(feature);
   if (!yield_) return null;
 
-  world.setFeature(x, y, Feature.None);
+  // Renovable o finito segun su naturaleza, como dice el capitulo II: lo que
+  // vuelve a crecer deja solo una marca temporal; lo que se agota de verdad
+  // (la piedra) se borra para siempre.
+  if (regrowTicksOf(feature) > 0) {
+    world.recordHarvest(x, y, feature, isPlant(feature) ? VEGETATION_COST : 0);
+  } else {
+    world.setFeature(x, y, Feature.None);
+  }
   inventory[yield_.resource] += yield_.amount;
   return { resource: yield_.resource, amount: yield_.amount, tileX: x, tileY: y };
 }

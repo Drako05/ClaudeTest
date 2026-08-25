@@ -15,7 +15,7 @@
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { CHUNK_SIZE, Feature } from '@verdant/shared';
 import type { Chunk, GameState } from '@verdant/sim';
-import { targetTile } from '@verdant/sim';
+import { daylight, targetTile } from '@verdant/sim';
 import { depthOf, TILE_H, TILE_W, worldToScreen } from './projection.js';
 import {
   CHUNK_TEX_H,
@@ -56,6 +56,8 @@ export class Renderer {
   private player!: Sprite;
   private playerRise = 0;
   private readonly reticle = new Graphics();
+  /** Vela de color sobre toda la escena: es el ciclo dia/noche. */
+  private readonly skyTint = new Graphics();
 
   /**
    * Filas de tiles visibles a lo largo del eje menor de la pantalla.
@@ -70,6 +72,8 @@ export class Renderer {
     this.camera.addChild(this.terrainLayer, this.markerLayer, this.objectLayer);
     this.app.stage.addChild(this.camera);
     this.markerLayer.addChild(this.reticle);
+    // Fuera de la camara: cubre la pantalla, no el mundo.
+    this.app.stage.addChild(this.skyTint);
     this.buildTextures();
   }
 
@@ -155,6 +159,7 @@ export class Renderer {
 
     this.fadeOccluders(wx, wy, playerScreen);
     this.drawReticle(entities, playerId);
+    this.drawSky(state.tick, view.width, view.height);
   }
 
   /**
@@ -198,6 +203,27 @@ export class Renderer {
         this.faded.push(sprite);
       }
     }
+  }
+
+  /**
+   * Tinte del cielo segun la hora del mundo.
+   *
+   * Una sola vela de color sobre la escena, mas barata y mas estable que
+   * retintar cada sprite. La noche entra en azul frio y el amanecer y el ocaso
+   * pasan por un ambar calido, que es lo que hace legible el paso del tiempo
+   * sin necesidad de mirar el reloj.
+   */
+  private drawSky(tick: number, width: number, height: number): void {
+    const light = daylight(tick);
+    this.skyTint.clear();
+    if (light >= 0.999) return; // pleno dia: nada que tintar
+
+    // Cerca de las transiciones el tinte vira a ambar; en plena noche, a azul.
+    const warmth = 1 - Math.abs(light - 0.5) * 2;
+    const nightAlpha = (1 - light) * 0.52;
+    const color = mixColor(0x0a1a3c, 0x6b3a12, warmth * 0.55);
+
+    this.skyTint.rect(0, 0, width, height).fill({ color, alpha: nightAlpha });
   }
 
   private drawReticle(entities: GameState['entities'], playerId: number): void {
@@ -348,4 +374,18 @@ export class Renderer {
   get objectCount(): number {
     return this.objectLayer.children.length;
   }
+}
+
+/** Mezcla dos colores empaquetados en 0xRRGGBB. */
+function mixColor(a: number, b: number, t: number): number {
+  const ar = (a >> 16) & 255;
+  const ag = (a >> 8) & 255;
+  const ab = a & 255;
+  const br = (b >> 16) & 255;
+  const bg = (b >> 8) & 255;
+  const bb = b & 255;
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(ab + (bb - ab) * t);
+  return (r << 16) | (g << 8) | bl;
 }

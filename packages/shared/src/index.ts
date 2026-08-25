@@ -12,6 +12,19 @@ export const CHUNK_MASK = CHUNK_SIZE - 1;
 export const TICK_HZ = 60;
 export const TICK_DT = 1 / TICK_HZ;
 
+/** Duracion de un dia completo del mundo: 8 minutos reales. */
+export const DAY_TICKS = 8 * 60 * TICK_HZ;
+
+/**
+ * Cada cuantos ticks avanza la vida vegetal.
+ *
+ * Que sea un paso FIJO y global no es un detalle de rendimiento: es lo que hace
+ * que ponerse al dia de golpe y simular continuamente den exactamente el mismo
+ * resultado, y por tanto lo que sostiene la ley de que el mundo existe
+ * independientemente de cualquier observador.
+ */
+export const LIFE_STEP_TICKS = 300;
+
 /** Capa de terreno. */
 export enum Terrain {
   DeepWater = 0,
@@ -56,6 +69,29 @@ export function isFeatureSolid(f: Feature): boolean {
 export interface Harvest {
   resource: Resource;
   amount: number;
+}
+
+/**
+ * Ticks que tarda un recurso en volver tras recolectarlo.
+ *
+ * Cero significa que NO vuelve. El libro dice que los recursos, «segun su
+ * naturaleza, pueden ser finitos, consumibles y renovables»: la madera y las
+ * bayas se renuevan, la piedra no.
+ */
+export function regrowTicksOf(f: Feature): number {
+  switch (f) {
+    case Feature.Tree:
+      return DAY_TICKS * 2;
+    case Feature.BerryBush:
+      return Math.round(DAY_TICKS * 0.6);
+    default:
+      return 0;
+  }
+}
+
+/** True si la feature forma parte del reino vegetal y depende del ecosistema. */
+export function isPlant(f: Feature): boolean {
+  return f === Feature.Tree || f === Feature.BerryBush;
 }
 
 export function harvestOf(f: Feature): Harvest | null {

@@ -27,6 +27,8 @@ const DIST = process.env.VERDANT_DIST
   : fileURLToPath(new URL('../packages/client/dist', import.meta.url));
 const SHOTS = fileURLToPath(new URL('../screenshots', import.meta.url));
 const SEED = 12345;
+/** Medianoche: el dia dura 8 minutos, asi que hay que saltar hasta la noche. */
+const NIGHT_TICK = 0;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -71,11 +73,27 @@ function watchProblems(page, label) {
   page.on('pageerror', (e) => fail(`${label} pageerror: ${e.message}`));
 }
 
-/** Espera a que el bucle de juego haya corrido de verdad, no solo a que cargue. */
+/**
+ * Espera a que el bucle de juego haya corrido de verdad, no solo a que cargue.
+ *
+ * Se mide el AVANCE del contador, no su valor absoluto. Comparar contra un
+ * numero fijo dejo de funcionar en cuanto los mundos empezaron a nacer ya
+ * entrados en la manana: el contador nacia por encima del umbral y la espera se
+ * daba por cumplida en el primer frame, sin haber dibujado nada todavia.
+ */
 async function waitForLoop(page) {
-  await page.waitForFunction(() => window.__verdant && window.__verdant.tick > 90, null, {
-    timeout: 20000,
-  });
+  await page.waitForFunction(
+    () => {
+      if (!window.__verdant) return false;
+      if (window.__smokeBaseTick === undefined) {
+        window.__smokeBaseTick = window.__verdant.tick;
+        return false;
+      }
+      return window.__verdant.tick - window.__smokeBaseTick > 90;
+    },
+    null,
+    { timeout: 20000 },
+  );
   return page.evaluate(() => window.__verdant);
 }
 
@@ -140,6 +158,8 @@ async function desktopPass(browser, baseUrl) {
   console.log('  estado inicial:', JSON.stringify(spawn));
 
   check(spawn.seed === SEED, `la semilla de la URL no se respeto (${spawn.seed})`);
+  check(!spawn.clock.startsWith('00:'), `un mundo nuevo no deberia empezar a medianoche (${spawn.clock})`);
+  check(spawn.objects > 50, `apenas se dibujaron objetos en la escena (${spawn.objects})`);
   check(spawn.chunks > 0, 'no se cargo ningun chunk');
   check(spawn.health === 100, `salud inicial inesperada: ${spawn.health}`);
 
@@ -185,6 +205,15 @@ async function desktopPass(browser, baseUrl) {
   for (let i = 0; i < 5; i++) await page.keyboard.press('Minus');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(SHOTS, '03-mundo-amplio.png') });
+
+  // El mundo de noche. Se abre con ?t= porque un dia dura ocho minutos reales y
+  // esperarlo en una prueba de humo no tiene sentido.
+  await page.goto(`${baseUrl}/?seed=${SEED}&t=${NIGHT_TICK}`, { waitUntil: 'load' });
+  await page.evaluate(() => delete window.__smokeBaseTick);
+  const night = await waitForLoop(page);
+  console.log(`  hora nocturna: ${night.clock}`);
+  check(night.clock.startsWith('00:'), `no arranco a medianoche (${night.clock})`);
+  await page.screenshot({ path: join(SHOTS, '07-noche.png') });
 
   await page.close();
 }

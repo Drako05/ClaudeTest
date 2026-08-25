@@ -7,7 +7,7 @@
  * la simulacion determinista y el movimiento suave al mismo tiempo.
  */
 
-import { createGame, step, type GameState } from '@verdant/sim';
+import { clockLabel, createGame, dayNumber, step, type GameState } from '@verdant/sim';
 import { Resource, TICK_DT } from '@verdant/shared';
 import { Input } from './input.js';
 import { Renderer } from './renderer.js';
@@ -24,6 +24,8 @@ const el = {
   wood: byId('wood'),
   stone: byId('stone'),
   berries: byId('berries'),
+  clock: byId('clock'),
+  day: byId('day'),
   seed: byId('seed'),
   pos: byId('pos'),
   chunks: byId('chunks'),
@@ -58,10 +60,23 @@ function seedFromLocation(): number {
   return (Math.random() * 0xffffffff) >>> 0;
 }
 
+/** Instante inicial via `?t=`, para poder abrir el mundo a una hora concreta. */
+function startTickFromLocation(): number | undefined {
+  try {
+    const param = new URLSearchParams(window.location.search).get('t');
+    if (param === null) return undefined;
+    const parsed = Number.parseInt(param, 10);
+    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  } catch {
+    // Sin acceso a la URL: se usa el amanecer por defecto.
+  }
+  return undefined;
+}
+
 async function main(): Promise<void> {
   const renderer = await Renderer.create();
 
-  let state: GameState = createGame(seedFromLocation());
+  let state: GameState = createGame(seedFromLocation(), startTickFromLocation());
   let prevX = state.entities.x[state.playerId];
   let prevY = state.entities.y[state.playerId];
 
@@ -152,6 +167,8 @@ async function main(): Promise<void> {
       // de verdad, en vez de asumirlo mirando pixeles.
       tilesOnScreen: renderer.tilesVisible,
       objects: renderer.objectCount,
+      clock: clockLabel(state.tick),
+      disturbed: state.world.life.disturbedCount,
       fps,
       /** Frame mas lento del ultimo segundo: es lo que delata un tiron. */
       worstFrameMs,
@@ -179,6 +196,8 @@ function updateHud(state: GameState, fps: number): void {
   el.stone.textContent = String(inventory[Resource.Stone]);
   el.berries.textContent = String(inventory[Resource.Berries]);
 
+  el.clock.textContent = clockLabel(state.tick);
+  el.day.textContent = String(dayNumber(state.tick));
   el.seed.textContent = String(state.world.seed);
   el.pos.textContent = `${Math.floor(entities.x[playerId])}, ${Math.floor(entities.y[playerId])}`;
   el.chunks.textContent = String(state.world.loadedChunkCount);

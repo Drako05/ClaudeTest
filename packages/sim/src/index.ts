@@ -8,6 +8,8 @@
  */
 
 export * from './rng.js';
+export * from './clock.js';
+export * from './life.js';
 export * from './worldgen.js';
 export * from './world.js';
 export * from './entities.js';

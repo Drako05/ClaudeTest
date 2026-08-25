@@ -7,7 +7,7 @@
  * repeticion de bugs, tests). El render interpola aparte, en el cliente.
  */
 
-import { CHUNK_SIZE, RESOURCE_COUNT, TICK_DT, type Intent } from '@verdant/shared';
+import { CHUNK_SIZE, DAY_TICKS, RESOURCE_COUNT, TICK_DT, type Intent } from '@verdant/shared';
 import { EntityKind, EntityStore } from './entities.js';
 import { moveEntity } from './systems/movement.js';
 import { updateSurvival } from './systems/survival.js';
@@ -34,7 +34,15 @@ export interface GameState {
   streamCy: number;
 }
 
-export function createGame(seed: number): GameState {
+/**
+ * Instante en que arranca un mundo nuevo: poco despues del amanecer.
+ *
+ * El tick 0 es medianoche, asi que sin este desplazamiento toda partida nueva
+ * empezaria a oscuras.
+ */
+export const DEFAULT_START_TICK = Math.round(DAY_TICKS * 0.28);
+
+export function createGame(seed: number, startTick: number = DEFAULT_START_TICK): GameState {
   const world = new World(seed);
   const spawn = world.findSpawn(0, 0);
   const entities = new EntityStore();
@@ -45,13 +53,14 @@ export function createGame(seed: number): GameState {
     entities,
     playerId,
     inventory: new Int32Array(RESOURCE_COUNT),
-    tick: 0,
+    tick: Math.max(0, Math.floor(startTick)),
     lastHarvest: null,
     streamCx: Number.NaN,
     streamCy: Number.NaN,
   };
 
   streamChunks(state);
+  world.setNow(state.tick);
   return state;
 }
 
@@ -74,6 +83,10 @@ function streamChunks(state: GameState): void {
 export function step(state: GameState, intent: Intent): void {
   const { entities, playerId, world, inventory } = state;
   state.lastHarvest = null;
+
+  // El tiempo avanza antes que nada: el resto del tick actua sobre el mundo tal
+  // y como esta AHORA, con la vegetacion ya puesta al dia.
+  world.setNow(state.tick);
 
   if (entities.alive[playerId]) {
     moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT);
