@@ -61,29 +61,48 @@ export class WorldGen {
   }
 
   /**
-   * Temperatura en [0, 1]. Baja con la latitud y con la altitud, como en el
-   * mundo real: por eso hay nieve en las cimas aunque no estes en el norte.
+   * Temperatura en [0, 1]. Combina ruido, latitud y altitud.
+   *
+   * Los pesos y el periodo de latitud estan calibrados contra la distribucion
+   * real medida de los campos, no elegidos a ojo: una version anterior tenia el
+   * umbral de nieve en 0.22 cuando la temperatura minima real era 0.35, asi que
+   * la nieve sencillamente no existia en el mundo. Si se tocan las escalas de
+   * ruido hay que volver a medir los percentiles y recalibrar los umbrales.
+   *
+   * El periodo de latitud (~1800 tiles por ciclo completo) esta elegido para que
+   * el jugador atraviese bandas climaticas caminando cientos de tiles, no miles.
    */
   temperatureAt(wx: number, wy: number, elevation: number): number {
     const base = this.temperature.fbm(wx * TEMPERATURE_SCALE, wy * TEMPERATURE_SCALE, 2) * 0.5 + 0.5;
-    const latitude = Math.cos(wy / 2600) * 0.5 + 0.5;
-    const altitudePenalty = Math.max(0, elevation - 0.62) * 1.6;
-    return clamp01(base * 0.45 + latitude * 0.55 - altitudePenalty);
+    const latitude = Math.cos(wy / 286) * 0.5 + 0.5;
+    const altitudePenalty = Math.max(0, elevation - 0.58) * 1.9;
+    // El ruido pesa mas que la latitud para que haya parches frios y calidos a
+    // ambos lados del ecuador, en vez de bandas horizontales perfectas.
+    return clamp01((base - 0.5) * 1.5 + 0.5 * 0.42 + latitude * 0.58 - altitudePenalty);
   }
 
-  /** Clasifica un tile en bioma a partir de los tres campos. */
+  /**
+   * Clasifica un tile en bioma a partir de los tres campos.
+   *
+   * Umbrales derivados de los percentiles reales de cada campo (ver
+   * tools/analyze-world.ts). Cambiar una escala de ruido invalida estos numeros.
+   */
   terrainAt(wx: number, wy: number): Terrain {
     const e = this.elevationAt(wx, wy);
     if (e < 0.34) return Terrain.DeepWater;
     if (e < 0.42) return Terrain.Water;
-    if (e < 0.46) return Terrain.Sand;
+    if (e < 0.455) return Terrain.Sand;
 
     const t = this.temperatureAt(wx, wy, e);
-    if (t < 0.22) return Terrain.Snow;
-    if (e > 0.78) return Terrain.Rock;
+
+    // Tierras altas: el frio de altitud decide entre cumbre nevada y roca desnuda.
+    if (e > 0.70) return t < 0.34 ? Terrain.Snow : Terrain.Rock;
+
+    if (t < 0.24) return Terrain.Snow;
+    if (t < 0.38) return Terrain.Tundra;
 
     const m = this.moistureAt(wx, wy);
-    if (m > 0.56) return Terrain.Forest;
+    if (m > 0.55) return Terrain.Forest;
     return Terrain.Grass;
   }
 
@@ -95,8 +114,11 @@ export class WorldGen {
     const r = hash2DFloat(this.seed ^ 0x51ed270b, wx, wy);
     switch (terrain) {
       case Terrain.Forest:
-        if (r < 0.42) return Feature.Tree;
-        if (r < 0.47) return Feature.BerryBush;
+        // Densidad deliberadamente por debajo del 42% inicial: los arboles
+        // bloquean el paso, y a esa densidad el bosque era un muro impenetrable
+        // en vez de un lugar por el que moverse.
+        if (r < 0.3) return Feature.Tree;
+        if (r < 0.36) return Feature.BerryBush;
         return Feature.None;
       case Terrain.Grass:
         if (r < 0.045) return Feature.Tree;
@@ -104,7 +126,12 @@ export class WorldGen {
         if (r < 0.09) return Feature.RockNode;
         return Feature.None;
       case Terrain.Snow:
-        return r < 0.05 ? Feature.Tree : Feature.None;
+        return r < 0.04 ? Feature.Tree : Feature.None;
+      case Terrain.Tundra:
+        if (r < 0.07) return Feature.Tree;
+        if (r < 0.1) return Feature.RockNode;
+        if (r < 0.12) return Feature.BerryBush;
+        return Feature.None;
       case Terrain.Sand:
         return r < 0.02 ? Feature.RockNode : Feature.None;
       default:

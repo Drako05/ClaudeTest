@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Verdant — prototipo</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1020; }
+      body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #e8eef7; }
+      canvas { display: block; }
+
+      #hud {
+        position: fixed; top: 12px; left: 12px; z-index: 10;
+        background: rgba(8, 14, 28, 0.78);
+        border: 1px solid rgba(140, 190, 255, 0.22);
+        border-radius: 10px; padding: 12px 14px;
+        font-size: 13px; line-height: 1.55; min-width: 210px;
+        backdrop-filter: blur(6px);
+      }
+      #hud h1 { margin: 0 0 8px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #8fc4ff; font-weight: 600; }
+      .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; margin: 3px 0 8px; }
+      .bar > i { display: block; height: 100%; width: 100%; transition: width .12s linear; }
+      #healthFill { background: linear-gradient(90deg, #ff6b6b, #ff9f7a); }
+      #hungerFill { background: linear-gradient(90deg, #ffc46b, #ffe89a); }
+      .row { display: flex; justify-content: space-between; gap: 16px; }
+      .dim { color: #8b9bb4; }
+
+      #help {
+        position: fixed; bottom: 12px; left: 12px; z-index: 10;
+        background: rgba(8, 14, 28, 0.78);
+        border: 1px solid rgba(140, 190, 255, 0.22);
+        border-radius: 10px; padding: 10px 14px; font-size: 12px; line-height: 1.7;
+        color: #b8c6dc; backdrop-filter: blur(6px);
+      }
+      kbd {
+        background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
+        border-radius: 4px; padding: 1px 6px; font: inherit; color: #e8eef7;
+      }
+      #dead {
+        position: fixed; inset: 0; z-index: 20; display: none;
+        align-items: center; justify-content: center; flex-direction: column; gap: 14px;
+        background: rgba(6, 10, 20, .82); backdrop-filter: blur(3px);
+      }
+      #dead.show { display: flex; }
+      #dead p { margin: 0; font-size: 26px; letter-spacing: .1em; color: #ff8080; }
+      #dead button {
+        font: inherit; color: #0b1020; background: #8fc4ff; border: 0;
+        padding: 9px 20px; border-radius: 8px; cursor: pointer; font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud">
+      <h1>Verdant</h1>
+      <div class="row"><span>Salud</span><span id="healthText" class="dim">100</span></div>
+      <div class="bar"><i id="healthFill"></i></div>
+      <div class="row"><span>Hambre</span><span id="hungerText" class="dim">100</span></div>
+      <div class="bar"><i id="hungerFill"></i></div>
+      <div class="row"><span>Madera</span><span id="wood" class="dim">0</span></div>
+      <div class="row"><span>Piedra</span><span id="stone" class="dim">0</span></div>
+      <div class="row"><span>Bayas</span><span id="berries" class="dim">0</span></div>
+      <hr style="border:0;border-top:1px solid rgba(255,255,255,.1);margin:9px 0" />
+      <div class="row dim"><span>Semilla</span><span id="seed">—</span></div>
+      <div class="row dim"><span>Pos</span><span id="pos">0, 0</span></div>
+      <div class="row dim"><span>Chunks</span><span id="chunks">0</span></div>
+      <div class="row dim"><span>FPS</span><span id="fps">0</span></div>
+    </div>
+
+    <div id="help">
+      <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> recolectar &nbsp; <kbd>E</kbd> comer bayas<br />
+      <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
+    </div>
+
+    <div id="dead">
+      <p>HAS MUERTO</p>
+      <button id="restart">Reiniciar</button>
+    </div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

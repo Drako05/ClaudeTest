@@ -21,6 +21,7 @@ export enum Terrain {
   Forest = 4,
   Rock = 5,
   Snow = 6,
+  Tundra = 7,
 }
 
 /** Capa de features: lo que se puede recolectar o estorba el paso. */
