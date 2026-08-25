@@ -16,7 +16,10 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-const DIST = fileURLToPath(new URL('../packages/client/dist', import.meta.url));
+// VERDANT_DIST permite verificar tambien el build de un solo fichero.
+const DIST = process.env.VERDANT_DIST
+  ? fileURLToPath(new URL(process.env.VERDANT_DIST, import.meta.url))
+  : fileURLToPath(new URL('../packages/client/dist', import.meta.url));
 const SHOTS = fileURLToPath(new URL('../screenshots', import.meta.url));
 const SEED = 12345;
 

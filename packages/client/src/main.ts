@@ -38,12 +38,20 @@ function byId(id: string): HTMLElement {
   return node;
 }
 
-/** Semilla de la URL si la hay, para poder compartir un mundo concreto. */
+/**
+ * Semilla de la URL si la hay, para poder compartir un mundo concreto.
+ * Envuelto en try/catch porque en un iframe con sandbox restrictivo el acceso a
+ * location puede lanzar; en ese caso simplemente se juega un mundo al azar.
+ */
 function seedFromLocation(): number {
-  const param = new URLSearchParams(window.location.search).get('seed');
-  if (param !== null) {
-    const parsed = Number.parseInt(param, 10);
-    if (Number.isFinite(parsed)) return parsed >>> 0;
+  try {
+    const param = new URLSearchParams(window.location.search).get('seed');
+    if (param !== null) {
+      const parsed = Number.parseInt(param, 10);
+      if (Number.isFinite(parsed)) return parsed >>> 0;
+    }
+  } catch {
+    // Sin acceso a la URL: mundo al azar.
   }
   // Math.random aqui es legitimo: esto es el cliente eligiendo que mundo abrir,
   // no la simulacion. Dentro de packages/sim estaria prohibido.
@@ -59,9 +67,15 @@ async function main(): Promise<void> {
 
   function restart(): void {
     const seed = (Math.random() * 0xffffffff) >>> 0;
-    const url = new URL(window.location.href);
-    url.searchParams.set('seed', String(seed));
-    window.history.replaceState({}, '', url);
+    // Reflejar la semilla en la URL es una comodidad, no un requisito: si el
+    // entorno no lo permite (iframe con sandbox), el juego sigue igual.
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('seed', String(seed));
+      window.history.replaceState({}, '', url);
+    } catch {
+      // Ignorado a proposito.
+    }
 
     renderer.reset();
     state = createGame(seed);
