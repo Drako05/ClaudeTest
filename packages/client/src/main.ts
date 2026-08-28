@@ -11,6 +11,7 @@ import {
   clockLabel,
   createGame,
   dayNumber,
+  skipTime,
   step,
   toChunkCoord,
   type GameState,
@@ -23,6 +24,7 @@ import {
   Resource,
   TICK_DT,
 } from '@verdant/shared';
+import { DevTools } from './devtools.js';
 import { Input } from './input.js';
 import { Renderer } from './renderer.js';
 
@@ -123,6 +125,15 @@ async function main(): Promise<void> {
     el.dead.classList.remove('show');
   }
 
+  const dev = new DevTools({
+    onSkip: (ticks) => {
+      skipTime(state, ticks);
+      // Tras un salto, el estado observado cambia de golpe; no tiene sentido
+      // registrarlo como si el jugador hubiera recolectado o comido.
+      dev.observe(Array.from(state.inventory), state.entities.hunger[state.playerId], 0);
+    },
+  });
+
   const input = new Input({
     onRestart: restart,
     onZoom: (factor) => renderer.zoomBy(factor),
@@ -173,7 +184,9 @@ async function main(): Promise<void> {
       worstFrame = 0;
     }
 
-    accumulator += frame;
+    // Las herramientas de desarrollo pueden pausar o acelerar el tiempo. Con
+    // escala cero el acumulador no avanza y la simulacion queda congelada.
+    accumulator += frame * dev.timeScale;
     while (accumulator >= TICK_DT) {
       prevX = state.entities.x[state.playerId];
       prevY = state.entities.y[state.playerId];
@@ -187,6 +200,15 @@ async function main(): Promise<void> {
     if (hudTimer >= 0.1) {
       updateHud(state, fps);
       updateStats(state);
+      renderer.setDebugOverlays(dev.showChunkBorders, dev.showBiomeBorders);
+      dev.observe(
+        Array.from(state.inventory),
+        state.entities.hunger[state.playerId],
+        state.world.biomeAt(
+          Math.floor(state.entities.x[state.playerId]),
+          Math.floor(state.entities.y[state.playerId]),
+        ),
+      );
       hudTimer = 0;
     }
   });
@@ -203,9 +225,21 @@ async function main(): Promise<void> {
       objects: renderer.objectCount,
       clock: clockLabel(state.tick),
       tracked: state.world.trackedChunkCount,
+      dev: dev.active,
+      timeScale: dev.timeScale,
+      biome: BIOME_NAMES[
+        state.world.biomeAt(
+          Math.floor(state.entities.x[state.playerId]),
+          Math.floor(state.entities.y[state.playerId]),
+        )
+      ],
       balanced: state.world.isBiomeBalanced(
         toChunkCoord(Math.floor(state.entities.x[state.playerId])),
         toChunkCoord(Math.floor(state.entities.y[state.playerId])),
+        state.world.biomeAt(
+          Math.floor(state.entities.x[state.playerId]),
+          Math.floor(state.entities.y[state.playerId]),
+        ),
       ),
       fps,
       /** Frame mas lento del ultimo segundo: es lo que delata un tiron. */
@@ -289,8 +323,14 @@ function updateStats(state: GameState): void {
   if (el.statsPanel.hidden) return;
 
   const { entities, playerId, world } = state;
-  const cx = toChunkCoord(Math.floor(entities.x[playerId]));
-  const cy = toChunkCoord(Math.floor(entities.y[playerId]));
+  const tileX = Math.floor(entities.x[playerId]);
+  const tileY = Math.floor(entities.y[playerId]);
+  const cx = toChunkCoord(tileX);
+  const cy = toChunkCoord(tileY);
+  // El bioma que se anuncia es el del SUELO que pisa el jugador, no el
+  // predominante de su chunk: por eso antes podia decir bosque estando sobre
+  // hierba.
+  const standing = world.biomeAt(tileX, tileY);
 
   if (biomeRows.length === 0) {
     for (const kind of KINDS) {
@@ -299,7 +339,7 @@ function updateStats(state: GameState): void {
     }
   }
 
-  const biome = world.biomeStats(cx, cy);
+  const biome = world.biomeStats(cx, cy, standing);
   el.biomeName.textContent = BIOME_NAMES[biome.kind] ?? 'Bioma';
   el.biomeScope.textContent =
     `${biome.chunks} chunk${biome.chunks === 1 ? '' : 's'} explorado` +
@@ -307,7 +347,11 @@ function updateStats(state: GameState): void {
 
   KINDS.forEach((kind, i) => {
     updateStatRow(biomeRows[i], biome.count[kind], biome.reference[kind]);
-    updateStatRow(chunkRows[i], world.countOf(cx, cy, kind), world.referenceOf(cx, cy, kind));
+    updateStatRow(
+      chunkRows[i],
+      world.countOf(cx, cy, standing, kind),
+      world.referenceOf(cx, cy, standing, kind),
+    );
   });
 
   if (biome.balanced) {

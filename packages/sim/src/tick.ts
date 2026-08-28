@@ -105,3 +105,29 @@ export function step(state: GameState, intent: Intent): void {
   streamChunks(state);
   state.tick++;
 }
+
+/**
+ * Salta hacia adelante en el tiempo del mundo.
+ *
+ * Herramienta de desarrollo: comprobar el reequilibrio o la maduracion de un
+ * brote exige esperar horas reales, y sin esto no hay forma de verlo.
+ *
+ * Es exactamente `step` con una Intent vacia, sin mover al personaje: mismo
+ * orden, mismo reloj, mismo hambre tick a tick. Tenia que serlo, porque si un
+ * salto no dejara el mundo igual que vivir ese rato quieto, lo que se verifique
+ * con el no diria nada de la partida real. Lo unico que no ocurre es el
+ * movimiento, porque el personaje no se ha movido.
+ *
+ * La vida no se recalcula 216.000 veces: `World.setNow` solo trabaja al cruzar
+ * un paso de vida y el resto de llamadas salen de vacio.
+ */
+export function skipTime(state: GameState, ticks: number): void {
+  const span = Math.max(0, Math.floor(ticks));
+  if (span === 0) return;
+
+  for (let i = 0; i < span; i++) {
+    state.world.setNow(state.tick);
+    updateSurvival(state.entities, state.playerId, TICK_DT);
+    state.tick++;
+  }
+}

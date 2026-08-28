@@ -7,6 +7,7 @@ import {
   World,
 } from '@verdant/sim';
 import {
+  BiomeKind,
   DENSITY_CAP,
   EQUILIBRIUM_BAND,
   Feature,
@@ -31,11 +32,17 @@ import {
  * vida o las tasas, esto deja de cuadrar y avisa.
  */
 
-function livelyChunk(world: World): { cx: number; cy: number } {
+/**
+ * Chunk con vida abundante de un bioma concreto. Devuelve tambien el bioma
+ * porque la contabilidad va por (chunk, bioma, tipo).
+ */
+function livelyChunk(world: World): { cx: number; cy: number; biome: BiomeKind } {
   for (let cy = -6; cy <= 6; cy++) {
     for (let cx = -6; cx <= 6; cx++) {
       world.getChunk(cx, cy);
-      if (world.referenceOf(cx, cy, LifeKind.Tree) > 60) return { cx, cy };
+      for (const biome of [BiomeKind.Forest, BiomeKind.Meadow]) {
+        if (world.referenceOf(cx, cy, biome, LifeKind.Tree) > 60) return { cx, cy, biome };
+      }
     }
   }
   throw new Error('no se encontro un chunk con vegetacion en el mundo de prueba');
@@ -54,14 +61,14 @@ describe('Ritmo de recuperacion: de cero al rango en 5 horas reales', () => {
   it('un chunk colonizado desde cero alcanza el rango en el tiempo acordado', () => {
     const world = new World(31337);
     world.setNow(0);
-    const { cx, cy } = livelyChunk(world);
-    const reference = world.referenceOf(cx, cy, LifeKind.Tree);
+    const { cx, cy, biome } = livelyChunk(world);
+    const reference = world.referenceOf(cx, cy, biome, LifeKind.Tree);
     const target = reference * (1 - EQUILIBRIUM_BAND);
 
     // A cero, pero con los vecinos intactos: hay un origen del que colonizar.
-    world.setPopulation(cx, cy, LifeKind.Tree, 0);
+    world.setPopulation(cx, cy, biome, LifeKind.Tree, 0);
 
-    const steps = stepsUntil(world, () => world.populationOf(cx, cy, LifeKind.Tree) >= target);
+    const steps = stepsUntil(world, () => world.populationOf(cx, cy, biome, LifeKind.Tree) >= target);
     const hours = steps / LIFE_STEPS_PER_HOUR;
     expect(hours, `tardo ${hours.toFixed(2)} h en vez de 5`).toBeGreaterThan(4.6);
     expect(hours, `tardo ${hours.toFixed(2)} h en vez de 5`).toBeLessThan(5.4);
@@ -72,15 +79,15 @@ describe('Ritmo de recuperacion: de cero al rango en 5 horas reales', () => {
     // alturas distintas de la curva.
     const world = new World(31337);
     world.setNow(0);
-    const { cx, cy } = livelyChunk(world);
-    const reference = world.referenceOf(cx, cy, LifeKind.Tree);
+    const { cx, cy, biome } = livelyChunk(world);
+    const reference = world.referenceOf(cx, cy, biome, LifeKind.Tree);
 
     function incrementAt(fraction: number): number {
-      world.setPopulation(cx, cy, LifeKind.Tree, reference * fraction);
-      const before = world.populationOf(cx, cy, LifeKind.Tree);
+      world.setPopulation(cx, cy, biome, LifeKind.Tree, reference * fraction);
+      const before = world.populationOf(cx, cy, biome, LifeKind.Tree);
       const at = world.currentTick;
       world.setNow(at + LIFE_STEP_TICKS);
-      return world.populationOf(cx, cy, LifeKind.Tree) - before;
+      return world.populationOf(cx, cy, biome, LifeKind.Tree) - before;
     }
 
     const low = incrementAt(0.05);
@@ -96,13 +103,13 @@ describe('Ritmo de mortandad: del 200 % al rango en 2.5 horas reales', () => {
   it('un chunk saturado vuelve a la banda en el tiempo acordado', () => {
     const world = new World(4242);
     world.setNow(0);
-    const { cx, cy } = livelyChunk(world);
-    const reference = world.referenceOf(cx, cy, LifeKind.Tree);
+    const { cx, cy, biome } = livelyChunk(world);
+    const reference = world.referenceOf(cx, cy, biome, LifeKind.Tree);
     const target = reference * (1 + EQUILIBRIUM_BAND);
 
-    world.setPopulation(cx, cy, LifeKind.Tree, reference * 2);
+    world.setPopulation(cx, cy, biome, LifeKind.Tree, reference * 2);
 
-    const steps = stepsUntil(world, () => world.populationOf(cx, cy, LifeKind.Tree) <= target);
+    const steps = stepsUntil(world, () => world.populationOf(cx, cy, biome, LifeKind.Tree) <= target);
     const hours = steps / LIFE_STEPS_PER_HOUR;
     expect(hours, `tardo ${hours.toFixed(2)} h en vez de 2.5`).toBeGreaterThan(2.3);
     expect(hours, `tardo ${hours.toFixed(2)} h en vez de 2.5`).toBeLessThan(2.7);
@@ -111,15 +118,15 @@ describe('Ritmo de mortandad: del 200 % al rango en 2.5 horas reales', () => {
   it('la mortandad corrige mas al principio que al final', () => {
     const world = new World(4242);
     world.setNow(0);
-    const { cx, cy } = livelyChunk(world);
-    const reference = world.referenceOf(cx, cy, LifeKind.Tree);
+    const { cx, cy, biome } = livelyChunk(world);
+    const reference = world.referenceOf(cx, cy, biome, LifeKind.Tree);
 
     function dropAt(fraction: number): number {
-      world.setPopulation(cx, cy, LifeKind.Tree, reference * fraction);
-      const before = world.populationOf(cx, cy, LifeKind.Tree);
+      world.setPopulation(cx, cy, biome, LifeKind.Tree, reference * fraction);
+      const before = world.populationOf(cx, cy, biome, LifeKind.Tree);
       const at = world.currentTick;
       world.setNow(at + LIFE_STEP_TICKS);
-      return before - world.populationOf(cx, cy, LifeKind.Tree);
+      return before - world.populationOf(cx, cy, biome, LifeKind.Tree);
     }
 
     expect(dropAt(2.0)).toBeGreaterThan(dropAt(1.3) * 2);
@@ -128,17 +135,17 @@ describe('Ritmo de mortandad: del 200 % al rango en 2.5 horas reales', () => {
   it('la saturacion deja al bioma sin recompensas mientras dura', () => {
     const world = new World(4242);
     world.setNow(0);
-    const { cx, cy } = livelyChunk(world);
-    expect(world.isBiomeBalanced(cx, cy)).toBe(true);
+    const { cx, cy, biome } = livelyChunk(world);
+    expect(world.isBiomeBalanced(cx, cy, biome)).toBe(true);
 
-    const reference = world.referenceOf(cx, cy, LifeKind.Tree);
-    world.setPopulation(cx, cy, LifeKind.Tree, reference * (DENSITY_CAP + 0.5));
-    expect(world.isChunkOvercrowded(cx, cy)).toBe(true);
-    expect(world.isBiomeBalanced(cx, cy)).toBe(false);
+    const reference = world.referenceOf(cx, cy, biome, LifeKind.Tree);
+    world.setPopulation(cx, cy, biome, LifeKind.Tree, reference * (DENSITY_CAP + 0.5));
+    expect(world.isChunkOvercrowded(cx, cy, biome)).toBe(true);
+    expect(world.isBiomeBalanced(cx, cy, biome)).toBe(false);
 
     // La competencia lo corrige sola con el tiempo.
-    stepsUntil(world, () => !world.isChunkOvercrowded(cx, cy));
-    expect(world.isChunkOvercrowded(cx, cy)).toBe(false);
+    stepsUntil(world, () => !world.isChunkOvercrowded(cx, cy, biome));
+    expect(world.isChunkOvercrowded(cx, cy, biome)).toBe(false);
   });
 });
 
@@ -201,7 +208,7 @@ describe('El ciclo de la siembra', () => {
 
     const inventory = new Int32Array(RESOURCE_COUNT);
     const { store, id } = playerOn(tree.x, tree.y);
-    const balanced = world.isBiomeBalanced(cx, cy);
+    const balanced = world.isBiomeBalanced(cx, cy, world.biomeAt(tree.x, tree.y));
     const result = tryHarvest(world, store, id, inventory, 0)!;
 
     if (balanced) {

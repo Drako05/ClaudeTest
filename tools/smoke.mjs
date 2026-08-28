@@ -418,6 +418,94 @@ async function mobilePass(browser, baseUrl) {
   await context.close();
 }
 
+// ------------------------------------------------- herramientas de desarrollo
+
+/**
+ * Las herramientas de desarrollo, ejercitadas de punta a punta.
+ *
+ * Los tests unitarios ya miden que un salto de tiempo equivale a esperar y que
+ * el bioma nombrado es el suelo pisado. Lo que solo se puede comprobar aqui es
+ * que el panel existe, que sus botones llegan al motor y que los bordes se
+ * dibujan sin reventar la escena.
+ */
+async function devToolsPass(browser, baseUrl) {
+  console.log('\n== herramientas de desarrollo (?dev=1) ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'desarrollo');
+
+  await page.goto(`${baseUrl}/?seed=${SEED}&dev=1`, { waitUntil: 'load' });
+  const start = await waitForLoop(page);
+  check(start.dev === true, 'el panel no se activo con ?dev=1');
+  check(await page.isVisible('#devPanel'), 'el panel de desarrollo no es visible');
+
+  // Bordes: la escena tiene que seguir en pie y con MAS cosas dibujadas.
+  await page.click('[data-toggle="chunks"]');
+  await page.click('[data-toggle="biomes"]');
+  await page.waitForTimeout(400);
+  const withBorders = await waitForLoop(page);
+  check(withBorders.objects > 50, `la escena se vacio al dibujar los bordes (${withBorders.objects})`);
+  const bordersOn = await page.evaluate(() => ({
+    chunks: !!document.querySelector('[data-toggle="chunks"].on'),
+    biomes: !!document.querySelector('[data-toggle="biomes"].on'),
+  }));
+  check(bordersOn.chunks && bordersOn.biomes, `los conmutadores no quedaron activos: ${JSON.stringify(bordersOn)}`);
+  await page.screenshot({ path: join(SHOTS, '10-dev-bordes.png') });
+
+  // Pausa: el reloj tiene que pararse de verdad, no solo cambiar de color.
+  await page.click('[data-toggle="pause"]');
+  await page.waitForTimeout(150);
+  const paused = await page.evaluate(() => window.__verdant);
+  check(paused.timeScale === 0, `pausar no dejo la escala a cero (${paused.timeScale})`);
+  await page.waitForTimeout(700);
+  const stillPaused = await page.evaluate(() => window.__verdant);
+  check(stillPaused.tick === paused.tick, `el tiempo avanzo en pausa (${paused.tick} -> ${stillPaused.tick})`);
+
+  await page.click('[data-toggle="pause"]');
+  await page.waitForTimeout(400);
+  const resumed = await page.evaluate(() => window.__verdant);
+  check(resumed.tick > stillPaused.tick, 'reanudar no volvio a mover el reloj');
+
+  // Salto: +1 h son DAY_TICKS/24 ticks. Se compara contra el instante justo
+  // anterior al clic para que el margen sea el del propio bucle, no el del salto.
+  const HOUR_TICKS = (8 * 60 * 60) / 24;
+  await page.click('[data-toggle="pause"]');
+  await page.waitForTimeout(150);
+  const beforeJump = await page.evaluate(() => window.__verdant);
+  await page.click('[data-jump="1200"]');
+  await page.waitForTimeout(200);
+  const afterJump = await page.evaluate(() => window.__verdant);
+  const jumped = afterJump.tick - beforeJump.tick;
+  console.log(`  salto de +1 h: ${beforeJump.clock} -> ${afterJump.clock} (${jumped} ticks)`);
+  check(jumped === HOUR_TICKS, `el salto no adelanto una hora exacta (${jumped} ticks)`);
+  const jumpLine = await page.evaluate(() => (document.getElementById('devLog') || {}).textContent || '');
+  check(jumpLine.includes('+1 h'), `el registro no anoto el salto tal cual (${JSON.stringify(jumpLine)})`);
+  await page.click('[data-toggle="pause"]');
+
+  // Registro: recolectar tiene que dejar constancia.
+  await page.keyboard.down('Space');
+  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(450);
+    await page.keyboard.up(key);
+  }
+  await page.keyboard.up('Space');
+  await page.waitForTimeout(300);
+  const log = await page.evaluate(() => (document.getElementById('devLog') || {}).textContent || '');
+  console.log(`  registro: ${JSON.stringify(log.split('\n')[0] ?? '')}`);
+  check(log.trim().length > 0, 'recolectar no dejo ninguna linea en el registro');
+  await page.screenshot({ path: join(SHOTS, '11-dev-registro.png') });
+
+  // F3 cierra el panel y devuelve el tiempo a su sitio.
+  await page.keyboard.press('F3');
+  await page.waitForTimeout(150);
+  const closed = await page.evaluate(() => window.__verdant);
+  check(closed.dev === false, 'F3 no cerro el panel');
+  check(closed.timeScale === 1, `al cerrar el panel el tiempo no volvio a 1x (${closed.timeScale})`);
+  check(!(await page.isVisible('#devPanel')), 'el panel sigue visible tras cerrarlo');
+
+  await page.close();
+}
+
 // ---------------------------------------------------------------------- main
 
 const remote = process.env.VERDANT_URL;
@@ -432,6 +520,7 @@ const browser = await chromium.launch(proxyUrl ? { proxy: { server: proxyUrl } }
 try {
   await desktopPass(browser, baseUrl);
   await mobilePass(browser, baseUrl);
+  await devToolsPass(browser, baseUrl);
 } finally {
   await browser.close();
   server?.close();

@@ -6,11 +6,7 @@
 export * from './base.js';
 export * from './ecology.js';
 
-import {
-  CHUNK_SIZE,
-  LifeKind,
-  Terrain,
-} from './base.js';
+import { BiomeKind, CHUNK_SIZE, LifeKind, Terrain } from './base.js';
 
 /**
  * Que hay sobre un tile.
@@ -38,22 +34,6 @@ export enum Feature {
   MeadowTreeSapling = 12,
   MeadowPlantSapling = 13,
 }
-
-/** Agrupacion de terrenos en biomas. Es la unidad que se equilibra. */
-export enum BiomeKind {
-  Ocean = 0,
-  Coast = 1,
-  Meadow = 2,
-  Forest = 3,
-  Highland = 4,
-}
-export const BIOME_NAMES: readonly string[] = [
-  'Oceano',
-  'Costa',
-  'Pradera',
-  'Bosque',
-  'Tierras altas',
-];
 
 export function biomeOfTerrain(t: Terrain): BiomeKind {
   switch (t) {

@@ -32,6 +32,17 @@ Esto es el resumen operativo.
    aparecera por delante de cosas que tiene detras.
 8. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
    interpolacion para el render es cosa del cliente.
+9. **El bioma es del tile, no del chunk.** La contabilidad de vida va por
+   `(chunk, bioma, tipo)` y `World.biomeAt` devuelve el bioma del suelo que se
+   pisa. Etiquetar el chunk entero con su terreno predominante hacia que el panel
+   anunciara «Bosque» estando en pradera y que dos especies distintas compartieran
+   referente. Un brote solo puede salir en un tile de su propio bioma.
+10. **Un paso de vida lee estado congelado y escribe en otro.** La colonizacion
+    mira si hay vida cerca en `ChunkRecord.live`, que es la foto del inicio del
+    paso, nunca los vecinos en curso. Leyendo el estado vivo, que un chunk
+    arrasado reviviera dependia del orden en que se generaron los chunks —es
+    decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
+    que ningun test evidente lo delate.
 
 ## Regla de trabajo con el autor
 
@@ -99,6 +110,23 @@ por las colisiones con arboles y agua; por eso se mide en
 
 Ojo con los FPS que reporta la pasada movil: en headless se renderiza por
 software a 3x, asi que ese numero no dice nada del rendimiento en un movil real.
+
+## Herramientas de desarrollo
+
+`packages/client/src/devtools.ts`, con `?dev=1` en la URL o F3. Pausa,
+multiplicadores de tiempo, saltos de +1 h / +6 h / +1 dia, bordes de chunk y de
+bioma, y un registro de eventos.
+
+Existen porque casi todo lo del ecosistema tarda horas reales en poder
+comprobarse —cinco para recuperar un bioma desde cero, dos y media para corregir
+una saturacion, ocho minutos para que madure un brote—, asi que sin ellas no hay
+forma de verificar a mano lo que se implementa.
+
+Dos cosas que conviene no romper: el registro sale de **comparar el inventario y
+el hambre entre refrescos**, no de que la simulacion emita eventos, asi que el
+nucleo no se entera de que existe; y `skipTime` es `step` con la Intent vacia,
+para que saltar una hora deje el mundo exactamente igual que vivirla quieto. Hay
+un test que lo comprueba.
 
 ## Si tocas la generacion del mundo
 

@@ -191,6 +191,70 @@
         #statsPanel { width: 224px; font-size: 11px; }
       }
 
+      /* ---- Panel de desarrollo (F3 o ?dev=1) ------------------------------
+         Deliberadamente sobrio y distinto del HUD: no es interfaz de juego, y
+         confundirlo con ella seria el peor resultado posible. */
+      #devPanel {
+        position: fixed; z-index: 14;
+        left: calc(12px + env(safe-area-inset-left));
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        width: 268px; max-width: calc(100vw - 24px);
+        max-height: calc(100vh - 24px); overflow-y: auto;
+        padding: 9px 11px; border-radius: 12px;
+        font-size: 12px; line-height: 1.45;
+        background: rgba(14, 12, 24, 0.90);
+        border: 1px solid rgba(255, 196, 107, 0.28);
+        backdrop-filter: blur(6px);
+      }
+      #devPanel[hidden] { display: none; }
+      #devPanel h2 {
+        margin: 0 0 8px; font-size: 11px; letter-spacing: .14em;
+        text-transform: uppercase; color: #ffc46b; font-weight: 600;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      #devPanel h2 .hint {
+        color: #8b9bb4; letter-spacing: .06em; font-weight: 400; font-size: 10px;
+      }
+      .devGroup { margin-bottom: 9px; }
+      .devGroup:last-child { margin-bottom: 0; }
+      .devLabel {
+        display: block; color: #8b9bb4; font-size: 10px;
+        letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px;
+      }
+      .devLabel b { color: #e8eef7; font-weight: 600; letter-spacing: 0; }
+      /* Sin envolver: que «64x» se caiga a una fila propia costaba una linea de
+         alto, y el panel ya compite con el HUD por la columna izquierda. */
+      .devRow { display: flex; gap: 3px; margin-bottom: 4px; }
+      .devRow:last-child { margin-bottom: 0; }
+      .devRow button {
+        flex: 1 1 0; min-width: 0; font: inherit; font-size: 10px;
+        padding: 5px 2px; border-radius: 6px; cursor: pointer;
+        color: #e8eef7; background: rgba(255,255,255,.07);
+        border: 1px solid rgba(255,255,255,.14);
+        touch-action: manipulation; white-space: nowrap;
+      }
+      .devRow button:active { transform: scale(.96); }
+      .devRow button:focus-visible { outline: 2px solid #ffc46b; outline-offset: 2px; }
+      .devRow button.on {
+        background: rgba(255, 196, 107, .22); border-color: rgba(255, 196, 107, .55);
+        color: #ffdca6;
+      }
+      .devNote { margin: 5px 0 0; font-size: 10px; line-height: 1.4; color: #8b9bb4; }
+      #devLog {
+        margin: 0; padding: 7px 8px; border-radius: 7px;
+        min-height: 34px; max-height: 112px; overflow-y: auto;
+        font: inherit; font-size: 11px; line-height: 1.45;
+        white-space: pre-wrap; color: #b8c6dc;
+        background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.08);
+      }
+
+      /* Los atajos de teclado y el panel comparten esquina: manda el panel. */
+      body:has(#devPanel:not([hidden])) #help { display: none; }
+
+      @media (max-width: 560px) {
+        #devPanel { width: 228px; font-size: 11px; max-height: 58vh; }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         #stick, .touch-btn, .bar > i { transition: none; }
       }

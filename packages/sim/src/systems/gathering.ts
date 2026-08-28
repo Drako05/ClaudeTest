@@ -71,7 +71,7 @@ export function tryHarvest(
   const yield_ = harvestOf(feature);
   if (!yield_) return null;
 
-  const rewarded = world.isBiomeBalanced(toChunkCoord(x), toChunkCoord(y));
+  const rewarded = world.isBiomeBalanced(toChunkCoord(x), toChunkCoord(y), world.biomeAt(x, y));
   const amount = Math.round(yield_.amount * (1 + (rewarded ? BALANCED_HARVEST_BONUS : 0)));
 
   world.setFeature(x, y, Feature.None);

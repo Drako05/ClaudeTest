@@ -13,7 +13,7 @@
  */
 
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import { CHUNK_SIZE, Feature } from '@verdant/shared';
+import { biomeOfTerrain, CHUNK_SIZE, Feature, Terrain } from '@verdant/shared';
 import type { Chunk, GameState, World } from '@verdant/sim';
 import { daylight, targetTile } from '@verdant/sim';
 import { depthOf, TILE_H, TILE_W, worldToScreen } from './projection.js';
@@ -31,6 +31,8 @@ interface ChunkView {
   texture: Texture;
   /** Sprites de las features de este chunk, para poder retirarlos en bloque. */
   features: Sprite[];
+  /** Contorno de los biomas del chunk. Solo existe con la vista activada. */
+  biomeBorders: Graphics | null;
   revision: number;
 }
 
@@ -74,6 +76,10 @@ export class Renderer {
   private player!: Sprite;
   private playerRise = 0;
   private readonly reticle = new Graphics();
+  /** Superposiciones de depuracion: rejilla de chunks y contorno de biomas. */
+  private readonly chunkGrid = new Graphics();
+  private debugChunks = false;
+  private debugBiomes = false;
   /** Vela de color sobre toda la escena: es el ciclo dia/noche. */
   private readonly skyTint = new Graphics();
 
@@ -90,6 +96,7 @@ export class Renderer {
     this.camera.addChild(this.terrainLayer, this.markerLayer, this.objectLayer);
     this.app.stage.addChild(this.camera);
     this.markerLayer.addChild(this.reticle);
+    this.markerLayer.addChild(this.chunkGrid);
     // Fuera de la camara: cubre la pantalla, no el mundo.
     this.app.stage.addChild(this.skyTint);
     this.buildTextures();
@@ -142,6 +149,20 @@ export class Renderer {
     return this.tilesOnScreen;
   }
 
+  /** Activa o desactiva las superposiciones de depuracion. */
+  setDebugOverlays(chunks: boolean, biomes: boolean): void {
+    this.debugChunks = chunks;
+    if (this.debugBiomes !== biomes) {
+      this.debugBiomes = biomes;
+      // Los contornos se construyen una vez por chunk y se guardan; al apagar la
+      // vista se destruyen para no pagar memoria por algo invisible.
+      for (const view of this.views.values()) {
+        view.biomeBorders?.destroy();
+        view.biomeBorders = null;
+      }
+    }
+  }
+
   zoomBy(factor: number): void {
     this.tilesOnScreen = Math.min(60, Math.max(9, this.tilesOnScreen * factor));
   }
@@ -177,6 +198,7 @@ export class Renderer {
 
     this.fadeOccluders(wx, wy, playerScreen);
     this.drawReticle(entities, playerId);
+    this.drawChunkGrid(state);
     this.drawSky(state.tick, view.width, view.height);
   }
 
@@ -244,6 +266,69 @@ export class Renderer {
     this.skyTint.rect(0, 0, width, height).fill({ color, alpha: nightAlpha });
   }
 
+  /** Rejilla sobre los limites de cada chunk visible. */
+  private drawChunkGrid(state: GameState): void {
+    this.chunkGrid.clear();
+    if (!this.debugChunks) return;
+
+    state.world.eachLoadedChunk((chunk) => {
+      const key = `${chunk.cx},${chunk.cy}`;
+      if (!this.views.has(key)) return;
+      const north = worldToScreen(chunk.cx * CHUNK_SIZE, chunk.cy * CHUNK_SIZE);
+      const east = worldToScreen((chunk.cx + 1) * CHUNK_SIZE, chunk.cy * CHUNK_SIZE);
+      const south = worldToScreen((chunk.cx + 1) * CHUNK_SIZE, (chunk.cy + 1) * CHUNK_SIZE);
+      const west = worldToScreen(chunk.cx * CHUNK_SIZE, (chunk.cy + 1) * CHUNK_SIZE);
+      this.chunkGrid
+        .moveTo(north.x, north.y)
+        .lineTo(east.x, east.y)
+        .lineTo(south.x, south.y)
+        .lineTo(west.x, west.y)
+        .closePath()
+        .stroke({ width: 1.5, color: 0x8fc4ff, alpha: 0.7 });
+    });
+  }
+
+  /**
+   * Contorno de las manchas de bioma, dibujado sobre los tiles reales.
+   *
+   * Es la comprobacion visual de que el bioma que anuncia el panel es el del
+   * suelo que se pisa: si el contorno no coincide con lo que se ve, algo falla.
+   * Se traza solo la arista entre dos tiles de biomas distintos.
+   */
+  private buildBiomeBorders(chunk: Chunk): Graphics {
+    const g = new Graphics();
+    const baseX = chunk.cx * CHUNK_SIZE;
+    const baseY = chunk.cy * CHUNK_SIZE;
+
+    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+        const mine = biomeOfTerrain(chunk.terrain[ly * CHUNK_SIZE + lx] as Terrain);
+        const p = worldToScreen(baseX + lx, baseY + ly);
+
+        // Arista este: entre este tile y el de la derecha.
+        const eastBiome =
+          lx + 1 < CHUNK_SIZE
+            ? biomeOfTerrain(chunk.terrain[ly * CHUNK_SIZE + lx + 1] as Terrain)
+            : mine;
+        if (eastBiome !== mine) {
+          g.moveTo(p.x + TILE_W / 2, p.y + TILE_H / 2).lineTo(p.x, p.y + TILE_H);
+        }
+
+        // Arista sur: entre este tile y el de abajo.
+        const southBiome =
+          ly + 1 < CHUNK_SIZE
+            ? biomeOfTerrain(chunk.terrain[(ly + 1) * CHUNK_SIZE + lx] as Terrain)
+            : mine;
+        if (southBiome !== mine) {
+          g.moveTo(p.x, p.y + TILE_H).lineTo(p.x - TILE_W / 2, p.y + TILE_H / 2);
+        }
+      }
+    }
+
+    g.stroke({ width: 1, color: 0xffe08a, alpha: 0.9 });
+    return g;
+  }
+
   private drawReticle(entities: GameState['entities'], playerId: number): void {
     const target = targetTile(entities, playerId);
     const p = worldToScreen(target.x, target.y);
@@ -301,11 +386,19 @@ export class Renderer {
         view.features = this.buildFeatures(state.world, chunk);
         view.revision = chunk.revision;
       }
+
+      if (this.debugBiomes && !view.biomeBorders) {
+        view.biomeBorders = this.buildBiomeBorders(chunk);
+        view.biomeBorders.position.copyFrom(view.terrain.position);
+        view.biomeBorders.position.x += CHUNK_TEX_OFFSET_X;
+        this.markerLayer.addChild(view.biomeBorders);
+      }
     });
 
     for (const [key, view] of this.views) {
       if (seen.has(key)) continue;
       this.clearFeatures(view);
+      view.biomeBorders?.destroy();
       view.terrain.destroy();
       view.texture.destroy(true);
       this.views.delete(key);
@@ -327,7 +420,13 @@ export class Renderer {
     terrain.position.set(origin.x - CHUNK_TEX_OFFSET_X, origin.y);
     this.terrainLayer.addChild(terrain);
 
-    return { terrain, texture, features: this.buildFeatures(world, chunk), revision: chunk.revision };
+    return {
+      terrain,
+      texture,
+      features: this.buildFeatures(world, chunk),
+      biomeBorders: null,
+      revision: chunk.revision,
+    };
   }
 
   /**
@@ -387,6 +486,7 @@ export class Renderer {
   reset(): void {
     for (const view of this.views.values()) {
       this.clearFeatures(view);
+      view.biomeBorders?.destroy();
       view.terrain.destroy();
       view.texture.destroy(true);
     }

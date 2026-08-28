@@ -22,14 +22,14 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 
 | Ley | Estado | Donde vive | Prueba |
 |---|---|---|---|
-| El mundo existe independientemente de cualquier observador | **Cumplida** | `sim/life.ts` — todos los chunks perturbados avanzan a la vez en pasos globales fijos, este cargado lo que este | «la vegetacion evoluciona igual se observe o no», «alejarse y volver no altera lo que ocurrio mientras tanto» |
+| El mundo existe independientemente de cualquier observador | **Cumplida** | `sim/world.ts` — todos los chunks conocidos avanzan a la vez en pasos globales fijos, este cargado lo que este, y cada paso lee una foto fija del anterior para no depender del orden entre chunks | «la vida evoluciona igual se observe o no», «alejarse y volver no altera lo que ocurrio mientras tanto», «una hora saltada y una hora vivida quieto dejan el mismo mundo» |
 | Impone sus reglas absolutas de forma igualitaria con todos | **Parcial** | `sim/worldgen.ts` no favorece ninguna posicion; el spawn solo busca terreno transitable | — falta cuando haya mas entidades a las que tratar por igual |
 | Todos los sistemas relacionados bajo causalidad rastreable | **Pendiente** | — | — no hay registro de causas; hoy no se podria rastrear por que paso algo |
 | Las consecuencias dependen del estado del mundo y de las relaciones | **Cumplida** | El rendimiento de recolectar depende de si el bioma esta equilibrado, y saturar un chunk deja al bioma entero sin recompensas | «un bioma equilibrado rinde mas al recolectar», «la saturacion deja al bioma sin recompensas mientras dura» |
-| Los jugadores no son necesarios para el desarrollo de sucesos | **Cumplida** | `sim/life.ts` — la vegetacion evoluciona sin que nadie la mire | «la vegetacion evoluciona igual se observe o no» |
+| Los jugadores no son necesarios para el desarrollo de sucesos | **Cumplida** | `sim/world.ts` — la vegetacion evoluciona sin que nadie la mire | «la vida evoluciona igual se observe o no» |
 | Existen el pasar del tiempo y las leyes fisicas fundamentales | **Parcial** | `sim/clock.ts` — tiempo, ciclo dia/noche | «el ciclo del dia es periodico», «el dia recorre sus cuatro fases» — de fisica solo hay colision |
 | El mundo es abierto para todos | **Cumplida** | `sim/world.ts` — infinito en las cuatro direcciones, sin barreras | «las coordenadas negativas de chunk funcionan» |
-| Toda existencia es justificada por un sistema | **Parcial** | Las plantas existen solo donde el bioma y la vegetacion las sostienen | «un chunk sin vida y rodeado de vacio no genera vida por si solo» |
+| Toda existencia es justificada por un sistema | **Parcial** | Las plantas existen solo donde el bioma y la vegetacion las sostienen, y cada bioma lleva su cuenta propia **dentro** de cada chunk: un arbol de bosque no puede brotar sobre la hierba de al lado | «un brote solo sale en el terreno de su bioma», «las especies no se mezclan: talar el bosque no toca la pradera» |
 | El entorno cambia por acontecimientos naturales o de las entidades | **Parcial** | Naturales (crecimiento vegetal) y por entidades (recoleccion) | «un arbusto recolectado vuelve a crecer con el tiempo» |
 
 ## Capitulo II: Los recursos
@@ -63,7 +63,7 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | El reino vegetal se desarrolla naturalmente y por intervencion | **Cumplida** | Crece solo despacio y el jugador lo acelera sembrando, que es la via principal de equilibrio | «el ecosistema repone lo recolectado», «sembrar consume una semilla y el brote madura a adulto» |
 | Las entidades vivas no surgen automaticamente | **Cumplida** | Con poblacion cero el crecimiento logistico vale exactamente cero; solo la colonizacion desde una fuente cercana lo arranca | «sin fuente cercana no se genera ni una sola unidad de vida», «donde el terreno no sostiene vida, no aparece jamas» |
 | Todo ser vivo puede desarrollar rasgos diferenciales | **Pendiente** | — | — |
-| Existen muchos tipos de biomas y ecosistemas | **Cumplida** | `sim/worldgen.ts` — ocho biomas calibrados | «todos los biomas aparecen» |
+| Existen muchos tipos de biomas y ecosistemas | **Cumplida** | `sim/worldgen.ts` — ocho biomas calibrados; el bioma es el del **tile**, no el del chunk, asi que la mancha sigue la forma real del terreno | «todos los biomas aparecen», «dos tiles del MISMO chunk pueden dar biomas distintos» |
 
 ## Capitulo IV: Las comunidades
 
@@ -85,10 +85,17 @@ Para que no baste con amontonar plantas en un solo sitio, cada chunk tiene un
 tope de densidad por tipo de vida: superarlo deja al bioma entero sin
 recompensas y provoca competencia y mortandad hasta volver al limite.
 
-Un bioma es el conjunto conexo de chunks del mismo tipo **ya generados**: el
-resto se asume en equilibrio, asi que solo lo explorado puede desviar las
-cuentas. Por eso el panel no muestra cantidades absolutas sino barras relativas
-al equilibrio con el que nacio la zona.
+Un bioma es el conjunto conexo de chunks que **contienen** ese bioma y que estan
+**ya generados**: el resto se asume en equilibrio, asi que solo lo explorado
+puede desviar las cuentas. Por eso el panel no muestra cantidades absolutas sino
+barras relativas al equilibrio con el que nacio la zona.
+
+La contabilidad va por `(chunk, bioma, tipo de vida)`, no por chunk. Antes cada
+chunk se etiquetaba con su terreno predominante, y eso tenia dos consecuencias
+malas: el panel podia anunciar «Bosque» mientras el personaje pisaba hierba, y
+los arboles de bosque y los de pradera de un mismo chunk compartian referente,
+mezclando dos especies en una sola cuenta. Ahora el bioma que se nombra es
+siempre el del tile que se pisa.
 
 ## Deudas conocidas
 

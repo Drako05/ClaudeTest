@@ -44,6 +44,23 @@ export enum Terrain {
   Tundra = 7,
 }
 
+/** Agrupacion de terrenos en biomas. Es la unidad que se equilibra. */
+export enum BiomeKind {
+  Ocean = 0,
+  Coast = 1,
+  Meadow = 2,
+  Forest = 3,
+  Highland = 4,
+}
+export const BIOME_COUNT = 5;
+export const BIOME_NAMES: readonly string[] = [
+  'Oceano',
+  'Costa',
+  'Pradera',
+  'Bosque',
+  'Tierras altas',
+];
+
 /** Tipos de vida que el equilibrio contabiliza por separado. */
 export enum LifeKind {
   Tree = 0,
@@ -52,3 +69,23 @@ export enum LifeKind {
 }
 export const LIFE_KIND_COUNT = 3;
 export const LIFE_KIND_NAMES: readonly string[] = ['Arboles', 'Plantas', 'Animales'];
+
+/**
+ * Indice plano de una casilla de contabilidad (bioma, tipo de vida).
+ *
+ * Un chunk puede contener varios biomas a la vez, y cada uno lleva sus propias
+ * cuentas: mezclarlos hacia que los arboles de bosque y los de pradera se
+ * sumaran bajo un mismo referente, y que el panel anunciara un bioma distinto
+ * del suelo que pisaba el jugador.
+ */
+export function lifeSlot(biome: BiomeKind, kind: LifeKind): number {
+  return biome * LIFE_KIND_COUNT + kind;
+}
+
+export const LIFE_SLOTS = BIOME_COUNT * LIFE_KIND_COUNT;
+
+/** Biomas que sostienen vida vegetal. El resto nunca tiene cuentas que llevar. */
+export const LIVING_BIOMES: readonly BiomeKind[] = [BiomeKind.Meadow, BiomeKind.Forest];
+
+/** Tipos de vida ya implementados. La fauna aun no existe. */
+export const LIVING_KINDS: readonly LifeKind[] = [LifeKind.Tree, LifeKind.Plant];
