@@ -479,7 +479,26 @@ async function devToolsPass(browser, baseUrl) {
   check(jumped === HOUR_TICKS, `el salto no adelanto una hora exacta (${jumped} ticks)`);
   const jumpLine = await page.evaluate(() => (document.getElementById('devLog') || {}).textContent || '');
   check(jumpLine.includes('+1 h'), `el registro no anoto el salto tal cual (${JSON.stringify(jumpLine)})`);
+
+  // La supervivencia viene congelada: saltar un dia entero gastaria 264 puntos
+  // de hambre y mataria al personaje, que es lo que hacia inservible el boton.
+  check(afterJump.survivalFrozen === true, 'el panel no arranco con la supervivencia congelada');
+  const beforeDay = await page.evaluate(() => window.__verdant);
+  await page.click('[data-jump="28800"]');
+  await page.waitForTimeout(300);
+  const afterDay = await page.evaluate(() => window.__verdant);
+  console.log(`  +1 dia congelado: hambre ${beforeDay.hunger.toFixed(2)} -> ${afterDay.hunger.toFixed(2)}`);
+  check(afterDay.hunger === beforeDay.hunger, `saltar un dia gasto hambre estando congelada (${beforeDay.hunger} -> ${afterDay.hunger})`);
+  check(afterDay.health === beforeDay.health, 'saltar un dia gasto salud estando congelada');
+
+  // Y al apagarlo, el hambre vuelve a bajar.
+  await page.click('[data-toggle="survival"]');
   await page.click('[data-toggle="pause"]');
+  await page.waitForTimeout(700);
+  const thawed = await page.evaluate(() => window.__verdant);
+  check(thawed.survivalFrozen === false, 'el conmutador no se apago');
+  check(thawed.hunger < afterDay.hunger, `apagar la congelacion no devolvio el hambre (${afterDay.hunger} -> ${thawed.hunger})`);
+  await page.click('[data-toggle="survival"]');
 
   // Registro: recolectar tiene que dejar constancia.
   await page.keyboard.down('Space');
@@ -501,6 +520,7 @@ async function devToolsPass(browser, baseUrl) {
   const closed = await page.evaluate(() => window.__verdant);
   check(closed.dev === false, 'F3 no cerro el panel');
   check(closed.timeScale === 1, `al cerrar el panel el tiempo no volvio a 1x (${closed.timeScale})`);
+  check(closed.survivalFrozen === false, 'al cerrar el panel el personaje siguio siendo inmortal');
   check(!(await page.isVisible('#devPanel')), 'el panel sigue visible tras cerrarlo');
 
   await page.close();

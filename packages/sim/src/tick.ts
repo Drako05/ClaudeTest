@@ -32,6 +32,16 @@ export interface GameState {
   /** Chunk en el que estaba el jugador el tick anterior, para streaming perezoso. */
   streamCx: number;
   streamCy: number;
+  /**
+   * Congela hambre y salud. Interruptor de desarrollo, no de juego.
+   *
+   * Existe porque el hambre hacia inservibles el acelerador y los saltos: a 64x
+   * se pierden unos 35 puntos por segundo real, y saltar un dia son 264 — muerte
+   * segura antes de poder observar nada del ecosistema. Lo respetan por igual
+   * `step` y `skipTime`, asi que saltar sigue equivaliendo a esperar este puesto
+   * o no.
+   */
+  survivalFrozen: boolean;
 }
 
 /**
@@ -57,6 +67,7 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     lastHarvest: null,
     streamCx: Number.NaN,
     streamCy: Number.NaN,
+    survivalFrozen: false,
   };
 
   streamChunks(state);
@@ -99,7 +110,7 @@ export function step(state: GameState, intent: Intent): void {
     if (intent.eat) {
       tryEat(entities, playerId, inventory);
     }
-    updateSurvival(entities, playerId, TICK_DT);
+    if (!state.survivalFrozen) updateSurvival(entities, playerId, TICK_DT);
   }
 
   streamChunks(state);
@@ -127,7 +138,7 @@ export function skipTime(state: GameState, ticks: number): void {
 
   for (let i = 0; i < span; i++) {
     state.world.setNow(state.tick);
-    updateSurvival(state.entities, state.playerId, TICK_DT);
+    if (!state.survivalFrozen) updateSurvival(state.entities, state.playerId, TICK_DT);
     state.tick++;
   }
 }

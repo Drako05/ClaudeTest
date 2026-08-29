@@ -115,18 +115,26 @@ software a 3x, asi que ese numero no dice nada del rendimiento en un movil real.
 
 `packages/client/src/devtools.ts`, con `?dev=1` en la URL o F3. Pausa,
 multiplicadores de tiempo, saltos de +1 h / +6 h / +1 dia, bordes de chunk y de
-bioma, y un registro de eventos.
+bioma, congelar la supervivencia, y un registro de eventos.
 
 Existen porque casi todo lo del ecosistema tarda horas reales en poder
 comprobarse —cinco para recuperar un bioma desde cero, dos y media para corregir
 una saturacion, ocho minutos para que madure un brote—, asi que sin ellas no hay
 forma de verificar a mano lo que se implementa.
 
-Dos cosas que conviene no romper: el registro sale de **comparar el inventario y
+Tres cosas que conviene no romper: el registro sale de **comparar el inventario y
 el hambre entre refrescos**, no de que la simulacion emita eventos, asi que el
-nucleo no se entera de que existe; y `skipTime` es `step` con la Intent vacia,
-para que saltar una hora deje el mundo exactamente igual que vivirla quieto. Hay
-un test que lo comprueba.
+nucleo no se entera de que existe; `skipTime` es `step` con la Intent vacia, para
+que saltar una hora deje el mundo exactamente igual que vivirla quieto; y
+`GameState.survivalFrozen` lo respetan por igual `step` y `skipTime`, para que esa
+equivalencia siga valiendo con el interruptor en cualquier posicion. Hay tests de
+las tres.
+
+La congelacion empieza puesta al abrir el panel y solo se aplica con el panel
+abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
+herramientas no sirven para lo que se hicieron: a 64x se pierden unos 35 puntos
+de hambre por segundo real y saltar un dia son 264, asi que el boton mas util del
+panel era el que mataba.
 
 ## Si tocas la generacion del mundo
 

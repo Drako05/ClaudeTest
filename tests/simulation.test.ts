@@ -6,10 +6,21 @@ import {
   EntityStore,
   HUNGER_DECAY_PER_SEC,
   moveEntity,
+  skipTime,
   step,
   World,
 } from '@verdant/sim';
-import { emptyIntent, Feature, LifeKind, lifeKindOf, Resource, TICK_DT, TICK_HZ, type Intent } from '@verdant/shared';
+import {
+  DAY_TICKS,
+  emptyIntent,
+  Feature,
+  LifeKind,
+  lifeKindOf,
+  Resource,
+  TICK_DT,
+  TICK_HZ,
+  type Intent,
+} from '@verdant/shared';
 
 function intent(over: Partial<Intent> = {}): Intent {
   return { ...emptyIntent(), ...over };
@@ -214,5 +225,65 @@ describe('movimiento analogico', () => {
 
   it('por debajo del umbral de ruido no hay movimiento', () => {
     expect(travel(1e-9, 0)).toBe(0);
+  });
+});
+
+/**
+ * El interruptor de supervivencia de las herramientas de desarrollo.
+ *
+ * Sin el, las herramientas no sirven para lo que se hicieron: saltar un dia son
+ * ocho minutos de mundo, o sea 264 puntos de hambre, y el personaje muere antes
+ * de que se pueda observar nada del ecosistema.
+ */
+describe('Congelar la supervivencia', () => {
+  it('con la supervivencia congelada, saltar un dia entero no gasta nada', () => {
+    const state = createGame(31337);
+    state.survivalFrozen = true;
+    const hunger = state.entities.hunger[state.playerId];
+    const health = state.entities.health[state.playerId];
+
+    skipTime(state, DAY_TICKS);
+
+    expect(state.entities.hunger[state.playerId]).toBe(hunger);
+    expect(state.entities.health[state.playerId]).toBe(health);
+    expect(state.entities.alive[state.playerId]).toBe(1);
+    // El mundo si avanza: lo congelado es el personaje, no el tiempo.
+    expect(state.tick).toBe(createGame(31337).tick + DAY_TICKS);
+  });
+
+  it('sin congelar, ese mismo salto sigue matando de hambre', () => {
+    const state = createGame(31337);
+    skipTime(state, DAY_TICKS);
+
+    // Es justo el comportamiento que hacia inservible el boton de +1 dia.
+    expect(state.entities.hunger[state.playerId]).toBe(0);
+    expect(state.entities.alive[state.playerId]).toBe(0);
+  });
+
+  it('el interruptor tambien congela el juego normal, no solo los saltos', () => {
+    const state = createGame(31337);
+    state.survivalFrozen = true;
+    const hunger = state.entities.hunger[state.playerId];
+
+    const idle = emptyIntent();
+    for (let t = 0; t < TICK_HZ * 30; t++) step(state, idle);
+
+    expect(state.entities.hunger[state.playerId]).toBe(hunger);
+  });
+
+  it('apagarlo devuelve el hambre a su ritmo de siempre', () => {
+    const state = createGame(31337);
+    state.survivalFrozen = true;
+    const idle = emptyIntent();
+    for (let t = 0; t < TICK_HZ * 30; t++) step(state, idle);
+
+    state.survivalFrozen = false;
+    const before = state.entities.hunger[state.playerId];
+    for (let t = 0; t < TICK_HZ * 10; t++) step(state, idle);
+
+    const lost = before - state.entities.hunger[state.playerId];
+    // Con dos decimales: el hambre vive en un Float32Array y 600 restas de
+    // 0.55/60 acumulan unas milesimas de error.
+    expect(lost).toBeCloseTo(HUNGER_DECAY_PER_SEC * 10, 2);
   });
 });

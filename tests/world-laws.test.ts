@@ -512,18 +512,26 @@ describe('Saltar el tiempo equivale a esperar quieto', () => {
     ];
   }
 
-  it('una hora saltada y una hora vivida quieto dejan el mismo mundo', () => {
-    const hour = Math.round(DAY_TICKS / 24);
+  // Con el interruptor de supervivencia en las dos posiciones: es una
+  // herramienta de desarrollo y no puede alterar la equivalencia que justifica
+  // usarla.
+  for (const frozen of [false, true]) {
+    const label = frozen ? 'con la supervivencia congelada' : 'con el hambre corriendo';
+    it(`una hora saltada y una hora vivida quieto dejan el mismo mundo, ${label}`, () => {
+      const hour = Math.round(DAY_TICKS / 24);
 
-    const waited = createGame(31337);
-    const idle = emptyIntent();
-    for (let t = 0; t < hour; t++) step(waited, idle);
+      const waited = createGame(31337);
+      waited.survivalFrozen = frozen;
+      const idle = emptyIntent();
+      for (let t = 0; t < hour; t++) step(waited, idle);
 
-    const skipped = createGame(31337);
-    skipTime(skipped, hour);
+      const skipped = createGame(31337);
+      skipped.survivalFrozen = frozen;
+      skipTime(skipped, hour);
 
-    // Identico, no parecido: la vida avanza en pasos globales fijos y el hambre
-    // se aplica tick a tick tambien en el salto.
-    expect(snapshot(skipped)).toEqual(snapshot(waited));
-  });
+      // Identico, no parecido: la vida avanza en pasos globales fijos y el
+      // hambre se aplica tick a tick tambien en el salto.
+      expect(snapshot(skipped)).toEqual(snapshot(waited));
+    });
+  }
 });

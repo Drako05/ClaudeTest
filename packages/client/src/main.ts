@@ -187,6 +187,9 @@ async function main(): Promise<void> {
     // Las herramientas de desarrollo pueden pausar o acelerar el tiempo. Con
     // escala cero el acumulador no avanza y la simulacion queda congelada.
     accumulator += frame * dev.timeScale;
+    // Se copia cada frame, como los conmutadores de bordes: asi reiniciar la
+    // partida o abrir el panel antes de que exista el estado se resuelve solo.
+    state.survivalFrozen = dev.survivalFrozen;
     while (accumulator >= TICK_DT) {
       prevX = state.entities.x[state.playerId];
       prevY = state.entities.y[state.playerId];
@@ -227,6 +230,7 @@ async function main(): Promise<void> {
       tracked: state.world.trackedChunkCount,
       dev: dev.active,
       timeScale: dev.timeScale,
+      survivalFrozen: dev.survivalFrozen,
       biome: BIOME_NAMES[
         state.world.biomeAt(
           Math.floor(state.entities.x[state.playerId]),

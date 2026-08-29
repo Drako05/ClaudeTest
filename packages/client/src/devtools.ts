@@ -41,6 +41,11 @@ export class DevTools {
   paused = false;
   showChunkBorders = false;
   showBiomeBorders = false;
+  /**
+   * Congela hambre y salud. Empieza puesto porque, sin el, el boton mas util del
+   * panel es el que mata: saltar un dia gasta 264 puntos de hambre.
+   */
+  freezeSurvival = true;
 
   /** Ultimo estado observado, para deducir que ha cambiado. */
   private lastInventory: number[] | null = null;
@@ -69,6 +74,14 @@ export class DevTools {
     return this.enabled;
   }
 
+  /**
+   * Congelacion efectiva. Con el panel cerrado el juego corre normal, aunque el
+   * conmutador se quede puesto para la proxima vez que se abra.
+   */
+  get survivalFrozen(): boolean {
+    return this.enabled && this.freezeSurvival;
+  }
+
   /** Factor por el que multiplicar el tiempo transcurrido en cada frame. */
   get timeScale(): number {
     if (!this.enabled) return 1;
@@ -81,11 +94,14 @@ export class DevTools {
     if (this.root) this.root.hidden = !this.enabled;
     if (!this.enabled) {
       // Al cerrar se devuelve todo a su sitio: dejar el juego en pausa o a 64x
-      // sin panel visible seria desconcertante.
+      // sin panel visible seria desconcertante. La congelacion vuelve a su valor
+      // de apertura, y el getter ya se encarga de que no afecte con el panel
+      // cerrado.
       this.paused = false;
       this.speed = 1;
       this.showChunkBorders = false;
       this.showBiomeBorders = false;
+      this.freezeSurvival = true;
     }
     this.refresh();
   }
@@ -137,6 +153,7 @@ export class DevTools {
       ['chunks', this.showChunkBorders],
       ['biomes', this.showBiomeBorders],
       ['pause', this.paused],
+      ['survival', this.freezeSurvival],
     ] as Array<[string, boolean]>) {
       this.root?.querySelector(`[data-toggle="${key}"]`)?.classList.toggle('on', on);
     }
@@ -164,8 +181,10 @@ export class DevTools {
               `<button data-jump="${ticks}" data-jump-label="${label}" type="button">${label}</button>`,
           ).join('')}
         </div>
-        <p class="devNote">Saltar adelanta reloj, vida y hambre. No simula el
-        movimiento de esas horas.</p>
+        <div class="devRow">
+          <button data-toggle="survival" type="button">Sin hambre</button>
+        </div>
+        <p class="devNote">Un salto no simula el movimiento de esas horas.</p>
       </div>
       <div class="devGroup">
         <span class="devLabel">Vista</span>
@@ -209,6 +228,9 @@ export class DevTools {
             break;
           case 'biomes':
             this.showBiomeBorders = !this.showBiomeBorders;
+            break;
+          case 'survival':
+            this.freezeSurvival = !this.freezeSurvival;
             break;
           default:
             break;
