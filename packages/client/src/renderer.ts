@@ -17,6 +17,7 @@ import { CHUNK_SIZE, Feature } from '@verdant/shared';
 import type { Chunk, GameState, World } from '@verdant/sim';
 import { actionArea, daylight } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
+import { progressOf, type Effects } from './effects.js';
 import { depthOf, screenToWorld, TILE_DIAMOND, TILE_H, TILE_W, worldToScreen } from './projection.js';
 import {
   CHUNK_TEX_H,
@@ -79,6 +80,8 @@ export class Renderer {
   private player!: Sprite;
   private playerRise = 0;
   private readonly reticle = new Graphics();
+  /** Slash y escombros. Van por encima de todo: son adorno, no mundo. */
+  private readonly effectLayer = new Graphics();
   /** Superposiciones de depuracion: rejilla de chunks y contorno de biomas. */
   private readonly chunkGrid = new Graphics();
   private debugChunks = false;
@@ -100,6 +103,7 @@ export class Renderer {
     this.app.stage.addChild(this.camera);
     this.markerLayer.addChild(this.reticle);
     this.markerLayer.addChild(this.chunkGrid);
+    this.camera.addChild(this.effectLayer);
     // Fuera de la camara: cubre la pantalla, no el mundo.
     this.app.stage.addChild(this.skyTint);
     this.buildTextures();
@@ -223,7 +227,7 @@ export class Renderer {
    * interpolar la posicion del jugador: sin esto se veria a saltos de 60 Hz
    * aunque la pantalla vaya a 144.
    */
-  render(state: GameState, prevX: number, prevY: number, alpha: number): void {
+  render(state: GameState, prevX: number, prevY: number, alpha: number, effects?: Effects): void {
     const { entities, playerId } = state;
     const wx = prevX + (entities.x[playerId] - prevX) * alpha;
     const wy = prevY + (entities.y[playerId] - prevY) * alpha;
@@ -249,6 +253,7 @@ export class Renderer {
 
     this.fadeOccluders(wx, wy, playerScreen);
     this.drawReticle(entities, playerId);
+    this.drawEffects(effects);
     this.drawChunkGrid(state);
     this.drawSky(state.tick, view.width, view.height);
   }
@@ -395,6 +400,63 @@ export class Renderer {
       (clientX - rect.left - this.camera.x) / scale,
       (clientY - rect.top - this.camera.y) / scale,
     );
+  }
+
+  /**
+   * Slash y escombros.
+   *
+   * El slash es un arco que barre los centros de las tres casillas: son
+   * contiguas en el anillo de direcciones, asi que un solo trazo las recorre y
+   * se lee como un golpe y no como tres marcas sueltas. Crece y se desvanece.
+   *
+   * Los escombros son cuadraditos con la altura restada en Y, que es como se
+   * dibuja en isometrica todo lo que se levanta del suelo.
+   */
+  private drawEffects(effects: Effects | undefined): void {
+    this.effectLayer.clear();
+    if (!effects) return;
+
+    for (const slash of effects.slashes) {
+      const t = progressOf(slash);
+      // Barre de una punta a la otra y se apaga por detras.
+      const swept = Math.min(1, t * 1.6);
+      const alpha = (1 - t) * 0.85;
+      if (alpha <= 0) continue;
+
+      // Las flanqueantes van a los extremos del arco y la apuntada al centro.
+      const [aimed, left, right] = slash.tiles;
+      const path = [left, aimed, right].filter(Boolean);
+      const points = path.map((tile) => {
+        const p = worldToScreen(tile.x, tile.y);
+        return { x: p.x, y: p.y + TILE_H / 2 - TILE_H * 0.9 };
+      });
+      if (points.length < 2) continue;
+
+      const last = Math.max(1, Math.ceil(swept * (points.length - 1)));
+      this.effectLayer.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i <= last && i < points.length; i++) {
+        this.effectLayer.lineTo(points[i].x, points[i].y);
+      }
+      this.effectLayer.stroke({ width: 3 - t * 1.5, color: 0xffffff, alpha });
+    }
+
+    for (const p of effects.particles) {
+      const t = progressOf(p);
+      const screen = worldToScreen(p.x, p.y);
+      const half = p.size / 2;
+      const x = screen.x - half;
+      const y = screen.y + TILE_H / 2 - p.z * TILE_H * 2 - half;
+      // Se apaga al final, no de golpe.
+      const alpha = Math.min(1, (1 - t) * 2.2);
+
+      // Un contorno oscuro por debajo: los verdes de un arbol sobre hierba verde
+      // desaparecen sin el, y cambiar el color seria traicionar el encargo —los
+      // escombros son los colores del objeto, no unos que se vean mejor.
+      this.effectLayer
+        .rect(x - 1, y - 1, p.size + 2, p.size + 2)
+        .fill({ color: 0x101820, alpha: alpha * 0.55 });
+      this.effectLayer.rect(x, y, p.size, p.size).fill({ color: p.color, alpha });
+    }
   }
 
   /** True si el rombo de un chunk toca la pantalla. */

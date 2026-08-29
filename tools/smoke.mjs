@@ -282,6 +282,34 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  clic izquierdo: +${clicked} recursos`);
   check(clicked > 0, 'el clic izquierdo no recolecto nada');
 
+  // Los efectos. El bloque anterior dejo la zona talada, asi que se golpea
+  // MIENTRAS se camina: sobre una casilla vacia solo saldria el slash, y de que
+  // haya algo que derribar no se puede depender quedandose quieto.
+  let sawSlash = false;
+  let sawDebris = 0;
+  await page.mouse.down();
+  for (const key of ['KeyS', 'KeyS', 'KeyA', 'KeyW', 'KeyD', 'KeyS']) {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(420);
+    await page.keyboard.up(key);
+    const now = await page.evaluate(() => window.__verdant);
+    if (now.effects.slashes > 0) sawSlash = true;
+    if (now.effects.particles > sawDebris) sawDebris = now.effects.particles;
+  }
+  await page.mouse.up();
+  console.log(`  al golpear: slash ${sawSlash ? 'si' : 'no'}, hasta ${sawDebris} escombros`);
+  check(sawSlash, 'accionar no dibujo ningun slash');
+  check(sawDebris > 0, 'derribar no solto ningun escombro');
+
+  // Y se apagan solos: no se quedan pegados en pantalla.
+  await page.waitForTimeout(1800);
+  const settled = await page.evaluate(() => window.__verdant);
+  check(
+    settled.effects.particles === 0 && settled.effects.slashes === 0,
+    `los efectos no se apagaron (${JSON.stringify(settled.effects)})`,
+  );
+
+
   for (let i = 0; i < 5; i++) await page.keyboard.press('Minus');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(SHOTS, '03-mundo-amplio.png') });
@@ -591,6 +619,37 @@ async function devToolsPass(browser, baseUrl) {
   console.log(`  registro: ${JSON.stringify(log.split('\n')[0] ?? '')}`);
   check(log.trim().length > 0, 'recolectar no dejo ninguna linea en el registro');
   await page.screenshot({ path: join(SHOTS, '11-dev-registro.png') });
+
+  // Captura del golpe. Los efectos avanzan con el tiempo escalado, asi que
+  // pausar los CONGELA: se golpea a velocidad normal y en cuanto salta un
+  // estallido se pausa y se fotografia con calma. A 1x el estallido entero cabe
+  // entre dos muestreos, y a 0.25x se camina cuatro veces mas lento y no se
+  // llega a nada que talar.
+  await page.click('[data-toggle="biomes"]');
+  await page.click('[data-toggle="chunks"]');
+  await page.mouse.move(760, 420);
+  await page.waitForTimeout(200);
+
+  let shot = false;
+  await page.mouse.down();
+  for (const key of ['KeyS', 'KeyD', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyW', 'KeyA']) {
+    await page.keyboard.down(key);
+    for (let i = 0; i < 10 && !shot; i++) {
+      await page.waitForTimeout(60);
+      const now = await page.evaluate(() => window.__verdant);
+      if (now.effects.particles >= 8 && now.effects.slashes > 0) {
+        await page.click('[data-toggle="pause"]');
+        await page.screenshot({ path: join(SHOTS, '13-golpe.png') });
+        console.log(`  captura del golpe: ${now.effects.particles} escombros congelados`);
+        await page.click('[data-toggle="pause"]');
+        shot = true;
+      }
+    }
+    await page.keyboard.up(key);
+    if (shot) break;
+  }
+  await page.mouse.up();
+  check(shot, 'no se pudo fotografiar un golpe con escombros');
 
   // F3 cierra el panel y devuelve el tiempo a su sitio.
   await page.keyboard.press('F3');

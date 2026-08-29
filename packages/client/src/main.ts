@@ -26,6 +26,8 @@ import {
   TICK_DT,
 } from '@verdant/shared';
 import { DevTools } from './devtools.js';
+import { Effects } from './effects.js';
+import { debrisPalette } from './palette.js';
 import { Input } from './input.js';
 import { Renderer } from './renderer.js';
 
@@ -120,11 +122,14 @@ async function main(): Promise<void> {
     }
 
     renderer.reset();
+    effects.clear();
     state = createGame(seed);
     prevX = state.entities.x[state.playerId];
     prevY = state.entities.y[state.playerId];
     el.dead.classList.remove('show');
   }
+
+  const effects = new Effects();
 
   const dev = new DevTools({
     onSkip: (ticks) => {
@@ -202,11 +207,22 @@ async function main(): Promise<void> {
     while (accumulator >= TICK_DT) {
       prevX = state.entities.x[state.playerId];
       prevY = state.entities.y[state.playerId];
-      step(state, input.consume());
+      // La Intent se guarda en vez de pasarse en linea: hace falta saber si se
+      // acciono para lanzar el slash, aunque no se derribara nada.
+      const intent = input.consume();
+      step(state, intent);
+      if (intent.harvest) {
+        effects.spawnSlash(actionArea(state.entities, state.playerId));
+      }
+      for (const hit of state.lastHarvest) {
+        effects.spawnDebris(hit.tileX, hit.tileY, debrisPalette(hit.feature));
+      }
       accumulator -= TICK_DT;
     }
 
-    renderer.render(state, prevX, prevY, accumulator / TICK_DT);
+    // Con el tiempo escalado: pausar congela los efectos y a 64x no inundan.
+    effects.advance(frame * dev.timeScale);
+    renderer.render(state, prevX, prevY, accumulator / TICK_DT, effects);
 
     hudTimer += frame;
     if (hudTimer >= 0.1) {
@@ -243,6 +259,7 @@ async function main(): Promise<void> {
       borderSegments: renderer.borderSegmentCount,
       misplacedBorders: renderer.misplacedBorderCount,
       facing: [state.entities.facingX[state.playerId], state.entities.facingY[state.playerId]],
+      effects: effects.tally,
       area: actionArea(state.entities, state.playerId).map((t) => [t.x, t.y]),
       biome: BIOME_NAMES[
         state.world.biomeAt(

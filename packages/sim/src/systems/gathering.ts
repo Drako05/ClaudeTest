@@ -31,6 +31,12 @@ export const BERRIES_PER_MEAL = 1;
 export const HUNGER_PER_BERRY = 14;
 
 export interface HarvestResult {
+  /**
+   * Lo que habia en el tile. La recoleccion ya lo sabe, y sin el dato el cliente
+   * no podria saber de que color son los escombros de algo que acaba de dejar de
+   * existir en el mundo.
+   */
+  feature: Feature;
   resource: Resource;
   amount: number;
   /** Semillas obtenidas, de cero a MAX_SEEDS_PER_HARVEST. */
@@ -134,6 +140,7 @@ export function harvestTile(
     amount,
     seeds,
     seedResource: yield_.seed,
+    feature,
     rare: isRare(feature),
     rewarded,
     tileX: x,

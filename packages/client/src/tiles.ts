@@ -14,6 +14,7 @@
 import { CHUNK_SIZE, Feature, isSapling, maturesInto, Terrain } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
 import type { Chunk } from '@verdant/sim';
+import { LOOKS, ROCK_FACES } from './palette.js';
 import { TILE_H, TILE_W, worldToScreen } from './projection.js';
 
 /** Caja que ocupa el rombo de un chunk completo, en pixeles. */
@@ -94,47 +95,6 @@ export interface FeatureArt {
   /** Pixeles que el dibujo se eleva sobre su punto de apoyo. */
   riseAbove: number;
 }
-
-/** Paleta de una especie. Basta esto para distinguirlas de un vistazo. */
-interface SpeciesLook {
-  /** Silueta: los arboles de bosque son altos y estrechos; los de pradera, anchos. */
-  readonly form: 'conifer' | 'broadleaf' | 'bush';
-  readonly trunk: string;
-  readonly dark: string;
-  readonly mid: string;
-  readonly light: string;
-  /** Color de los frutos, si la especie los tiene. */
-  readonly fruit?: string;
-  /** Las variantes raras se dibujan algo mas grandes ademas de con otro color. */
-  readonly rare: boolean;
-}
-
-const LOOKS: Partial<Record<Feature, SpeciesLook>> = {
-  [Feature.ForestTree]: {
-    form: 'conifer', trunk: '#4a3420', dark: '#1d4419', mid: '#2a5f23', light: '#3d7d31', rare: false,
-  },
-  [Feature.ForestTreeRare]: {
-    form: 'conifer', trunk: '#5a3f26', dark: '#7a5410', mid: '#a8761a', light: '#d9a531', rare: true,
-  },
-  [Feature.MeadowTree]: {
-    form: 'broadleaf', trunk: '#6b4a2c', dark: '#2f6b28', mid: '#438a33', light: '#5aa844', rare: false,
-  },
-  [Feature.MeadowTreeRare]: {
-    form: 'broadleaf', trunk: '#6b4a2c', dark: '#8e3567', mid: '#bd5a8e', light: '#e08cb4', rare: true,
-  },
-  [Feature.ForestPlant]: {
-    form: 'bush', trunk: '#3a5a24', dark: '#24501f', mid: '#33682a', light: '#457f36', fruit: '#c8384a', rare: false,
-  },
-  [Feature.ForestPlantRare]: {
-    form: 'bush', trunk: '#3a5a24', dark: '#1f4650', mid: '#2a6878', light: '#3f93a6', fruit: '#5fd8f0', rare: true,
-  },
-  [Feature.MeadowPlant]: {
-    form: 'bush', trunk: '#4a6b2c', dark: '#2f5a28', mid: '#3f7534', light: '#57944a', fruit: '#c8384a', rare: false,
-  },
-  [Feature.MeadowPlantRare]: {
-    form: 'bush', trunk: '#4a6b2c', dark: '#5a5220', mid: '#8a7a2c', light: '#c4b04a', fruit: '#ffd75e', rare: true,
-  },
-};
 
 function newCanvas(width: number, height: number): [HTMLCanvasElement, CanvasRenderingContext2D] | null {
   const canvas = document.createElement('canvas');
@@ -269,6 +229,7 @@ function makeSaplingArt(feature: Feature): FeatureArt | null {
 }
 
 function makeRockArt(): FeatureArt | null {
+  const [base, face, highlight] = ROCK_FACES;
   const made = newCanvas(40, 40);
   if (!made) return null;
   const [canvas, ctx] = made;
@@ -276,7 +237,7 @@ function makeRockArt(): FeatureArt | null {
   const footY = 34;
 
   drawShadow(ctx, footX, footY, 0.9);
-  ctx.fillStyle = '#6f6f78';
+  ctx.fillStyle = base;
   ctx.beginPath();
   ctx.moveTo(footX - 11, footY);
   ctx.lineTo(footX - 5, footY - 15);
@@ -284,7 +245,7 @@ function makeRockArt(): FeatureArt | null {
   ctx.lineTo(footX + 11, footY);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = '#9a9aa4';
+  ctx.fillStyle = face;
   ctx.beginPath();
   ctx.moveTo(footX - 5, footY - 15);
   ctx.lineTo(footX + 4, footY - 12);
@@ -292,7 +253,7 @@ function makeRockArt(): FeatureArt | null {
   ctx.lineTo(footX - 11, footY);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = '#b8b8c2';
+  ctx.fillStyle = highlight;
   ctx.beginPath();
   ctx.moveTo(footX - 5, footY - 15);
   ctx.lineTo(footX - 1, footY - 6);

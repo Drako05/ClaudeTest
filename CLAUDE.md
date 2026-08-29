@@ -125,6 +125,20 @@ por las colisiones con arboles y agua; por eso se mide en
 Ojo con los FPS que reporta la pasada movil: en headless se renderiza por
 software a 3x, asi que ese numero no dice nada del rendimiento en un movil real.
 
+## Efectos visuales
+
+`client/effects.ts` lleva el movimiento —donde esta cada cosa y cuanto le queda
+de vida— sin DOM ni PixiJS, y el renderizador solo lo dibuja: asi la fisica de
+las particulas se mide en Node. Avanzan con el tiempo **escalado**, de modo que
+pausar los congela y 64x no inunda la pantalla.
+
+Los colores de los escombros salen de `client/palette.ts`, la misma tabla con la
+que `tiles.ts` pinta cada especie. Estan juntas a proposito: el encargo era que
+los escombros fueran los colores del objeto, y con una copia se separarian al
+primer retoque. Sobre hierba los verdes de un arbol desaparecen, asi que cada
+cuadrado lleva un contorno oscuro debajo; cambiarles el color habria sido
+traicionar el encargo.
+
 ## Herramientas de desarrollo
 
 `packages/client/src/devtools.ts`, con `?dev=1` en la URL o F3. Pausa,
