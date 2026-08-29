@@ -231,6 +231,8 @@ async function main(): Promise<void> {
       dev: dev.active,
       timeScale: dev.timeScale,
       survivalFrozen: dev.survivalFrozen,
+      borderSegments: renderer.borderSegmentCount,
+      misplacedBorders: renderer.misplacedBorderCount,
       biome: BIOME_NAMES[
         state.world.biomeAt(
           Math.floor(state.entities.x[state.playerId]),

@@ -130,6 +130,13 @@ que saltar una hora deje el mundo exactamente igual que vivirla quieto; y
 equivalencia siga valiendo con el interruptor en cualquier posicion. Hay tests de
 las tres.
 
+Las superposiciones de depuracion (rejilla de chunks y contorno de biomas) se
+trazan en coordenadas de pantalla **absolutas** y su `Graphics` se queda en (0,0)
+dentro de `markerLayer`. Asignarle ademas la posicion del chunk suma el origen
+dos veces y saca todo el dibujo un chunk en diagonal; como en el chunk (0,0) el
+error vale cero, a ojo parece que funciona. La geometria del contorno vive aparte
+en `client/biome-edges.ts`, sin PixiJS, para poder verificarla en Node.
+
 La congelacion empieza puesta al abrir el panel y solo se aplica con el panel
 abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
 herramientas no sirven para lo que se hicieron: a 64x se pierden unos 35 puntos

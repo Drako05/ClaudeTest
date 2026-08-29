@@ -13,9 +13,10 @@
  */
 
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
-import { biomeOfTerrain, CHUNK_SIZE, Feature, Terrain } from '@verdant/shared';
+import { CHUNK_SIZE, Feature } from '@verdant/shared';
 import type { Chunk, GameState, World } from '@verdant/sim';
 import { daylight, targetTile } from '@verdant/sim';
+import { collectBiomeEdges } from './biome-edges.js';
 import { depthOf, TILE_H, TILE_W, worldToScreen } from './projection.js';
 import {
   CHUNK_TEX_H,
@@ -33,6 +34,8 @@ interface ChunkView {
   features: Sprite[];
   /** Contorno de los biomas del chunk. Solo existe con la vista activada. */
   biomeBorders: Graphics | null;
+  /** Segmentos de ese contorno. Solo para verificacion. */
+  borderSegments: number;
   revision: number;
 }
 
@@ -149,6 +152,53 @@ export class Renderer {
     return this.tilesOnScreen;
   }
 
+  /**
+   * Segmentos de contorno de bioma dibujados ahora mismo.
+   *
+   * Solo existe para que la prueba de humo pueda afirmar que el contorno sigue
+   * ahi despues de caminar a otro chunk o de cambiar el zoom, que es justo lo
+   * que se veia fallar.
+   */
+  get borderSegmentCount(): number {
+    let total = 0;
+    for (const view of this.views.values()) total += view.borderSegments;
+    return total;
+  }
+
+  /**
+   * Contornos que se salen del rombo de su propio chunk.
+   *
+   * Tiene que ser siempre cero. Existe porque el fallo que hubo aqui era
+   * exactamente ese: al contorno se le sumaba el origen del chunk dos veces y
+   * acababa dibujado un chunk mas alla, tapando el del vecino. A ojo no se
+   * distingue de un contorno correcto; midiendolo, si.
+   */
+  get misplacedBorderCount(): number {
+    let bad = 0;
+    for (const [key, view] of this.views) {
+      if (!view.biomeBorders || view.borderSegments === 0) continue;
+      const comma = key.indexOf(',');
+      const origin = worldToScreen(
+        Number(key.slice(0, comma)) * CHUNK_SIZE,
+        Number(key.slice(comma + 1)) * CHUNK_SIZE,
+      );
+      // Con la posicion del propio Graphics sumada, que es donde estaba el
+      // fallo. Sin ella el error quedaria justo fuera de la medida.
+      const b = view.biomeBorders.getLocalBounds();
+      const x0 = view.biomeBorders.position.x + b.minX;
+      const x1 = view.biomeBorders.position.x + b.maxX;
+      const y0 = view.biomeBorders.position.y + b.minY;
+      const y1 = view.biomeBorders.position.y + b.maxY;
+      const inside =
+        x0 >= origin.x - CHUNK_TEX_OFFSET_X - 1 &&
+        x1 <= origin.x + CHUNK_TEX_OFFSET_X + 1 &&
+        y0 >= origin.y - 1 &&
+        y1 <= origin.y + CHUNK_TEX_H + 1;
+      if (!inside) bad++;
+    }
+    return bad;
+  }
+
   /** Activa o desactiva las superposiciones de depuracion. */
   setDebugOverlays(chunks: boolean, biomes: boolean): void {
     this.debugChunks = chunks;
@@ -159,6 +209,7 @@ export class Renderer {
       for (const view of this.views.values()) {
         view.biomeBorders?.destroy();
         view.biomeBorders = null;
+        view.borderSegments = 0;
       }
     }
   }
@@ -293,39 +344,20 @@ export class Renderer {
    *
    * Es la comprobacion visual de que el bioma que anuncia el panel es el del
    * suelo que se pisa: si el contorno no coincide con lo que se ve, algo falla.
-   * Se traza solo la arista entre dos tiles de biomas distintos.
+   *
+   * La geometria viene en coordenadas ABSOLUTAS de `collectBiomeEdges`, asi que
+   * el `Graphics` se queda en (0,0) dentro de `markerLayer`, igual que
+   * `chunkGrid`. Asignarle ademas la posicion del chunk sumaba el origen dos
+   * veces y sacaba todo el contorno un chunk en diagonal.
    */
-  private buildBiomeBorders(chunk: Chunk): Graphics {
+  private buildBiomeBorders(world: World, chunk: Chunk, view: ChunkView): Graphics {
     const g = new Graphics();
-    const baseX = chunk.cx * CHUNK_SIZE;
-    const baseY = chunk.cy * CHUNK_SIZE;
-
-    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
-      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-        const mine = biomeOfTerrain(chunk.terrain[ly * CHUNK_SIZE + lx] as Terrain);
-        const p = worldToScreen(baseX + lx, baseY + ly);
-
-        // Arista este: entre este tile y el de la derecha.
-        const eastBiome =
-          lx + 1 < CHUNK_SIZE
-            ? biomeOfTerrain(chunk.terrain[ly * CHUNK_SIZE + lx + 1] as Terrain)
-            : mine;
-        if (eastBiome !== mine) {
-          g.moveTo(p.x + TILE_W / 2, p.y + TILE_H / 2).lineTo(p.x, p.y + TILE_H);
-        }
-
-        // Arista sur: entre este tile y el de abajo.
-        const southBiome =
-          ly + 1 < CHUNK_SIZE
-            ? biomeOfTerrain(chunk.terrain[(ly + 1) * CHUNK_SIZE + lx] as Terrain)
-            : mine;
-        if (southBiome !== mine) {
-          g.moveTo(p.x, p.y + TILE_H).lineTo(p.x - TILE_W / 2, p.y + TILE_H / 2);
-        }
-      }
+    const segments = collectBiomeEdges(world, chunk);
+    for (let i = 0; i < segments.length; i += 4) {
+      g.moveTo(segments[i], segments[i + 1]).lineTo(segments[i + 2], segments[i + 3]);
     }
-
     g.stroke({ width: 1, color: 0xffe08a, alpha: 0.9 });
+    view.borderSegments = segments.length / 4;
     return g;
   }
 
@@ -387,12 +419,7 @@ export class Renderer {
         view.revision = chunk.revision;
       }
 
-      if (this.debugBiomes && !view.biomeBorders) {
-        view.biomeBorders = this.buildBiomeBorders(chunk);
-        view.biomeBorders.position.copyFrom(view.terrain.position);
-        view.biomeBorders.position.x += CHUNK_TEX_OFFSET_X;
-        this.markerLayer.addChild(view.biomeBorders);
-      }
+      this.ensureBiomeBorders(state.world, chunk, view);
     });
 
     for (const [key, view] of this.views) {
@@ -420,13 +447,25 @@ export class Renderer {
     terrain.position.set(origin.x - CHUNK_TEX_OFFSET_X, origin.y);
     this.terrainLayer.addChild(terrain);
 
-    return {
+    const view: ChunkView = {
       terrain,
       texture,
       features: this.buildFeatures(world, chunk),
       biomeBorders: null,
+      borderSegments: 0,
       revision: chunk.revision,
     };
+    // Tambien al nacer la vista: si no, el contorno tardaria un frame de mas en
+    // aparecer cada vez que un chunk entra en pantalla.
+    this.ensureBiomeBorders(world, chunk, view);
+    return view;
+  }
+
+  /** Crea el contorno del chunk si toca y todavia no existe. */
+  private ensureBiomeBorders(world: World, chunk: Chunk, view: ChunkView): void {
+    if (!this.debugBiomes || view.biomeBorders) return;
+    view.biomeBorders = this.buildBiomeBorders(world, chunk, view);
+    this.markerLayer.addChild(view.biomeBorders);
   }
 
   /**

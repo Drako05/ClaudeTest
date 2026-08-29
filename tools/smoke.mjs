@@ -449,7 +449,37 @@ async function devToolsPass(browser, baseUrl) {
     biomes: !!document.querySelector('[data-toggle="biomes"].on'),
   }));
   check(bordersOn.chunks && bordersOn.biomes, `los conmutadores no quedaron activos: ${JSON.stringify(bordersOn)}`);
+  check(withBorders.borderSegments > 0, 'el contorno de biomas no dibujo ni un segmento');
+  // Cada contorno tiene que caber en el rombo de su propio chunk. Es la medida
+  // del fallo que hubo: el origen del chunk sumado dos veces lo sacaba un chunk
+  // entero en diagonal, y eso a ojo no se distingue.
+  check(withBorders.misplacedBorders === 0, `${withBorders.misplacedBorders} contornos fuera de su chunk`);
   await page.screenshot({ path: join(SHOTS, '10-dev-bordes.png') });
+
+  // El contorno tiene que sobrevivir a cambiar de chunk y a mover el zoom, que
+  // es justo donde se veia aparecer y desaparecer.
+  const startChunk = [Math.floor(withBorders.x) >> 5, Math.floor(withBorders.y) >> 5];
+  await page.keyboard.down('KeyD');
+  await page.waitForTimeout(2600);
+  await page.keyboard.up('KeyD');
+  const walked = await waitForLoop(page);
+  const walkedChunk = [Math.floor(walked.x) >> 5, Math.floor(walked.y) >> 5];
+  console.log(`  chunk ${startChunk} -> ${walkedChunk}, segmentos ${withBorders.borderSegments} -> ${walked.borderSegments}`);
+  check(
+    walkedChunk[0] !== startChunk[0] || walkedChunk[1] !== startChunk[1],
+    `el jugador no llego a cambiar de chunk (${startChunk} -> ${walkedChunk})`,
+  );
+  check(walked.borderSegments > 0, 'el contorno desaparecio al cambiar de chunk');
+  check(walked.misplacedBorders === 0, `${walked.misplacedBorders} contornos fuera de su chunk tras caminar`);
+
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Minus');
+  await page.waitForTimeout(400);
+  const zoomedOutBorders = await waitForLoop(page);
+  check(zoomedOutBorders.tilesOnScreen > walked.tilesOnScreen, 'el zoom no cambio');
+  check(zoomedOutBorders.borderSegments > 0, 'el contorno desaparecio al alejar el zoom');
+  check(zoomedOutBorders.misplacedBorders === 0, `${zoomedOutBorders.misplacedBorders} contornos fuera de su chunk tras el zoom`);
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Equal');
+  await page.waitForTimeout(300);
 
   // Pausa: el reloj tiene que pararse de verdad, no solo cambiar de color.
   await page.click('[data-toggle="pause"]');
