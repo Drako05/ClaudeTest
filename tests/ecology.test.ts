@@ -150,14 +150,19 @@ describe('Ritmo de mortandad: del 200 % al rango en 2.5 horas reales', () => {
 });
 
 describe('El ciclo de la siembra', () => {
-  /** Coloca al jugador justo encima del tile indicado. */
+  /**
+   * Coloca al jugador al norte del tile indicado y mirando al sur, de forma que
+   * la casilla apuntada sea exactamente esa.
+   *
+   * Antes se le ponia encima con la mirada a cero, porque asi el tile apuntado
+   * era el propio. Ya no: una accion siempre afecta a casillas adyacentes, nunca
+   * a la que se pisa.
+   */
   function playerOn(x: number, y: number): { store: EntityStore; id: number } {
     const store = new EntityStore(4);
-    const id = store.spawn(EntityKind.Player, x + 0.5, y + 0.5);
-    // Sin direccion, el tile apuntado es el propio: asi el test no depende de
-    // hacia donde mire el personaje.
+    const id = store.spawn(EntityKind.Player, x + 0.5, y - 0.5);
     store.facingX[id] = 0;
-    store.facingY[id] = 0;
+    store.facingY[id] = 1;
     return { store, id };
   }
 

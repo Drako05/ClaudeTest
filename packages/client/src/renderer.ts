@@ -15,9 +15,9 @@
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { CHUNK_SIZE, Feature } from '@verdant/shared';
 import type { Chunk, GameState, World } from '@verdant/sim';
-import { daylight, targetTile } from '@verdant/sim';
+import { actionArea, daylight } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
-import { depthOf, TILE_H, TILE_W, worldToScreen } from './projection.js';
+import { depthOf, screenToWorld, TILE_DIAMOND, TILE_H, TILE_W, worldToScreen } from './projection.js';
 import {
   CHUNK_TEX_H,
   CHUNK_TEX_OFFSET_X,
@@ -361,17 +361,40 @@ export class Renderer {
     return g;
   }
 
+  /**
+   * Marca las tres casillas del area. La apuntada va mas marcada que las dos
+   * flanqueantes: sigue siendo la que importa para sembrar.
+   */
   private drawReticle(entities: GameState['entities'], playerId: number): void {
-    const target = targetTile(entities, playerId);
-    const p = worldToScreen(target.x, target.y);
     this.reticle.clear();
-    this.reticle
-      .moveTo(p.x, p.y)
-      .lineTo(p.x + TILE_W / 2, p.y + TILE_H / 2)
-      .lineTo(p.x, p.y + TILE_H)
-      .lineTo(p.x - TILE_W / 2, p.y + TILE_H / 2)
-      .closePath()
-      .stroke({ width: 1.5, color: 0xffffff, alpha: 0.5 });
+    const area = actionArea(entities, playerId);
+    for (let i = 0; i < area.length; i++) {
+      const p = worldToScreen(area[i].x, area[i].y);
+      for (let c = 0; c < TILE_DIAMOND.length; c++) {
+        const corner = TILE_DIAMOND[c];
+        if (c === 0) this.reticle.moveTo(p.x + corner.x, p.y + corner.y);
+        else this.reticle.lineTo(p.x + corner.x, p.y + corner.y);
+      }
+      this.reticle
+        .closePath()
+        .stroke({ width: 1.5, color: 0xffffff, alpha: i === 0 ? 0.55 : 0.22 });
+    }
+  }
+
+  /**
+   * Pixel de pantalla a coordenadas del mundo.
+   *
+   * Es la inversa de la camara, y vive aqui porque el renderizador es la unica
+   * parte que sabe donde esta y a que escala. Con ella el input traduce el raton
+   * a una direccion de mirada sin enterarse de como se proyecta el mundo.
+   */
+  pointerToWorld(clientX: number, clientY: number): { x: number; y: number } {
+    const rect = this.app.canvas.getBoundingClientRect();
+    const scale = this.camera.scale.x;
+    return screenToWorld(
+      (clientX - rect.left - this.camera.x) / scale,
+      (clientY - rect.top - this.camera.y) / scale,
+    );
   }
 
   /** True si el rombo de un chunk toca la pantalla. */

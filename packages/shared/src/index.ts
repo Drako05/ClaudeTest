@@ -224,8 +224,18 @@ export interface Intent {
   eat: boolean;
   /** Sembrar en el tile mirado. */
   plant: boolean;
+  /**
+   * Direccion a la que se quiere mirar, independiente de hacia donde se anda.
+   *
+   * En (0,0) no hay apuntado y la mirada sigue al movimiento, que es como se
+   * comporta el teclado solo y el joystick en reposo. Viaja en la Intent y no se
+   * escribe a mano en la entidad para que la misma estructura pueda ir por red
+   * sin reescribir nada.
+   */
+  aimX: number;
+  aimY: number;
 }
 
 export function emptyIntent(): Intent {
-  return { moveX: 0, moveY: 0, harvest: false, eat: false, plant: false };
+  return { moveX: 0, moveY: 0, harvest: false, eat: false, plant: false, aimX: 0, aimY: 0 };
 }

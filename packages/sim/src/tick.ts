@@ -11,7 +11,8 @@ import { CHUNK_SIZE, DAY_TICKS, RESOURCE_COUNT, TICK_DT, type Intent } from '@ve
 import { EntityKind, EntityStore } from './entities.js';
 import { moveEntity } from './systems/movement.js';
 import { updateSurvival } from './systems/survival.js';
-import { tryEat, tryHarvest, tryPlant, type HarvestResult } from './systems/gathering.js';
+import { tryEat, tryHarvestArea, tryPlant, type HarvestResult } from './systems/gathering.js';
+import { directionOf, facingOf } from './aim.js';
 import { toChunkCoord, World } from './world.js';
 
 /** Radio de chunks mantenidos cargados alrededor del jugador. */
@@ -27,8 +28,8 @@ export interface GameState {
   /** Cantidades por Resource. Int32Array para mantener el estado en datos planos. */
   readonly inventory: Int32Array;
   tick: number;
-  /** Ultima recoleccion, para que el cliente muestre feedback. Efimero. */
-  lastHarvest: HarvestResult | null;
+  /** Lo recolectado en el ultimo tick, una entrada por casilla. Efimero. */
+  lastHarvest: HarvestResult[];
   /** Chunk en el que estaba el jugador el tick anterior, para streaming perezoso. */
   streamCx: number;
   streamCy: number;
@@ -64,7 +65,7 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     playerId,
     inventory: new Int32Array(RESOURCE_COUNT),
     tick: Math.max(0, Math.floor(startTick)),
-    lastHarvest: null,
+    lastHarvest: [],
     streamCx: Number.NaN,
     streamCy: Number.NaN,
     survivalFrozen: false,
@@ -93,7 +94,7 @@ function streamChunks(state: GameState): void {
 /** Avanza la simulacion exactamente un tick. */
 export function step(state: GameState, intent: Intent): void {
   const { entities, playerId, world, inventory } = state;
-  state.lastHarvest = null;
+  state.lastHarvest = [];
 
   // El tiempo avanza antes que nada: el resto del tick actua sobre el mundo tal
   // y como esta AHORA, con la vegetacion ya puesta al dia.
@@ -101,8 +102,19 @@ export function step(state: GameState, intent: Intent): void {
 
   if (entities.alive[playerId]) {
     moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT);
+
+    // El apuntado manda sobre la mirada que acaba de fijar el movimiento: con
+    // raton se mira a donde apunta el cursor aunque se ande en otra direccion.
+    // Sin apuntado la mirada sigue al movimiento, que es lo de siempre.
+    const aimed = directionOf(intent.aimX, intent.aimY);
+    if (aimed >= 0) {
+      const facing = facingOf(aimed);
+      entities.facingX[playerId] = facing.x;
+      entities.facingY[playerId] = facing.y;
+    }
+
     if (intent.harvest) {
-      state.lastHarvest = tryHarvest(world, entities, playerId, inventory, state.tick);
+      state.lastHarvest = tryHarvestArea(world, entities, playerId, inventory, state.tick);
     }
     if (intent.plant) {
       tryPlant(world, entities, playerId, inventory);

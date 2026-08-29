@@ -234,6 +234,54 @@ async function desktopPass(browser, baseUrl) {
     'sembrar no consumio ninguna semilla',
   );
 
+  // Apuntar con el raton: la mirada tiene que seguir al cursor, y el clic
+  // izquierdo accionar sin tocar Espacio.
+  const centre = { x: 640, y: 360 };
+  await page.mouse.move(centre.x - 260, centre.y);
+  await page.waitForTimeout(200);
+  const aimLeft = await waitForLoop(page);
+  await page.mouse.move(centre.x + 260, centre.y);
+  await page.waitForTimeout(200);
+  const aimRight = await waitForLoop(page);
+  console.log(`  mirada: ${JSON.stringify(aimLeft.facing)} -> ${JSON.stringify(aimRight.facing)}`);
+  check(
+    aimLeft.facing[0] !== aimRight.facing[0] || aimLeft.facing[1] !== aimRight.facing[1],
+    `el cursor no giro la mirada (${JSON.stringify(aimLeft.facing)})`,
+  );
+  // En isometrica el eje X de pantalla mezcla los dos ejes del mundo, asi que se
+  // comprueba la relacion entre las dos miradas y no un signo concreto.
+  check(
+    aimRight.facing[0] > aimLeft.facing[0] || aimRight.facing[1] < aimLeft.facing[1],
+    `la mirada no giro hacia el lado del cursor: ${JSON.stringify([aimLeft.facing, aimRight.facing])}`,
+  );
+  check(aimRight.area.length === 3, `el area no son 3 casillas: ${JSON.stringify(aimRight.area)}`);
+
+  // El area son la apuntada y sus dos vecinas del anillo: las tres tocan al
+  // jugador y son distintas.
+  const playerTile = [Math.floor(aimRight.x), Math.floor(aimRight.y)];
+  const distinct = new Set(aimRight.area.map((t) => t.join(',')));
+  check(distinct.size === 3, `el area repite casilla: ${JSON.stringify(aimRight.area)}`);
+  for (const [tx, ty] of aimRight.area) {
+    const reach = Math.max(Math.abs(tx - playerTile[0]), Math.abs(ty - playerTile[1]));
+    check(reach === 1, `casilla del area a distancia ${reach}: ${tx},${ty}`);
+  }
+
+  await page.screenshot({ path: join(SHOTS, '12-area-apuntada.png') });
+
+  const beforeClick = await waitForLoop(page);
+  for (let i = 0; i < 12; i++) {
+    await page.mouse.click(centre.x + 120, centre.y + 60);
+    await page.waitForTimeout(90);
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(110);
+    await page.keyboard.up('KeyW');
+  }
+  const afterClick = await waitForLoop(page);
+  const clicked = afterClick.inventory.reduce((a, b) => a + b, 0)
+    - beforeClick.inventory.reduce((a, b) => a + b, 0);
+  console.log(`  clic izquierdo: +${clicked} recursos`);
+  check(clicked > 0, 'el clic izquierdo no recolecto nada');
+
   for (let i = 0; i < 5; i++) await page.keyboard.press('Minus');
   await page.waitForTimeout(400);
   await page.screenshot({ path: join(SHOTS, '03-mundo-amplio.png') });

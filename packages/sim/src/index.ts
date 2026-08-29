@@ -10,6 +10,7 @@
 export * from './rng.js';
 export * from './clock.js';
 export * from './coords.js';
+export * from './aim.js';
 export * from './biome.js';
 export * from './worldgen.js';
 export * from './world.js';

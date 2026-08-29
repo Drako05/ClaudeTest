@@ -8,6 +8,7 @@
  */
 
 import {
+  actionArea,
   clockLabel,
   createGame,
   dayNumber,
@@ -137,6 +138,14 @@ async function main(): Promise<void> {
   const input = new Input({
     onRestart: restart,
     onZoom: (factor) => renderer.zoomBy(factor),
+    aimFrom: (clientX, clientY) => {
+      const world = renderer.pointerToWorld(clientX, clientY);
+      const dx = world.x - state.entities.x[state.playerId];
+      const dy = world.y - state.entities.y[state.playerId];
+      // Con el cursor practicamente encima del personaje no hay direccion que
+      // valga; se conserva la mirada anterior en vez de dar tumbos.
+      return Math.hypot(dx, dy) < 0.35 ? null : { x: dx, y: dy };
+    },
   });
   el.restart.addEventListener('click', restart);
 
@@ -233,6 +242,8 @@ async function main(): Promise<void> {
       survivalFrozen: dev.survivalFrozen,
       borderSegments: renderer.borderSegmentCount,
       misplacedBorders: renderer.misplacedBorderCount,
+      facing: [state.entities.facingX[state.playerId], state.entities.facingY[state.playerId]],
+      area: actionArea(state.entities, state.playerId).map((t) => [t.x, t.y]),
       biome: BIOME_NAMES[
         state.world.biomeAt(
           Math.floor(state.entities.x[state.playerId]),

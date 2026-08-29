@@ -22,7 +22,14 @@ Esto es el resumen operativo.
 5. **El input produce `Intent`; nunca muta el estado.** Es lo que permitira
    enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
-   nucleo.
+   nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`): con raton la fija el
+   cursor, en tactil el joystick, y en reposo se conserva la que hubiera. a tres casillas: la apuntada y sus dos vecinas en el
+    anillo de 8 direcciones** (`sim/aim.ts`). De esa unica regla salen los dos
+    casos que describio el autor —en recto las flanqueantes quedan en diagonal,
+    en diagonal quedan ortogonales— y `tests/aim.test.ts` las tiene todas.
+    El area parte de la casilla que se PISA. Antes se apuntaba con
+    `floor(pos + mirada * 1.1)`, que pegado al borde de la casilla podia saltar a
+    dos de distancia; con tres casillas eso deja de ser inadvertido.
 6. **La vista es isometrica y vive solo en el cliente.** La transformacion esta
    entera en `packages/client/src/projection.ts`. El mundo es una rejilla
    cuadrada: si algo del nucleo necesita saber como se proyecta, es que esta mal
@@ -43,6 +50,13 @@ Esto es el resumen operativo.
     arrasado reviviera dependia del orden en que se generaron los chunks —es
     decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
     que ningun test evidente lo delate.
+11. **Una accion afecta a tres casillas: la apuntada y sus dos vecinas en el
+    anillo de 8 direcciones** (`sim/aim.ts`). De esa unica regla salen los dos
+    casos que describio el autor —en recto las flanqueantes quedan en diagonal,
+    en diagonal quedan ortogonales— y `tests/aim.test.ts` las tiene todas. El
+    area parte de la casilla que se PISA: antes se apuntaba con
+    `floor(pos + mirada * 1.1)`, que pegado al borde de la casilla podia saltar a
+    dos de distancia, y con tres casillas eso deja de pasar inadvertido.
 
 ## Regla de trabajo con el autor
 

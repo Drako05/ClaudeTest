@@ -22,12 +22,11 @@ import {
   seedFor,
   speciesFor,
 } from '@verdant/shared';
+import { actionTiles, directionOf, type Offset } from '../aim.js';
 import type { EntityStore } from '../entities.js';
 import { hash2DFloat } from '../rng.js';
 import { toChunkCoord, type World } from '../world.js';
 
-/** Alcance en tiles desde el centro del jugador. */
-export const REACH = 1.1;
 export const BERRIES_PER_MEAL = 1;
 export const HUNGER_PER_BERRY = 14;
 
@@ -44,12 +43,26 @@ export interface HarvestResult {
   tileY: number;
 }
 
-/** Tile al que apunta la entidad segun su ultima direccion de movimiento. */
+/**
+ * Las casillas que afecta una accion de la entidad. La apuntada va la primera.
+ *
+ * Se calculan desde la casilla que PISA y no desde su posicion continua. Antes
+ * era `floor(pos + mirada * 1.1)`, y con el personaje pegado al borde de su
+ * casilla eso podia apuntar dos casillas mas alla; con un area de tres el fallo
+ * pasaria de inadvertido a evidente.
+ */
+export function actionArea(store: EntityStore, id: number): Offset[] {
+  const dir = directionOf(store.facingX[id], store.facingY[id]);
+  const tileX = Math.floor(store.x[id]);
+  const tileY = Math.floor(store.y[id]);
+  // Sin mirada todavia, se apunta al sur, que es hacia donde nace mirando.
+  return actionTiles(tileX, tileY, dir < 0 ? 4 : dir);
+}
+
+/** Tile al que apunta la entidad. */
 export function targetTile(store: EntityStore, id: number): { x: number; y: number } {
-  return {
-    x: Math.floor(store.x[id] + store.facingX[id] * REACH),
-    y: Math.floor(store.y[id] + store.facingY[id] * REACH),
-  };
+  const [aimed] = actionArea(store, id);
+  return { x: aimed.x, y: aimed.y };
 }
 
 /**
@@ -67,6 +80,38 @@ export function tryHarvest(
   tick: number,
 ): HarvestResult | null {
   const { x, y } = targetTile(store, id);
+  return harvestTile(world, x, y, inventory, tick);
+}
+
+/**
+ * Recolecta las tres casillas del area, en orden fijo y empezando por la
+ * apuntada. Cada una rinde lo suyo: tres arboles dan la madera de tres arboles,
+ * como decidio el autor. El coste lo pone el ecosistema, que tardara mas en
+ * reponerse de una tala tan rapida.
+ */
+export function tryHarvestArea(
+  world: World,
+  store: EntityStore,
+  id: number,
+  inventory: Int32Array,
+  tick: number,
+): HarvestResult[] {
+  const out: HarvestResult[] = [];
+  for (const tile of actionArea(store, id)) {
+    const result = harvestTile(world, tile.x, tile.y, inventory, tick);
+    if (result) out.push(result);
+  }
+  return out;
+}
+
+/** Recolecta un tile concreto. Es la primitiva de la que salen las dos de arriba. */
+export function harvestTile(
+  world: World,
+  x: number,
+  y: number,
+  inventory: Int32Array,
+  tick: number,
+): HarvestResult | null {
   const feature = world.featureAt(x, y);
   const yield_ = harvestOf(feature);
   if (!yield_) return null;

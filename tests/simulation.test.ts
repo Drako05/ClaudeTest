@@ -5,9 +5,12 @@ import {
   EntityKind,
   EntityStore,
   HUNGER_DECAY_PER_SEC,
+  actionArea,
   moveEntity,
   skipTime,
   step,
+  tryHarvestArea,
+  tryPlant,
   World,
 } from '@verdant/sim';
 import {
@@ -17,6 +20,7 @@ import {
   LifeKind,
   lifeKindOf,
   Resource,
+  RESOURCE_COUNT,
   TICK_DT,
   TICK_HZ,
   type Intent,
@@ -285,5 +289,140 @@ describe('Congelar la supervivencia', () => {
     // Con dos decimales: el hambre vive en un Float32Array y 600 restas de
     // 0.55/60 acumulan unas milesimas de error.
     expect(lost).toBeCloseTo(HUNGER_DECAY_PER_SEC * 10, 2);
+  });
+});
+
+/**
+ * Apuntar con el cursor y accionar en area.
+ *
+ * La mirada viaja en la Intent, asi que estos tests la ejercitan por donde
+ * entrara tambien desde la red: nadie escribe `facingX` a mano.
+ */
+describe('Mirada y area de efecto', () => {
+  it('el apuntado de la Intent fija la mirada', () => {
+    const state = createGame(31337);
+    state.survivalFrozen = true;
+
+    const aim = emptyIntent();
+    aim.aimX = 1;
+    aim.aimY = 0;
+    step(state, aim);
+    expect(actionArea(state.entities, state.playerId)[0]).toEqual({
+      x: Math.floor(state.entities.x[state.playerId]) + 1,
+      y: Math.floor(state.entities.y[state.playerId]),
+    });
+
+    aim.aimX = 0;
+    aim.aimY = -1;
+    step(state, aim);
+    expect(actionArea(state.entities, state.playerId)[0]).toEqual({
+      x: Math.floor(state.entities.x[state.playerId]),
+      y: Math.floor(state.entities.y[state.playerId]) - 1,
+    });
+  });
+
+  it('el apuntado manda aunque se ande en otra direccion', () => {
+    // Es el caso que motivo el cambio: andar hacia un lado mirando a otro.
+    const state = createGame(31337);
+    state.survivalFrozen = true;
+
+    const intent = emptyIntent();
+    intent.moveX = 1;
+    intent.aimX = 0;
+    intent.aimY = -1;
+    step(state, intent);
+
+    expect(state.entities.facingY[state.playerId]).toBeCloseTo(-1, 6);
+    expect(state.entities.facingX[state.playerId]).toBeCloseTo(0, 6);
+  });
+
+  it('sin apuntado, la mirada sigue al movimiento', () => {
+    // La regresion de lo que ya funcionaba: teclado solo y joystick en reposo.
+    const state = createGame(31337);
+    state.survivalFrozen = true;
+
+    const intent = emptyIntent();
+    intent.moveX = 1;
+    for (let t = 0; t < 10; t++) step(state, intent);
+
+    expect(state.entities.facingX[state.playerId]).toBeCloseTo(1, 6);
+    expect(state.entities.facingY[state.playerId]).toBeCloseTo(0, 6);
+  });
+
+  it('recolectar vacia las tres casillas y suma el botin de las tres', () => {
+    const world = new World(2024);
+    world.setNow(0);
+    const store = new EntityStore(4);
+
+    // Un sitio donde las tres casillas del area tengan algo que recolectar.
+    let placed: { id: number; tiles: ReturnType<typeof actionArea> } | null = null;
+    for (let y = -40; y < 40 && !placed; y++) {
+      for (let x = -40; x < 40; x++) {
+        const id = store.spawn(EntityKind.Player, x + 0.5, y + 0.5);
+        store.facingX[id] = 1;
+        store.facingY[id] = 0;
+        const tiles = actionArea(store, id);
+        if (tiles.every((t) => lifeKindOf(world.featureAt(t.x, t.y)) !== null)) {
+          placed = { id, tiles };
+          break;
+        }
+        store.count--; // se descarta la entidad de prueba
+      }
+    }
+    expect(placed, 'no se encontro un area con vida en las tres casillas').not.toBeNull();
+
+    const inventory = new Int32Array(RESOURCE_COUNT);
+    const results = tryHarvestArea(world, store, placed!.id, inventory, 0);
+
+    expect(results).toHaveLength(3);
+    for (const tile of placed!.tiles) {
+      expect(world.featureAt(tile.x, tile.y)).toBe(Feature.None);
+    }
+    // El botin del inventario es la suma exacta de lo que reporto cada casilla.
+    const reported = results.reduce((sum, r) => sum + r.amount, 0);
+    const gained = Array.from(inventory).reduce((sum, n) => sum + n, 0);
+    const seeds = results.reduce((sum, r) => sum + r.seeds, 0);
+    expect(gained).toBe(reported + seeds);
+  });
+
+  it('sembrar sigue afectando solo a la casilla apuntada', () => {
+    // Decision del autor: de tres en tres gastaria las semillas demasiado rapido.
+    const world = new World(2024);
+    world.setNow(0);
+    const store = new EntityStore(4);
+
+    let spot: { id: number; tiles: ReturnType<typeof actionArea> } | null = null;
+    for (let y = -40; y < 40 && !spot; y++) {
+      for (let x = -40; x < 40; x++) {
+        const id = store.spawn(EntityKind.Player, x + 0.5, y + 0.5);
+        store.facingX[id] = 1;
+        store.facingY[id] = 0;
+        const tiles = actionArea(store, id);
+        const free = tiles.every(
+          (t) => world.featureAt(t.x, t.y) === Feature.None && !world.isSolidAt(t.x, t.y),
+        );
+        if (free && lifeKindOf(world.featureAt(tiles[0].x, tiles[0].y)) === null) {
+          spot = { id, tiles };
+          break;
+        }
+        store.count--;
+      }
+    }
+    expect(spot, 'no se encontro un area libre para sembrar').not.toBeNull();
+
+    const inventory = new Int32Array(RESOURCE_COUNT);
+    inventory[Resource.TreeSeed] = 3;
+    inventory[Resource.PlantSeed] = 3;
+    const planted = tryPlant(world, store, spot!.id, inventory);
+
+    if (planted !== null) {
+      expect(world.featureAt(spot!.tiles[0].x, spot!.tiles[0].y)).not.toBe(Feature.None);
+      // Las dos flanqueantes siguen vacias.
+      expect(world.featureAt(spot!.tiles[1].x, spot!.tiles[1].y)).toBe(Feature.None);
+      expect(world.featureAt(spot!.tiles[2].x, spot!.tiles[2].y)).toBe(Feature.None);
+      // Y solo se gasto una semilla.
+      const left = inventory[Resource.TreeSeed] + inventory[Resource.PlantSeed];
+      expect(left).toBe(5);
+    }
   });
 });

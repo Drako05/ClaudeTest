@@ -13,6 +13,16 @@ export interface InputActions {
   onRestart: () => void;
   /** Factor < 1 acerca, > 1 aleja. */
   onZoom: (factor: number) => void;
+  /**
+   * Direccion del personaje al punto de pantalla indicado, o null si todavia no
+   * se puede saber.
+   *
+   * Es una consulta y no una accion: convertir un pixel en direccion exige
+   * conocer la camara, y de eso sabe el renderizador. El input se limita a
+   * preguntar y a meter el resultado en la Intent, sin aprenderse la
+   * proyeccion.
+   */
+  aimFrom: (clientX: number, clientY: number) => { x: number; y: number } | null;
 }
 
 /** Desplazamiento en pixeles que equivale a deflexion completa del joystick. */
@@ -43,6 +53,10 @@ export class Input {
   private eatQueued = false;
   private plantQueued = false;
 
+  /** Ultima posicion conocida del raton, o null si nunca se ha movido. */
+  private pointerX: number | null = null;
+  private pointerY: number | null = null;
+
   private readonly stick: StickState = { touchId: null, originX: 0, originY: 0, x: 0, y: 0 };
   private pinchDistance = 0;
   /** Toques activos fuera de la interfaz. Con dos o mas se entra en modo zoom. */
@@ -56,6 +70,7 @@ export class Input {
     this.knobEl = document.getElementById('stickKnob');
 
     this.bindKeyboard();
+    this.bindPointer();
     this.bindTouch();
     this.bindButtons();
 
@@ -118,6 +133,43 @@ export class Input {
       this.surfaceTouches.clear();
       this.pinchDistance = 0;
       this.endStick();
+    });
+  }
+
+  /**
+   * Raton: la mirada sigue al cursor y el clic izquierdo acciona.
+   *
+   * El clic reutiliza el mismo pestillo que Espacio, asi que mantener pulsado
+   * repite igual y un clic brevisimo se registra igual de bien.
+   */
+  private bindPointer(): void {
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerType === 'touch') return;
+      this.pointerX = e.clientX;
+      this.pointerY = e.clientY;
+    });
+
+    window.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'touch' || e.button !== 0) return;
+      // Sobre la interfaz no se acciona: los botones y el HUD son suyos. Se
+      // reutiliza el mismo selector que impide que el joystick nazca ahi.
+      if ((e.target as Element | null)?.closest?.(UI_SELECTOR)) return;
+      this.pointerX = e.clientX;
+      this.pointerY = e.clientY;
+      this.pressHarvest();
+    });
+
+    for (const event of ['pointerup', 'pointercancel']) {
+      window.addEventListener(event, (e) => {
+        if ((e as PointerEvent).pointerType === 'touch') return;
+        this.releaseHarvest();
+      });
+    }
+
+    // Si el cursor sale de la ventana deja de haber a donde mirar.
+    window.addEventListener('pointerleave', () => {
+      this.pointerX = null;
+      this.pointerY = null;
     });
   }
 
@@ -331,6 +383,20 @@ export class Input {
       if (this.held.has('KeyD') || this.held.has('ArrowRight')) intent.moveX += 1;
       if (this.held.has('KeyW') || this.held.has('ArrowUp')) intent.moveY -= 1;
       if (this.held.has('KeyS') || this.held.has('ArrowDown')) intent.moveY += 1;
+    }
+
+    // En tactil no hay cursor, asi que la mirada sigue al joystick, que es lo
+    // que ya hacia. Con raton manda el cursor. En reposo no hay apuntado y la
+    // mirada se queda donde estaba.
+    if (this.stick.touchId !== null) {
+      intent.aimX = intent.moveX;
+      intent.aimY = intent.moveY;
+    } else if (this.pointerX !== null && this.pointerY !== null) {
+      const aim = this.actions.aimFrom(this.pointerX, this.pointerY);
+      if (aim) {
+        intent.aimX = aim.x;
+        intent.aimY = aim.y;
+      }
     }
 
     if (this.harvestQueued) {
