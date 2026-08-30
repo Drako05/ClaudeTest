@@ -52,6 +52,31 @@ export const LOOKS: Partial<Record<Feature, SpeciesLook>> = {
   [Feature.MeadowPlantRare]: {
     form: 'bush', trunk: '#4a6b2c', dark: '#5a5220', mid: '#8a7a2c', light: '#c4b04a', fruit: '#ffd75e', rare: true,
   },
+  // El frio: coniferas apagadas y azuladas, y matas bajas escarchadas.
+  [Feature.TundraTree]: {
+    form: 'conifer', trunk: '#4b4038', dark: '#20423c', mid: '#2f5c52', light: '#477a6c', rare: false,
+  },
+  [Feature.TundraTreeRare]: {
+    form: 'conifer', trunk: '#55483d', dark: '#3a3f63', mid: '#54598c', light: '#7c82bd', rare: true,
+  },
+  [Feature.TundraPlant]: {
+    form: 'bush', trunk: '#4a5148', dark: '#2b4a44', mid: '#3a6158', light: '#4f7d70', fruit: '#d8e4ea', rare: false,
+  },
+  [Feature.TundraPlantRare]: {
+    form: 'bush', trunk: '#4a5148', dark: '#453055', mid: '#63467a', light: '#8c66a8', fruit: '#e0b7ff', rare: true,
+  },
+};
+
+/**
+ * Las tres caras de cada mineral, en el mismo orden que las de la roca.
+ *
+ * Comparten forma con la roca y se distinguen por color, que es lo que hace que
+ * se lean como vetas del mismo material y no como objetos ajenos.
+ */
+export const MINERAL_FACES: Partial<Record<Feature, readonly string[]>> = {
+  [Feature.CoalNode]: ['#2b2b31', '#3d3d45', '#55555f'],
+  [Feature.IronNode]: ['#5d4a41', '#87695a', '#a98a78'],
+  [Feature.CopperNode]: ['#6b4326', '#a5643a', '#d19a5c'],
 };
 
 /** Las tres caras de la roca, en el mismo orden en que se pintan. */
@@ -70,6 +95,8 @@ function toHex(color: string): number {
  */
 export function debrisPalette(feature: Feature): number[] {
   if (feature === Feature.RockNode) return ROCK_FACES.map(toHex);
+  const mineral = MINERAL_FACES[feature];
+  if (mineral) return mineral.map(toHex);
 
   const look = LOOKS[feature];
   if (!look) return [];

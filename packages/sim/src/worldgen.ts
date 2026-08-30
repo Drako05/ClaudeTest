@@ -142,6 +142,17 @@ export class WorldGen {
     threshold += density.rock;
     if (roll < threshold) return Feature.RockNode;
 
+    // Los minerales van despues de la piedra y solo existen en la montana, que
+    // es la unica que los trae con densidad distinta de cero.
+    threshold += density.coal;
+    if (roll < threshold) return Feature.CoalNode;
+
+    threshold += density.iron;
+    if (roll < threshold) return Feature.IronNode;
+
+    threshold += density.copper;
+    if (roll < threshold) return Feature.CopperNode;
+
     return Feature.None;
   }
 

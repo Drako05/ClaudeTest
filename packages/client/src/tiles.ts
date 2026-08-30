@@ -14,7 +14,7 @@
 import { CHUNK_SIZE, Feature, isSapling, maturesInto, Terrain } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
 import type { Chunk } from '@verdant/sim';
-import { LOOKS, ROCK_FACES } from './palette.js';
+import { LOOKS, MINERAL_FACES, ROCK_FACES } from './palette.js';
 import { TILE_H, TILE_W, worldToScreen } from './projection.js';
 
 /** Caja que ocupa el rombo de un chunk completo, en pixeles. */
@@ -121,7 +121,9 @@ function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: 
  * que todas las especies se lean como parte del mismo mundo.
  */
 export function makeFeatureArt(feature: Feature): FeatureArt | null {
-  if (feature === Feature.RockNode) return makeRockArt();
+  if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES);
+  const mineral = MINERAL_FACES[feature];
+  if (mineral) return makeRockArt(mineral);
   if (isSapling(feature)) return makeSaplingArt(feature);
 
   const look = LOOKS[feature];
@@ -228,8 +230,12 @@ function makeSaplingArt(feature: Feature): FeatureArt | null {
   return { canvas, anchorX: footX / 28, anchorY: footY / 26, riseAbove: footY };
 }
 
-function makeRockArt(): FeatureArt | null {
-  const [base, face, highlight] = ROCK_FACES;
+/**
+ * Roca y minerales comparten silueta y se distinguen por color: asi se leen como
+ * vetas del mismo material y no como objetos ajenos entre si.
+ */
+function makeRockArt(faces: readonly string[]): FeatureArt | null {
+  const [base, face, highlight] = faces;
   const made = newCanvas(40, 40);
   if (!made) return null;
   const [canvas, ctx] = made;

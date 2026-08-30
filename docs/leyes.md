@@ -36,13 +36,13 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 
 | Ley | Estado | Donde vive | Prueba |
 |---|---|---|---|
-| Pueden ser finitos, consumibles y renovables | **Cumplida** | La vida se repone via el ecosistema; la roca es inerte y no vuelve | «el ecosistema repone lo recolectado», «la piedra es inerte: ni cuenta como vida ni se repone» |
+| Pueden ser finitos, consumibles y renovables | **Cumplida** | La vida se repone via el ecosistema; roca y minerales son inertes y no vuelven | «el ecosistema repone lo recolectado», «la piedra es inerte: ni cuenta como vida ni se repone», «la piedra sigue siendo inerte y de cantidad fija» |
 | Todo recurso tiene origen, transformacion y destino | **Parcial** | Origen (worldgen), destino (inventario) y un primer ciclo cerrado: recolectar deja semillas que se siembran y maduran | «sembrar consume una semilla y el brote madura a adulto» — falta el procesado y el crafteo |
 | Los mas basicos se generan con el terreno | **Cumplida** | `sim/worldgen.ts` — `featureAt` decide segun el bioma | tests de `world-quality` |
 | Deben ser recolectados para usarlos | **Cumplida** | `sim/systems/gathering.ts` | «recolectar un arbol da madera y vacia el tile» |
 | En su mayoria requieren ser procesados | **Pendiente** | — | — |
 | Algunos podran combinarse para crear cosas nuevas | **Pendiente** | — | — |
-| Categorias: minerales, quimicos, organicos | **Pendiente** | Hoy solo hay tres recursos sin taxonomia | — |
+| Categorias: minerales, quimicos, organicos | **Parcial** | Los minerales existen y viven donde deben: carbon, hierro y cobre solo en la montana. Faltan los quimicos y una taxonomia explicita | «solo aparecen sobre roca», «los tres existen y el carbon es el mas comun» |
 | Se requieren herramientas y experiencia | **Pendiente** | — | — |
 
 ## Capitulo III: La vida
@@ -58,7 +58,7 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Cada entidad cumple un rol y coexiste con sus vecinos | **Pendiente** | — | — |
 | Ciclo basico: nacimiento, crecimiento, reproduccion y muerte | **Parcial** | Las plantas son instancias que nacen (brote o brote sembrado), maduran y mueren por recoleccion o competencia | «sembrar consume una semilla y el brote madura a adulto», «la mortandad corrige mas al principio que al final» — falta la fauna |
 | Los ecosistemas tienden a estados dinamicos de equilibrio | **Cumplida** | Crecimiento logistico hacia el referente y mortandad exponencial por saturacion, con los ritmos que fijo el autor | «de cero al rango en 5 horas reales», «del 200 % al rango en 2.5 horas reales», «la vida tiende a su referente sin superarlo nunca» |
-| Existen muchas y diversas formas de vida | **Parcial** | Bosque y pradera tienen su arbol y su planta propios, cada uno con variante rara. Tundra y nieve heredan los de pradera | «los biomas nacen equilibrados salvo excepciones del azar» — falta la fauna y el resto de biomas |
+| Existen muchas y diversas formas de vida | **Parcial** | Bosque, pradera y tundra tienen su arbol y su planta propios, cada uno con variante rara. La nieve es la franja extrema de la tundra: sostiene arboles pero no plantas | «cada planta esta en el bioma de su especie, sin cruces», «tiene arbol y planta propios, con sus variantes raras» — falta la fauna y la vida de costa |
 | Las comunidades de especies desarrollan comportamientos colectivos | **Pendiente** | — | — |
 | El reino vegetal se desarrolla naturalmente y por intervencion | **Cumplida** | Crece solo despacio y el jugador lo acelera sembrando, que es la via principal de equilibrio | «el ecosistema repone lo recolectado», «sembrar consume una semilla y el brote madura a adulto» |
 | Las entidades vivas no surgen automaticamente | **Cumplida** | Con poblacion cero el crecimiento logistico vale exactamente cero; solo la colonizacion desde una fuente cercana lo arranca | «sin fuente cercana no se genera ni una sola unidad de vida», «donde el terreno no sostiene vida, no aparece jamas» |
@@ -90,6 +90,12 @@ Un bioma es el conjunto conexo de chunks que **contienen** ese bioma y que estan
 puede desviar las cuentas. Por eso el panel no muestra cantidades absolutas sino
 barras relativas al equilibrio con el que nacio la zona.
 
+La montana es el bioma mineral. No tiene vegetacion, pero la piedra sale alli con
+el mismo indice que los arboles en la pradera, y con ella los tres minerales
+—carbon, hierro y cobre— que suman un 10 % de ese indice. Fuera de la montana la
+piedra sigue apareciendo, al 60 % de lo que aparecia antes. Nada de eso se repone:
+son los recursos finitos del Capitulo II.
+
 La contabilidad va por `(chunk, bioma, tipo de vida)`, no por chunk. Antes cada
 chunk se etiquetaba con su terreno predominante, y eso tenia dos consecuencias
 malas: el panel podia anunciar «Bosque» mientras el personaje pisaba hierba, y
@@ -107,5 +113,7 @@ siempre el del tile que se pisa.
   primer ciclo, pero falta el procesado y el crafteo.
 - **La fauna** (Capitulos III y IV) no existe. El panel ya reserva su fila para
   dejar claro que falta. Las comunidades del Capitulo IV dependen de ella.
-- **Las especies** solo cubren bosque y pradera; tundra y nieve heredan las de
-  pradera de momento.
+- **Las especies** cubren bosque, pradera y tundra. La costa sigue sin vida
+  propia, y la montana es mineral a proposito.
+- **El relieve** no existe: las tierras altas se llaman asi pero estan al mismo
+  nivel que el resto. El autor dira mas adelante como se trabajan las alturas.

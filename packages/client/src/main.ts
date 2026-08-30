@@ -24,6 +24,13 @@ import {
   LifeKind,
   Resource,
   TICK_DT,
+  TERRAIN_NAMES,
+  Terrain,
+  MINERAL_NODES,
+  RESOURCE_NAMES,
+  harvestOf,
+  isTerrainSolid,
+  isFeatureSolid,
 } from '@verdant/shared';
 import { DevTools } from './devtools.js';
 import { Effects } from './effects.js';
@@ -45,6 +52,9 @@ const el = {
   berries: byId('berries'),
   treeSeed: byId('treeSeed'),
   plantSeed: byId('plantSeed'),
+  coal: byId('coal'),
+  iron: byId('iron'),
+  copper: byId('copper'),
   statsToggle: byId('statsToggle'),
   statsPanel: byId('statsPanel'),
   biomeName: byId('biomeName'),
@@ -102,10 +112,86 @@ function startTickFromLocation(): number | undefined {
   return undefined;
 }
 
+/**
+ * Posicion inicial via `?x=&y=`, para abrir el mundo en un sitio concreto.
+ *
+ * Nace de necesitarlo en la prueba de humo —llegar andando a la montana esquiva
+ * arboles y es un via crucis— pero sirve igual para volver a mano a un punto que
+ * se quiere mirar dos veces.
+ */
+function startPlaceFromLocation(): { x: number; y: number } | undefined {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const x = Number.parseFloat(params.get('x') ?? '');
+    const y = Number.parseFloat(params.get('y') ?? '');
+    if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+  } catch {
+    // Sin acceso a la URL: se aparece donde diga findSpawn.
+  }
+  return undefined;
+}
+
+/**
+ * Un mineral de la montana y una casilla libre justo al norte desde la que
+ * golpearlo.
+ *
+ * Existe solo para la prueba de humo. Sin esto habria que pasear por la montana
+ * a ver si aparece algo, y con el carbon al 0.00225 por casilla eso es una
+ * loteria: la prueba fallaria por azar, no por un fallo. Es la misma clase de
+ * ayuda que `tilesOnScreen` para el zoom.
+ */
+function mineralSpot(
+  state: GameState,
+): { stand: { x: number; y: number }; node: { x: number; y: number }; kind: string } | null {
+  const px = Math.floor(state.entities.x[state.playerId]);
+  const py = Math.floor(state.entities.y[state.playerId]);
+  const gen = state.world.gen;
+
+  let best: { stand: { x: number; y: number }; node: { x: number; y: number }; kind: string; d: number } | null = null;
+  for (let y = py - 200; y <= py + 200; y++) {
+    for (let x = px - 200; x <= px + 200; x++) {
+      const terrain = gen.terrainAt(x, y);
+      if (terrain !== Terrain.Rock) continue;
+      const feature = gen.featureAt(x, y, terrain);
+      if (!MINERAL_NODES.includes(feature)) continue;
+
+      // La casilla desde la que se golpea: al norte, pisable y despejada.
+      const sy = y - 1;
+      const standTerrain = gen.terrainAt(x, sy);
+      if (isTerrainSolid(standTerrain)) continue;
+      if (isFeatureSolid(gen.featureAt(x, sy, standTerrain))) continue;
+
+      const d = Math.max(Math.abs(x - px), Math.abs(y - py));
+      if (!best || d < best.d) {
+        best = {
+          stand: { x: x + 0.5, y: sy + 0.5 },
+          node: { x, y },
+          kind: RESOURCE_NAMES[harvestOf(feature)!.resource],
+          d,
+        };
+      }
+    }
+  }
+  return best ? { stand: best.stand, node: best.node, kind: best.kind } : null;
+}
+
 async function main(): Promise<void> {
   const renderer = await Renderer.create();
 
-  let state: GameState = createGame(seedFromLocation(), startTickFromLocation());
+  /** Coloca al jugador donde diga la URL, si lo dice. */
+  function placeStart(target: GameState): GameState {
+    const place = startPlaceFromLocation();
+    if (place) {
+      target.entities.x[target.playerId] = place.x;
+      target.entities.y[target.playerId] = place.y;
+      // El streaming se pone al dia solo en el primer tick, que ve el cambio de
+      // chunk contra los `NaN` con los que nace el estado.
+      target.world.ensureAround(place.x, place.y, 2);
+    }
+    return target;
+  }
+
+  let state: GameState = placeStart(createGame(seedFromLocation(), startTickFromLocation()));
   let prevX = state.entities.x[state.playerId];
   let prevY = state.entities.y[state.playerId];
 
@@ -123,7 +209,7 @@ async function main(): Promise<void> {
 
     renderer.reset();
     effects.clear();
-    state = createGame(seed);
+    state = placeStart(createGame(seed));
     prevX = state.entities.x[state.playerId];
     prevY = state.entities.y[state.playerId];
     el.dead.classList.remove('show');
@@ -259,6 +345,14 @@ async function main(): Promise<void> {
       borderSegments: renderer.borderSegmentCount,
       misplacedBorders: renderer.misplacedBorderCount,
       facing: [state.entities.facingX[state.playerId], state.entities.facingY[state.playerId]],
+      terrain: TERRAIN_NAMES[
+        state.world.terrainAt(
+          Math.floor(state.entities.x[state.playerId]),
+          Math.floor(state.entities.y[state.playerId]),
+        )
+      ],
+      /** Roca visible mas cercana. La usa la prueba de humo para ir a la montana. */
+      mineralSpot: mineralSpot(state),
       effects: effects.tally,
       area: actionArea(state.entities, state.playerId).map((t) => [t.x, t.y]),
       biome: BIOME_NAMES[
@@ -419,6 +513,9 @@ function updateHud(state: GameState, fps: number): void {
   el.berries.textContent = String(inventory[Resource.Berries]);
   el.treeSeed.textContent = String(inventory[Resource.TreeSeed]);
   el.plantSeed.textContent = String(inventory[Resource.PlantSeed]);
+  el.coal.textContent = String(inventory[Resource.Coal]);
+  el.iron.textContent = String(inventory[Resource.Iron]);
+  el.copper.textContent = String(inventory[Resource.Copper]);
 
   el.clock.textContent = clockLabel(state.tick);
   el.day.textContent = String(dayNumber(state.tick));

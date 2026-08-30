@@ -285,10 +285,17 @@ async function desktopPass(browser, baseUrl) {
   // Los efectos. El bloque anterior dejo la zona talada, asi que se golpea
   // MIENTRAS se camina: sobre una casilla vacia solo saldria el slash, y de que
   // haya algo que derribar no se puede depender quedandose quieto.
+  // Primero, lejos de lo ya talado: el bloque del clic izquierdo deja la zona
+  // vacia, y sobre casillas vacias solo saldria el slash.
+  await page.keyboard.down('KeyS');
+  await page.waitForTimeout(2200);
+  await page.keyboard.up('KeyS');
+  await waitForLoop(page);
+
   let sawSlash = false;
   let sawDebris = 0;
   await page.mouse.down();
-  for (const key of ['KeyS', 'KeyS', 'KeyA', 'KeyW', 'KeyD', 'KeyS']) {
+  for (const key of ['KeyS', 'KeyD', 'KeyS', 'KeyA', 'KeyW', 'KeyD', 'KeyS', 'KeyA', 'KeyD', 'KeyS']) {
     await page.keyboard.down(key);
     await page.waitForTimeout(420);
     await page.keyboard.up(key);
@@ -663,6 +670,79 @@ async function devToolsPass(browser, baseUrl) {
   await page.close();
 }
 
+// ------------------------------------------------------------------ montana
+
+/**
+ * La montana: entrar, caminar y minar.
+ *
+ * La roca figuraba como terreno solido, asi que el bioma entero era un muro y el
+ * autor chocaba contra su borde. Esto lo comprueba de punta a punta.
+ *
+ * Se abre directamente junto a un mineral con `?x=&y=`. Llegar andando obliga a
+ * esquivar arboles, y buscar mineral paseando seria una loteria: el carbon sale
+ * a 0.00225 por casilla, asi que la prueba fallaria por azar y no por un fallo.
+ *
+ * Aqui NO se toca el raton a proposito: sin puntero la mirada sigue al
+ * movimiento, asi que andar hacia el mineral es lo que lo deja apuntado.
+ */
+async function mountainPass(browser, baseUrl) {
+  console.log('\n== montana (roca y minerales) ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'montana');
+
+  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
+  const spawn = await waitForLoop(page);
+  const spot = spawn.mineralSpot;
+  check(spot !== null, 'no se encontro ningun mineral en el mundo de prueba');
+  if (!spot) {
+    await page.close();
+    return;
+  }
+  console.log(`  ${spot.kind} en ${spot.node.x},${spot.node.y}; se golpea desde ${spot.stand.x},${spot.stand.y}`);
+
+  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
+    waitUntil: 'load',
+  });
+  await page.evaluate(() => delete window.__smokeBaseTick);
+  const arrived = await waitForLoop(page);
+  console.log(`  aparecio en ${arrived.terrain} / ${arrived.biome}`);
+  check(arrived.biome === 'Tierras altas', `el bioma no es el esperado: ${arrived.biome}`);
+
+  // Se puede andar dentro, que es exactamente lo que no se podia.
+  await page.keyboard.down('KeyD');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('KeyD');
+  const walked = await waitForLoop(page);
+  const moved = Math.hypot(walked.x - arrived.x, walked.y - arrived.y);
+  console.log(`  camino ${moved.toFixed(2)} casillas por la montana`);
+  check(moved > 1, 'el jugador no pudo caminar dentro de la montana');
+
+  // Se vuelve al sitio y se mina: andar al sur deja el mineral apuntado.
+  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
+    waitUntil: 'load',
+  });
+  await page.evaluate(() => delete window.__smokeBaseTick);
+  await waitForLoop(page);
+
+  await page.keyboard.down('KeyS');
+  await page.waitForTimeout(120);
+  await page.keyboard.up('KeyS');
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(500);
+  await page.keyboard.up('Space');
+  await page.screenshot({ path: join(SHOTS, '14-montana.png') });
+
+  const end = await page.evaluate(() => window.__verdant);
+  const minerals = end.inventory.slice(5);
+  console.log(`  piedra ${end.inventory[1]}, carbon/hierro/cobre ${minerals.join('/')}`);
+  check(
+    minerals.some((n) => n > 0),
+    `no se saco ningun mineral: inventario ${JSON.stringify(end.inventory)}`,
+  );
+
+  await page.close();
+}
+
 // ---------------------------------------------------------------------- main
 
 const remote = process.env.VERDANT_URL;
@@ -678,6 +758,7 @@ try {
   await desktopPass(browser, baseUrl);
   await mobilePass(browser, baseUrl);
   await devToolsPass(browser, baseUrl);
+  await mountainPass(browser, baseUrl);
 } finally {
   await browser.close();
   server?.close();

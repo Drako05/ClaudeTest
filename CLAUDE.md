@@ -39,18 +39,22 @@ Esto es el resumen operativo.
    aparecera por delante de cosas que tiene detras.
 8. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
    interpolacion para el render es cosa del cliente.
-9. **El bioma es del tile, no del chunk.** La contabilidad de vida va por
+9. **Lo unico que detiene el paso es el agua.** La roca estuvo en
+   `isTerrainSolid` y eso convertia el bioma de montana entero en un muro contra
+   el que se chocaba; de paso explicaba que no tuviera nada dentro. Si algo tiene
+   que estorbar, que sea una feature, no el terreno.
+10. **El bioma es del tile, no del chunk.** La contabilidad de vida va por
    `(chunk, bioma, tipo)` y `World.biomeAt` devuelve el bioma del suelo que se
    pisa. Etiquetar el chunk entero con su terreno predominante hacia que el panel
    anunciara «Bosque» estando en pradera y que dos especies distintas compartieran
    referente. Un brote solo puede salir en un tile de su propio bioma.
-10. **Un paso de vida lee estado congelado y escribe en otro.** La colonizacion
+11. **Un paso de vida lee estado congelado y escribe en otro.** La colonizacion
     mira si hay vida cerca en `ChunkRecord.live`, que es la foto del inicio del
     paso, nunca los vecinos en curso. Leyendo el estado vivo, que un chunk
     arrasado reviviera dependia del orden en que se generaron los chunks —es
     decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
     que ningun test evidente lo delate.
-11. **Una accion afecta a tres casillas: la apuntada y sus dos vecinas en el
+12. **Una accion afecta a tres casillas: la apuntada y sus dos vecinas en el
     anillo de 8 direcciones** (`sim/aim.ts`). De esa unica regla salen los dos
     casos que describio el autor —en recto las flanqueantes quedan en diagonal,
     en diagonal quedan ortogonales— y `tests/aim.test.ts` las tiene todas. El

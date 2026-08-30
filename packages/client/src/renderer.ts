@@ -43,6 +43,15 @@ interface ChunkView {
 /** Todo lo que puede haber sobre un tile y necesita sprite propio. */
 const FEATURE_KINDS: readonly Feature[] = [
   Feature.RockNode,
+  Feature.CoalNode,
+  Feature.IronNode,
+  Feature.CopperNode,
+  Feature.TundraTree,
+  Feature.TundraTreeRare,
+  Feature.TundraPlant,
+  Feature.TundraPlantRare,
+  Feature.TundraTreeSapling,
+  Feature.TundraPlantSapling,
   Feature.ForestTree,
   Feature.ForestTreeRare,
   Feature.ForestPlant,

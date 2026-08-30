@@ -33,6 +33,30 @@ export enum Feature {
   ForestPlantSapling = 11,
   MeadowTreeSapling = 12,
   MeadowPlantSapling = 13,
+
+  TundraTree = 14,
+  TundraTreeRare = 15,
+  TundraPlant = 16,
+  TundraPlantRare = 17,
+  TundraTreeSapling = 18,
+  TundraPlantSapling = 19,
+
+  /** Minerales de la montana. Inertes y finitos, como la roca. */
+  CoalNode = 20,
+  IronNode = 21,
+  CopperNode = 22,
+}
+
+/** Los tres minerales, en el orden en que se sortean. */
+export const MINERAL_NODES: readonly Feature[] = [
+  Feature.CoalNode,
+  Feature.IronNode,
+  Feature.CopperNode,
+];
+
+/** True si es roca o mineral: no cuenta como vida y no se repone. */
+export function isInert(f: Feature): boolean {
+  return f === Feature.RockNode || MINERAL_NODES.includes(f);
 }
 
 export function biomeOfTerrain(t: Terrain): BiomeKind {
@@ -46,8 +70,13 @@ export function biomeOfTerrain(t: Terrain): BiomeKind {
       return BiomeKind.Forest;
     case Terrain.Rock:
       return BiomeKind.Highland;
+    case Terrain.Tundra:
+    case Terrain.Snow:
+      // El frio es un bioma propio. Mandarlos a pradera hacia que el panel
+      // anunciara «Pradera» pisando nieve y que un arbol de pradera pudiera
+      // brotar sobre hielo.
+      return BiomeKind.Tundra;
     default:
-      // Tundra y nieve heredan de momento las especies de pradera.
       return BiomeKind.Meadow;
   }
 }
@@ -61,6 +90,10 @@ export function speciesFor(biome: BiomeKind, kind: LifeKind): Feature {
   if (biome === BiomeKind.Meadow) {
     if (kind === LifeKind.Tree) return Feature.MeadowTree;
     if (kind === LifeKind.Plant) return Feature.MeadowPlant;
+  }
+  if (biome === BiomeKind.Tundra) {
+    if (kind === LifeKind.Tree) return Feature.TundraTree;
+    if (kind === LifeKind.Plant) return Feature.TundraPlant;
   }
   return Feature.None;
 }
@@ -76,6 +109,10 @@ export function rareOf(f: Feature): Feature {
       return Feature.MeadowTreeRare;
     case Feature.MeadowPlant:
       return Feature.MeadowPlantRare;
+    case Feature.TundraTree:
+      return Feature.TundraTreeRare;
+    case Feature.TundraPlant:
+      return Feature.TundraPlantRare;
     default:
       return f;
   }
@@ -86,7 +123,9 @@ export function isRare(f: Feature): boolean {
     f === Feature.ForestTreeRare ||
     f === Feature.ForestPlantRare ||
     f === Feature.MeadowTreeRare ||
-    f === Feature.MeadowPlantRare
+    f === Feature.MeadowPlantRare ||
+    f === Feature.TundraTreeRare ||
+    f === Feature.TundraPlantRare
   );
 }
 
@@ -101,6 +140,10 @@ export function saplingOf(f: Feature): Feature {
       return Feature.MeadowTreeSapling;
     case Feature.MeadowPlant:
       return Feature.MeadowPlantSapling;
+    case Feature.TundraTree:
+      return Feature.TundraTreeSapling;
+    case Feature.TundraPlant:
+      return Feature.TundraPlantSapling;
     default:
       return Feature.None;
   }
@@ -117,6 +160,10 @@ export function maturesInto(f: Feature): Feature {
       return Feature.MeadowTree;
     case Feature.MeadowPlantSapling:
       return Feature.MeadowPlant;
+    case Feature.TundraTreeSapling:
+      return Feature.TundraTree;
+    case Feature.TundraPlantSapling:
+      return Feature.TundraPlant;
     default:
       return Feature.None;
   }
@@ -139,6 +186,9 @@ export function lifeKindOf(f: Feature): LifeKind | null {
     case Feature.MeadowTreeRare:
     case Feature.ForestTreeSapling:
     case Feature.MeadowTreeSapling:
+    case Feature.TundraTree:
+    case Feature.TundraTreeRare:
+    case Feature.TundraTreeSapling:
       return LifeKind.Tree;
     case Feature.ForestPlant:
     case Feature.ForestPlantRare:
@@ -146,6 +196,9 @@ export function lifeKindOf(f: Feature): LifeKind | null {
     case Feature.MeadowPlantRare:
     case Feature.ForestPlantSapling:
     case Feature.MeadowPlantSapling:
+    case Feature.TundraPlant:
+    case Feature.TundraPlantRare:
+    case Feature.TundraPlantSapling:
       return LifeKind.Plant;
     default:
       return null;
@@ -153,14 +206,22 @@ export function lifeKindOf(f: Feature): LifeKind | null {
 }
 
 /** Terrenos que bloquean el paso. */
+/**
+ * Terrenos que no se pueden pisar.
+ *
+ * La roca ESTABA aqui, y eso convertia el bioma de montana entero en un muro: el
+ * jugador chocaba contra su borde y no habia forma de entrar. De paso explicaba
+ * que su densidad de vida fuera cero, porque no tenia sentido poner nada donde
+ * no se podia llegar. Solo el agua detiene el paso.
+ */
 export function isTerrainSolid(t: Terrain): boolean {
-  return t === Terrain.DeepWater || t === Terrain.Water || t === Terrain.Rock;
+  return t === Terrain.DeepWater || t === Terrain.Water;
 }
 
 /** Features que bloquean el paso. Los brotes no estorban: aun son pequenos. */
 export function isFeatureSolid(f: Feature): boolean {
   if (isSapling(f)) return false;
-  return f === Feature.RockNode || lifeKindOf(f) === LifeKind.Tree;
+  return isInert(f) || lifeKindOf(f) === LifeKind.Tree;
 }
 
 export enum Resource {
@@ -169,21 +230,38 @@ export enum Resource {
   Berries = 2,
   TreeSeed = 3,
   PlantSeed = 4,
+  Coal = 5,
+  Iron = 6,
+  Copper = 7,
 }
-export const RESOURCE_COUNT = 5;
+export const RESOURCE_COUNT = 8;
 export const RESOURCE_NAMES: readonly string[] = [
   'Madera',
   'Piedra',
   'Bayas',
   'Semilla de arbol',
   'Semilla de planta',
+  'Carbon',
+  'Hierro',
+  'Cobre',
 ];
 
 export interface Harvest {
   resource: Resource;
+  /** Minimo del botin. Con `max` igual, la cantidad es fija. */
   amount: number;
+  /** Maximo del botin. Los minerales son los primeros que dan un rango. */
+  max: number;
   /** Semilla que puede caer. None si no la hay. */
   seed: Resource | null;
+  /**
+   * True si lo recolectado es inerte.
+   *
+   * El bonus del +30 % premia cuidar un ecosistema, y la montana no tiene
+   * ninguno: su bioma esta siempre «equilibrado» por vacio, asi que sin esto los
+   * minerales cobrarian el bonus gratis y para siempre.
+   */
+  inert: boolean;
 }
 
 /**
@@ -194,18 +272,37 @@ export function harvestOf(f: Feature): Harvest | null {
   if (isSapling(f)) return null;
   const rare = isRare(f);
   switch (lifeKindOf(f)) {
-    case LifeKind.Tree:
-      return { resource: Resource.Wood, amount: rare ? 6 : 3, seed: Resource.TreeSeed };
-    case LifeKind.Plant:
-      return { resource: Resource.Berries, amount: rare ? 8 : 4, seed: Resource.PlantSeed };
+    case LifeKind.Tree: {
+      const n = rare ? 6 : 3;
+      return { resource: Resource.Wood, amount: n, max: n, seed: Resource.TreeSeed, inert: false };
+    }
+    case LifeKind.Plant: {
+      const n = rare ? 8 : 4;
+      return {
+        resource: Resource.Berries,
+        amount: n,
+        max: n,
+        seed: Resource.PlantSeed,
+        inert: false,
+      };
+    }
     default:
       break;
   }
-  if (f === Feature.RockNode) {
-    // Inerte y finita: da piedra y no deja semilla ni cuenta para el equilibrio.
-    return { resource: Resource.Stone, amount: 2, seed: null };
+
+  // Lo inerte: finito, sin semilla y fuera del sistema de equilibrio.
+  switch (f) {
+    case Feature.RockNode:
+      return { resource: Resource.Stone, amount: 2, max: 2, seed: null, inert: true };
+    case Feature.CoalNode:
+      return { resource: Resource.Coal, amount: 2, max: 5, seed: null, inert: true };
+    case Feature.IronNode:
+      return { resource: Resource.Iron, amount: 1, max: 2, seed: null, inert: true };
+    case Feature.CopperNode:
+      return { resource: Resource.Copper, amount: 2, max: 3, seed: null, inert: true };
+    default:
+      return null;
   }
-  return null;
 }
 
 /** Semilla que hace falta para sembrar cada tipo de vida. */

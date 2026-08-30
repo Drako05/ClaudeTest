@@ -122,8 +122,21 @@ export function harvestTile(
   const yield_ = harvestOf(feature);
   if (!yield_) return null;
 
-  const rewarded = world.isBiomeBalanced(toChunkCoord(x), toChunkCoord(y), world.biomeAt(x, y));
-  const amount = Math.round(yield_.amount * (1 + (rewarded ? BALANCED_HARVEST_BONUS : 0)));
+  // El botin puede ser un rango —los minerales lo son—. Se sortea con el mismo
+  // hash de posicion y tiempo que las semillas, no con un generador con estado,
+  // para no romper el determinismo.
+  let amount = yield_.amount;
+  if (yield_.max > yield_.amount) {
+    const roll = hash2DFloat(world.seed ^ 0x2f6a1c93, x * 40503 + tick, y);
+    amount += Math.floor(roll * (yield_.max - yield_.amount + 1));
+  }
+
+  // Lo inerte no cobra el bonus de equilibrio: premia cuidar un ecosistema, y la
+  // montana no tiene ninguno que cuidar.
+  const rewarded =
+    !yield_.inert &&
+    world.isBiomeBalanced(toChunkCoord(x), toChunkCoord(y), world.biomeAt(x, y));
+  amount = Math.round(amount * (1 + (rewarded ? BALANCED_HARVEST_BONUS : 0)));
 
   world.setFeature(x, y, Feature.None);
   inventory[yield_.resource] += amount;

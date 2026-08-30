@@ -51,14 +51,28 @@ export enum BiomeKind {
   Meadow = 2,
   Forest = 3,
   Highland = 4,
+  Tundra = 5,
 }
-export const BIOME_COUNT = 5;
+export const BIOME_COUNT = 6;
+
+/** Nombres de terreno. Solo para el panel y para la verificacion. */
+export const TERRAIN_NAMES: readonly string[] = [
+  'Agua profunda',
+  'Agua',
+  'Arena',
+  'Hierba',
+  'Bosque',
+  'Roca',
+  'Nieve',
+  'Tundra',
+];
 export const BIOME_NAMES: readonly string[] = [
   'Oceano',
   'Costa',
   'Pradera',
   'Bosque',
   'Tierras altas',
+  'Tundra',
 ];
 
 /** Tipos de vida que el equilibrio contabiliza por separado. */
@@ -85,7 +99,11 @@ export function lifeSlot(biome: BiomeKind, kind: LifeKind): number {
 export const LIFE_SLOTS = BIOME_COUNT * LIFE_KIND_COUNT;
 
 /** Biomas que sostienen vida vegetal. El resto nunca tiene cuentas que llevar. */
-export const LIVING_BIOMES: readonly BiomeKind[] = [BiomeKind.Meadow, BiomeKind.Forest];
+export const LIVING_BIOMES: readonly BiomeKind[] = [
+  BiomeKind.Meadow,
+  BiomeKind.Forest,
+  BiomeKind.Tundra,
+];
 
 /** Tipos de vida ya implementados. La fauna aun no existe. */
 export const LIVING_KINDS: readonly LifeKind[] = [LifeKind.Tree, LifeKind.Plant];

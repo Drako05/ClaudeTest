@@ -84,22 +84,59 @@ export interface TerrainDensity {
   tree: number;
   plant: number;
   rock: number;
+  coal: number;
+  iron: number;
+  copper: number;
 }
 
-const EMPTY: TerrainDensity = { tree: 0, plant: 0, rock: 0 };
+const EMPTY: TerrainDensity = { tree: 0, plant: 0, rock: 0, coal: 0, iron: 0, copper: 0 };
+
+/**
+ * Cuanto se ralea la piedra fuera de la montana. Decision del autor.
+ *
+ * Antes la piedra se minaba en la hierba y en la arena y no en la roca, que era
+ * ademas intransitable. Ahora la montana es su sitio y el resto del mundo la da
+ * a cuentagotas.
+ */
+export const ROCK_ELSEWHERE = 0.6;
+
+/**
+ * Piedra en la montana: el mismo indice que los arboles de la pradera.
+ * Es la referencia que fijo el autor, no un numero suelto.
+ */
+export const HIGHLAND_ROCK = 0.045;
+
+/**
+ * Los tres minerales suman un 10 % de esa piedra: carbon 5 %, cobre 2.5 % y
+ * hierro 2.5 %. Numeros de arranque, para ajustar mas adelante.
+ */
+export const MINERAL_SHARE = { coal: 0.05, iron: 0.025, copper: 0.025 } as const;
+
+const MINERALS = {
+  coal: HIGHLAND_ROCK * MINERAL_SHARE.coal,
+  iron: HIGHLAND_ROCK * MINERAL_SHARE.iron,
+  copper: HIGHLAND_ROCK * MINERAL_SHARE.copper,
+};
+
+const NO_MINERALS = { coal: 0, iron: 0, copper: 0 };
 
 export function densityFor(t: Terrain): TerrainDensity {
   switch (t) {
     case Terrain.Forest:
-      return { tree: 0.3, plant: 0.06, rock: 0 };
+      return { tree: 0.3, plant: 0.06, rock: 0, ...NO_MINERALS };
     case Terrain.Grass:
-      return { tree: 0.045, plant: 0.03, rock: 0.015 };
+      return { tree: 0.045, plant: 0.03, rock: 0.015 * ROCK_ELSEWHERE, ...NO_MINERALS };
     case Terrain.Tundra:
-      return { tree: 0.07, plant: 0.02, rock: 0.03 };
+      return { tree: 0.07, plant: 0.02, rock: 0.03 * ROCK_ELSEWHERE, ...NO_MINERALS };
     case Terrain.Snow:
-      return { tree: 0.04, plant: 0, rock: 0 };
+      // La nieve sostiene arboles pero no plantas: es la franja extrema del
+      // bioma frio, que se ralea solo al subir sin reglas aparte.
+      return { tree: 0.04, plant: 0, rock: 0, ...NO_MINERALS };
     case Terrain.Sand:
-      return { tree: 0, plant: 0, rock: 0.02 };
+      return { tree: 0, plant: 0, rock: 0.02 * ROCK_ELSEWHERE, ...NO_MINERALS };
+    case Terrain.Rock:
+      // La montana: sin vegetacion, pero es donde vive lo mineral.
+      return { tree: 0, plant: 0, rock: HIGHLAND_ROCK, ...MINERALS };
     default:
       return EMPTY;
   }
