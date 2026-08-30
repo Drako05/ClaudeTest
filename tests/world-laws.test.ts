@@ -477,10 +477,16 @@ describe('El bioma nombrado es el suelo que se pisa', () => {
         const x = cx * CHUNK_SIZE + tx;
         const y = cy * CHUNK_SIZE + ty;
         if (lifeKindOf(world.featureAt(x, y)) !== LifeKind.Tree) continue;
-        expect(
-          world.biomeAt(x, y),
-          `arbol fuera de su bioma en (${x}, ${y})`,
-        ).toBe(BiomeKind.Forest);
+        // Un chunk mixto puede tener ademas tundra o montana, y sus arboles son
+        // legitimos: lo que se mide es el reparto entre los DOS biomas que se
+        // han tocado. Con la llegada de las cordilleras esto dejo de ser
+        // hipotetico —el chunk de prueba gano una franja de tundra— y el test
+        // fallaba por un arbol que estaba donde debia.
+        const biome = world.biomeAt(x, y);
+        if (biome !== BiomeKind.Meadow && biome !== BiomeKind.Forest) continue;
+        expect(biome, `arbol de pradera en tierra vaciada, en (${x}, ${y})`).toBe(
+          BiomeKind.Forest,
+        );
       }
     }
   });

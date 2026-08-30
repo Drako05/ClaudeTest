@@ -13,6 +13,20 @@
 import { CHUNK_SIZE, type Terrain } from '@verdant/shared';
 import { groundHeight, localCoord, type Chunk, type World } from '@verdant/sim';
 
+/**
+ * Rango de tiles LOCALES de un chunk, para poder trabajar por trozos.
+ *
+ * El recorte de pantalla es por bloques y no por chunk entero: con montanas de
+ * cuarenta niveles un chunk puede ocupar mas que la pantalla, asi que darlo por
+ * visible entero significa dibujar miles de tiles que no se ven.
+ */
+export interface TileBounds {
+  readonly x0: number;
+  readonly y0: number;
+  readonly x1: number;
+  readonly y1: number;
+}
+
 /** Una cara pendiente de dibujar. */
 export interface ReliefFace {
   /** Tile del que cuelga. */
@@ -65,13 +79,17 @@ function cornerAt(
  * subir hacia su vecino alto, sus dos alturas coinciden con las de el y no
  * aparece ninguna cara.
  */
-export function collectFaces(world: World, chunk: Chunk): ReliefFace[] {
+export function collectFaces(world: World, chunk: Chunk, bounds?: TileBounds): ReliefFace[] {
   const faces: ReliefFace[] = [];
   const baseX = chunk.cx * CHUNK_SIZE;
   const baseY = chunk.cy * CHUNK_SIZE;
+  const x0 = bounds?.x0 ?? 0;
+  const y0 = bounds?.y0 ?? 0;
+  const x1 = bounds?.x1 ?? CHUNK_SIZE;
+  const y1 = bounds?.y1 ?? CHUNK_SIZE;
 
-  for (let ly = 0; ly < CHUNK_SIZE; ly++) {
-    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+  for (let ly = y0; ly < y1; ly++) {
+    for (let lx = x0; lx < x1; lx++) {
       const idx = ly * CHUNK_SIZE + lx;
       const wx = baseX + lx;
       const wy = baseY + ly;

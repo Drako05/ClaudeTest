@@ -140,6 +140,23 @@ function startPlaceFromLocation(): { x: number; y: number } | undefined {
  * loteria: la prueba fallaria por azar, no por un fallo. Es la misma clase de
  * ayuda que `tilesOnScreen` para el zoom.
  */
+/** El punto mas alto que se encuentre cerca. La prueba de humo sube ahi. */
+function peakSpot(state: GameState): { stand: { x: number; y: number }; level: number } | null {
+  const px = Math.floor(state.entities.x[state.playerId]);
+  const py = Math.floor(state.entities.y[state.playerId]);
+  const gen = state.world.gen;
+
+  let best: { stand: { x: number; y: number }; level: number } | null = null;
+  for (let y = py - 300; y <= py + 300; y += 3) {
+    for (let x = px - 300; x <= px + 300; x += 3) {
+      const level = gen.levelAt(x, y);
+      if (best && level <= best.level) continue;
+      best = { stand: { x: x + 0.5, y: y + 0.5 }, level };
+    }
+  }
+  return best;
+}
+
 /**
  * Sitio desde el que se ve una pared de dos o mas bloques.
  *
@@ -427,7 +444,9 @@ async function main(): Promise<void> {
       ),
       relief: reliefAround(state),
       cliffSpot: cliffSpot(state),
+      peakSpot: peakSpot(state),
       faces: renderer.faceCount,
+      playerHidden: renderer.playerHidden,
       /** Roca visible mas cercana. La usa la prueba de humo para ir a la montana. */
       mineralSpot: mineralSpot(state),
       effects: effects.tally,

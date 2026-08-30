@@ -148,6 +148,27 @@ async function touch(page, type, { id = 1, x, y, selector }) {
 
 // ---------------------------------------------------------------- escritorio
 
+/**
+ * Camina hasta moverse de verdad, probando direcciones.
+ *
+ * Insistir en una sola direccion no vale: el mundo tiene agua, arboles y ahora
+ * relieve, y el bloque anterior deja al personaje donde le deja. Si se empena en
+ * ir al norte y al norte hay mar, la prueba mide cero y falla por el mapa y no
+ * por un fallo. Devuelve cuanto se ha movido en total.
+ */
+async function walkToOpenGround(page, seconds = 1.4) {
+  const start = await page.evaluate(() => window.__verdant);
+  let last = start;
+  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA', 'KeyD', 'KeyW']) {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(seconds * 1000);
+    await page.keyboard.up(key);
+    last = await waitForLoop(page);
+    if (Math.hypot(last.x - start.x, last.y - start.y) > 1.5) break;
+  }
+  return Math.hypot(last.x - start.x, last.y - start.y);
+}
+
 async function desktopPass(browser, baseUrl) {
   console.log('\n== escritorio (teclado) ==');
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -282,37 +303,51 @@ async function desktopPass(browser, baseUrl) {
 
   await page.screenshot({ path: join(SHOTS, '12-area-apuntada.png') });
 
-  // Andar mientras se golpea, y comprobar que se anda de verdad. El pulso de
-  // tecla dura lo suficiente para cubrir un frame: en headless un frame puede
-  // pasar de 200 ms, y con pulsos mas cortos el jugador no se movia ni una
-  // casilla, con lo que se golpeaba doce veces la misma zona ya talada y la
-  // prueba fallaba por azar en vez de por un fallo.
-  //
-  // La tecla se suelta y se vuelve a pulsar en cada vuelta a proposito: el clic
-  // llega a robar el foco de la ventana, y el manejador de `blur` —que existe
-  // para no dejar al personaje andando solo al cambiar de pestana— vacia las
-  // teclas pulsadas. Mantenerla pulsada toda la tanda deja al jugador clavado.
+  // Ritmo en REPOSO, ya construida la escena: el `fps` del estado inicial mide
+  // la reventada de arranque —crear miles de sprites y sus lienzos— y no dice
+  // nada de como va el juego una vez cargado. Ojo: aqui se renderiza por
+  // software, sin GPU, asi que ni uno ni otro dicen nada de una maquina real.
+  await page.waitForTimeout(2500);
+  const idle = await page.evaluate(() => window.__verdant);
+  console.log(`  en reposo: ${idle.fps.toFixed(1)} fps, peor frame ${idle.worstFrameMs.toFixed(0)} ms`);
+
+  // Primero se anda a terreno sin talar, SIN tocar el raton, y luego se golpea
+  // con el clic izquierdo quieto. Andar y clicar a la vez no se puede medir
+  // aqui: el clic sintetico de Playwright roba el foco de la ventana y el
+  // manejador de `blur` —que existe para no dejar al personaje andando solo al
+  // cambiar de pestana— suelta las teclas pulsadas. Separandolo se comprueban
+  // las dos cosas que importan sin depender de esa carrera.
+  const walked = await walkToOpenGround(page);
+  check(walked > 1, `el personaje apenas se movio: ${walked.toFixed(2)} casillas`);
   const beforeClick = await waitForLoop(page);
-  for (let i = 0; i < 12; i++) {
-    await page.mouse.click(centre.x + 120, centre.y + 60);
-    await page.keyboard.down('KeyW');
-    await page.waitForTimeout(260);
-    await page.keyboard.up('KeyW');
+
+  // Se barre el anillo entero de direcciones y, si la vuelta no da nada, se
+  // cambia de sitio y se repite. Golpear siempre hacia el mismo lado depende de
+  // que ahi hubiera algo, y eso es echarlo a suertes: lo que se comprueba es que
+  // **el clic izquierdo recolecta**, no que el este del jugador tenga un arbol.
+  const ring = [
+    [120, 60],
+    [0, 90],
+    [-120, 60],
+    [-120, -60],
+    [0, -90],
+    [120, -60],
+  ];
+  let afterClick = beforeClick;
+  const before = beforeClick.inventory.reduce((a, b) => a + b, 0);
+  for (let round = 0; round < 3; round++) {
+    for (const [dx, dy] of ring) {
+      await page.mouse.click(centre.x + dx, centre.y + dy);
+      await page.waitForTimeout(220);
+    }
+    afterClick = await waitForLoop(page);
+    if (afterClick.inventory.reduce((a, b) => a + b, 0) > before) break;
+    await walkToOpenGround(page, 1.1);
+    await waitForLoop(page);
   }
-  const afterClick = await waitForLoop(page);
-  const walkedWhileClicking = Math.hypot(
-    afterClick.x - beforeClick.x,
-    afterClick.y - beforeClick.y,
-  );
-  check(
-    walkedWhileClicking > 1,
-    `el personaje no llego a moverse mientras golpeaba: ${walkedWhileClicking.toFixed(2)} casillas`,
-  );
   const clicked = afterClick.inventory.reduce((a, b) => a + b, 0)
     - beforeClick.inventory.reduce((a, b) => a + b, 0);
-  console.log(
-    `  clic izquierdo: +${clicked} recursos tras andar ${walkedWhileClicking.toFixed(1)} casillas`,
-  );
+  console.log(`  clic izquierdo: +${clicked} recursos tras andar ${walked.toFixed(1)} casillas`);
   check(clicked > 0, 'el clic izquierdo no recolecto nada');
 
   // Los efectos. El bloque anterior dejo la zona talada, asi que se golpea
@@ -320,10 +355,7 @@ async function desktopPass(browser, baseUrl) {
   // haya algo que derribar no se puede depender quedandose quieto.
   // Primero, lejos de lo ya talado: el bloque del clic izquierdo deja la zona
   // vacia, y sobre casillas vacias solo saldria el slash.
-  await page.keyboard.down('KeyS');
-  await page.waitForTimeout(2200);
-  await page.keyboard.up('KeyS');
-  await waitForLoop(page);
+  await walkToOpenGround(page, 1.1);
 
   let sawSlash = false;
   let sawDebris = 0;
@@ -670,12 +702,16 @@ async function devToolsPass(browser, baseUrl) {
   await page.mouse.move(760, 420);
   await page.waitForTimeout(200);
 
+  // A terreno sin talar antes de nada: golpear donde ya se golpeo solo saca el
+  // slash, y entonces no hay estallido que fotografiar.
+  await walkToOpenGround(page, 1.2);
+
   let shot = false;
   await page.mouse.down();
   for (const key of ['KeyS', 'KeyD', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyW', 'KeyA']) {
     await page.keyboard.down(key);
-    for (let i = 0; i < 10 && !shot; i++) {
-      await page.waitForTimeout(60);
+    for (let i = 0; i < 12 && !shot; i++) {
+      await page.waitForTimeout(90);
       const now = await page.evaluate(() => window.__verdant);
       if (now.effects.particles >= 8 && now.effects.slashes > 0) {
         await page.click('[data-toggle="pause"]');
@@ -755,6 +791,29 @@ async function reliefPass(browser, baseUrl) {
   check(arrived.faces.drawn > 0, 'la pared no dibujo ninguna cara');
 
   await page.screenshot({ path: join(SHOTS, '15-relieve.png') });
+
+  // La cima. Es lo que el autor no encontraba explorando: subir a un punto alto
+  // y ver que el mundo tiene escala de verdad.
+  const peak = spawn.peakSpot;
+  check(peak !== null, 'no se encontro ninguna cima');
+  if (peak) {
+    console.log(`  cima mas alta cerca: nivel ${peak.level} en ${peak.stand.x},${peak.stand.y}`);
+    check(peak.level > 15, `la cima mas alta del entorno es el nivel ${peak.level}`);
+    await page.goto(`${baseUrl}/?seed=${SEED}&x=${peak.stand.x}&y=${peak.stand.y}`, {
+      waitUntil: 'load',
+    });
+    await page.evaluate(() => delete window.__smokeBaseTick);
+    const onTop = await waitForLoop(page);
+    console.log(`  en la cima: nivel ${onTop.level}, terreno ${onTop.terrain}`);
+    check(onTop.level > 15, `la cima no era tan alta: nivel ${onTop.level}`);
+    // En lo mas alto no hay nada por delante que pueda taparle, asi que la
+    // silueta sobra. Si saliera aqui es que se dispara siempre y no significa
+    // nada, que es justo lo que pasaba comparando cajas enteras.
+    check(!onTop.playerHidden, 'la silueta sale hasta en la cima, donde nada tapa');
+    for (let i = 0; i < 4; i++) await page.keyboard.press('Minus');
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: join(SHOTS, '16-cima.png') });
+  }
 
   // Caminar por el relieve no puede atascar: en esta fase la altura solo se ve,
   // asi que el personaje sigue moviendose como en llano.

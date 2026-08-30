@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   groundHeight,
   isRampEdge,
+  LEVEL_STEP,
   levelFrom,
   MAX_LEVEL,
   NO_RAMP,
@@ -37,9 +38,18 @@ describe('La altura es otra forma de escribir la elevacion', () => {
   });
 
   it('cada escalon de elevacion sube un nivel, y se topa arriba', () => {
-    expect(levelFrom(SEA_LEVEL + 0.06)).toBe(1);
-    expect(levelFrom(SEA_LEVEL + 0.18)).toBe(3);
-    expect(levelFrom(1)).toBe(MAX_LEVEL);
+    expect(levelFrom(SEA_LEVEL + LEVEL_STEP)).toBe(1);
+    expect(levelFrom(SEA_LEVEL + LEVEL_STEP * 3)).toBe(3);
+    expect(levelFrom(SEA_LEVEL + LEVEL_STEP * MAX_LEVEL)).toBe(MAX_LEVEL);
+    expect(levelFrom(SEA_LEVEL + LEVEL_STEP * (MAX_LEVEL + 20))).toBe(MAX_LEVEL);
+  });
+
+  it('el tope solo se alcanza con cordillera, no con la elevacion a secas', () => {
+    // La elevacion cruda no pasa de 1, que son nueve niveles. Los cuarenta del
+    // tope son cosa de la amplificacion: si `levelFrom(1)` llegara al tope, el
+    // escalon estaria mal y todo el mundo llano se habria aplastado.
+    expect(levelFrom(1)).toBeLessThan(MAX_LEVEL);
+    expect(levelFrom(1)).toBe(Math.floor((1 - SEA_LEVEL) / LEVEL_STEP));
   });
 
   it('el terreno generado no ha cambiado: agua es nivel negativo y tierra no', () => {
@@ -54,6 +64,49 @@ describe('La altura es otra forma de escribir la elevacion', () => {
           expect(gen.levelAt(x, y) < 0, `desacuerdo en (${x}, ${y}) semilla ${seed}`).toBe(wet);
         }
       }
+    }
+  });
+
+  it('la costa no se ha movido: bajo el mar el relieve es la elevacion', () => {
+    // La amplificacion de cordillera esta anclada al nivel del mar y solo actua
+    // por encima. Es lo que permite meter montanas sin volver a calibrar el agua,
+    // el fondo y la arena, que son los tres umbrales mas delicados que hay.
+    for (const seed of SEEDS) {
+      const gen = new WorldGen(seed);
+      let wet = 0;
+      for (let y = -150; y < 150; y += 3) {
+        for (let x = -150; x < 150; x += 3) {
+          const e = gen.elevationAt(x, y);
+          if (e > SEA_LEVEL) continue;
+          expect(gen.reliefAt(x, y), `el mar se movio en (${x}, ${y})`).toBe(e);
+          wet++;
+        }
+      }
+      expect(wet, `semilla ${seed} sin mar`).toBeGreaterThan(100);
+    }
+  });
+
+  it('hay montanas de verdad, no llanuras onduladas', () => {
+    // El fallo que reporto el autor: exploro un rato y no encontro ninguna
+    // colina pronunciada. La medida le daba la razon a medias —habia rango pero
+    // no pendiente— y esto es esa queja convertida en numero.
+    for (const seed of SEEDS) {
+      const gen = new WorldGen(seed);
+      let peak = 0;
+      let steps = 0;
+      for (let y = -200; y < 200; y++) {
+        for (let x = -200; x < 200; x++) {
+          const level = gen.levelAt(x, y);
+          if (level < 0) continue;
+          if (level > peak) peak = level;
+          if (gen.levelAt(x + 1, y) !== level) steps++;
+        }
+      }
+      // Una cima que domine el paisaje, no un cerro.
+      expect(peak, `semilla ${seed}: la cima mas alta es el nivel ${peak}`).toBeGreaterThan(18);
+      // Y pendiente: una frontera de nivel cada pocas casillas en alguna parte.
+      // Antes de las cordilleras caia una cada treinta, que es una llanura.
+      expect(steps / (400 * 400)).toBeGreaterThan(0.03);
     }
   });
 
@@ -269,29 +322,53 @@ describe('El mundo con relieve sigue siendo explorable', () => {
     });
   }
 
-  it('todas las paredes altas vienen de los salientes', () => {
-    // El campo de elevacion es tan suave que dos tiles vecinos jamas se llevan
-    // dos niveles: medido, sin salientes la perdida de conectividad es cero. Por
-    // eso los salientes no son un adorno sino el unico origen de los muros.
+  it('fuera de las cordilleras el terreno no da escalones de dos', () => {
+    // Donde no hay cordillera, el campo de elevacion es tan suave que dos tiles
+    // vecinos no se llevan dos niveles: ahi los muros solo pueden venir de los
+    // salientes. Es lo que hace que el mundo llano siga siendo el de siempre.
     const gen = new WorldGen(12345);
+    let checked = 0;
     for (let y = -120; y < 120; y++) {
       for (let x = -120; x < 120; x++) {
-        if (gen.isOutcrop(x, y)) continue;
+        if (gen.isOutcrop(x, y) || gen.ridgeAt(x, y) > 0) continue;
         const here = gen.levelAt(x, y);
         if (here < 0) continue;
         for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
           const nx = x + dx;
           const ny = y + dy;
-          if (gen.isOutcrop(nx, ny)) continue;
+          if (gen.isOutcrop(nx, ny) || gen.ridgeAt(nx, ny) > 0) continue;
           const there = gen.levelAt(nx, ny);
           if (there < 0) continue;
           expect(
             Math.abs(there - here),
-            `escalon de ${Math.abs(there - here)} sin saliente en (${x}, ${y})`,
+            `escalon de ${Math.abs(there - here)} en llano, en (${x}, ${y})`,
           ).toBeLessThanOrEqual(1);
+          checked++;
         }
       }
     }
+    expect(checked, 'no se encontro llano sin cordillera').toBeGreaterThan(1000);
+  });
+
+  it('las cordilleras SI dan acantilados naturales, y salen gratis', () => {
+    // Esto contradice lo que supuse al disenarlo: pensaba que una cordillera solo
+    // daria laderas escalonadas y que todo muro vendria de un saliente. Medido,
+    // la pendiente amplificada pasa de un nivel por casilla en muchos sitios y
+    // fabrica acantilados de verdad. Y no cuesta conectividad: un acantilado en
+    // mitad de una ladera siempre se rodea, porque la escalera sigue al lado.
+    const gen = new WorldGen(7);
+    let cliffs = 0;
+    for (let y = -200; y < 200; y++) {
+      for (let x = -200; x < 200; x++) {
+        if (gen.isOutcrop(x, y) || gen.ridgeAt(x, y) === 0) continue;
+        const here = gen.levelAt(x, y);
+        if (here < 0) continue;
+        for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
+          if (gen.levelAt(x + dx, y + dy) - here >= 2) cliffs++;
+        }
+      }
+    }
+    expect(cliffs, 'las cordilleras no producen ni un acantilado').toBeGreaterThan(50);
   });
 
   it('un saliente levanta exactamente lo acordado', () => {
@@ -302,7 +379,9 @@ describe('El mundo con relieve sigue siendo explorable', () => {
         if (!gen.isOutcrop(x, y)) continue;
         const level = gen.levelAt(x, y);
         if (level < 0 || level === MAX_LEVEL) continue; // el agua no sube y arriba se topa
-        expect(level - levelFrom(gen.elevationAt(x, y))).toBe(OUTCROP_RISE);
+        // La base es el nivel del RELIEVE, no el de la elevacion cruda: sobre una
+        // cordillera el saliente se levanta desde la ladera amplificada.
+        expect(level - levelFrom(gen.reliefAt(x, y))).toBe(OUTCROP_RISE);
         checked++;
       }
     }

@@ -2,23 +2,32 @@
  * Renderizador isometrico. Es la unica parte del proyecto que sabe que existe
  * un navegador.
  *
- * Tres capas, y el reparto entre ellas es lo que hace que la vista funcione:
+ * **Un solo orden para todo lo que es mundo.** Suelo, paredes, arboles y
+ * personaje van juntos en la misma capa, ordenados por profundidad. Antes el
+ * suelo se horneaba en una textura por chunk y las paredes vivian en la capa de
+ * objetos, que estaba entera por encima: asi una pared se pintaba sobre
+ * cualquier suelo, lo tuviera delante o detras. Con relieve plano casi no se
+ * notaba; con montanas de verdad hacia el dibujo incomprensible.
  *
- *  1. Terreno: un sprite por chunk visible, pre-pintado en rombos. Es plano y no
- *     cambia nunca, asi que su textura se genera una vez.
- *  2. Marcador: el reticulo del tile apuntado, siempre sobre el suelo.
- *  3. Objetos: features, personaje y todo lo que tenga altura, ORDENADO POR
- *     PROFUNDIDAD. Sin ese orden el personaje apareceria por delante de un arbol
- *     que tiene detras, que es exactamente lo que destruye la ilusion de volumen.
+ * Ordenar por `zIndex` unos miles de sprites en cada frame seria caro, y ademas
+ * es innecesario: los tiles de una misma **antidiagonal** (`wx + wy` constante)
+ * no se solapan nunca entre si. Asi que cada antidiagonal es un contenedor
+ * propio —dentro, primero el suelo y luego lo que se apoya en el—, y lo unico
+ * que se ordena es la lista corta de contenedores. Un tile nunca cambia de fila;
+ * solo el personaje lo hace, y es uno.
+ *
+ * Por encima quedan dos capas que no son mundo: el reticulo y las
+ * superposiciones de depuracion, y los efectos.
  */
 
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { CHUNK_SIZE, Feature } from '@verdant/shared';
 import type { Chunk, GameState, World } from '@verdant/sim';
-import { actionArea, daylight, groundHeight } from '@verdant/sim';
+import { actionArea, daylight, groundHeight, MAX_LEVEL } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
 import { progressOf, type Effects } from './effects.js';
-import { collectFaces } from './relief-faces.js';
+import { groundPieces } from './terrain-draw.js';
+import type { TileBounds } from './relief-faces.js';
 import {
   depthOf,
   heightOffset,
@@ -30,28 +39,58 @@ import {
   worldToScreen,
 } from './projection.js';
 import {
-  CHUNK_TEX_H,
-  CHUNK_TEX_OFFSET_X,
-  CHUNK_TEX_TOP,
-  CHUNK_TEX_W,
+  CHUNK_BOX_H,
+  CHUNK_BOX_OFFSET_X,
+  CHUNK_BOX_W,
+  blockReliefMargin,
   makeFaceArt,
   makeFeatureArt,
   makePlayerArt,
-  paintChunkTerrain,
+  makeTopArt,
+  shadeStepAt,
 } from './tiles.js';
 
-interface ChunkView {
-  terrain: Sprite;
-  texture: Texture;
-  /** Sprites de las features de este chunk, para poder retirarlos en bloque. */
+/**
+ * Lado, en tiles, del bloque que se recorta contra la pantalla.
+ *
+ * El recorte era por chunk entero, y con montanas de cuarenta niveles eso dejo
+ * de servir: un chunk mide mas que la pantalla, asi que darlo por visible
+ * significa dibujar mil tiles para ver ciento cincuenta. Medido, por chunk se
+ * dibujaban 10.200 piezas donde hacen falta unas 1.500.
+ */
+const VIEW_BLOCK = 8;
+const BLOCKS_PER_CHUNK = CHUNK_SIZE / VIEW_BLOCK;
+
+interface BlockView {
+  readonly cx: number;
+  readonly cy: number;
+  readonly bounds: TileBounds;
+  /** Cimas, paredes y costados de talud. Se calculan una vez: el relieve no cambia. */
+  ground: Sprite[];
+  /** Sprites de las features del bloque, para poder retirarlos de golpe. */
   features: Sprite[];
-  /** Paredes y costados de talud. Se calculan una vez: el relieve no cambia. */
-  faces: Sprite[];
-  /** Contorno de los biomas del chunk. Solo existe con la vista activada. */
-  biomeBorders: Graphics | null;
-  /** Segmentos de ese contorno. Solo para verificacion. */
-  borderSegments: number;
+  /** Cuanto sobresale el relieve del bloque por arriba y por abajo, para recortar. */
+  margin: { top: number; bottom: number };
   revision: number;
+}
+
+/** Contorno de biomas de un chunk. Va aparte: es vista de depuracion, no mundo. */
+interface BorderView {
+  graphics: Graphics;
+  segments: number;
+}
+
+/**
+ * Una antidiagonal del mundo: todo lo que comparte `wx + wy`.
+ *
+ * `ground` lleva el terreno y `props` lo que se apoya en el, en ese orden. No
+ * hace falta ordenar dentro de ninguno de los dos: dos tiles de la misma
+ * antidiagonal caen en columnas distintas de la pantalla y no llegan a tocarse.
+ */
+interface DepthRow {
+  readonly node: Container;
+  readonly ground: Container;
+  readonly props: Container;
 }
 
 /** Todo lo que puede haber sobre un tile y necesita sprite propio. */
@@ -80,16 +119,33 @@ const FEATURE_KINDS: readonly Feature[] = [
   Feature.MeadowPlantSapling,
 ];
 
+/**
+ * Cuantas filas por delante del personaje se miran al buscar lo que le tapa.
+ *
+ * Una pared de treinta niveles mide casi quinientos pixeles y llega a tapar
+ * desde muy lejos, pero mas alla de esto ya no hay nada que quepa en pantalla
+ * entre ella y el jugador.
+ */
+const OCCLUSION_ROWS = 24;
+
 /** Buffer reutilizado al leer las features efectivas de un chunk. */
 const featureScratch = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
 
 export class Renderer {
   readonly app: Application;
   private readonly camera = new Container();
-  private readonly terrainLayer = new Container();
+  /** Todo lo que es mundo, repartido en antidiagonales ordenadas. */
+  private readonly worldLayer = new Container();
+  private readonly rows = new Map<number, DepthRow>();
   private readonly markerLayer = new Container();
-  private readonly objectLayer = new Container();
-  private readonly views = new Map<string, ChunkView>();
+  private readonly views = new Map<string, BlockView>();
+  /** Contornos de bioma, por chunk. Solo existen con la vista de depuracion. */
+  private readonly borders = new Map<string, BorderView>();
+  /** Cimas de terreno, por (terreno, nivel del talud, franja de brillo). */
+  private readonly topTextures = new Map<
+    string,
+    { texture: Texture; ax: number; ay: number } | null
+  >();
   private readonly featureTextures = new Map<
     Feature,
     { texture: Texture; ax: number; ay: number; rise: number; halfWidth: number }
@@ -110,9 +166,21 @@ export class Renderer {
   private readonly featureByTile = new Map<string, Sprite>();
   /** Camino inverso del indice, para poder limpiarlo al destruir un chunk. */
   private readonly featureKeys = new Map<Sprite, string>();
+  /**
+   * Piezas de suelo por tile.
+   *
+   * Ahora que el terreno esta en el mismo orden que todo lo demas, un acantilado
+   * por delante tapa al personaje. Eso es lo correcto y es lo que se buscaba,
+   * pero deja al jugador invisible metido en un rincon, asi que el terreno
+   * necesita el mismo atenuado que ya tenian los arboles. Sin este indice habria
+   * que recorrer miles de sprites para encontrar los pocos que estorban.
+   */
+  private readonly groundByTile = new Map<string, Sprite[]>();
   /** Features atenuadas este frame, para poder restaurarlas en el siguiente. */
   private readonly faded: Sprite[] = [];
   private player!: Sprite;
+  /** Silueta del personaje, para no perderlo detras de un acantilado. */
+  private playerGhost!: Sprite;
   private playerRise = 0;
   private readonly reticle = new Graphics();
   /** Slash y escombros. Van por encima de todo: son adorno, no mundo. */
@@ -141,12 +209,9 @@ export class Renderer {
 
   private constructor(app: Application) {
     this.app = app;
-    this.objectLayer.sortableChildren = true;
-    // Con relieve el suelo tambien se solapa: una cima levantada invade el rombo
-    // del chunk de al lado, y sin ordenar se pintaria por debajo de el. El
-    // terreno no cambia nunca, asi que esta profundidad se asigna una sola vez.
-    this.terrainLayer.sortableChildren = true;
-    this.camera.addChild(this.terrainLayer, this.markerLayer, this.objectLayer);
+    // Lo unico que se ordena es la lista de antidiagonales, que son unos cientos.
+    this.worldLayer.sortableChildren = true;
+    this.camera.addChild(this.worldLayer, this.markerLayer);
     this.app.stage.addChild(this.camera);
     this.markerLayer.addChild(this.reticle);
     this.markerLayer.addChild(this.chunkGrid);
@@ -154,6 +219,22 @@ export class Renderer {
     // Fuera de la camara: cubre la pantalla, no el mundo.
     this.app.stage.addChild(this.skyTint);
     this.buildTextures();
+  }
+
+  /** La antidiagonal `k`, creandola si es la primera vez que se pide. */
+  private rowAt(k: number): DepthRow {
+    const existing = this.rows.get(k);
+    if (existing) return existing;
+
+    const node = new Container();
+    node.zIndex = k;
+    const ground = new Container();
+    const props = new Container();
+    node.addChild(ground, props);
+    this.worldLayer.addChild(node);
+    const row = { node, ground, props };
+    this.rows.set(k, row);
+    return row;
   }
 
   static async create(): Promise<Renderer> {
@@ -196,7 +277,17 @@ export class Renderer {
     this.player = new Sprite(playerTexture);
     this.player.anchor.set(playerArt.anchorX, playerArt.anchorY);
     this.playerRise = playerArt.riseAbove;
-    this.objectLayer.addChild(this.player);
+
+    // La silueta: el mismo dibujo, tenido y translucido, por encima de todo.
+    // Solo aparece cuando algo del terreno tapa al personaje.
+    this.playerGhost = new Sprite(playerTexture);
+    this.playerGhost.anchor.set(playerArt.anchorX, playerArt.anchorY);
+    this.playerGhost.tint = 0x9fd0ff;
+    this.playerGhost.alpha = 0.85;
+    this.playerGhost.visible = false;
+    this.markerLayer.addChild(this.playerGhost);
+    // El personaje no tiene sitio fijo: cada frame entra en la antidiagonal que
+    // pisa, que es lo que le hace pasar por detras de lo que tiene delante.
   }
 
   get tilesVisible(): number {
@@ -212,7 +303,7 @@ export class Renderer {
    */
   get borderSegmentCount(): number {
     let total = 0;
-    for (const view of this.views.values()) total += view.borderSegments;
+    for (const view of this.borders.values()) total += view.segments;
     return total;
   }
 
@@ -226,8 +317,8 @@ export class Renderer {
    */
   get misplacedBorderCount(): number {
     let bad = 0;
-    for (const [key, view] of this.views) {
-      if (!view.biomeBorders || view.borderSegments === 0) continue;
+    for (const [key, view] of this.borders) {
+      if (view.segments === 0) continue;
       const comma = key.indexOf(',');
       const origin = worldToScreen(
         Number(key.slice(0, comma)) * CHUNK_SIZE,
@@ -235,18 +326,19 @@ export class Renderer {
       );
       // Con la posicion del propio Graphics sumada, que es donde estaba el
       // fallo. Sin ella el error quedaria justo fuera de la medida.
-      const b = view.biomeBorders.getLocalBounds();
-      const x0 = view.biomeBorders.position.x + b.minX;
-      const x1 = view.biomeBorders.position.x + b.maxX;
-      const y0 = view.biomeBorders.position.y + b.minY;
-      const y1 = view.biomeBorders.position.y + b.maxY;
-      // El margen vertical es el del relieve: el contorno se pega a la cima de
-      // cada tile, asi que sobre una meseta sube por encima del rombo plano.
+      const b = view.graphics.getLocalBounds();
+      const x0 = view.graphics.position.x + b.minX;
+      const x1 = view.graphics.position.x + b.maxX;
+      const y0 = view.graphics.position.y + b.minY;
+      const y1 = view.graphics.position.y + b.maxY;
+      // El margen vertical es el del relieve REAL del chunk: el contorno se pega
+      // a la cima de cada tile, asi que sobre una meseta sube por encima del
+      // rombo plano, pero solo lo que ese chunk suba de verdad.
       const inside =
-        x0 >= origin.x - CHUNK_TEX_OFFSET_X - 1 &&
-        x1 <= origin.x + CHUNK_TEX_OFFSET_X + 1 &&
-        y0 >= origin.y - CHUNK_TEX_TOP - 1 &&
-        y1 <= origin.y + CHUNK_TEX_H - CHUNK_TEX_TOP + 1;
+        x0 >= origin.x - CHUNK_BOX_OFFSET_X - 1 &&
+        x1 <= origin.x + CHUNK_BOX_OFFSET_X + 1 &&
+        y0 >= origin.y - MAX_LEVEL * LEVEL_PX - 1 &&
+        y1 <= origin.y + CHUNK_BOX_H + LEVEL_PX + 1;
       if (!inside) bad++;
     }
     return bad;
@@ -259,11 +351,8 @@ export class Renderer {
       this.debugBiomes = biomes;
       // Los contornos se construyen una vez por chunk y se guardan; al apagar la
       // vista se destruyen para no pagar memoria por algo invisible.
-      for (const view of this.views.values()) {
-        view.biomeBorders?.destroy();
-        view.biomeBorders = null;
-        view.borderSegments = 0;
-      }
+      for (const view of this.borders.values()) view.graphics.destroy();
+      this.borders.clear();
     }
   }
 
@@ -306,7 +395,7 @@ export class Renderer {
     const playerScreen = worldToScreen(wx, wy);
     playerScreen.y += this.aimLift;
     this.player.position.set(playerScreen.x, playerScreen.y);
-    this.player.zIndex = depthOf(wx, wy);
+    this.rowAt(Math.round(depthOf(wx, wy))).props.addChild(this.player);
 
     this.fadeOccluders(state.world, wx, wy, playerScreen);
     this.drawReticle(state.world, entities, playerId);
@@ -362,6 +451,44 @@ export class Renderer {
         this.faded.push(sprite);
       }
     }
+
+    // El terreno es otra historia. Ahora que el suelo va en el mismo orden que
+    // todo lo demas, un acantilado por delante tapa al personaje: correcto, y es
+    // lo que se buscaba, pero deja al jugador invisible metido en un rincon.
+    //
+    // Atenuarlo como a un arbol NO vale: por detras de un arbol se ve el suelo,
+    // pero por detras del suelo no hay nada, asi que se abre un agujero al vacio
+    // en mitad del mundo. Se probo y quedaba peor que el problema.
+    //
+    // La solucion es la de siempre en isometrica: el terreno se queda opaco y el
+    // personaje se dibuja ademas en SILUETA por encima. Se ve donde estas sin
+    // mentir sobre lo que tienes delante.
+    //
+    // Que casillas estorban no se puede adivinar: una pared alta a diez filas
+    // tapa tanto como la de al lado. Como las piezas ya estan indexadas por
+    // profundidad, se recorren las filas de delante y se compara caja contra
+    // caja; son unos cientos de rectangulos.
+    // Se miran dos puntos —el pecho y la cabeza—, no la caja entera. La casilla
+    // de justo delante siempre roza los PIES del personaje, asi que comparando
+    // cajas la silueta saldria practicamente siempre y dejaria de significar
+    // nada. Lo que de verdad estorba es lo que le tapa el cuerpo.
+    const chest = { x: playerScreen.x, y: playerScreen.y - this.playerRise * 0.5 };
+    const head = { x: playerScreen.x, y: playerScreen.y - this.playerRise * 0.85 };
+    const from = Math.round(depthOf(wx, wy)) + 1;
+    let hidden = false;
+    for (let k = from; k <= from + OCCLUSION_ROWS && !hidden; k++) {
+      const row = this.rows.get(k);
+      if (!row) continue;
+      for (const child of row.ground.children) {
+        const box = spriteBox(child as Sprite);
+        if (!contains(box, chest) && !contains(box, head)) continue;
+        hidden = true;
+        break;
+      }
+    }
+
+    this.playerGhost.visible = hidden;
+    if (hidden) this.playerGhost.position.copyFrom(this.player.position);
   }
 
   /**
@@ -418,15 +545,15 @@ export class Renderer {
    * `chunkGrid`. Asignarle ademas la posicion del chunk sumaba el origen dos
    * veces y sacaba todo el contorno un chunk en diagonal.
    */
-  private buildBiomeBorders(world: World, chunk: Chunk, view: ChunkView): Graphics {
-    const g = new Graphics();
+  private buildBiomeBorders(world: World, chunk: Chunk): BorderView {
+    const graphics = new Graphics();
     const segments = collectBiomeEdges(world, chunk);
     for (let i = 0; i < segments.length; i += 4) {
-      g.moveTo(segments[i], segments[i + 1]).lineTo(segments[i + 2], segments[i + 3]);
+      graphics.moveTo(segments[i], segments[i + 1]).lineTo(segments[i + 2], segments[i + 3]);
     }
-    g.stroke({ width: 1, color: 0xffe08a, alpha: 0.9 });
-    view.borderSegments = segments.length / 4;
-    return g;
+    graphics.stroke({ width: 1, color: 0xffe08a, alpha: 0.9 });
+    this.markerLayer.addChild(graphics);
+    return { graphics, segments: segments.length / 4 };
   }
 
   /**
@@ -529,15 +656,27 @@ export class Renderer {
   }
 
   /** True si el rombo de un chunk toca la pantalla. */
-  private chunkVisible(cx: number, cy: number, w: number, h: number, scale: number): boolean {
-    const origin = worldToScreen(cx * CHUNK_SIZE, cy * CHUNK_SIZE);
-    const left = this.camera.x + (origin.x - CHUNK_TEX_OFFSET_X) * scale;
-    const top = this.camera.y + (origin.y - CHUNK_TEX_TOP) * scale;
+  private blockVisible(
+    chunk: Chunk,
+    bounds: TileBounds,
+    w: number,
+    h: number,
+    scale: number,
+    relief: { top: number; bottom: number },
+  ): boolean {
+    const baseX = chunk.cx * CHUNK_SIZE + bounds.x0;
+    const baseY = chunk.cy * CHUNK_SIZE + bounds.y0;
+    const side = bounds.x1 - bounds.x0;
+    const origin = worldToScreen(baseX, baseY);
+    const boxW = side * TILE_W;
+    const boxH = side * TILE_H + relief.top + relief.bottom;
+    const left = this.camera.x + (origin.x - boxW / 2) * scale;
+    const top = this.camera.y + (origin.y - relief.top) * scale;
     const margin = TILE_W * scale; // holgura para objetos altos que sobresalen
     return (
-      left + CHUNK_TEX_W * scale > -margin &&
+      left + boxW * scale > -margin &&
       left < w + margin &&
-      top + CHUNK_TEX_H * scale > -margin * 4 &&
+      top + boxH * scale > -margin * 4 &&
       top < h + margin
     );
   }
@@ -546,83 +685,175 @@ export class Renderer {
    * Materializa solo los chunks que se ven.
    *
    * Antes se creaba una textura para cada chunk CARGADO (49) aunque solo se
-   * vieran unos pocos. En isometrica la caja de un chunk pasa de 512x512 a
-   * 1024x512, asi que hacerlo asi rondaria los 100 MB de texturas: inviable en
-   * un movil.
+   * vieran unos pocos. Sigue valiendo con los sprites por tile: mil por chunk
+   * cargado serian cincuenta mil, y visibles hay una decima parte.
    */
   private syncChunks(state: GameState, w: number, h: number, scale: number): void {
     const seen = new Set<string>();
+    const chunksSeen = new Set<string>();
 
     state.world.eachLoadedChunk((chunk: Chunk) => {
-      if (!this.chunkVisible(chunk.cx, chunk.cy, w, h, scale)) return;
+      for (let by = 0; by < BLOCKS_PER_CHUNK; by++) {
+        for (let bx = 0; bx < BLOCKS_PER_CHUNK; bx++) {
+          const key = `${chunk.cx},${chunk.cy},${bx},${by}`;
+          const bounds = {
+            x0: bx * VIEW_BLOCK,
+            y0: by * VIEW_BLOCK,
+            x1: (bx + 1) * VIEW_BLOCK,
+            y1: (by + 1) * VIEW_BLOCK,
+          };
+          const view = this.views.get(key);
+          // Un bloque que ya tiene vista sabe cuanto sobresale su relieve; uno
+          // que no, se mide al vuelo. Son sesenta y cuatro enteros, mucho mas
+          // barato que construirle los sprites por si acaso.
+          const margin = view ? view.margin : blockReliefMargin(chunk, bounds);
+          if (!this.blockVisible(chunk, bounds, w, h, scale, margin)) continue;
 
-      const key = `${chunk.cx},${chunk.cy}`;
-      seen.add(key);
-      const view = this.views.get(key);
+          seen.add(key);
+          chunksSeen.add(`${chunk.cx},${chunk.cy}`);
+          if (!view) {
+            this.views.set(key, this.buildBlockView(state.world, chunk, bounds, margin));
+            continue;
+          }
 
-      if (!view) {
-        this.views.set(key, this.buildChunkView(state.world, chunk));
-        return;
+          // El terreno no cambia nunca; solo las features pueden desaparecer al
+          // recolectarlas, asi que basta con rehacer los sprites del bloque.
+          if (view.revision !== chunk.revision) {
+            this.clearFeatures(view);
+            view.features = this.buildFeatures(state.world, chunk, bounds);
+            view.revision = chunk.revision;
+          }
+        }
       }
-
-      // El terreno no cambia nunca; solo las features pueden desaparecer al
-      // recolectarlas, asi que basta con rehacer los sprites de este chunk.
-      if (view.revision !== chunk.revision) {
-        this.clearFeatures(view);
-        view.features = this.buildFeatures(state.world, chunk);
-        view.revision = chunk.revision;
-      }
-
-      this.ensureBiomeBorders(state.world, chunk, view);
+      if (chunksSeen.has(`${chunk.cx},${chunk.cy}`)) this.ensureBiomeBorders(state.world, chunk);
     });
 
     for (const [key, view] of this.views) {
       if (seen.has(key)) continue;
       this.clearFeatures(view);
-      this.clearFaces(view);
-      view.biomeBorders?.destroy();
-      view.terrain.destroy();
-      view.texture.destroy(true);
+      this.clearGround(view);
       this.views.delete(key);
+    }
+    for (const [key, view] of this.borders) {
+      if (chunksSeen.has(key)) continue;
+      view.graphics.destroy();
+      this.borders.delete(key);
+    }
+
+    this.pruneRows();
+  }
+
+  /**
+   * Tira las antidiagonales que se han quedado vacias.
+   *
+   * Sin esto la lista crece con cada paso que da el jugador y nunca encoge, y es
+   * justo la lista que se ordena en cada frame: seria una fuga lenta que acabaria
+   * costando mas que todo lo que dibuja.
+   */
+  private pruneRows(): void {
+    for (const [k, row] of this.rows) {
+      if (row.ground.children.length > 0 || row.props.children.length > 0) continue;
+      row.node.destroy({ children: true });
+      this.rows.delete(k);
     }
   }
 
-  private buildChunkView(world: World, chunk: Chunk): ChunkView {
-    const canvas = document.createElement('canvas');
-    canvas.width = CHUNK_TEX_W;
-    canvas.height = CHUNK_TEX_H;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('No se pudo obtener el contexto 2D del chunk');
-    paintChunkTerrain(chunk, ctx, world.seed);
-
-    const texture = Texture.from(canvas);
-    texture.source.scaleMode = 'nearest';
-    const terrain = new Sprite(texture);
-    const origin = worldToScreen(chunk.cx * CHUNK_SIZE, chunk.cy * CHUNK_SIZE);
-    terrain.position.set(origin.x - CHUNK_TEX_OFFSET_X, origin.y - CHUNK_TEX_TOP);
-    terrain.zIndex = depthOf(chunk.cx, chunk.cy);
-    this.terrainLayer.addChild(terrain);
-
-    const view: ChunkView = {
-      terrain,
-      texture,
-      features: this.buildFeatures(world, chunk),
-      faces: this.buildFaces(world, chunk),
-      biomeBorders: null,
-      borderSegments: 0,
+  private buildBlockView(
+    world: World,
+    chunk: Chunk,
+    bounds: TileBounds,
+    margin: { top: number; bottom: number },
+  ): BlockView {
+    return {
+      cx: chunk.cx,
+      cy: chunk.cy,
+      bounds,
+      ground: this.buildGround(world, chunk, bounds),
+      features: this.buildFeatures(world, chunk, bounds),
+      margin,
       revision: chunk.revision,
     };
-    // Tambien al nacer la vista: si no, el contorno tardaria un frame de mas en
-    // aparecer cada vez que un chunk entra en pantalla.
-    this.ensureBiomeBorders(world, chunk, view);
-    return view;
+  }
+
+  /**
+   * El terreno de un chunk: una cima por tile y las caras que cuelguen de ella.
+   *
+   * Cada pieza entra en la antidiagonal de su propio tile, y dentro de ella en
+   * `ground`. La cima va antes que sus caras porque las caras cuelgan por
+   * delante; y como la cara este se comparte con el tile de `x + 1`, que esta una
+   * antidiagonal mas adelante, ese vecino se dibuja despues y la tapa si le toca.
+   */
+  private buildGround(world: World, chunk: Chunk, bounds: TileBounds): Sprite[] {
+    const sprites: Sprite[] = [];
+
+    // La geometria y el ORDEN salen de `terrain-draw.ts`, que es puro. Aqui solo
+    // se convierten en sprites: asi la regla de quien tapa a quien se puede
+    // afirmar en un test de Node, que es lo que faltaba cuando se rompio.
+    for (const piece of groundPieces(world, chunk, bounds)) {
+      const art =
+        piece.kind === 'top'
+          ? this.topTexture(
+              piece.terrain,
+              piece.rampDir,
+              shadeStepAt(world.seed, piece.wx, piece.wy),
+            )
+          : this.faceTexture(piece.face!);
+      if (!art) continue;
+
+      const o = worldToScreen(piece.wx, piece.wy);
+      // La cima se ancla en la esquina norte; una cara, en la esquina cercana de
+      // su borde: la E para la del este y la O para la del sur.
+      const anchor =
+        piece.kind === 'top'
+          ? { x: 0, y: 0 }
+          : piece.kind === 'east'
+            ? { x: TILE_W / 2, y: TILE_H / 2 }
+            : { x: -TILE_W / 2, y: TILE_H / 2 };
+
+      const sprite = new Sprite(art.texture);
+      sprite.anchor.set(art.ax, art.ay);
+      sprite.position.set(o.x + anchor.x, o.y + anchor.y + heightOffset(piece.anchorHeight));
+      this.rowAt(piece.wx + piece.wy).ground.addChild(sprite);
+      const tileKey = `${piece.wx},${piece.wy}`;
+      const atTile = this.groundByTile.get(tileKey);
+      if (atTile) atTile.push(sprite);
+      else this.groundByTile.set(tileKey, [sprite]);
+      sprites.push(sprite);
+    }
+
+    return sprites;
+  }
+
+  private topTexture(
+    terrain: number,
+    rampDir: number,
+    shadeStep: number,
+  ): { texture: Texture; ax: number; ay: number } | null {
+    // El nivel NO entra en la clave: la forma de una cima solo depende de su
+    // talud, y la altura la pone la posicion del sprite. Sin eso habria una
+    // textura por altitud y el cache no serviria de nada.
+    const key = `${terrain}|${rampDir}|${shadeStep}`;
+    const cached = this.topTextures.get(key);
+    if (cached !== undefined) return cached;
+
+    const art = makeTopArt(terrain, 0, rampDir, shadeStep);
+    if (!art) {
+      this.topTextures.set(key, null);
+      return null;
+    }
+    const texture = Texture.from(art.canvas);
+    texture.source.scaleMode = 'nearest';
+    const made = { texture, ax: art.anchorX, ay: art.anchorY };
+    this.topTextures.set(key, made);
+    return made;
   }
 
   /** Crea el contorno del chunk si toca y todavia no existe. */
-  private ensureBiomeBorders(world: World, chunk: Chunk, view: ChunkView): void {
-    if (!this.debugBiomes || view.biomeBorders) return;
-    view.biomeBorders = this.buildBiomeBorders(world, chunk, view);
-    this.markerLayer.addChild(view.biomeBorders);
+  private ensureBiomeBorders(world: World, chunk: Chunk): void {
+    if (!this.debugBiomes) return;
+    const key = `${chunk.cx},${chunk.cy}`;
+    if (this.borders.has(key)) return;
+    this.borders.set(key, this.buildBiomeBorders(world, chunk));
   }
 
   /**
@@ -633,14 +864,14 @@ export class Renderer {
    * eso una planta recolectada seguia dibujada aunque ya no existiera para el
    * juego. Una sola fuente de verdad cierra ese fallo por construccion.
    */
-  private buildFeatures(world: World, chunk: Chunk): Sprite[] {
+  private buildFeatures(world: World, chunk: Chunk, bounds: TileBounds): Sprite[] {
     const sprites: Sprite[] = [];
     const baseX = chunk.cx * CHUNK_SIZE;
     const baseY = chunk.cy * CHUNK_SIZE;
     world.readFeatures(chunk, featureScratch);
 
-    for (let ly = 0; ly < CHUNK_SIZE; ly++) {
-      for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+    for (let ly = bounds.y0; ly < bounds.y1; ly++) {
+      for (let lx = bounds.x0; lx < bounds.x1; lx++) {
         const feature = featureScratch[ly * CHUNK_SIZE + lx] as Feature;
         if (feature === Feature.None) continue;
         const art = this.featureTextures.get(feature);
@@ -656,43 +887,12 @@ export class Renderer {
         const sprite = new Sprite(art.texture);
         sprite.anchor.set(art.ax, art.ay);
         sprite.position.set(p.x, p.y + heightOffset(height));
-        sprite.zIndex = depthOf(wx + 0.5, wy + 0.5);
-        this.objectLayer.addChild(sprite);
+        this.rowAt(wx + wy).props.addChild(sprite);
         const tileKey = `${wx},${wy}`;
         this.featureByTile.set(tileKey, sprite);
         this.featureKeys.set(sprite, tileKey);
         sprites.push(sprite);
       }
-    }
-    return sprites;
-  }
-
-  /**
-   * Las paredes y los costados de talud de un chunk.
-   *
-   * Van en la capa ordenada por profundidad, no horneados en el suelo, porque
-   * tienen altura (regla 7 de CLAUDE.md). Su profundidad es la del BORDE del que
-   * cuelgan, media casilla por delante del centro del tile: asi una pared tapa lo
-   * que hay detras de ella y queda tapada por lo que se apoya en el tile de
-   * abajo, que es justo lo que se ve en la realidad.
-   */
-  private buildFaces(world: World, chunk: Chunk): Sprite[] {
-    const sprites: Sprite[] = [];
-    for (const face of collectFaces(world, chunk)) {
-      const art = this.faceTexture(face);
-      if (!art) continue;
-      const p = worldToScreen(face.wx, face.wy);
-      // Esquina cercana del borde: la E para la cara este, la O para la sur.
-      const corner =
-        face.side === 'east'
-          ? { x: p.x + TILE_W / 2, y: p.y + TILE_H / 2 }
-          : { x: p.x - TILE_W / 2, y: p.y + TILE_H / 2 };
-      const sprite = new Sprite(art.texture);
-      sprite.anchor.set(art.ax, art.ay);
-      sprite.position.set(corner.x, corner.y + heightOffset(face.top0));
-      sprite.zIndex = depthOf(face.wx, face.wy) + 1.5;
-      this.objectLayer.addChild(sprite);
-      sprites.push(sprite);
     }
     return sprites;
   }
@@ -737,12 +937,21 @@ export class Renderer {
     return made;
   }
 
-  private clearFaces(view: ChunkView): void {
-    for (const sprite of view.faces) sprite.destroy();
-    view.faces.length = 0;
+  private clearGround(view: BlockView): void {
+    const baseX = view.cx * CHUNK_SIZE;
+    const baseY = view.cy * CHUNK_SIZE;
+    for (let ly = view.bounds.y0; ly < view.bounds.y1; ly++) {
+      for (let lx = view.bounds.x0; lx < view.bounds.x1; lx++) {
+        this.groundByTile.delete(`${baseX + lx},${baseY + ly}`);
+      }
+    }
+    for (const sprite of view.ground) sprite.destroy();
+    view.ground.length = 0;
+    // Un suelo atenuado que acaba de destruirse no debe quedar en la lista.
+    this.faded.length = 0;
   }
 
-  private clearFeatures(view: ChunkView): void {
+  private clearFeatures(view: BlockView): void {
     for (const sprite of view.features) {
       const key = this.featureKeys.get(sprite);
       if (key) {
@@ -760,20 +969,37 @@ export class Renderer {
   reset(): void {
     for (const view of this.views.values()) {
       this.clearFeatures(view);
-      this.clearFaces(view);
-      view.biomeBorders?.destroy();
-      view.terrain.destroy();
-      view.texture.destroy(true);
+      this.clearGround(view);
     }
+    for (const view of this.borders.values()) view.graphics.destroy();
     this.views.clear();
+    this.borders.clear();
+    this.groundByTile.clear();
     this.featureByTile.clear();
     this.featureKeys.clear();
     this.faded.length = 0;
+    // El personaje sale de su fila antes de tirarlas: si no, se destruiria con
+    // ella y el mundo nuevo nacería sin nadie dentro.
+    this.player.removeFromParent();
+    for (const row of this.rows.values()) row.node.destroy({ children: true });
+    this.rows.clear();
   }
 
-  /** Numero de objetos dibujados. Util para vigilar el coste del ordenado. */
+  /**
+   * Si el terreno esta tapando al personaje ahora mismo.
+   *
+   * Lo expone para que la prueba de humo pueda comprobar las dos mitades de la
+   * regla: al descubierto no hay silueta, y detras de un acantilado si.
+   */
+  get playerHidden(): boolean {
+    return this.playerGhost.visible;
+  }
+
+  /** Piezas de mundo dibujadas: suelo, relieve, features y personaje. */
   get objectCount(): number {
-    return this.objectLayer.children.length;
+    let total = 0;
+    for (const view of this.views.values()) total += view.ground.length + view.features.length;
+    return total;
   }
 
   /**
@@ -785,9 +1011,25 @@ export class Renderer {
    */
   get faceCount(): { drawn: number; shapes: number } {
     let drawn = 0;
-    for (const view of this.views.values()) drawn += view.faces.length;
-    return { drawn, shapes: this.faceTextures.size };
+    for (const view of this.views.values()) drawn += view.ground.length;
+    return { drawn, shapes: this.faceTextures.size + this.topTextures.size };
   }
+}
+
+/** Caja que ocupa un sprite, en el espacio del mundo dibujado. */
+function spriteBox(sprite: Sprite): { x0: number; y0: number; x1: number; y1: number } {
+  const w = sprite.texture.width;
+  const h = sprite.texture.height;
+  const x0 = sprite.position.x - w * sprite.anchor.x;
+  const y0 = sprite.position.y - h * sprite.anchor.y;
+  return { x0, y0, x1: x0 + w, y1: y0 + h };
+}
+
+function contains(
+  box: { x0: number; y0: number; x1: number; y1: number },
+  p: { x: number; y: number },
+): boolean {
+  return p.x >= box.x0 && p.x <= box.x1 && p.y >= box.y0 && p.y <= box.y1;
 }
 
 /** Mezcla dos colores empaquetados en 0xRRGGBB. */

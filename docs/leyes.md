@@ -64,7 +64,7 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Las entidades vivas no surgen automaticamente | **Cumplida** | Con poblacion cero el crecimiento logistico vale exactamente cero; solo la colonizacion desde una fuente cercana lo arranca | «sin fuente cercana no se genera ni una sola unidad de vida», «donde el terreno no sostiene vida, no aparece jamas» |
 | Todo ser vivo puede desarrollar rasgos diferenciales | **Pendiente** | — | — |
 | Existen muchos tipos de biomas y ecosistemas | **Cumplida** | `sim/worldgen.ts` — ocho biomas calibrados; el bioma es el del **tile**, no el del chunk, asi que la mancha sigue la forma real del terreno | «todos los biomas aparecen», «dos tiles del MISMO chunk pueden dar biomas distintos» |
-| El mundo es abierto para todos (aplicada al relieve) | **Cumplida** | `sim/relief.ts` y `sim/worldgen.ts` — la altura sale de la misma elevacion que ya clasificaba el terreno, y la densidad de salientes esta calibrada contra la conectividad real del mundo, no elegida a ojo | «el relieve no parte el mundo», «existen paredes de dos o mas bloques», «el terreno generado no ha cambiado» |
+| El mundo es abierto para todos (aplicada al relieve) | **Cumplida** | `sim/relief.ts` y `sim/worldgen.ts` — hay cordilleras de hasta cuarenta niveles y mesetas con paredes, y la densidad de las dos cosas esta calibrada contra la conectividad real del mundo, no elegida a ojo | «el relieve no parte el mundo», «hay montanas de verdad, no llanuras onduladas», «existen paredes de dos o mas bloques», «la costa no se ha movido» |
 
 ## Capitulo IV: Las comunidades
 

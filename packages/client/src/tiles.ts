@@ -12,25 +12,40 @@
  */
 
 import { CHUNK_SIZE, Feature, isSapling, maturesInto, Terrain } from '@verdant/shared';
-import { groundHeight, hash2DFloat, MAX_LEVEL, WATER_LEVEL } from '@verdant/sim';
+import { groundHeight, hash2DFloat } from '@verdant/sim';
 import type { Chunk } from '@verdant/sim';
 import { LOOKS, MINERAL_FACES, ROCK_FACES } from './palette.js';
 import { LEVEL_PX, TILE_H, TILE_W, worldToScreen } from './projection.js';
 
 /** Caja que ocupa el rombo de un chunk completo, en pixeles. */
-export const CHUNK_TEX_W = CHUNK_SIZE * TILE_W;
-/**
- * Margen que hay que dejar arriba y abajo por el relieve.
- *
- * Las cimas suben hasta `MAX_LEVEL` niveles sobre el rombo plano, y el agua se
- * hunde uno por debajo. Sin este margen, una meseta en el borde norte del chunk
- * se recortaria contra el limite de su textura.
- */
-export const CHUNK_TEX_TOP = MAX_LEVEL * LEVEL_PX;
-const CHUNK_TEX_BOTTOM = -WATER_LEVEL * LEVEL_PX;
-export const CHUNK_TEX_H = CHUNK_SIZE * TILE_H + CHUNK_TEX_TOP + CHUNK_TEX_BOTTOM;
+export const CHUNK_BOX_W = CHUNK_SIZE * TILE_W;
+/** Alto del rombo de un chunk sin contar el relieve. */
+export const CHUNK_BOX_H = CHUNK_SIZE * TILE_H;
 /** El rombo se extiende a izquierda y derecha del origen: hay que recentrarlo. */
-export const CHUNK_TEX_OFFSET_X = CHUNK_TEX_W / 2;
+export const CHUNK_BOX_OFFSET_X = CHUNK_BOX_W / 2;
+
+/**
+ * Cuanto sobresale un trozo de chunk por arriba y por abajo de su rombo plano.
+ *
+ * Se calcula con las alturas REALES del trozo, no con el tope global: la mayoria
+ * son llanos que no sobresalen nada, y reservarles el margen de una cordillera
+ * de cuarenta niveles inflaria el recorte hasta dejarlo sin efecto.
+ */
+export function blockReliefMargin(
+  chunk: Chunk,
+  bounds: { x0: number; y0: number; x1: number; y1: number },
+): { top: number; bottom: number } {
+  let highest = 0;
+  let lowest = 0;
+  for (let ly = bounds.y0; ly < bounds.y1; ly++) {
+    for (let lx = bounds.x0; lx < bounds.x1; lx++) {
+      const level = chunk.level[ly * CHUNK_SIZE + lx];
+      if (level > highest) highest = level;
+      if (level < lowest) lowest = level;
+    }
+  }
+  return { top: highest * LEVEL_PX, bottom: -lowest * LEVEL_PX };
+}
 
 const TERRAIN_RGB: Record<Terrain, [number, number, number]> = {
   [Terrain.DeepWater]: [22, 48, 82],
@@ -100,34 +115,66 @@ export function cornerHeights(level: number, rampDir: number): [number, number, 
   ];
 }
 
-/** Pinta el terreno de un chunk. Las features van aparte, como sprites. */
-export function paintChunkTerrain(
-  chunk: Chunk,
-  ctx: CanvasRenderingContext2D,
-  seed: number,
-): void {
-  const baseX = chunk.cx * CHUNK_SIZE;
-  const baseY = chunk.cy * CHUNK_SIZE;
-  ctx.clearRect(0, 0, CHUNK_TEX_W, CHUNK_TEX_H);
+/**
+ * Cuantas franjas de brillo distintas tiene el terreno.
+ *
+ * El moteado que rompe el aspecto plastico era continuo mientras el suelo se
+ * horneaba de una pieza; con una cima por sprite tiene que discretizarse para
+ * que los lienzos se puedan cachear. Ocho franjas siguen leyendose como ruido y
+ * dejan el numero de texturas distintas en unas pocas docenas.
+ */
+export const SHADE_STEPS = 8;
 
-  // De atras hacia delante en profundidad. Con relieve el orden importa: una
-  // cima levantada invade el rombo de su vecino del norte, y pintando en orden
-  // de aparicion se dibujaria por debajo de el.
-  for (let sum = 0; sum <= (CHUNK_SIZE - 1) * 2; sum++) {
-    for (let lx = Math.max(0, sum - CHUNK_SIZE + 1); lx < CHUNK_SIZE && lx <= sum; lx++) {
-      const ly = sum - lx;
-      const idx = ly * CHUNK_SIZE + lx;
-      const terrain = chunk.terrain[idx] as Terrain;
-      const rgb = TERRAIN_RGB[terrain] ?? TERRAIN_RGB[Terrain.Grass];
-      const jitter = (hash2DFloat(seed ^ 0x1f2e3d4c, baseX + lx, baseY + ly) - 0.5) * 2 * SPECKLE;
-      const [north, east, south, west] = cornerHeights(chunk.level[idx], chunk.rampDir[idx]);
+/** Franja de brillo de un tile, de 0 a `SHADE_STEPS - 1`. */
+export function shadeStepAt(seed: number, wx: number, wy: number): number {
+  const roll = hash2DFloat(seed ^ 0x1f2e3d4c, wx, wy);
+  return Math.min(SHADE_STEPS - 1, Math.floor(roll * SHADE_STEPS));
+}
 
-      const p = worldToScreen(lx, ly);
-      ctx.fillStyle = shade(rgb, jitter);
-      traceTop(ctx, p.x + CHUNK_TEX_OFFSET_X, p.y + CHUNK_TEX_TOP, north, east, south, west);
-      ctx.fill();
-    }
-  }
+/**
+ * La cima de un tile: el rombo de arriba, con sus cuatro esquinas a su altura.
+ *
+ * Deja de estar horneada en la textura del chunk. Una cima tiene altura —sobre
+ * una meseta sube decenas de pixeles— y lo que tiene altura va en la capa
+ * ordenada por profundidad, junto a sus propias caras. Tenerlas separadas era
+ * justo el fallo que reporto el autor: la capa de caras estaba entera por
+ * encima de la de cimas, asi que una pared se pintaba sobre cualquier suelo,
+ * lo tuviera delante o detras.
+ *
+ * El lienzo se ancla a la esquina NORTE del tile a la altura de su esquina mas
+ * alta, que es lo que permite reutilizar el mismo dibujo a cualquier altitud.
+ */
+export function makeTopArt(
+  terrain: Terrain,
+  level: number,
+  rampDir: number,
+  shadeStep: number,
+): FeatureArt | null {
+  const [north, east, south, west] = cornerHeights(level, rampDir);
+  const top = Math.max(north, east, south, west);
+  // Caida de cada esquina respecto de la mas alta, en pixeles.
+  const dn = (top - north) * LEVEL_PX;
+  const de = (top - east) * LEVEL_PX;
+  const ds = (top - south) * LEVEL_PX;
+  const dw = (top - west) * LEVEL_PX;
+
+  const width = TILE_W + 2;
+  const height = TILE_H + Math.max(dn, de, ds, dw) + 2;
+  const made = newCanvas(Math.ceil(width), Math.ceil(height));
+  if (!made) return null;
+  const [canvas, ctx] = made;
+
+  // Origen del lienzo: la esquina norte del tile a la altura `top`.
+  const ox = TILE_W / 2 + 1;
+  const oy = 1;
+
+  const rgb = TERRAIN_RGB[terrain] ?? TERRAIN_RGB[Terrain.Grass];
+  const jitter = ((shadeStep + 0.5) / SHADE_STEPS - 0.5) * 2 * SPECKLE;
+  ctx.fillStyle = shade(rgb, jitter);
+  traceTop(ctx, ox, oy, -dn / LEVEL_PX, -de / LEVEL_PX, -ds / LEVEL_PX, -dw / LEVEL_PX);
+  ctx.fill();
+
+  return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height, riseAbove: 0 };
 }
 
 /** De que lado de un tile cuelga una cara. */

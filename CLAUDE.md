@@ -66,15 +66,18 @@ Esto es el resumen operativo.
     mas que otra forma de leer el `e < 0.42` que ya separaba el agua, asi que
     `terrainAt` no cambia y los umbrales de bioma siguen calibrados. Si mueves el
     nivel del mar sin mover el umbral de agua, `tests/relief.test.ts` te avisa.
-14. **Las paredes de dos o mas bloques SOLO salen de los salientes.** El campo de
-    elevacion es tan suave que dos tiles vecinos nunca se llevan dos niveles:
-    medido, sin salientes la perdida de conectividad es exactamente cero. Y esa
-    densidad esta calibrada, no elegida: al doble de salientes una de cada tres
-    semillas pierde 17 puntos de conectividad, o sea un mundo partido en dos.
-    Antes de tocar `OUTCROP_THRESHOLD` o su escala, vuelve a medir con
+14. **La altura y los muros son dos mecanismos distintos.** Las **cordilleras**
+    amplifican el desnivel sobre el nivel del mar, y de ahi salen la altitud y
+    las laderas escalonadas; los **salientes** levantan +3 de golpe y de ahi
+    salen las mesetas. Medido, una cordillera tambien produce acantilados
+    naturales —la pendiente amplificada pasa de un nivel por casilla— y **le
+    salen gratis**: un acantilado a media ladera siempre se rodea porque la
+    escalera sigue al lado. Los salientes, en cambio, se pagan en conectividad, y
+    su densidad esta calibrada, no elegida. Antes de tocar `OUTCROP_THRESHOLD`,
+    `RIDGE_GAIN` o sus escalas, vuelve a medir con
     `npx vite-node tools/analyze-world.ts` y mira la **linea base solo-agua**: el
     mundo plano tampoco es del todo conexo, y comparar contra el 100 % hace pasar
-    por sano un relieve que no lo es.
+    por sano un relieve que no lo es. El presupuesto acordado es un punto.
 15. **La rampa es propiedad del tile bajo, no de la arista.** Es lo que hace
     continuo el campo de alturas: con la rampa en la arista habria un escalon
     vertical justo en el limite entre las dos casillas, que es lo que un talud no
@@ -82,12 +85,32 @@ Esto es el resumen operativo.
     especial. Las caras se calculan con las alturas de los **dos extremos** de
     cada borde: comparando niveles enteros, el costado de un talud se quedaria
     sin su cuna y se veria el fondo por el agujero.
-16. **Las caras van en la capa ordenada por profundidad, las cimas en la textura
-    del chunk.** Es la regla 7 aplicada al relieve: una pared tiene altura y
-    horneada en el suelo se dibujaria por debajo del arbol que tiene detras. Las
-    cimas se quedan horneadas porque tapan mucho menos, y a cambio el terreno
-    sigue costando un sprite por chunk. El `terrainLayer` si pasa a ordenarse por
-    profundidad de chunk: una cima levantada invade el rombo del chunk vecino.
+16. **Todo el mundo va en UN solo orden, por antidiagonales.** Suelo, paredes,
+    arboles y personaje comparten capa y se ordenan por `wx + wy`. Tener el suelo
+    horneado por un lado y las paredes en la capa de objetos por otro fue un
+    fallo de verdad, y de los caros: la capa de caras estaba entera por encima,
+    asi que una pared se pintaba sobre cualquier suelo, lo tuviera delante o
+    detras. **No lo vio ningun test ni la prueba de humo; lo vio el autor
+    jugando.** Por eso el orden vive ahora en `client/terrain-draw.ts`, que es
+    puro, y `tests/terrain-draw.test.ts` afirma la regla: si dos piezas se
+    solapan en pantalla, la de mayor profundidad se dibuja despues.
+
+    No se ordenan miles de sprites por frame: los tiles de una misma
+    antidiagonal **no se solapan nunca entre si**, asi que cada una es un
+    contenedor y solo se ordena la lista de contenedores. Si tocas eso, el test
+    «dentro de una antidiagonal nada se pisa» es el que defiende la suposicion.
+
+17. **El recorte de pantalla es por bloques de 8x8, no por chunk.** Con montanas
+    de cuarenta niveles un chunk ocupa mas que la pantalla, asi que darlo por
+    visible entero significa dibujar diez mil piezas para ver mil quinientas.
+    Medido: 10.236 contra 3.026.
+
+18. **Al personaje lo tapa el terreno, y por eso lleva silueta.** Atenuar el
+    suelo como se atenua un arbol NO vale: por detras de un arbol se ve el suelo,
+    pero por detras del suelo no hay nada y se abre un agujero al vacio. Se
+    probo. La silueta se decide mirando si algo cubre el **pecho o la cabeza**,
+    no la caja entera: la casilla de justo delante siempre roza los pies, y
+    comparando cajas la silueta salia siempre y dejaba de significar nada.
 
 ## Regla de trabajo con el autor
 
@@ -204,15 +227,26 @@ panel era el que mataba.
 
 ## El relieve
 
-El mundo tiene altura desde `packages/sim/src/relief.ts`: ocho niveles, escalon
-de 0.06 de elevacion, y `groundHeightAt` devuelve la altura real de un punto con
-decimales. **Por ahora el relieve solo se ve**: la colision no ha cambiado y el
-jugador camina por donde caminaba. La gravedad, el salto y las paredes que
-estorban son la fase siguiente, ya disenada con el autor.
+El mundo tiene altura desde `packages/sim/src/relief.ts`: hasta 41 niveles,
+escalon de 0.06 de elevacion, y `groundHeightAt` devuelve la altura real de un
+punto con decimales. **Por ahora el relieve solo se ve**: la colision no ha
+cambiado y el jugador camina por donde caminaba. La gravedad, el salto y las
+paredes que estorban son la fase siguiente, ya disenada con el autor.
 
-Tres numeros son suyos y no se tocan sin preguntarle: el escalon (0.06), los 8
-px por nivel y el 15 % de fronteras que son rampa. El umbral de salientes, en
-cambio, es una calibracion: se elige midiendo (regla 14).
+Un nivel mide **16 px**, que es `TILE_W / 2`: en una isometrica 2:1 esa es la
+arista vertical de un cubo. Estuvo en 8 y el autor lo noto a la primera —los
+bloques se veian como baldosas—, asi que no es una eleccion estetica.
+
+Las cordilleras amplifican el desnivel **anclando en el nivel del mar**: bajo el
+agua `reliefAt` es identica a `elevationAt`, y por eso meter montanas no obligo a
+recalibrar la costa, que son los tres umbrales mas delicados que hay. Los de
+altitud si se recalibraron, pero **sumando** reglas a las viejas en vez de
+sustituirlas, para no mover el mundo llano ni un tile.
+
+Numeros del autor, que no se tocan sin preguntarle: el escalon (0.06), los 16 px
+por nivel, el 15 % de fronteras que son rampa y el tope de 40 niveles. El umbral
+de salientes y la ganancia de cordillera, en cambio, son calibraciones: se eligen
+midiendo (regla 14).
 
 Lo que la fase siguiente traera, para no disenarlo dos veces: el salto es una
 parabola simetrica cuyo apice cae **a una casilla exacta** y cuyo alcance son dos

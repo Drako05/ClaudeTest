@@ -26,8 +26,15 @@ export const SEA_LEVEL = 0.42;
 /** Cuanta elevacion vale un nivel. */
 export const LEVEL_STEP = 0.06;
 
-/** Nivel mas alto posible. Ocho alturas contando el cero. */
-export const MAX_LEVEL = 7;
+/**
+ * Nivel mas alto posible.
+ *
+ * Cuarenta y uno contando el cero. Es numero del autor: queria montanas que
+ * haya que rodear o escalar en serio, y con cubos de 16 px eso son 640 px de
+ * cima, casi una pantalla entera. Fuera de las cordilleras el mundo sigue sin
+ * pasar de seis o siete, que es lo que daba el campo de elevacion a secas.
+ */
+export const MAX_LEVEL = 40;
 
 /** Nivel que se le asigna al agua. Uno solo: el fondo no se pisa. */
 export const WATER_LEVEL = -1;
@@ -44,11 +51,14 @@ export const RAMP_SHARE = 0.15;
 /**
  * Cuanto levanta un saliente.
  *
- * De aqui salen las paredes de dos bloques: un campo de ruido suave nunca da un
- * salto de dos niveles entre tiles vecinos, asi que sin salientes todas las
- * paredes del mundo serian de uno y se subirian todas de un salto.
+ * De aqui salen las paredes altas: el campo de elevacion es tan suave que sin
+ * salientes casi todas las paredes del mundo serian de un bloque y se subirian
+ * todas de un salto. Una cordillera tampoco las fabrica —amplifica la pendiente,
+ * pero partiendo de 0.03 niveles por casilla haria falta un factor de sesenta
+ * para llegar al escalon de dos—, asi que altura y muros son dos mecanismos
+ * distintos y hacen falta los dos.
  */
-export const OUTCROP_RISE = 2;
+export const OUTCROP_RISE = 3;
 
 /** Direcciones ortogonales, en el orden en que se busca por donde sube un talud. */
 export const RAMP_DIRS: ReadonlyArray<{ readonly x: number; readonly y: number }> = [

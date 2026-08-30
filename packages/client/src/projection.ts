@@ -18,10 +18,13 @@ export const TILE_H = 16;
  * Pixeles que sube un nivel de altura.
  *
  * Es una constante de la VISTA, no de la simulacion: el nucleo cuenta niveles
- * enteros y no sabe cuanto miden en pantalla. Media altura de tile, que es lo
- * que hace que un bloque se lea como un bloque y no como un escalon perdido.
+ * enteros y no sabe cuanto miden en pantalla.
+ *
+ * Es `TILE_W / 2`, y no es una eleccion estetica: en una isometrica 2:1 esa es
+ * exactamente la arista vertical de un **cubo**. Con la mitad —que es lo que
+ * habia— un bloque se ve como una baldosa, que fue lo primero que noto el autor.
  */
-export const LEVEL_PX = 8;
+export const LEVEL_PX = 16;
 
 /** Desplazamiento vertical en pantalla de una altura dada. */
 export function heightOffset(height: number): number {

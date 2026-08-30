@@ -9,7 +9,7 @@
  *   npx vite-node tools/analyze-world.ts
  */
 
-import { createGame, World, WorldGen } from '@verdant/sim';
+import { createGame, MAX_LEVEL, World, WorldGen } from '@verdant/sim';
 import { Terrain } from '@verdant/shared';
 
 const SEEDS = [12345, 7, 999];
@@ -33,15 +33,26 @@ function reportFields(seed: number): void {
       moist.push(gen.moistureAt(x, y));
     }
   }
+  // El relieve, SOLO sobre tierra: es el campo contra el que hay que calibrar
+  // los umbrales de altitud, y mezclarle el mar hundiria los percentiles.
+  const relief: number[] = [];
+  for (let y = -R; y < R; y += 3) {
+    for (let x = -R; x < R; x += 3) {
+      const r = gen.reliefAt(x, y);
+      if (r >= 0.42) relief.push(r);
+    }
+  }
   for (const [name, arr] of [
     ['elevacion', elev],
+    ['relieve/tierra', relief],
     ['temperatura', temp],
     ['humedad', moist],
   ] as const) {
     const s = [...arr].sort((a, b) => a - b);
     console.log(
-      `  ${name.padEnd(12)} min=${percentile(s, 0).toFixed(3)} p05=${percentile(s, 0.05).toFixed(3)} ` +
-        `p50=${percentile(s, 0.5).toFixed(3)} p95=${percentile(s, 0.95).toFixed(3)} max=${percentile(s, 1).toFixed(3)}`,
+      `  ${name.padEnd(15)} min=${percentile(s, 0).toFixed(3)} p50=${percentile(s, 0.5).toFixed(3)} ` +
+        `p80=${percentile(s, 0.8).toFixed(3)} p90=${percentile(s, 0.9).toFixed(3)} ` +
+        `p95=${percentile(s, 0.95).toFixed(3)} p99=${percentile(s, 0.99).toFixed(3)} max=${percentile(s, 1).toFixed(3)}`,
     );
   }
 }
@@ -120,7 +131,7 @@ function reportRelief(seed: number): void {
 
   let land = 0;
   let raised = 0;
-  const histogram = new Array(9).fill(0);
+  const histogram = new Array(MAX_LEVEL + 1).fill(0);
   for (let y = -R; y < R; y++) {
     for (let x = -R; x < R; x++) {
       const lvl = gen.levelAt(x, y);
@@ -189,12 +200,17 @@ function reportRelief(seed: number): void {
 
   const base = largestComponent(99); // solo el agua separa
   const real = largestComponent(1); // se sube un bloque de un salto
-  console.log(
-    `  alturas: ${histogram
-      .map((c, i) => (c ? `n${i} ${((100 * c) / land).toFixed(1)}%` : ''))
-      .filter(Boolean)
-      .join('  ')}`,
-  );
+  let peak = 0;
+  for (let i = 0; i < histogram.length; i++) if (histogram[i]) peak = i;
+  // Reparto por franjas: el detalle nivel a nivel deja de caber con 40 alturas.
+  const bands = [0, 1, 3, 6, 10, 16, 24, MAX_LEVEL + 1];
+  const spread: string[] = [];
+  for (let b = 0; b + 1 < bands.length; b++) {
+    let sum = 0;
+    for (let i = bands[b]; i < bands[b + 1]; i++) sum += histogram[i];
+    if (sum) spread.push(`n${bands[b]}-${bands[b + 1] - 1} ${((100 * sum) / land).toFixed(1)}%`);
+  }
+  console.log(`  alturas: pico n${peak} | ${spread.join('  ')}`);
   console.log(
     `  salientes: ${((100 * raised) / land).toFixed(1)}% de la tierra | ` +
       `conexo base ${((100 * base) / land).toFixed(1)}% -> con relieve ${((100 * real) / land).toFixed(1)}% ` +
