@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { World } from '@verdant/sim';
+import { groundHeight, World } from '@verdant/sim';
 import { biomeOfTerrain, CHUNK_SIZE, type Terrain } from '@verdant/shared';
 import { collectBiomeEdges } from '../packages/client/src/biome-edges.js';
-import { TILE_DIAMOND, worldToScreen } from '../packages/client/src/projection.js';
+import { heightOffset, TILE_DIAMOND, worldToScreen } from '../packages/client/src/projection.js';
 
 /**
  * El contorno de biomas de las herramientas de desarrollo.
@@ -22,6 +22,17 @@ function quads(segments: number[]): string[] {
     out.push(segments.slice(i, i + 4).join(','));
   }
   return out;
+}
+
+/**
+ * Cuanto sube en pantalla una esquina de un tile por su relieve.
+ *
+ * El contorno se pega a la cima, asi que las coordenadas esperadas tienen que
+ * llevar la altura: con el mundo plano esto valia siempre cero y por eso no
+ * hacia falta.
+ */
+function lift(world: World, wx: number, wy: number, fx: number, fy: number): number {
+  return heightOffset(groundHeight(world.levelAt(wx, wy), world.rampDirAt(wx, wy), fx, fy));
 }
 
 /** Bioma de un tile del mundo, sin pasar por los chunks registrados. */
@@ -61,7 +72,12 @@ describe('Contorno de biomas', () => {
         const wy = cy * CHUNK_SIZE + ly;
         if (biomeOf(world, wx + 1, wy) === biomeOf(world, wx, wy)) continue;
         const p = worldToScreen(wx, wy);
-        const quad = [p.x + EAST.x, p.y + EAST.y, p.x + SOUTH.x, p.y + SOUTH.y].join(',');
+        const quad = [
+          p.x + EAST.x,
+          p.y + EAST.y + lift(world, wx, wy, 1, 0),
+          p.x + SOUTH.x,
+          p.y + SOUTH.y + lift(world, wx, wy, 1, 1),
+        ].join(',');
         expect(found, `falta la arista este de (${wx}, ${wy})`).toContain(quad);
         checked++;
       }
@@ -109,7 +125,12 @@ describe('Contorno de biomas', () => {
           const wy = cy * CHUNK_SIZE + ly;
           if (biomeOf(world, wx + 1, wy) === biomeOf(world, wx, wy)) continue;
           const p = worldToScreen(wx, wy);
-          const quad = [p.x + EAST.x, p.y + EAST.y, p.x + SOUTH.x, p.y + SOUTH.y].join(',');
+          const quad = [
+            p.x + EAST.x,
+            p.y + EAST.y + lift(world, wx, wy, 1, 0),
+            p.x + SOUTH.x,
+            p.y + SOUTH.y + lift(world, wx, wy, 1, 1),
+          ].join(',');
           expect(found, `costura sin dibujar en (${wx}, ${wy})`).toContain(quad);
           seams++;
         }
@@ -131,7 +152,12 @@ describe('Contorno de biomas', () => {
         const wy = cy * CHUNK_SIZE + ly;
         if (biomeOf(world, wx, wy + 1) === biomeOf(world, wx, wy)) continue;
         const p = worldToScreen(wx, wy);
-        const quad = [p.x + SOUTH.x, p.y + SOUTH.y, p.x + WEST.x, p.y + WEST.y].join(',');
+        const quad = [
+          p.x + SOUTH.x,
+          p.y + SOUTH.y + lift(world, wx, wy, 1, 1),
+          p.x + WEST.x,
+          p.y + WEST.y + lift(world, wx, wy, 0, 1),
+        ].join(',');
         expect(found, `falta la arista sur de (${wx}, ${wy})`).toContain(quad);
         checked++;
       }

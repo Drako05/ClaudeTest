@@ -27,10 +27,16 @@ export const DEBRIS_PER_BURST = 10;
  */
 export const MAX_PARTICLES = 240;
 
-/** Gravedad en casillas por segundo al cuadrado. */
-const GRAVITY = 9;
-/** Altura de salida, en casillas. */
-const RISE = 0.75;
+/**
+ * Gravedad en NIVELES por segundo al cuadrado.
+ *
+ * La altura de un escombro se mide con la misma vara que el relieve del mundo,
+ * porque comparten eje: si se midiera en casillas, los escombros de una meseta
+ * caerian por debajo de ella hasta el nivel del mar.
+ */
+const GRAVITY = 36;
+/** Impulso vertical de salida, en niveles por segundo. */
+const RISE = 3;
 /** Dispersion horizontal, en casillas por segundo. */
 const SPREAD = 1.9;
 
@@ -38,8 +44,10 @@ export interface Particle {
   /** Posicion en el mundo, en casillas. */
   x: number;
   y: number;
-  /** Altura sobre el suelo, en casillas. Cero es posado. */
+  /** Altura en el mundo, en niveles. */
   z: number;
+  /** Altura del suelo bajo el escombro: donde se posa y se queda. */
+  floor: number;
   vx: number;
   vy: number;
   vz: number;
@@ -97,7 +105,12 @@ export class Effects {
    * Sin colores no hay estallido: mejor no dibujar nada que inventarse una
    * paleta que no es la del objeto.
    */
-  spawnDebris(tileX: number, tileY: number, colors: readonly number[]): void {
+  spawnDebris(
+    tileX: number,
+    tileY: number,
+    colors: readonly number[],
+    floor = 0,
+  ): void {
     if (colors.length === 0) return;
 
     const random = mulberry32(this.seed);
@@ -114,7 +127,8 @@ export class Effects {
         // Reparto dentro de la casilla, no todos desde el centro exacto.
         x: tileX + 0.25 + random() * 0.5,
         y: tileY + 0.25 + random() * 0.5,
-        z: 0.12 + random() * 0.3,
+        z: floor + 0.5 + random() * 1.2,
+        floor,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         vz: RISE * (0.6 + random() * 0.8),
@@ -146,14 +160,14 @@ export class Effects {
         continue;
       }
 
-      if (p.z > 0) {
+      if (p.z > p.floor) {
         p.vz -= GRAVITY * dt;
         p.z += p.vz * dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
-        if (p.z <= 0) {
+        if (p.z <= p.floor) {
           // Posado: ni atraviesa el suelo ni rebota.
-          p.z = 0;
+          p.z = p.floor;
           p.vx = 0;
           p.vy = 0;
           p.vz = 0;

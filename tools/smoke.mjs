@@ -163,6 +163,20 @@ async function desktopPass(browser, baseUrl) {
   check(spawn.chunks > 0, 'no se cargo ningun chunk');
   check(spawn.health === 100, `salud inicial inesperada: ${spawn.health}`);
 
+  // El relieve tiene que estar ahi desde el primer frame: varias alturas
+  // alrededor y sus caras dibujadas. Cero caras con varias alturas significaria
+  // un mundo escalonado que se ve plano.
+  check(spawn.relief.levels > 1, `el terreno sale a una sola altura: ${spawn.relief.levels}`);
+  check(spawn.faces.drawn > 0, 'no se dibujo ni una cara de relieve');
+  check(
+    spawn.faces.shapes < spawn.faces.drawn,
+    `el cache de caras no agrupa nada: ${spawn.faces.shapes} formas para ${spawn.faces.drawn} caras`,
+  );
+  console.log(
+    `  relieve: ${spawn.relief.levels} alturas, ${spawn.relief.ramps} taludes, ` +
+      `${spawn.faces.drawn} caras de ${spawn.faces.shapes} formas`,
+  );
+
   await page.screenshot({ path: join(SHOTS, '01-spawn.png') });
 
   await page.keyboard.down('KeyD');
@@ -268,18 +282,37 @@ async function desktopPass(browser, baseUrl) {
 
   await page.screenshot({ path: join(SHOTS, '12-area-apuntada.png') });
 
+  // Andar mientras se golpea, y comprobar que se anda de verdad. El pulso de
+  // tecla dura lo suficiente para cubrir un frame: en headless un frame puede
+  // pasar de 200 ms, y con pulsos mas cortos el jugador no se movia ni una
+  // casilla, con lo que se golpeaba doce veces la misma zona ya talada y la
+  // prueba fallaba por azar en vez de por un fallo.
+  //
+  // La tecla se suelta y se vuelve a pulsar en cada vuelta a proposito: el clic
+  // llega a robar el foco de la ventana, y el manejador de `blur` —que existe
+  // para no dejar al personaje andando solo al cambiar de pestana— vacia las
+  // teclas pulsadas. Mantenerla pulsada toda la tanda deja al jugador clavado.
   const beforeClick = await waitForLoop(page);
   for (let i = 0; i < 12; i++) {
     await page.mouse.click(centre.x + 120, centre.y + 60);
-    await page.waitForTimeout(90);
     await page.keyboard.down('KeyW');
-    await page.waitForTimeout(110);
+    await page.waitForTimeout(260);
     await page.keyboard.up('KeyW');
   }
   const afterClick = await waitForLoop(page);
+  const walkedWhileClicking = Math.hypot(
+    afterClick.x - beforeClick.x,
+    afterClick.y - beforeClick.y,
+  );
+  check(
+    walkedWhileClicking > 1,
+    `el personaje no llego a moverse mientras golpeaba: ${walkedWhileClicking.toFixed(2)} casillas`,
+  );
   const clicked = afterClick.inventory.reduce((a, b) => a + b, 0)
     - beforeClick.inventory.reduce((a, b) => a + b, 0);
-  console.log(`  clic izquierdo: +${clicked} recursos`);
+  console.log(
+    `  clic izquierdo: +${clicked} recursos tras andar ${walkedWhileClicking.toFixed(1)} casillas`,
+  );
   check(clicked > 0, 'el clic izquierdo no recolecto nada');
 
   // Los efectos. El bloque anterior dejo la zona talada, asi que se golpea
@@ -685,6 +718,57 @@ async function devToolsPass(browser, baseUrl) {
  * Aqui NO se toca el raton a proposito: sin puntero la mirada sigue al
  * movimiento, asi que andar hacia el mineral es lo que lo deja apuntado.
  */
+/**
+ * El relieve visto de cerca.
+ *
+ * Se va a una pared de dos bloques, que es la que el autor pidio expresamente y
+ * la que la calibracion de salientes hace escasa. Sin ir a buscarla, la prueba
+ * dependeria de que el spawn cayera al lado de una.
+ */
+async function reliefPass(browser, baseUrl) {
+  console.log('\n== relieve (paredes y taludes) ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'relieve');
+
+  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
+  const spawn = await waitForLoop(page);
+  const spot = spawn.cliffSpot;
+  check(spot !== null, 'no se encontro ninguna pared de dos bloques en el mundo de prueba');
+  if (!spot) {
+    await page.close();
+    return;
+  }
+  console.log(`  pared de ${spot.drop} bloques en ${spot.stand.x},${spot.stand.y}`);
+  check(spot.drop >= 2, `la pared mas alta es de ${spot.drop} bloque(s)`);
+
+  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
+    waitUntil: 'load',
+  });
+  await page.evaluate(() => delete window.__smokeBaseTick);
+  const arrived = await waitForLoop(page);
+  console.log(
+    `  al pie: nivel ${arrived.level}, ${arrived.relief.levels} alturas, ` +
+      `${arrived.relief.tallWalls} tiles al pie de un muro, ${arrived.faces.drawn} caras`,
+  );
+  check(arrived.relief.tallWalls > 0, 'no hay paredes de dos bloques donde deberia haberlas');
+  check(arrived.relief.ramps > 0, 'no hay ni un talud por el que subir en toda la zona');
+  check(arrived.faces.drawn > 0, 'la pared no dibujo ninguna cara');
+
+  await page.screenshot({ path: join(SHOTS, '15-relieve.png') });
+
+  // Caminar por el relieve no puede atascar: en esta fase la altura solo se ve,
+  // asi que el personaje sigue moviendose como en llano.
+  await page.keyboard.down('KeyD');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('KeyD');
+  const walked = await waitForLoop(page);
+  const moved = Math.hypot(walked.x - arrived.x, walked.y - arrived.y);
+  console.log(`  camino ${moved.toFixed(2)} casillas junto a la pared`);
+  check(moved > 1, 'el jugador se quedo atascado junto a la pared');
+
+  await page.close();
+}
+
 async function mountainPass(browser, baseUrl) {
   console.log('\n== montana (roca y minerales) ==');
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -758,6 +842,7 @@ try {
   await desktopPass(browser, baseUrl);
   await mobilePass(browser, baseUrl);
   await devToolsPass(browser, baseUrl);
+  await reliefPass(browser, baseUrl);
   await mountainPass(browser, baseUrl);
 } finally {
   await browser.close();

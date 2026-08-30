@@ -15,14 +15,26 @@
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { CHUNK_SIZE, Feature } from '@verdant/shared';
 import type { Chunk, GameState, World } from '@verdant/sim';
-import { actionArea, daylight } from '@verdant/sim';
+import { actionArea, daylight, groundHeight } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
 import { progressOf, type Effects } from './effects.js';
-import { depthOf, screenToWorld, TILE_DIAMOND, TILE_H, TILE_W, worldToScreen } from './projection.js';
+import { collectFaces } from './relief-faces.js';
+import {
+  depthOf,
+  heightOffset,
+  LEVEL_PX,
+  screenToWorld,
+  TILE_DIAMOND,
+  TILE_H,
+  TILE_W,
+  worldToScreen,
+} from './projection.js';
 import {
   CHUNK_TEX_H,
   CHUNK_TEX_OFFSET_X,
+  CHUNK_TEX_TOP,
   CHUNK_TEX_W,
+  makeFaceArt,
   makeFeatureArt,
   makePlayerArt,
   paintChunkTerrain,
@@ -33,6 +45,8 @@ interface ChunkView {
   texture: Texture;
   /** Sprites de las features de este chunk, para poder retirarlos en bloque. */
   features: Sprite[];
+  /** Paredes y costados de talud. Se calculan una vez: el relieve no cambia. */
+  faces: Sprite[];
   /** Contorno de los biomas del chunk. Solo existe con la vista activada. */
   biomeBorders: Graphics | null;
   /** Segmentos de ese contorno. Solo para verificacion. */
@@ -80,6 +94,18 @@ export class Renderer {
     Feature,
     { texture: Texture; ax: number; ay: number; rise: number; halfWidth: number }
   >();
+  /**
+   * Texturas de cara, por forma.
+   *
+   * Una cara queda definida por su terreno, su lado y las cuatro alturas de sus
+   * bordes, y esas combinaciones se repiten muchisimo: un acantilado largo son
+   * decenas de caras identicas. Cachearlas deja el coste en unas pocas docenas
+   * de lienzos para todo el mundo.
+   */
+  private readonly faceTextures = new Map<
+    string,
+    { texture: Texture; ax: number; ay: number } | null
+  >();
   /** Indice de features por tile, para resolver oclusion sin recorrerlas todas. */
   private readonly featureByTile = new Map<string, Sprite>();
   /** Camino inverso del indice, para poder limpiarlo al destruir un chunk. */
@@ -97,6 +123,14 @@ export class Renderer {
   private debugBiomes = false;
   /** Vela de color sobre toda la escena: es el ciclo dia/noche. */
   private readonly skyTint = new Graphics();
+  /**
+   * Cuanto sube en pantalla el plano en el que esta el jugador.
+   *
+   * Lo usan la camara y el apuntado, y tienen que usar el MISMO: si el cursor se
+   * tradujera al plano cero mientras la camara mira al plano del jugador, sobre
+   * una meseta la mirada apuntaria a un sitio distinto del que senala el raton.
+   */
+  private aimLift = 0;
 
   /**
    * Filas de tiles visibles a lo largo del eje menor de la pantalla.
@@ -108,6 +142,10 @@ export class Renderer {
   private constructor(app: Application) {
     this.app = app;
     this.objectLayer.sortableChildren = true;
+    // Con relieve el suelo tambien se solapa: una cima levantada invade el rombo
+    // del chunk de al lado, y sin ordenar se pintaria por debajo de el. El
+    // terreno no cambia nunca, asi que esta profundidad se asigna una sola vez.
+    this.terrainLayer.sortableChildren = true;
     this.camera.addChild(this.terrainLayer, this.markerLayer, this.objectLayer);
     this.app.stage.addChild(this.camera);
     this.markerLayer.addChild(this.reticle);
@@ -202,11 +240,13 @@ export class Renderer {
       const x1 = view.biomeBorders.position.x + b.maxX;
       const y0 = view.biomeBorders.position.y + b.minY;
       const y1 = view.biomeBorders.position.y + b.maxY;
+      // El margen vertical es el del relieve: el contorno se pega a la cima de
+      // cada tile, asi que sobre una meseta sube por encima del rombo plano.
       const inside =
         x0 >= origin.x - CHUNK_TEX_OFFSET_X - 1 &&
         x1 <= origin.x + CHUNK_TEX_OFFSET_X + 1 &&
-        y0 >= origin.y - 1 &&
-        y1 <= origin.y + CHUNK_TEX_H + 1;
+        y0 >= origin.y - CHUNK_TEX_TOP - 1 &&
+        y1 <= origin.y + CHUNK_TEX_H - CHUNK_TEX_TOP + 1;
       if (!inside) bad++;
     }
     return bad;
@@ -248,21 +288,29 @@ export class Renderer {
     const scale = minAxis / (this.tilesOnScreen * TILE_H);
     this.camera.scale.set(scale);
 
+    // El personaje se apoya en la altura REAL del suelo bajo sus pies, con
+    // decimales: sobre un talud sube poco a poco en vez de dar un tiron al
+    // cambiar de casilla. Y la camara le sigue tambien en altura: sin esto,
+    // subir a una meseta le empujaria hacia el borde de arriba de la pantalla.
+    const playerHeight = state.world.groundHeightAt(wx, wy);
+    this.aimLift = heightOffset(playerHeight);
+
     const focus = worldToScreen(wx, wy);
     this.camera.position.set(
       view.width / 2 - focus.x * scale,
-      view.height / 2 - focus.y * scale,
+      view.height / 2 - (focus.y + this.aimLift) * scale,
     );
 
     this.syncChunks(state, view.width, view.height, scale);
 
     const playerScreen = worldToScreen(wx, wy);
+    playerScreen.y += this.aimLift;
     this.player.position.set(playerScreen.x, playerScreen.y);
     this.player.zIndex = depthOf(wx, wy);
 
-    this.fadeOccluders(wx, wy, playerScreen);
-    this.drawReticle(entities, playerId);
-    this.drawEffects(effects);
+    this.fadeOccluders(state.world, wx, wy, playerScreen);
+    this.drawReticle(state.world, entities, playerId);
+    this.drawEffects(state.world, effects);
     this.drawChunkGrid(state);
     this.drawSky(state.tick, view.width, view.height);
   }
@@ -278,7 +326,12 @@ export class Renderer {
    * Solo se examinan las pocas casillas que geometricamente PUEDEN tapar: las
    * que estan por delante en profundidad y a un par de filas de distancia.
    */
-  private fadeOccluders(wx: number, wy: number, playerScreen: { x: number; y: number }): void {
+  private fadeOccluders(
+    world: World,
+    wx: number,
+    wy: number,
+    playerScreen: { x: number; y: number },
+  ): void {
     for (const sprite of this.faded) sprite.alpha = 1;
     this.faded.length = 0;
 
@@ -295,6 +348,7 @@ export class Renderer {
         if (!sprite || sprite.zIndex <= playerDepth) continue;
 
         const foot = worldToScreen(tx + 0.5, ty + 0.5);
+        foot.y += heightOffset(world.groundHeightAt(tx + 0.5, ty + 0.5));
         const rise = sprite.texture.height * sprite.anchor.y;
         const halfWidth = sprite.texture.width / 2;
 
@@ -379,15 +433,18 @@ export class Renderer {
    * Marca las tres casillas del area. La apuntada va mas marcada que las dos
    * flanqueantes: sigue siendo la que importa para sembrar.
    */
-  private drawReticle(entities: GameState['entities'], playerId: number): void {
+  private drawReticle(world: World, entities: GameState['entities'], playerId: number): void {
     this.reticle.clear();
     const area = actionArea(entities, playerId);
     for (let i = 0; i < area.length; i++) {
       const p = worldToScreen(area[i].x, area[i].y);
+      // Cada casilla se marca a SU altura, que es lo que hace ver de un vistazo
+      // que la de arriba de una pared no esta al alcance.
+      const lift = heightOffset(world.levelAt(area[i].x, area[i].y));
       for (let c = 0; c < TILE_DIAMOND.length; c++) {
         const corner = TILE_DIAMOND[c];
-        if (c === 0) this.reticle.moveTo(p.x + corner.x, p.y + corner.y);
-        else this.reticle.lineTo(p.x + corner.x, p.y + corner.y);
+        if (c === 0) this.reticle.moveTo(p.x + corner.x, p.y + corner.y + lift);
+        else this.reticle.lineTo(p.x + corner.x, p.y + corner.y + lift);
       }
       this.reticle
         .closePath()
@@ -407,7 +464,7 @@ export class Renderer {
     const scale = this.camera.scale.x;
     return screenToWorld(
       (clientX - rect.left - this.camera.x) / scale,
-      (clientY - rect.top - this.camera.y) / scale,
+      (clientY - rect.top - this.camera.y) / scale - this.aimLift,
     );
   }
 
@@ -421,7 +478,7 @@ export class Renderer {
    * Los escombros son cuadraditos con la altura restada en Y, que es como se
    * dibuja en isometrica todo lo que se levanta del suelo.
    */
-  private drawEffects(effects: Effects | undefined): void {
+  private drawEffects(world: World, effects: Effects | undefined): void {
     this.effectLayer.clear();
     if (!effects) return;
 
@@ -437,7 +494,8 @@ export class Renderer {
       const path = [left, aimed, right].filter(Boolean);
       const points = path.map((tile) => {
         const p = worldToScreen(tile.x, tile.y);
-        return { x: p.x, y: p.y + TILE_H / 2 - TILE_H * 0.9 };
+        const lift = heightOffset(world.levelAt(tile.x, tile.y));
+        return { x: p.x, y: p.y + lift + TILE_H / 2 - TILE_H * 0.9 };
       });
       if (points.length < 2) continue;
 
@@ -454,7 +512,9 @@ export class Renderer {
       const screen = worldToScreen(p.x, p.y);
       const half = p.size / 2;
       const x = screen.x - half;
-      const y = screen.y + TILE_H / 2 - p.z * TILE_H * 2 - half;
+      // La altura del escombro es la del mundo, asi que se mide con la misma
+      // vara que el relieve: si no, los escombros de una meseta caerian al mar.
+      const y = screen.y + TILE_H / 2 - p.z * LEVEL_PX - half;
       // Se apaga al final, no de golpe.
       const alpha = Math.min(1, (1 - t) * 2.2);
 
@@ -472,7 +532,7 @@ export class Renderer {
   private chunkVisible(cx: number, cy: number, w: number, h: number, scale: number): boolean {
     const origin = worldToScreen(cx * CHUNK_SIZE, cy * CHUNK_SIZE);
     const left = this.camera.x + (origin.x - CHUNK_TEX_OFFSET_X) * scale;
-    const top = this.camera.y + origin.y * scale;
+    const top = this.camera.y + (origin.y - CHUNK_TEX_TOP) * scale;
     const margin = TILE_W * scale; // holgura para objetos altos que sobresalen
     return (
       left + CHUNK_TEX_W * scale > -margin &&
@@ -519,6 +579,7 @@ export class Renderer {
     for (const [key, view] of this.views) {
       if (seen.has(key)) continue;
       this.clearFeatures(view);
+      this.clearFaces(view);
       view.biomeBorders?.destroy();
       view.terrain.destroy();
       view.texture.destroy(true);
@@ -538,13 +599,15 @@ export class Renderer {
     texture.source.scaleMode = 'nearest';
     const terrain = new Sprite(texture);
     const origin = worldToScreen(chunk.cx * CHUNK_SIZE, chunk.cy * CHUNK_SIZE);
-    terrain.position.set(origin.x - CHUNK_TEX_OFFSET_X, origin.y);
+    terrain.position.set(origin.x - CHUNK_TEX_OFFSET_X, origin.y - CHUNK_TEX_TOP);
+    terrain.zIndex = depthOf(chunk.cx, chunk.cy);
     this.terrainLayer.addChild(terrain);
 
     const view: ChunkView = {
       terrain,
       texture,
       features: this.buildFeatures(world, chunk),
+      faces: this.buildFaces(world, chunk),
       biomeBorders: null,
       borderSegments: 0,
       revision: chunk.revision,
@@ -585,11 +648,14 @@ export class Renderer {
 
         const wx = baseX + lx;
         const wy = baseY + ly;
-        // El objeto se apoya en el CENTRO del tile, no en su esquina norte.
+        // El objeto se apoya en el CENTRO del tile, no en su esquina norte, y a
+        // la altura que tenga ese centro: un arbol sobre una meseta va arriba.
         const p = worldToScreen(wx + 0.5, wy + 0.5);
+        const idx = ly * CHUNK_SIZE + lx;
+        const height = groundHeight(chunk.level[idx], chunk.rampDir[idx], 0.5, 0.5);
         const sprite = new Sprite(art.texture);
         sprite.anchor.set(art.ax, art.ay);
-        sprite.position.set(p.x, p.y);
+        sprite.position.set(p.x, p.y + heightOffset(height));
         sprite.zIndex = depthOf(wx + 0.5, wy + 0.5);
         this.objectLayer.addChild(sprite);
         const tileKey = `${wx},${wy}`;
@@ -599,6 +665,81 @@ export class Renderer {
       }
     }
     return sprites;
+  }
+
+  /**
+   * Las paredes y los costados de talud de un chunk.
+   *
+   * Van en la capa ordenada por profundidad, no horneados en el suelo, porque
+   * tienen altura (regla 7 de CLAUDE.md). Su profundidad es la del BORDE del que
+   * cuelgan, media casilla por delante del centro del tile: asi una pared tapa lo
+   * que hay detras de ella y queda tapada por lo que se apoya en el tile de
+   * abajo, que es justo lo que se ve en la realidad.
+   */
+  private buildFaces(world: World, chunk: Chunk): Sprite[] {
+    const sprites: Sprite[] = [];
+    for (const face of collectFaces(world, chunk)) {
+      const art = this.faceTexture(face);
+      if (!art) continue;
+      const p = worldToScreen(face.wx, face.wy);
+      // Esquina cercana del borde: la E para la cara este, la O para la sur.
+      const corner =
+        face.side === 'east'
+          ? { x: p.x + TILE_W / 2, y: p.y + TILE_H / 2 }
+          : { x: p.x - TILE_W / 2, y: p.y + TILE_H / 2 };
+      const sprite = new Sprite(art.texture);
+      sprite.anchor.set(art.ax, art.ay);
+      sprite.position.set(corner.x, corner.y + heightOffset(face.top0));
+      sprite.zIndex = depthOf(face.wx, face.wy) + 1.5;
+      this.objectLayer.addChild(sprite);
+      sprites.push(sprite);
+    }
+    return sprites;
+  }
+
+  private faceTexture(face: {
+    terrain: number;
+    side: 'east' | 'south';
+    top0: number;
+    top1: number;
+    bottom0: number;
+    bottom1: number;
+  }): { texture: Texture; ax: number; ay: number } | null {
+    // Las alturas entran en la clave RELATIVAS a la cima cercana: dos paredes
+    // con la misma forma a distinta altitud comparten dibujo.
+    const key = [
+      face.terrain,
+      face.side,
+      0,
+      face.top1 - face.top0,
+      face.bottom0 - face.top0,
+      face.bottom1 - face.top0,
+    ].join('|');
+    const cached = this.faceTextures.get(key);
+    if (cached !== undefined) return cached;
+
+    const art = makeFaceArt(
+      face.terrain,
+      face.side,
+      0,
+      face.top1 - face.top0,
+      face.bottom0 - face.top0,
+      face.bottom1 - face.top0,
+    );
+    if (!art) {
+      this.faceTextures.set(key, null);
+      return null;
+    }
+    const texture = Texture.from(art.canvas);
+    texture.source.scaleMode = 'nearest';
+    const made = { texture, ax: art.anchorX, ay: art.anchorY };
+    this.faceTextures.set(key, made);
+    return made;
+  }
+
+  private clearFaces(view: ChunkView): void {
+    for (const sprite of view.faces) sprite.destroy();
+    view.faces.length = 0;
   }
 
   private clearFeatures(view: ChunkView): void {
@@ -619,6 +760,7 @@ export class Renderer {
   reset(): void {
     for (const view of this.views.values()) {
       this.clearFeatures(view);
+      this.clearFaces(view);
       view.biomeBorders?.destroy();
       view.terrain.destroy();
       view.texture.destroy(true);
@@ -632,6 +774,19 @@ export class Renderer {
   /** Numero de objetos dibujados. Util para vigilar el coste del ordenado. */
   get objectCount(): number {
     return this.objectLayer.children.length;
+  }
+
+  /**
+   * Caras de relieve dibujadas y formas distintas cacheadas.
+   *
+   * La primera dice que el relieve se esta viendo; la segunda vigila que el
+   * cache haga su trabajo: si creciera con cada chunk seria que la clave no
+   * agrupa nada y estariamos pagando un lienzo por pared.
+   */
+  get faceCount(): { drawn: number; shapes: number } {
+    let drawn = 0;
+    for (const view of this.views.values()) drawn += view.faces.length;
+    return { drawn, shapes: this.faceTextures.size };
   }
 }
 

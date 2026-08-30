@@ -79,6 +79,21 @@ describe('Escombros de lo recolectado', () => {
     }
   });
 
+  it('se posan en la cima del tile, no en el plano cero', () => {
+    // Con relieve, la altura de un escombro se mide con la misma vara que el
+    // terreno. Sin suelo propio, talar en una meseta tiraria la madera al mar.
+    const effects = new Effects(17);
+    effects.spawnDebris(0, 0, PALETTE, 3);
+    for (const p of effects.particles) {
+      expect(p.z, 'nace por debajo de la meseta').toBeGreaterThanOrEqual(3);
+    }
+    run(effects, 0.6);
+    for (const p of effects.particles) {
+      expect(p.z, 'se hundio por debajo de la meseta').toBe(3);
+    }
+    expect(effects.particles.length).toBeGreaterThan(0);
+  });
+
   it('los tamanos varian', () => {
     // Sin esto, un estallido de diez cuadrados identicos pasaria igual.
     const effects = new Effects(5);

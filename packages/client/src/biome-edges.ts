@@ -12,8 +12,8 @@
  */
 
 import { biomeOfTerrain, CHUNK_SIZE, type Terrain } from '@verdant/shared';
-import type { Chunk, World } from '@verdant/sim';
-import { TILE_DIAMOND, worldToScreen } from './projection.js';
+import { groundHeight, type Chunk, type World } from '@verdant/sim';
+import { heightOffset, TILE_DIAMOND, worldToScreen } from './projection.js';
 
 const [, EAST, SOUTH, WEST] = TILE_DIAMOND;
 
@@ -48,17 +48,25 @@ export function collectBiomeEdges(world: World, chunk: Chunk): number[] {
 
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+      const idx = ly * CHUNK_SIZE + lx;
       const mine = biomeAt(lx, ly);
       const p = worldToScreen(baseX + lx, baseY + ly);
+      // El contorno se pega a la cima del tile, no al plano cero: sobre relieve,
+      // trazarlo a ras de suelo lo dejaria flotando bajo los acantilados.
+      const level = chunk.level[idx];
+      const ramp = chunk.rampDir[idx];
+      const east = heightOffset(groundHeight(level, ramp, 1, 0));
+      const south = heightOffset(groundHeight(level, ramp, 1, 1));
+      const west = heightOffset(groundHeight(level, ramp, 0, 1));
 
       // Al este: la arista compartida va de la esquina este a la sur.
       if (biomeAt(lx + 1, ly) !== mine) {
-        segments.push(p.x + EAST.x, p.y + EAST.y, p.x + SOUTH.x, p.y + SOUTH.y);
+        segments.push(p.x + EAST.x, p.y + EAST.y + east, p.x + SOUTH.x, p.y + SOUTH.y + south);
       }
 
       // Al sur: de la esquina sur a la oeste.
       if (biomeAt(lx, ly + 1) !== mine) {
-        segments.push(p.x + SOUTH.x, p.y + SOUTH.y, p.x + WEST.x, p.y + WEST.y);
+        segments.push(p.x + SOUTH.x, p.y + SOUTH.y + south, p.x + WEST.x, p.y + WEST.y + west);
       }
     }
   }

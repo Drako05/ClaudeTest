@@ -140,6 +140,68 @@ function startPlaceFromLocation(): { x: number; y: number } | undefined {
  * loteria: la prueba fallaria por azar, no por un fallo. Es la misma clase de
  * ayuda que `tilesOnScreen` para el zoom.
  */
+/**
+ * Sitio desde el que se ve una pared de dos o mas bloques.
+ *
+ * Igual que `mineralSpot`, existe para que la prueba de humo no juegue a la
+ * loteria: el relieve alto es escaso a proposito —esa fue la calibracion— y
+ * esperar a tropezar con uno paseando fallaria por azar y no por un fallo.
+ */
+function cliffSpot(state: GameState): { stand: { x: number; y: number }; drop: number } | null {
+  const px = Math.floor(state.entities.x[state.playerId]);
+  const py = Math.floor(state.entities.y[state.playerId]);
+  const gen = state.world.gen;
+
+  let best: { stand: { x: number; y: number }; drop: number; d: number } | null = null;
+  for (let y = py - 220; y <= py + 220; y += 2) {
+    for (let x = px - 220; x <= px + 220; x += 2) {
+      const level = gen.levelAt(x, y);
+      if (level < 0) continue;
+      let drop = 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        drop = Math.max(drop, gen.levelAt(x + dx, y + dy) - level);
+      }
+      if (drop < 2) continue;
+      const d = Math.max(Math.abs(x - px), Math.abs(y - py));
+      if (!best || d < best.d) best = { stand: { x: x + 0.5, y: y + 0.5 }, drop, d };
+    }
+  }
+  return best ? { stand: best.stand, drop: best.drop } : null;
+}
+
+/**
+ * Resumen del relieve alrededor del jugador, para la prueba de humo.
+ *
+ * Los tres numeros que interesan: que haya varias alturas —si no, el relieve no
+ * se esta generando—, que haya taludes por los que subir y que existan paredes
+ * de dos o mas bloques, que es lo que el autor pidio expresamente. Se lee del
+ * GENERADOR y no del mundo, para no registrar chunks solo por mirar.
+ */
+function reliefAround(state: GameState): { levels: number; ramps: number; tallWalls: number } {
+  const px = Math.floor(state.entities.x[state.playerId]);
+  const py = Math.floor(state.entities.y[state.playerId]);
+  const gen = state.world.gen;
+  const seen = new Set<number>();
+  let ramps = 0;
+  let tallWalls = 0;
+
+  for (let y = py - 40; y <= py + 40; y++) {
+    for (let x = px - 40; x <= px + 40; x++) {
+      const level = gen.levelAt(x, y);
+      if (level < 0) continue;
+      seen.add(level);
+      if (gen.rampDirAt(x, y) >= 0) ramps++;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        if (gen.levelAt(x + dx, y + dy) - level >= 2) {
+          tallWalls++;
+          break;
+        }
+      }
+    }
+  }
+  return { levels: seen.size, ramps, tallWalls };
+}
+
 function mineralSpot(
   state: GameState,
 ): { stand: { x: number; y: number }; node: { x: number; y: number }; kind: string } | null {
@@ -301,7 +363,14 @@ async function main(): Promise<void> {
         effects.spawnSlash(actionArea(state.entities, state.playerId));
       }
       for (const hit of state.lastHarvest) {
-        effects.spawnDebris(hit.tileX, hit.tileY, debrisPalette(hit.feature));
+        // Los escombros se posan en la cima del tile del que salieron, no en el
+        // plano cero: talar en una meseta no puede tirar la madera al mar.
+        effects.spawnDebris(
+          hit.tileX,
+          hit.tileY,
+          debrisPalette(hit.feature),
+          state.world.levelAt(hit.tileX, hit.tileY),
+        );
       }
       accumulator -= TICK_DT;
     }
@@ -351,6 +420,14 @@ async function main(): Promise<void> {
           Math.floor(state.entities.y[state.playerId]),
         )
       ],
+      /** Altura del suelo bajo el jugador y del relieve que le rodea. */
+      level: state.world.levelAt(
+        Math.floor(state.entities.x[state.playerId]),
+        Math.floor(state.entities.y[state.playerId]),
+      ),
+      relief: reliefAround(state),
+      cliffSpot: cliffSpot(state),
+      faces: renderer.faceCount,
       /** Roca visible mas cercana. La usa la prueba de humo para ir a la montana. */
       mineralSpot: mineralSpot(state),
       effects: effects.tally,

@@ -62,6 +62,33 @@ Esto es el resumen operativo.
     `floor(pos + mirada * 1.1)`, que pegado al borde de la casilla podia saltar a
     dos de distancia, y con tres casillas eso deja de pasar inadvertido.
 
+13. **El relieve sale de la misma elevacion que el terreno.** `levelFrom` no es
+    mas que otra forma de leer el `e < 0.42` que ya separaba el agua, asi que
+    `terrainAt` no cambia y los umbrales de bioma siguen calibrados. Si mueves el
+    nivel del mar sin mover el umbral de agua, `tests/relief.test.ts` te avisa.
+14. **Las paredes de dos o mas bloques SOLO salen de los salientes.** El campo de
+    elevacion es tan suave que dos tiles vecinos nunca se llevan dos niveles:
+    medido, sin salientes la perdida de conectividad es exactamente cero. Y esa
+    densidad esta calibrada, no elegida: al doble de salientes una de cada tres
+    semillas pierde 17 puntos de conectividad, o sea un mundo partido en dos.
+    Antes de tocar `OUTCROP_THRESHOLD` o su escala, vuelve a medir con
+    `npx vite-node tools/analyze-world.ts` y mira la **linea base solo-agua**: el
+    mundo plano tampoco es del todo conexo, y comparar contra el 100 % hace pasar
+    por sano un relieve que no lo es.
+15. **La rampa es propiedad del tile bajo, no de la arista.** Es lo que hace
+    continuo el campo de alturas: con la rampa en la arista habria un escalon
+    vertical justo en el limite entre las dos casillas, que es lo que un talud no
+    tiene. Y por eso un talud se dibuja como un rombo torcido, sin forma
+    especial. Las caras se calculan con las alturas de los **dos extremos** de
+    cada borde: comparando niveles enteros, el costado de un talud se quedaria
+    sin su cuna y se veria el fondo por el agujero.
+16. **Las caras van en la capa ordenada por profundidad, las cimas en la textura
+    del chunk.** Es la regla 7 aplicada al relieve: una pared tiene altura y
+    horneada en el suelo se dibujaria por debajo del arbol que tiene detras. Las
+    cimas se quedan horneadas porque tapan mucho menos, y a cambio el terreno
+    sigue costando un sprite por chunk. El `terrainLayer` si pasa a ordenarse por
+    profundidad de chunk: una cima levantada invade el rombo del chunk vecino.
+
 ## Regla de trabajo con el autor
 
 **La interpretacion de las leyes es del autor, no del agente.** Antes de escribir
@@ -174,6 +201,24 @@ abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
 herramientas no sirven para lo que se hicieron: a 64x se pierden unos 35 puntos
 de hambre por segundo real y saltar un dia son 264, asi que el boton mas util del
 panel era el que mataba.
+
+## El relieve
+
+El mundo tiene altura desde `packages/sim/src/relief.ts`: ocho niveles, escalon
+de 0.06 de elevacion, y `groundHeightAt` devuelve la altura real de un punto con
+decimales. **Por ahora el relieve solo se ve**: la colision no ha cambiado y el
+jugador camina por donde caminaba. La gravedad, el salto y las paredes que
+estorban son la fase siguiente, ya disenada con el autor.
+
+Tres numeros son suyos y no se tocan sin preguntarle: el escalon (0.06), los 8
+px por nivel y el 15 % de fronteras que son rampa. El umbral de salientes, en
+cambio, es una calibracion: se elige midiendo (regla 14).
+
+Lo que la fase siguiente traera, para no disenarlo dos veces: el salto es una
+parabola simetrica cuyo apice cae **a una casilla exacta** y cuyo alcance son dos
+—de ahi salen `GRAVITY` y `JUMP_SPEED`, derivados del caso concreto que describio
+el autor—, conserva el impulso que se llevaba, admite un 30 % de correccion en el
+aire, y el agua sigue siendo muro tambien volando.
 
 ## Si tocas la generacion del mundo
 

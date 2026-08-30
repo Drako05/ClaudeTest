@@ -27,7 +27,7 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Todos los sistemas relacionados bajo causalidad rastreable | **Pendiente** | — | — no hay registro de causas; hoy no se podria rastrear por que paso algo |
 | Las consecuencias dependen del estado del mundo y de las relaciones | **Cumplida** | El rendimiento de recolectar depende de si el bioma esta equilibrado, y saturar un chunk deja al bioma entero sin recompensas | «un bioma equilibrado rinde mas al recolectar», «la saturacion deja al bioma sin recompensas mientras dura» |
 | Los jugadores no son necesarios para el desarrollo de sucesos | **Cumplida** | `sim/world.ts` — la vegetacion evoluciona sin que nadie la mire | «la vida evoluciona igual se observe o no» |
-| Existen el pasar del tiempo y las leyes fisicas fundamentales | **Parcial** | `sim/clock.ts` — tiempo, ciclo dia/noche | «el ciclo del dia es periodico», «el dia recorre sus cuatro fases» — de fisica solo hay colision |
+| Existen el pasar del tiempo y las leyes fisicas fundamentales | **Parcial** | `sim/clock.ts` — tiempo y ciclo dia/noche; `sim/relief.ts` — el mundo tiene altura, y `groundHeightAt` la da como campo continuo | «el ciclo del dia es periodico», «el dia recorre sus cuatro fases», «la altura del suelo es continua al cruzar a un talud» — el relieve todavia solo se ve: la gravedad y el salto son la fase siguiente |
 | El mundo es abierto para todos | **Cumplida** | `sim/world.ts` — infinito en las cuatro direcciones, sin barreras | «las coordenadas negativas de chunk funcionan» |
 | Toda existencia es justificada por un sistema | **Parcial** | Las plantas existen solo donde el bioma y la vegetacion las sostienen, y cada bioma lleva su cuenta propia **dentro** de cada chunk: un arbol de bosque no puede brotar sobre la hierba de al lado | «un brote solo sale en el terreno de su bioma», «las especies no se mezclan: talar el bosque no toca la pradera» |
 | El entorno cambia por acontecimientos naturales o de las entidades | **Parcial** | Naturales (crecimiento vegetal) y por entidades (recoleccion) | «un arbusto recolectado vuelve a crecer con el tiempo» |
@@ -64,6 +64,7 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Las entidades vivas no surgen automaticamente | **Cumplida** | Con poblacion cero el crecimiento logistico vale exactamente cero; solo la colonizacion desde una fuente cercana lo arranca | «sin fuente cercana no se genera ni una sola unidad de vida», «donde el terreno no sostiene vida, no aparece jamas» |
 | Todo ser vivo puede desarrollar rasgos diferenciales | **Pendiente** | — | — |
 | Existen muchos tipos de biomas y ecosistemas | **Cumplida** | `sim/worldgen.ts` — ocho biomas calibrados; el bioma es el del **tile**, no el del chunk, asi que la mancha sigue la forma real del terreno | «todos los biomas aparecen», «dos tiles del MISMO chunk pueden dar biomas distintos» |
+| El mundo es abierto para todos (aplicada al relieve) | **Cumplida** | `sim/relief.ts` y `sim/worldgen.ts` — la altura sale de la misma elevacion que ya clasificaba el terreno, y la densidad de salientes esta calibrada contra la conectividad real del mundo, no elegida a ojo | «el relieve no parte el mundo», «existen paredes de dos o mas bloques», «el terreno generado no ha cambiado» |
 
 ## Capitulo IV: Las comunidades
 

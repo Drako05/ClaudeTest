@@ -99,3 +99,112 @@ for (const seed of SEEDS) {
   const sy = Math.floor(game.entities.y[game.playerId]);
   console.log(`  navegable desde el spawn: ${(100 * navigability(world, sx, sy)).toFixed(1)}%`);
 }
+
+// ---------------------------------------------------------------- relieve
+
+/**
+ * Reparto de alturas y explorabilidad.
+ *
+ * El umbral de salientes de `worldgen.ts` sale de aqui, no de la intuicion: con
+ * salientes abundantes la mayor componente conexa del mundo se parte. Se mide
+ * contra la LINEA BASE que ya impone el agua, porque el mundo plano tampoco es
+ * completamente conexo y confundir las dos cosas lleva a leer como sano un
+ * relieve que no lo es.
+ */
+function reportRelief(seed: number): void {
+  const gen = new WorldGen(seed);
+  const R = 180;
+  const side = R * 2;
+  const level = new Int8Array(side * side);
+  const at = (x: number, y: number) => level[(y + R) * side + (x + R)];
+
+  let land = 0;
+  let raised = 0;
+  const histogram = new Array(9).fill(0);
+  for (let y = -R; y < R; y++) {
+    for (let x = -R; x < R; x++) {
+      const lvl = gen.levelAt(x, y);
+      level[(y + R) * side + (x + R)] = lvl;
+      if (lvl < 0) continue;
+      land++;
+      histogram[lvl]++;
+      if (gen.isOutcrop(x, y)) raised++;
+    }
+  }
+
+  /** Mayor componente conexa bajo «se sube como mucho `climb` niveles». */
+  function largestComponent(climb: number): number {
+    const seen = new Uint8Array(side * side);
+    let best = 0;
+    const stack: number[] = [];
+    for (let start = 0; start < seen.length; start++) {
+      if (seen[start] || level[start] < 0) continue;
+      let size = 0;
+      stack.push(start);
+      seen[start] = 1;
+      while (stack.length) {
+        const i = stack.pop()!;
+        size++;
+        const x = (i % side) - R;
+        const y = Math.floor(i / side) - R;
+        const here = level[i];
+        for (const [dx, dy] of [
+          [1, 0],
+          [-1, 0],
+          [0, 1],
+          [0, -1],
+        ]) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < -R || nx >= R || ny < -R || ny >= R) continue;
+          const j = (ny + R) * side + (nx + R);
+          if (seen[j]) continue;
+          const there = at(nx, ny);
+          if (there < 0) continue;
+          if (there - here > climb) continue;
+          seen[j] = 1;
+          stack.push(j);
+        }
+      }
+      if (size > best) best = size;
+    }
+    return best;
+  }
+
+  // Paredes de dos o mas bloques: son las que obligan a buscar otro punto por
+  // donde subir, y sin ellas el encargo del autor no esta cumplido.
+  let tallWalls = 0;
+  for (let y = -R + 1; y < R - 1; y++) {
+    for (let x = -R + 1; x < R - 1; x++) {
+      const here = at(x, y);
+      if (here < 0) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (at(x + dx, y + dy) - here >= 2) {
+          tallWalls++;
+          break;
+        }
+      }
+    }
+  }
+
+  const base = largestComponent(99); // solo el agua separa
+  const real = largestComponent(1); // se sube un bloque de un salto
+  console.log(
+    `  alturas: ${histogram
+      .map((c, i) => (c ? `n${i} ${((100 * c) / land).toFixed(1)}%` : ''))
+      .filter(Boolean)
+      .join('  ')}`,
+  );
+  console.log(
+    `  salientes: ${((100 * raised) / land).toFixed(1)}% de la tierra | ` +
+      `conexo base ${((100 * base) / land).toFixed(1)}% -> con relieve ${((100 * real) / land).toFixed(1)}% ` +
+      `(pierde ${((100 * (base - real)) / land).toFixed(2)} pt)`,
+  );
+  console.log(`  al pie de una pared de 2+ bloques: ${tallWalls} tiles`);
+}
+
+console.log('\n===== relieve =====');
+for (const seed of SEEDS) {
+  console.log(`--- semilla ${seed} ---`);
+  reportRelief(seed);
+}

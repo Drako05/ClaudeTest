@@ -18,6 +18,7 @@ import {
   speciesFor,
   Terrain,
 } from '@verdant/shared';
+import { levelFrom, MAX_LEVEL, OUTCROP_RISE, rampDirOf } from './relief.js';
 import { hash2DFloat, SimplexNoise } from './rng.js';
 
 /** Escalas de muestreo del ruido, en tiles. Mayor = accidentes geograficos mas grandes. */
@@ -26,6 +27,27 @@ const MOISTURE_SCALE = 1 / 160;
 const TEMPERATURE_SCALE = 1 / 340;
 const WARP_SCALE = 1 / 90;
 const WARP_STRENGTH = 22;
+
+/**
+ * Escala de los salientes. Bastante mas fina que la de la elevacion: son
+ * accidentes locales —mesetas y afloramientos— y no cordilleras.
+ */
+const OUTCROP_SCALE = 1 / 70;
+/**
+ * A partir de que valor del campo se levanta un saliente.
+ *
+ * Calibrado, no elegido a ojo. Medido con `tools/analyze-world.ts` sobre tres
+ * semillas: levanta el 2.6-3.8 % de la tierra y la mayor componente conexa del
+ * mundo pierde como mucho 0.95 puntos contra la que ya impone el agua. Al doble
+ * de salientes esa perdida se dispara a 17 puntos en una de las tres semillas,
+ * que es un mundo partido en dos. Si se toca la escala de arriba, hay que
+ * volver a medirlo.
+ *
+ * De aqui salen TODAS las paredes de dos o mas bloques: sin salientes, la
+ * perdida es exactamente cero en las tres semillas, porque el campo de
+ * elevacion es tan suave que dos tiles vecinos nunca se llevan dos niveles.
+ */
+const OUTCROP_THRESHOLD = 0.8;
 
 /**
  * Campos de ruido del mundo. Se construye una vez por semilla y se reutiliza:
@@ -38,6 +60,7 @@ export class WorldGen {
   private readonly temperature: SimplexNoise;
   private readonly warpX: SimplexNoise;
   private readonly warpY: SimplexNoise;
+  private readonly outcrop: SimplexNoise;
 
   constructor(seed: number) {
     this.seed = seed >>> 0;
@@ -48,6 +71,7 @@ export class WorldGen {
     this.temperature = new SimplexNoise(this.seed ^ 0xc2b2ae35);
     this.warpX = new SimplexNoise(this.seed ^ 0x27d4eb2d);
     this.warpY = new SimplexNoise(this.seed ^ 0x165667b1);
+    this.outcrop = new SimplexNoise(this.seed ^ 0x2545f491);
   }
 
   /**
@@ -98,7 +122,17 @@ export class WorldGen {
    * tools/analyze-world.ts). Cambiar una escala de ruido invalida estos numeros.
    */
   terrainAt(wx: number, wy: number): Terrain {
-    const e = this.elevationAt(wx, wy);
+    return this.terrainFrom(this.elevationAt(wx, wy), wx, wy);
+  }
+
+  /**
+   * La clasificacion propiamente dicha, con la elevacion ya calculada.
+   *
+   * Existe aparte porque generar un chunk necesita la elevacion **dos veces**
+   * —para el terreno y para la altura— y `elevationAt` es lo mas caro del
+   * generador: dos ruidos de deformacion mas un fbm de cinco octavas por tile.
+   */
+  terrainFrom(e: number, wx: number, wy: number): Terrain {
     if (e < 0.34) return Terrain.DeepWater;
     if (e < 0.42) return Terrain.Water;
     if (e < 0.455) return Terrain.Sand;
@@ -114,6 +148,38 @@ export class WorldGen {
     const m = this.moistureAt(wx, wy);
     if (m > 0.55) return Terrain.Forest;
     return Terrain.Grass;
+  }
+
+  /**
+   * Altura entera del tile. Negativa es agua.
+   *
+   * Sale de la MISMA elevacion que clasifica el terreno, asi que el relieve y
+   * los biomas no pueden discrepar: una costa es una costa en los dos.
+   */
+  levelAt(wx: number, wy: number): number {
+    return this.levelFromElevation(this.elevationAt(wx, wy), wx, wy);
+  }
+
+  /** Como `levelAt`, con la elevacion ya calculada. */
+  levelFromElevation(e: number, wx: number, wy: number): number {
+    const base = levelFrom(e);
+    // El agua no se levanta: un saliente en mitad del mar seria una isla que el
+    // terreno no conoce, y el terreno es quien manda sobre lo que es agua.
+    if (base < 0) return base;
+    if (!this.isOutcrop(wx, wy)) return base;
+    const raised = base + OUTCROP_RISE;
+    return raised > MAX_LEVEL ? MAX_LEVEL : raised;
+  }
+
+  /** Si un tile de tierra pertenece a un saliente. */
+  isOutcrop(wx: number, wy: number): boolean {
+    const raw = this.outcrop.fbm(wx * OUTCROP_SCALE, wy * OUTCROP_SCALE, 2) * 0.5 + 0.5;
+    return raw > OUTCROP_THRESHOLD;
+  }
+
+  /** Por donde se inclina el talud de un tile, o `NO_RAMP` si es plano. */
+  rampDirAt(wx: number, wy: number): number {
+    return rampDirOf(this.seed, wx, wy, this.levelAt(wx, wy), (x, y) => this.levelAt(x, y));
   }
 
   /**
@@ -180,6 +246,10 @@ export class WorldGen {
 export interface GeneratedChunk {
   readonly terrain: Uint8Array;
   readonly feature: Uint8Array;
+  /** Altura entera de cada tile. Negativa es agua. */
+  readonly level: Int8Array;
+  /** Direccion del talud de cada tile, o `NO_RAMP`. */
+  readonly rampDir: Int8Array;
 }
 
 /**
@@ -191,21 +261,50 @@ export function generateChunk(gen: WorldGen, cx: number, cy: number): GeneratedC
   const n = CHUNK_SIZE * CHUNK_SIZE;
   const terrain = new Uint8Array(n);
   const feature = new Uint8Array(n);
+  const level = new Int8Array(n);
+  const rampDir = new Int8Array(n);
   const baseX = cx * CHUNK_SIZE;
   const baseY = cy * CHUNK_SIZE;
+
+  // Los niveles se calculan con un tile de MARGEN alrededor del chunk. Un talud
+  // mira a sus cuatro vecinos, y los del borde caen fuera: sin el margen, el
+  // relieve del limite de un chunk dependeria de por donde se generase, que es
+  // exactamente lo que la pureza de `generateChunk` promete que no pasa.
+  //
+  // La elevacion se guarda de paso: es con diferencia lo mas caro del generador
+  // —dos ruidos de deformacion y un fbm de cinco octavas por tile— y la
+  // necesitan tanto el terreno como la altura. Calculandola una sola vez, el
+  // margen sale casi gratis.
+  const side = CHUNK_SIZE + 2;
+  const padded = new Int8Array(side * side);
+  const elevations = new Float64Array(side * side);
+  for (let py = 0; py < side; py++) {
+    for (let px = 0; px < side; px++) {
+      const wx = baseX + px - 1;
+      const wy = baseY + py - 1;
+      const e = gen.elevationAt(wx, wy);
+      elevations[py * side + px] = e;
+      padded[py * side + px] = gen.levelFromElevation(e, wx, wy);
+    }
+  }
+  const levelOf = (x: number, y: number): number => padded[(y - baseY + 1) * side + (x - baseX + 1)];
 
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
       const wx = baseX + lx;
       const wy = baseY + ly;
-      const t = gen.terrainAt(wx, wy);
       const idx = ly * CHUNK_SIZE + lx;
+      const padIdx = (ly + 1) * side + (lx + 1);
+      const t = gen.terrainFrom(elevations[padIdx], wx, wy);
       terrain[idx] = t;
       feature[idx] = gen.featureAt(wx, wy, t);
+      const lvl = padded[padIdx];
+      level[idx] = lvl;
+      rampDir[idx] = rampDirOf(gen.seed, wx, wy, lvl, levelOf);
     }
   }
 
-  return { terrain, feature };
+  return { terrain, feature, level, rampDir };
 }
 
 function clamp01(v: number): number {

@@ -44,6 +44,7 @@ import {
 } from '@verdant/shared';
 import { collectBiome, type BiomeStats } from './biome.js';
 import { chunkKey, localCoord, toChunkCoord } from './coords.js';
+import { groundHeight } from './relief.js';
 import { hash2D, hash2DFloat } from './rng.js';
 import { generateChunk, WorldGen } from './worldgen.js';
 
@@ -55,6 +56,10 @@ export interface Chunk {
   readonly terrain: Uint8Array;
   /** Potencial pristino del generador. Los cambios viven en los overrides. */
   readonly feature: Uint8Array;
+  /** Altura entera de cada tile. Negativa es agua. */
+  readonly level: Int8Array;
+  /** Direccion del talud de cada tile, o `NO_RAMP` si es plano. */
+  readonly rampDir: Int8Array;
   /** Sube cuando lo visible cambia; el renderer lo usa para invalidar cache. */
   revision: number;
 }
@@ -126,6 +131,8 @@ export class World {
       cy,
       terrain: raw.terrain,
       feature: new Uint8Array(raw.feature),
+      level: raw.level,
+      rampDir: raw.rampDir,
       revision: 0,
     };
     this.chunks.set(key, chunk);
@@ -228,6 +235,38 @@ export class World {
    */
   biomeAt(wx: number, wy: number): BiomeKind {
     return biomeOfTerrain(this.terrainAt(wx, wy));
+  }
+
+  /**
+   * Altura entera del tile. Negativa es agua.
+   *
+   * Sale del chunk y no del generador: es el mismo dato que dibuja el cliente y
+   * el mismo con el que chocara el jugador, que es la regla de la fuente unica
+   * de verdad aplicada al relieve.
+   */
+  levelAt(wx: number, wy: number): number {
+    const chunk = this.getChunk(toChunkCoord(wx), toChunkCoord(wy));
+    return chunk.level[localCoord(wy) * CHUNK_SIZE + localCoord(wx)];
+  }
+
+  /** Direccion del talud de un tile, o `NO_RAMP`. */
+  rampDirAt(wx: number, wy: number): number {
+    const chunk = this.getChunk(toChunkCoord(wx), toChunkCoord(wy));
+    return chunk.rampDir[localCoord(wy) * CHUNK_SIZE + localCoord(wx)];
+  }
+
+  /**
+   * Altura real del suelo en un punto, con decimales.
+   *
+   * Es lo que convierte el relieve en un campo continuo: en un tile plano vale
+   * su nivel, y sobre un talud sube poco a poco. De aqui saldra la fisica —no se
+   * entra donde el suelo esta por encima de los pies— sin necesidad de tratar
+   * las rampas como un caso aparte.
+   */
+  groundHeightAt(wx: number, wy: number): number {
+    const tx = Math.floor(wx);
+    const ty = Math.floor(wy);
+    return groundHeight(this.levelAt(tx, ty), this.rampDirAt(tx, ty), wx - tx, wy - ty);
   }
 
   /** Lo que hay realmente en un tile. Unica fuente de verdad. */

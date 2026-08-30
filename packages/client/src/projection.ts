@@ -14,6 +14,20 @@
 export const TILE_W = 32;
 export const TILE_H = 16;
 
+/**
+ * Pixeles que sube un nivel de altura.
+ *
+ * Es una constante de la VISTA, no de la simulacion: el nucleo cuenta niveles
+ * enteros y no sabe cuanto miden en pantalla. Media altura de tile, que es lo
+ * que hace que un bloque se lea como un bloque y no como un escalon perdido.
+ */
+export const LEVEL_PX = 8;
+
+/** Desplazamiento vertical en pantalla de una altura dada. */
+export function heightOffset(height: number): number {
+  return -height * LEVEL_PX;
+}
+
 export interface ScreenPoint {
   x: number;
   y: number;
