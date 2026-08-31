@@ -30,10 +30,20 @@ Esto es el resumen operativo.
     El area parte de la casilla que se PISA. Antes se apuntaba con
     `floor(pos + mirada * 1.1)`, que pegado al borde de la casilla podia saltar a
     dos de distancia; con tres casillas eso deja de ser inadvertido.
-6. **La vista es isometrica y vive solo en el cliente.** La transformacion esta
-   entera en `packages/client/src/projection.ts`. El mundo es una rejilla
-   cuadrada: si algo del nucleo necesita saber como se proyecta, es que esta mal
-   puesto.
+6. **La vista es isometrica, GIRABLE en cuatro, y vive solo en el cliente.** La
+   transformacion esta entera en `packages/client/src/projection.ts`, que lleva
+   una orientacion de modulo y la aplica dentro de `worldToScreen`,
+   `screenToWorld` y `depthOf`; todo lo demas se entera solo. El mundo es una
+   rejilla cuadrada y la simulacion no sabe que existe una camara: el vector de
+   movimiento se rota en `input.ts` **antes** de entrar en la Intent, para que la
+   Intent siga siendo de mundo y pueda viajar por red (regla 5).
+
+   Se gira porque con una sola vista la cara oculta de una montana es
+   inexplorable: lo que hay al otro lado lo tapa la montana misma. Girar de forma
+   continua no es posible —el arte lleva la proyeccion horneada dentro, asi que a
+   un angulo libre habria que rehacer la geometria del terreno en cada frame y el
+   orden dejaria de agruparse en antidiagonales—, y por eso el giro es de 90
+   grados y con corte seco.
 7. **Todo lo que tenga altura va en la capa ordenada por profundidad**
    (`depthOf`), nunca horneado en la textura del chunk; si no, el personaje
    aparecera por delante de cosas que tiene detras.
@@ -111,6 +121,27 @@ Esto es el resumen operativo.
     probo. La silueta se decide mirando si algo cubre el **pecho o la cabeza**,
     no la caja entera: la casilla de justo delante siempre roza los pies, y
     comparando cajas la silueta salia siempre y dejaba de significar nada.
+
+    Lo que estorba se busca recorriendo las **filas de delante**, no una ventana
+    de casillas alrededor: con relieve, un arbol encaramado cinco filas mas alla
+    tapa tanto como el de al lado. Y ojo con las condiciones de esa busqueda: la
+    version anterior filtraba por un `zIndex` que al pasar a contenedores por fila
+    dejo de asignarse, asi que en coordenadas positivas no se atenuaba **nada** y
+    en negativas se atenuaba todo. Medio mundo bien y medio mal, y ningun test
+    unitario lo ve. Por eso la prueba de humo lo mide en el cuadrante positivo.
+
+19. **Una entidad va en la fila de su CASILLA, no de su posicion.** `depthRowOf`
+    redondea la casilla; redondear la posicion continua metia al personaje una
+    fila por delante de si mismo en media casilla de cada dos, dibujandolo sobre
+    el arbol y el bloque que tenia justo delante. Aparecia y desaparecia al
+    caminar, que es lo que lo hacia dificil de ver.
+
+20. **Un escalon mirado por detras no se ve, asi que se dibuja lo que deja.** Los
+    dos costados traseros de un bloque los tapa el propio bloque; sin nada mas,
+    un escalon por detras es indistinguible de terreno llano. En su sitio van dos
+    cosas que si se ven: el **filo iluminado** de la arista y la **sombra**
+    translucida que proyecta hacia atras. Translucida a proposito: detras hay
+    terreno de verdad y tiene que seguir viendose.
 
 ## Regla de trabajo con el autor
 
@@ -242,6 +273,9 @@ agua `reliefAt` es identica a `elevationAt`, y por eso meter montanas no obligo 
 recalibrar la costa, que son los tres umbrales mas delicados que hay. Los de
 altitud si se recalibraron, pero **sumando** reglas a las viejas en vez de
 sustituirlas, para no mover el mundo llano ni un tile.
+
+La camara gira con **coma y punto**, no con Q y E: la E ya era comer, y cambiar
+una tecla que funciona para meter otra no es decision del agente.
 
 Numeros del autor, que no se tocan sin preguntarle: el escalon (0.06), los 16 px
 por nivel, el 15 % de fronteras que son rampa y el tope de 40 niveles. El umbral

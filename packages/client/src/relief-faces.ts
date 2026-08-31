@@ -5,13 +5,19 @@
  * comprobar la geometria en Node. El renderizador solo convierte esta lista en
  * sprites.
  *
- * En isometrica un tile solo ensena dos de sus cuatro costados: el que da al
- * este y el que da al sur. Los otros dos quedan tapados por el propio tile, asi
- * que dibujarlos seria pagar el doble por nada.
+ * En isometrica un tile solo ensena dos de sus cuatro costados: los dos que dan
+ * a la camara. Los otros dos quedan tapados por el propio tile, asi que
+ * dibujarlos seria pagar el doble por nada.
+ *
+ * Con la camara girable, **cuales son esos dos depende de la vista**. Todo lo de
+ * aqui trabaja en ESPACIO DE VISTA —donde siempre son el este y el sur— y solo
+ * pasa por la rotacion lo que hace falta: a que vecino del mundo se mira y que
+ * esquinas suyas. Asi el codigo que dibuja no se entera de que la camara gira.
  */
 
 import { CHUNK_SIZE, type Terrain } from '@verdant/shared';
 import { groundHeight, localCoord, type Chunk, type World } from '@verdant/sim';
+import { toWorldSpace } from './projection.js';
 
 /**
  * Rango de tiles LOCALES de un chunk, para poder trabajar por trozos.
@@ -42,6 +48,18 @@ export interface ReliefFace {
   /** Alturas del vecino de abajo, en el mismo orden. */
   readonly bottom0: number;
   readonly bottom1: number;
+}
+
+/**
+ * La esquina del MUNDO que ocupa una esquina dada del rombo en pantalla.
+ *
+ * Las cuatro esquinas de un tile son las mismas cuatro; lo que cambia con la
+ * vista es cual de ellas cae arriba, cual a la derecha y asi. Se rota alrededor
+ * del centro de la casilla, que es lo que mantiene la correspondencia.
+ */
+export function worldCorner(vx: number, vy: number): { fx: number; fy: number } {
+  const w = toWorldSpace(vx - 0.5, vy - 0.5);
+  return { fx: w.x + 0.5, fy: w.y + 0.5 };
 }
 
 /** Altura del suelo de un tile en una de sus esquinas, sin generar nada nuevo. */
@@ -88,6 +106,17 @@ export function collectFaces(world: World, chunk: Chunk, bounds?: TileBounds): R
   const x1 = bounds?.x1 ?? CHUNK_SIZE;
   const y1 = bounds?.y1 ?? CHUNK_SIZE;
 
+  // Los dos vecinos que caen delante en la vista actual, en coordenadas de
+  // mundo. En la vista 0 son el de +x y el de +y, los de siempre.
+  const ahead = { east: toWorldSpace(1, 0), south: toWorldSpace(0, 1) };
+  // Nuestras dos esquinas de cada borde, y las dos del vecino que las tocan.
+  // En espacio de vista el borde este va de la esquina E a la S, y el sur de la
+  // O a la S; las del vecino son las opuestas.
+  const corners = {
+    east: [worldCorner(1, 0), worldCorner(1, 1), worldCorner(0, 0), worldCorner(0, 1)],
+    south: [worldCorner(0, 1), worldCorner(1, 1), worldCorner(0, 0), worldCorner(1, 0)],
+  } as const;
+
   for (let ly = y0; ly < y1; ly++) {
     for (let lx = x0; lx < x1; lx++) {
       const idx = ly * CHUNK_SIZE + lx;
@@ -97,33 +126,22 @@ export function collectFaces(world: World, chunk: Chunk, bounds?: TileBounds): R
       const ramp = chunk.rampDir[idx];
       const terrain = chunk.terrain[idx] as Terrain;
 
-      // Cara este: el borde que va de la esquina E a la S, compartido con el
-      // tile de x+1. Nuestras esquinas E y S son las N y O del vecino.
-      push(
-        faces,
-        wx,
-        wy,
-        'east',
-        terrain,
-        groundHeight(level, ramp, 1, 0),
-        groundHeight(level, ramp, 1, 1),
-        cornerAt(world, chunk, wx + 1, wy, 0, 0),
-        cornerAt(world, chunk, wx + 1, wy, 0, 1),
-      );
-
-      // Cara sur: el borde de la esquina O a la S, compartido con el tile de
-      // y+1. Nuestras esquinas O y S son las N y E del vecino.
-      push(
-        faces,
-        wx,
-        wy,
-        'south',
-        terrain,
-        groundHeight(level, ramp, 0, 1),
-        groundHeight(level, ramp, 1, 1),
-        cornerAt(world, chunk, wx, wy + 1, 0, 0),
-        cornerAt(world, chunk, wx, wy + 1, 1, 0),
-      );
+      for (const side of ['east', 'south'] as const) {
+        const [near, far, theirNear, theirFar] = corners[side];
+        const nx = wx + ahead[side].x;
+        const ny = wy + ahead[side].y;
+        push(
+          faces,
+          wx,
+          wy,
+          side,
+          terrain,
+          groundHeight(level, ramp, near.fx, near.fy),
+          groundHeight(level, ramp, far.fx, far.fy),
+          cornerAt(world, chunk, nx, ny, theirNear.fx, theirNear.fy),
+          cornerAt(world, chunk, nx, ny, theirFar.fx, theirFar.fy),
+        );
+      }
     }
   }
   return faces;

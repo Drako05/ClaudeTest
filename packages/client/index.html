@@ -103,6 +103,12 @@
       .touch-btn:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
 
       #btnHarvest { width: 92px; height: 92px; }
+      #rotButtons {
+        position: fixed; right: 14px; top: 14px; z-index: 9;
+        display: none; gap: 8px;
+      }
+      .touch-btn.rot { width: 46px; height: 46px; }
+      body.touch-active #rotButtons { display: flex; }
       #btnEat { width: 58px; height: 58px; margin-bottom: 6px; }
       #btnPlant { width: 70px; height: 70px; margin-bottom: 2px; }
 
@@ -287,7 +293,8 @@
 
     <div id="help">
       <kbd>WASD</kbd> moverse &nbsp; <kbd>clic</kbd> / <kbd>Espacio</kbd> recolectar &nbsp; <kbd>E</kbd> comer bayas<br />
-      <kbd>F</kbd> sembrar &nbsp; <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
+      <kbd>F</kbd> sembrar &nbsp; <kbd>,</kbd>/<kbd>.</kbd> girar la vista &nbsp;
+      <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
     </div>
 
     <button id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"
@@ -308,6 +315,18 @@
     </div>
 
     <div id="stick" aria-hidden="true"><i id="stickKnob"></i></div>
+
+    <!-- Girar la camara: en tactil no hay teclas, y sin poder girar la cara
+         oculta de una montana es inexplorable. Van arriba a la izquierda de los
+         botones de accion para no competir con el pulgar que recolecta. -->
+    <div id="rotButtons">
+      <button id="btnRotL" class="touch-btn rot" type="button" aria-label="Girar a la izquierda">
+        <span class="glyph" aria-hidden="true">&#8630;</span>
+      </button>
+      <button id="btnRotR" class="touch-btn rot" type="button" aria-label="Girar a la derecha">
+        <span class="glyph" aria-hidden="true">&#8631;</span>
+      </button>
+    </div>
 
     <div id="touchButtons">
       <button id="btnEat" class="touch-btn" type="button" aria-label="Comer bayas">

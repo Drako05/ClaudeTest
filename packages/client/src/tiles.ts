@@ -100,22 +100,6 @@ function traceTop(
 }
 
 /**
- * Altura de las cuatro esquinas de un tile, en el orden N, E, S, O.
- *
- * Las esquinas del rombo son las cuatro combinaciones de (0,1) dentro de la
- * casilla, asi que salen de `groundHeight` sin ninguna regla nueva: el dibujo lee
- * el mismo campo de alturas con el que chocara el jugador.
- */
-export function cornerHeights(level: number, rampDir: number): [number, number, number, number] {
-  return [
-    groundHeight(level, rampDir, 0, 0),
-    groundHeight(level, rampDir, 1, 0),
-    groundHeight(level, rampDir, 1, 1),
-    groundHeight(level, rampDir, 0, 1),
-  ];
-}
-
-/**
  * Cuantas franjas de brillo distintas tiene el terreno.
  *
  * El moteado que rompe el aspecto plastico era continuo mientras el suelo se
@@ -146,17 +130,10 @@ export function shadeStepAt(seed: number, wx: number, wy: number): number {
  */
 export function makeTopArt(
   terrain: Terrain,
-  level: number,
-  rampDir: number,
   shadeStep: number,
+  corners: readonly [number, number, number, number],
 ): FeatureArt | null {
-  const [north, east, south, west] = cornerHeights(level, rampDir);
-  const top = Math.max(north, east, south, west);
-  // Caida de cada esquina respecto de la mas alta, en pixeles.
-  const dn = (top - north) * LEVEL_PX;
-  const de = (top - east) * LEVEL_PX;
-  const ds = (top - south) * LEVEL_PX;
-  const dw = (top - west) * LEVEL_PX;
+  const [dn, de, ds, dw] = corners.map((c) => c * LEVEL_PX);
 
   const width = TILE_W + 2;
   const height = TILE_H + Math.max(dn, de, ds, dw) + 2;
@@ -164,7 +141,7 @@ export function makeTopArt(
   if (!made) return null;
   const [canvas, ctx] = made;
 
-  // Origen del lienzo: la esquina norte del tile a la altura `top`.
+  // Origen del lienzo: la esquina norte del tile a la altura de anclaje.
   const ox = TILE_W / 2 + 1;
   const oy = 1;
 
@@ -173,6 +150,57 @@ export function makeTopArt(
   ctx.fillStyle = shade(rgb, jitter);
   traceTop(ctx, ox, oy, -dn / LEVEL_PX, -de / LEVEL_PX, -ds / LEVEL_PX, -dw / LEVEL_PX);
   ctx.fill();
+
+  return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height, riseAbove: 0 };
+}
+
+/**
+ * La senal de una arista TRASERA: el filo iluminado y la sombra que sube de el.
+ *
+ * En isometrica los dos costados de atras de un bloque no se ven —los tapa el
+ * propio bloque—, asi que un escalon mirado por detras es indistinguible de
+ * terreno llano. Fue lo primero que noto el autor. Aqui no se dibuja el muro que
+ * no se ve, sino sus DOS consecuencias: el canto, que da la luz, y la sombra que
+ * proyecta hacia atras. El ojo reconstruye la altura solo.
+ *
+ * La sombra es translucida a proposito: por detras hay terreno de verdad y tiene
+ * que seguir viendose. Un relleno opaco seria inventarse una pared.
+ */
+export function makeEdgeCueArt(kind: 'backEast' | 'backWest', drop: number): FeatureArt | null {
+  const rise = drop * LEVEL_PX;
+  const width = TILE_W / 2 + 2;
+  const height = TILE_H / 2 + rise + 2;
+  const made = newCanvas(Math.ceil(width), Math.ceil(height));
+  if (!made) return null;
+  const [canvas, ctx] = made;
+
+  // Origen: la esquina norte del tile. La arista baja hacia la derecha en la de
+  // atras-este y hacia la izquierda en la de atras-oeste.
+  const ox = kind === 'backEast' ? 1 : width - 1;
+  const oy = rise + 1;
+  const fx = kind === 'backEast' ? width - 1 : 1;
+  const fy = oy + TILE_H / 2;
+
+  // La sombra ocupa justo donde estaria el muro que no se ve.
+  const gradient = ctx.createLinearGradient(0, oy - rise, 0, oy);
+  gradient.addColorStop(0, 'rgba(8,12,20,0)');
+  gradient.addColorStop(1, 'rgba(8,12,20,0.42)');
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.moveTo(ox, oy);
+  ctx.lineTo(fx, fy);
+  ctx.lineTo(fx, fy - rise);
+  ctx.lineTo(ox, oy - rise);
+  ctx.closePath();
+  ctx.fill();
+
+  // Y el canto, del lado del tile alto.
+  ctx.strokeStyle = 'rgba(255,255,255,0.30)';
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(ox, oy);
+  ctx.lineTo(fx, fy);
+  ctx.stroke();
 
   return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height, riseAbove: 0 };
 }

@@ -321,6 +321,35 @@ async function desktopPass(browser, baseUrl) {
   check(walked > 1, `el personaje apenas se movio: ${walked.toFixed(2)} casillas`);
   const beforeClick = await waitForLoop(page);
 
+  // La atenuacion, en coordenadas POSITIVAS. Aqui estuvo rota: la comprobacion
+  // miraba un `zIndex` que al pasar a contenedores por fila dejo de asignarse y
+  // valia cero, asi que con `x + y` positivo no se atenuaba NADA y con negativo
+  // se atenuaba todo. Media pantalla del mundo bien y la otra media mal, y ningun
+  // test unitario lo ve: hay que jugar. Se camina hasta el cuadrante positivo y
+  // se busca un momento en que algo estorbe.
+  {
+    let faded = 0;
+    let where = null;
+    for (let i = 0; i < 10 && faded === 0; i++) {
+      await page.keyboard.down('KeyS');
+      await page.keyboard.down('KeyD');
+      await page.waitForTimeout(700);
+      await page.keyboard.up('KeyS');
+      await page.keyboard.up('KeyD');
+      const now = await waitForLoop(page);
+      if (now.x > 1 && now.y > 1) {
+        faded = now.faded;
+        where = now;
+      }
+    }
+    console.log(
+      `  atenuado en cuadrante positivo: ${faded} en ` +
+        `${where ? `${where.x.toFixed(1)},${where.y.toFixed(1)}` : 'ningun sitio'}`,
+    );
+    check(where !== null, 'no se llego al cuadrante positivo');
+    check(faded > 0, 'nada se atenuo estando en coordenadas positivas');
+  }
+
   // Se barre el anillo entero de direcciones y, si la vuelta no da nada, se
   // cambia de sitio y se repite. Golpear siempre hacia el mismo lado depende de
   // que ahi hubiera algo, y eso es echarlo a suertes: lo que se comprueba es que
@@ -792,6 +821,19 @@ async function reliefPass(browser, baseUrl) {
 
   await page.screenshot({ path: join(SHOTS, '15-relieve.png') });
 
+  // Caminar por el relieve no puede atascar: en esta fase la altura solo se ve,
+  // asi que el personaje sigue moviendose como en llano. Va ANTES de subir a la
+  // cima: puesto despues medía el teletransporte y pasaba por el motivo
+  // equivocado, que es peor que fallar.
+  await page.keyboard.down('KeyD');
+  await page.waitForTimeout(700);
+  await page.keyboard.up('KeyD');
+  const walked = await waitForLoop(page);
+  const moved = Math.hypot(walked.x - arrived.x, walked.y - arrived.y);
+  console.log(`  camino ${moved.toFixed(2)} casillas junto a la pared`);
+  check(moved > 1, 'el jugador se quedo atascado junto a la pared');
+  check(moved < 30, `no camino, se teletransporto: ${moved.toFixed(1)} casillas`);
+
   // La cima. Es lo que el autor no encontraba explorando: subir a un punto alto
   // y ver que el mundo tiene escala de verdad.
   const peak = spawn.peakSpot;
@@ -815,15 +857,71 @@ async function reliefPass(browser, baseUrl) {
     await page.screenshot({ path: join(SHOTS, '16-cima.png') });
   }
 
-  // Caminar por el relieve no puede atascar: en esta fase la altura solo se ve,
-  // asi que el personaje sigue moviendose como en llano.
-  await page.keyboard.down('KeyD');
-  await page.waitForTimeout(700);
-  await page.keyboard.up('KeyD');
-  const walked = await waitForLoop(page);
-  const moved = Math.hypot(walked.x - arrived.x, walked.y - arrived.y);
-  console.log(`  camino ${moved.toFixed(2)} casillas junto a la pared`);
-  check(moved > 1, 'el jugador se quedo atascado junto a la pared');
+  await page.close();
+}
+
+/**
+ * Girar la camara.
+ *
+ * Con una sola vista, la cara oculta de una montana es inexplorable: lo que hay
+ * al otro lado lo tapa la montana misma. Aqui se comprueba lo que hace falta para
+ * que girar sirva de algo: que las cuatro vistas sean distintas, que en todas se
+ * dibuje relieve, que el mando siga la vista, y que volver dejé el mundo como
+ * estaba.
+ */
+async function rotationPass(browser, baseUrl) {
+  console.log('\n== rotacion de camara ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'rotacion');
+
+  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
+  const spawn = await waitForLoop(page);
+  const peak = spawn.peakSpot;
+  check(peak !== null, 'no se encontro ninguna cima');
+  if (!peak) {
+    await page.close();
+    return;
+  }
+
+  // Al pie de la cima, que es donde girar tiene sentido: media montana tapa.
+  await page.goto(`${baseUrl}/?seed=${SEED}&x=${peak.stand.x}&y=${peak.stand.y}`, {
+    waitUntil: 'load',
+  });
+  await page.evaluate(() => delete window.__smokeBaseTick);
+  const start = await waitForLoop(page);
+  check(start.view === 0, `no se empieza en la vista 0: ${start.view}`);
+
+  const seen = [];
+  for (let i = 0; i < 4; i++) {
+    const now = await waitForLoop(page);
+    check(now.view === i, `se esperaba la vista ${i} y hay la ${now.view}`);
+    check(now.faces.drawn > 0, `la vista ${i} no dibujo relieve`);
+    seen.push(now.faces.drawn);
+    await page.screenshot({ path: join(SHOTS, `17-vista-${i}.png`) });
+    await page.keyboard.press('Period');
+    await page.waitForTimeout(500);
+  }
+  const back = await waitForLoop(page);
+  console.log(`  caras por vista: ${seen.join(' / ')}`);
+  check(back.view === 0, `cuatro giros no volvieron a la vista 0: ${back.view}`);
+  check(
+    Math.abs(back.x - start.x) < 0.001 && Math.abs(back.y - start.y) < 0.001,
+    'girar movio al personaje',
+  );
+
+  // El mando gira con la vista: «arriba» tiene que seguir siendo arriba en
+  // pantalla. Se mide en coordenadas de MUNDO, que es lo que cambia.
+  for (let v = 0; v < 4; v++) {
+    const before = await waitForLoop(page);
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(700);
+    await page.keyboard.up('KeyW');
+    const after = await waitForLoop(page);
+    const moved = Math.hypot(after.x - before.x, after.y - before.y);
+    console.log(`  vista ${v}: andar arriba movio ${moved.toFixed(2)} casillas`);
+    await page.keyboard.press('Period');
+    await page.waitForTimeout(400);
+  }
 
   await page.close();
 }
@@ -902,6 +1000,7 @@ try {
   await mobilePass(browser, baseUrl);
   await devToolsPass(browser, baseUrl);
   await reliefPass(browser, baseUrl);
+  await rotationPass(browser, baseUrl);
   await mountainPass(browser, baseUrl);
 } finally {
   await browser.close();

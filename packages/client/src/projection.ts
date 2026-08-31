@@ -36,11 +36,70 @@ export interface ScreenPoint {
   y: number;
 }
 
+/**
+ * Desde que esquina se mira el mundo: 0, 1, 2 o 3, en cuartos de vuelta.
+ *
+ * Con la camara fija, la cara oculta de una montana era inexplorable: lo que hay
+ * al otro lado lo tapa la montana misma, y eso no tiene arreglo desde un solo
+ * angulo. Cuatro vistas lo resuelven, que es como lo hacen las isometricas con
+ * altura de verdad.
+ *
+ * Es estado de MODULO y no un parametro: la camara es una sola, y asi los
+ * veintitantos sitios que ya llaman a estas funciones no se enteran de que
+ * existe. Los tests que dependan de la vista tienen que fijarla ellos.
+ *
+ * Girar de forma continua, siguiendo al cursor, no es posible con este dibujo:
+ * el arte lleva la proyeccion horneada dentro, asi que a un angulo libre habria
+ * que rehacer la geometria del terreno en cada frame en vez de reutilizar
+ * sprites cacheados, y el orden de dibujado dejaria de agruparse en
+ * antidiagonales. Seria pasar a 3D de verdad.
+ */
+export const VIEW_COUNT = 4;
+
+let view = 0;
+
+export function currentView(): number {
+  return view;
+}
+
+export function setView(next: number): void {
+  view = ((next % VIEW_COUNT) + VIEW_COUNT) % VIEW_COUNT;
+}
+
+/** Gira una direccion o posicion del mundo al espacio de la vista actual. */
+export function toViewSpace(wx: number, wy: number): ScreenPoint {
+  switch (view) {
+    case 1:
+      return { x: wy, y: -wx };
+    case 2:
+      return { x: -wx, y: -wy };
+    case 3:
+      return { x: -wy, y: wx };
+    default:
+      return { x: wx, y: wy };
+  }
+}
+
+/** La inversa de `toViewSpace`: del espacio de la vista al mundo. */
+export function toWorldSpace(vx: number, vy: number): ScreenPoint {
+  switch (view) {
+    case 1:
+      return { x: -vy, y: vx };
+    case 2:
+      return { x: -vx, y: -vy };
+    case 3:
+      return { x: vy, y: -vx };
+    default:
+      return { x: vx, y: vy };
+  }
+}
+
 /** Coordenadas del mundo (en tiles, con decimales) a pixeles de pantalla. */
 export function worldToScreen(wx: number, wy: number): ScreenPoint {
+  const v = toViewSpace(wx, wy);
   return {
-    x: (wx - wy) * (TILE_W / 2),
-    y: (wx + wy) * (TILE_H / 2),
+    x: (v.x - v.y) * (TILE_W / 2),
+    y: (v.x + v.y) * (TILE_H / 2),
   };
 }
 
@@ -48,10 +107,7 @@ export function worldToScreen(wx: number, wy: number): ScreenPoint {
 export function screenToWorld(sx: number, sy: number): ScreenPoint {
   const a = sx / (TILE_W / 2);
   const b = sy / (TILE_H / 2);
-  return {
-    x: (b + a) / 2,
-    y: (b - a) / 2,
-  };
+  return toWorldSpace((b + a) / 2, (b - a) / 2);
 }
 
 /**
@@ -63,7 +119,20 @@ export function screenToWorld(sx: number, sy: number): ScreenPoint {
  * la ilusion.
  */
 export function depthOf(wx: number, wy: number): number {
-  return wx + wy;
+  const v = toViewSpace(wx, wy);
+  return v.x + v.y;
+}
+
+/**
+ * Antidiagonal a la que pertenece una entidad que esta EN una casilla.
+ *
+ * Se redondea la casilla, no la posicion. Con la posicion continua, un personaje
+ * en (10.5, 10.5) caia en la fila 21 mientras su casilla era la 20: una fila por
+ * delante de si mismo, dibujandose encima del arbol y del bloque que tenia justo
+ * delante. Y como dependia de los decimales, aparecia y desaparecia al caminar.
+ */
+export function depthRowOf(wx: number, wy: number): number {
+  return depthOf(Math.floor(wx), Math.floor(wy));
 }
 
 /**

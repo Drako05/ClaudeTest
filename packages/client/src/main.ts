@@ -307,6 +307,7 @@ async function main(): Promise<void> {
 
   const input = new Input({
     onRestart: restart,
+    onRotate: (delta: number) => renderer.rotateView(delta),
     onZoom: (factor) => renderer.zoomBy(factor),
     aimFrom: (clientX, clientY) => {
       const world = renderer.pointerToWorld(clientX, clientY);
@@ -447,6 +448,8 @@ async function main(): Promise<void> {
       peakSpot: peakSpot(state),
       faces: renderer.faceCount,
       playerHidden: renderer.playerHidden,
+      view: renderer.view,
+      faded: renderer.fadedCount,
       /** Roca visible mas cercana. La usa la prueba de humo para ir a la montana. */
       mineralSpot: mineralSpot(state),
       effects: effects.tally,

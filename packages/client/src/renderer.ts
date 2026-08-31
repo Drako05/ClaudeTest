@@ -26,13 +26,16 @@ import type { Chunk, GameState, World } from '@verdant/sim';
 import { actionArea, daylight, groundHeight, MAX_LEVEL } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
 import { progressOf, type Effects } from './effects.js';
-import { groundPieces } from './terrain-draw.js';
+import { groundPieces, type GroundPiece } from './terrain-draw.js';
 import type { TileBounds } from './relief-faces.js';
 import {
+  currentView,
   depthOf,
+  depthRowOf,
   heightOffset,
   LEVEL_PX,
   screenToWorld,
+  setView,
   TILE_DIAMOND,
   TILE_H,
   TILE_W,
@@ -43,6 +46,7 @@ import {
   CHUNK_BOX_OFFSET_X,
   CHUNK_BOX_W,
   blockReliefMargin,
+  makeEdgeCueArt,
   makeFaceArt,
   makeFeatureArt,
   makePlayerArt,
@@ -356,6 +360,29 @@ export class Renderer {
     }
   }
 
+  /** Desde que esquina se mira el mundo ahora mismo. */
+  get view(): number {
+    return currentView();
+  }
+
+  /**
+   * Gira la camara un cuarto de vuelta.
+   *
+   * Se tira todo lo dibujado y se reconstruye: las posiciones de cada pieza
+   * cambian y no hay atajo. Las TEXTURAS si sobreviven —una cima se cachea por la
+   * forma de sus esquinas y una cara por su desnivel, y ninguna de las dos cosas
+   * depende del angulo—, asi que volver a una vista ya vista solo cuesta crear
+   * sprites.
+   *
+   * Es un tiron de un frame, y es el precio del corte seco. Animar el giro no es
+   * posible: a mitad de camino los rombos saldrian torcidos, porque el arte lleva
+   * la proyeccion horneada dentro.
+   */
+  rotateView(delta: number): void {
+    setView(currentView() + delta);
+    this.reset();
+  }
+
   zoomBy(factor: number): void {
     this.tilesOnScreen = Math.min(60, Math.max(9, this.tilesOnScreen * factor));
   }
@@ -395,9 +422,9 @@ export class Renderer {
     const playerScreen = worldToScreen(wx, wy);
     playerScreen.y += this.aimLift;
     this.player.position.set(playerScreen.x, playerScreen.y);
-    this.rowAt(Math.round(depthOf(wx, wy))).props.addChild(this.player);
+    this.rowAt(depthRowOf(wx, wy)).props.addChild(this.player);
 
-    this.fadeOccluders(state.world, wx, wy, playerScreen);
+    this.fadeOccluders(wx, wy, playerScreen);
     this.drawReticle(state.world, entities, playerId);
     this.drawEffects(state.world, effects);
     this.drawChunkGrid(state);
@@ -412,41 +439,36 @@ export class Renderer {
    * habitual, y la que usa la referencia que pidio el usuario, es volver
    * translucido lo que estorba en vez de moverlo o recortarlo.
    *
-   * Solo se examinan las pocas casillas que geometricamente PUEDEN tapar: las
-   * que estan por delante en profundidad y a un par de filas de distancia.
+   * Solo se examinan las filas que geometricamente PUEDEN tapar: las que van por
+   * delante en profundidad, hasta donde alcanza una pared alta.
    */
-  private fadeOccluders(
-    world: World,
-    wx: number,
-    wy: number,
-    playerScreen: { x: number; y: number },
-  ): void {
+  private fadeOccluders(wx: number, wy: number, playerScreen: { x: number; y: number }): void {
     for (const sprite of this.faded) sprite.alpha = 1;
     this.faded.length = 0;
 
-    const playerDepth = depthOf(wx, wy);
-    const playerTop = playerScreen.y - this.playerRise;
-    const tileX = Math.floor(wx);
-    const tileY = Math.floor(wy);
+    // Que estorba se decide recorriendo las FILAS que van por delante, no una
+    // ventana de casillas alrededor: con relieve, un arbol alto encaramado a
+    // cinco filas tapa tanto como el de al lado, y la ventana de 3x3 de antes ni
+    // lo miraba. Y se compara contra el pecho y la cabeza, no contra la caja
+    // entera: la casilla de justo delante siempre roza los PIES, asi que por
+    // cajas se atenuaria practicamente todo y dejaria de significar nada.
+    //
+    // La version anterior miraba `sprite.zIndex`, que al pasar a contenedores por
+    // fila dejo de asignarse y valia cero en todas las features. En coordenadas
+    // positivas eso hacia que **no se atenuara nada**, y en negativas que se
+    // atenuara todo: media pantalla del mundo bien y la otra media mal.
+    const chest = { x: playerScreen.x, y: playerScreen.y - this.playerRise * 0.5 };
+    const head = { x: playerScreen.x, y: playerScreen.y - this.playerRise * 0.85 };
+    const from = depthRowOf(wx, wy) + 1;
 
-    for (let dy = 0; dy <= 3; dy++) {
-      for (let dx = 0; dx <= 3; dx++) {
-        const tx = tileX + dx;
-        const ty = tileY + dy;
-        const sprite = this.featureByTile.get(`${tx},${ty}`);
-        if (!sprite || sprite.zIndex <= playerDepth) continue;
-
-        const foot = worldToScreen(tx + 0.5, ty + 0.5);
-        foot.y += heightOffset(world.groundHeightAt(tx + 0.5, ty + 0.5));
-        const rise = sprite.texture.height * sprite.anchor.y;
-        const halfWidth = sprite.texture.width / 2;
-
-        // Solapa horizontalmente con el cuerpo del jugador, y su copa llega lo
-        // bastante arriba como para cubrirlo.
-        if (Math.abs(foot.x - playerScreen.x) > halfWidth + TILE_W / 2) continue;
-        if (foot.y - rise > playerScreen.y) continue;
-        if (foot.y < playerTop) continue;
-
+    for (let k = from; k <= from + OCCLUSION_ROWS; k++) {
+      const row = this.rows.get(k);
+      if (!row) continue;
+      for (const child of row.props.children) {
+        if (child === this.player) continue;
+        const sprite = child as Sprite;
+        const box = spriteBox(sprite);
+        if (!contains(box, chest) && !contains(box, head)) continue;
         sprite.alpha = 0.34;
         this.faded.push(sprite);
       }
@@ -468,13 +490,6 @@ export class Renderer {
     // tapa tanto como la de al lado. Como las piezas ya estan indexadas por
     // profundidad, se recorren las filas de delante y se compara caja contra
     // caja; son unos cientos de rectangulos.
-    // Se miran dos puntos —el pecho y la cabeza—, no la caja entera. La casilla
-    // de justo delante siempre roza los PIES del personaje, asi que comparando
-    // cajas la silueta saldria practicamente siempre y dejaria de significar
-    // nada. Lo que de verdad estorba es lo que le tapa el cuerpo.
-    const chest = { x: playerScreen.x, y: playerScreen.y - this.playerRise * 0.5 };
-    const head = { x: playerScreen.x, y: playerScreen.y - this.playerRise * 0.85 };
-    const from = Math.round(depthOf(wx, wy)) + 1;
     let hidden = false;
     for (let k = from; k <= from + OCCLUSION_ROWS && !hidden; k++) {
       const row = this.rows.get(k);
@@ -790,30 +805,24 @@ export class Renderer {
     // se convierten en sprites: asi la regla de quien tapa a quien se puede
     // afirmar en un test de Node, que es lo que faltaba cuando se rompio.
     for (const piece of groundPieces(world, chunk, bounds)) {
-      const art =
-        piece.kind === 'top'
-          ? this.topTexture(
-              piece.terrain,
-              piece.rampDir,
-              shadeStepAt(world.seed, piece.wx, piece.wy),
-            )
-          : this.faceTexture(piece.face!);
+      const art = this.pieceTexture(piece, shadeStepAt(world.seed, piece.wx, piece.wy));
       if (!art) continue;
 
       const o = worldToScreen(piece.wx, piece.wy);
-      // La cima se ancla en la esquina norte; una cara, en la esquina cercana de
-      // su borde: la E para la del este y la O para la del sur.
+      // La cima y las senales traseras se anclan en la esquina norte; una cara,
+      // en la esquina cercana de su borde: la E para la del este y la O para la
+      // del sur.
       const anchor =
-        piece.kind === 'top'
-          ? { x: 0, y: 0 }
-          : piece.kind === 'east'
-            ? { x: TILE_W / 2, y: TILE_H / 2 }
-            : { x: -TILE_W / 2, y: TILE_H / 2 };
+        piece.kind === 'east'
+          ? { x: TILE_W / 2, y: TILE_H / 2 }
+          : piece.kind === 'south'
+            ? { x: -TILE_W / 2, y: TILE_H / 2 }
+            : { x: 0, y: 0 };
 
       const sprite = new Sprite(art.texture);
       sprite.anchor.set(art.ax, art.ay);
       sprite.position.set(o.x + anchor.x, o.y + anchor.y + heightOffset(piece.anchorHeight));
-      this.rowAt(piece.wx + piece.wy).ground.addChild(sprite);
+      this.rowAt(depthOf(piece.wx, piece.wy)).ground.addChild(sprite);
       const tileKey = `${piece.wx},${piece.wy}`;
       const atTile = this.groundByTile.get(tileKey);
       if (atTile) atTile.push(sprite);
@@ -824,19 +833,31 @@ export class Renderer {
     return sprites;
   }
 
-  private topTexture(
-    terrain: number,
-    rampDir: number,
+  /**
+   * La textura de una pieza de terreno, cacheada por su FORMA.
+   *
+   * Ni el nivel ni la vista entran en la clave: una cima depende de como caigan
+   * sus cuatro esquinas y una senal de cuanto desnivel delata; la altura y el
+   * angulo los pone la posicion del sprite. Sin eso habria una textura por
+   * altitud y el cache no serviria de nada.
+   */
+  private pieceTexture(
+    piece: GroundPiece,
     shadeStep: number,
   ): { texture: Texture; ax: number; ay: number } | null {
-    // El nivel NO entra en la clave: la forma de una cima solo depende de su
-    // talud, y la altura la pone la posicion del sprite. Sin eso habria una
-    // textura por altitud y el cache no serviria de nada.
-    const key = `${terrain}|${rampDir}|${shadeStep}`;
+    if (piece.kind === 'east' || piece.kind === 'south') return this.faceTexture(piece.face!);
+
+    const key =
+      piece.kind === 'top'
+        ? `top|${piece.terrain}|${shadeStep}|${piece.corners.join(',')}`
+        : `${piece.kind}|${piece.drop}`;
     const cached = this.topTextures.get(key);
     if (cached !== undefined) return cached;
 
-    const art = makeTopArt(terrain, 0, rampDir, shadeStep);
+    const art =
+      piece.kind === 'top'
+        ? makeTopArt(piece.terrain, shadeStep, piece.corners)
+        : makeEdgeCueArt(piece.kind, piece.drop);
     if (!art) {
       this.topTextures.set(key, null);
       return null;
@@ -887,7 +908,7 @@ export class Renderer {
         const sprite = new Sprite(art.texture);
         sprite.anchor.set(art.ax, art.ay);
         sprite.position.set(p.x, p.y + heightOffset(height));
-        this.rowAt(wx + wy).props.addChild(sprite);
+        this.rowAt(depthOf(wx, wy)).props.addChild(sprite);
         const tileKey = `${wx},${wy}`;
         this.featureByTile.set(tileKey, sprite);
         this.featureKeys.set(sprite, tileKey);
@@ -993,6 +1014,17 @@ export class Renderer {
    */
   get playerHidden(): boolean {
     return this.playerGhost.visible;
+  }
+
+  /**
+   * Cuantas cosas se estan atenuando por tapar al personaje.
+   *
+   * Lo expone porque el fallo que hubo aqui —comparar un `zIndex` que ya no se
+   * asignaba— hacia que en media pantalla del mundo no se atenuara nada, y eso no
+   * lo detecta ningun test unitario: hay que jugar. La prueba de humo lo mide.
+   */
+  get fadedCount(): number {
+    return this.faded.length;
   }
 
   /** Piezas de mundo dibujadas: suelo, relieve, features y personaje. */

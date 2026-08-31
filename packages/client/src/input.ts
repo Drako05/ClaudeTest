@@ -8,11 +8,14 @@
  */
 
 import { emptyIntent, type Intent } from '@verdant/shared';
+import { toWorldSpace } from './projection.js';
 
 export interface InputActions {
   onRestart: () => void;
   /** Factor < 1 acerca, > 1 aleja. */
   onZoom: (factor: number) => void;
+  /** Gira la camara un cuarto de vuelta, en un sentido o en el otro. */
+  onRotate: (delta: number) => void;
   /**
    * Direccion del personaje al punto de pantalla indicado, o null si todavia no
    * se puede saber.
@@ -106,6 +109,15 @@ export class Input {
           break;
         case 'KeyR':
           this.actions.onRestart();
+          break;
+        // Coma y punto, no Q y E: la E ya era comer, y cambiar una tecla que
+        // funciona para meter otra no es decision del agente. Son ademas el par
+        // de girar de toda la vida en las isometricas de estrategia.
+        case 'Comma':
+          this.actions.onRotate(-1);
+          break;
+        case 'Period':
+          this.actions.onRotate(1);
           break;
         case 'Equal':
         case 'NumpadAdd':
@@ -215,6 +227,8 @@ export class Input {
     for (const [element, run] of [
       [eat, () => (this.eatQueued = true)],
       [document.getElementById('btnPlant'), () => (this.plantQueued = true)],
+      [document.getElementById('btnRotL'), () => this.actions.onRotate(-1)],
+      [document.getElementById('btnRotR'), () => this.actions.onRotate(1)],
     ] as Array<[HTMLElement | null, () => void]>) {
       if (!element) continue;
       const press = (e: Event) => {
@@ -384,6 +398,15 @@ export class Input {
       if (this.held.has('KeyW') || this.held.has('ArrowUp')) intent.moveY -= 1;
       if (this.held.has('KeyS') || this.held.has('ArrowDown')) intent.moveY += 1;
     }
+
+    // Hasta aqui el vector esta en coordenadas de la VISTA: pulsar arriba tiene
+    // que seguir siendo arriba en pantalla aunque la camara este girada. La
+    // Intent, en cambio, es de mundo y tiene que serlo —es lo que le permitira
+    // viajar por red sin enterarse de que existe una camara—, asi que se rota
+    // aqui, en el input, que es quien conoce el dispositivo y el encuadre.
+    const world = toWorldSpace(intent.moveX, intent.moveY);
+    intent.moveX = world.x;
+    intent.moveY = world.y;
 
     // En tactil no hay cursor, asi que la mirada sigue al joystick, que es lo
     // que ya hacia. Con raton manda el cursor. En reposo no hay apuntado y la

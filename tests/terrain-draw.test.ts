@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { CHUNK_SIZE } from '@verdant/shared';
 import { World } from '@verdant/sim';
+import { setView, toWorldSpace, VIEW_COUNT } from '../packages/client/src/projection.js';
 import {
   depthOfPiece,
   groundPieces,
+  MAX_CUE_DROP,
   overlaps,
   type GroundPiece,
 } from '../packages/client/src/terrain-draw.js';
@@ -23,6 +25,8 @@ import {
  */
 
 const SEEDS = [12345, 7, 999];
+
+afterEach(() => setView(0));
 
 /** Un chunk del mundo de prueba con relieve suficiente para que haya solapes. */
 function chunkWithRelief(world: World): ReturnType<World['getChunk']> {
@@ -50,28 +54,32 @@ function chunkWithRelief(world: World): ReturnType<World['getChunk']> {
 describe('Quien tapa a quien', () => {
   for (const seed of SEEDS) {
     it(`semilla ${seed}: dos piezas que se solapan van en orden de profundidad`, () => {
-      // Es el fallo convertido en regresion. Con la arquitectura vieja —todas las
-      // caras despues de todas las cimas— esta comprobacion falla.
-      const world = new World(seed);
-      const pieces = groundPieces(world, chunkWithRelief(world));
-      expect(pieces.length).toBeGreaterThan(CHUNK_SIZE * CHUNK_SIZE);
+      // Es el fallo convertido en regresion, y se corre en las CUATRO vistas: la
+      // camara gira, y si la profundidad no girara con ella cada pieza acabaria
+      // en la fila equivocada y el dibujo se vendria abajo en tres de las cuatro.
+      for (let v = 0; v < VIEW_COUNT; v++) {
+        setView(v);
+        const world = new World(seed);
+        const pieces = groundPieces(world, chunkWithRelief(world));
+        expect(pieces.length).toBeGreaterThan(CHUNK_SIZE * CHUNK_SIZE);
 
-      let compared = 0;
-      for (let i = 0; i < pieces.length; i++) {
-        const a = pieces[i];
-        for (let j = i + 1; j < pieces.length; j++) {
-          const b = pieces[j];
-          // `b` se dibuja despues, asi que no puede estar mas atras que `a`.
-          if (!overlaps(a.box, b.box)) continue;
-          expect(
-            depthOfPiece(b),
-            `(${b.wx}, ${b.wy}) ${b.kind} se dibuja sobre (${a.wx}, ${a.wy}) ${a.kind}, ` +
-              'que esta mas cerca de la camara',
-          ).toBeGreaterThanOrEqual(depthOfPiece(a));
-          compared++;
+        let compared = 0;
+        for (let i = 0; i < pieces.length; i++) {
+          const a = pieces[i];
+          for (let j = i + 1; j < pieces.length; j++) {
+            const b = pieces[j];
+            // `b` se dibuja despues, asi que no puede estar mas atras que `a`.
+            if (!overlaps(a.box, b.box)) continue;
+            expect(
+              depthOfPiece(b),
+              `vista ${v}: (${b.wx}, ${b.wy}) ${b.kind} se dibuja sobre ` +
+                `(${a.wx}, ${a.wy}) ${a.kind}, que esta mas cerca de la camara`,
+            ).toBeGreaterThanOrEqual(depthOfPiece(a));
+            compared++;
+          }
         }
+        expect(compared, `vista ${v}: no hubo ni un solape que comprobar`).toBeGreaterThan(100);
       }
-      expect(compared, 'no hubo ni un solape que comprobar').toBeGreaterThan(100);
     });
   }
 
@@ -148,7 +156,7 @@ describe('La geometria de cada pieza', () => {
     }
   });
 
-  it('cada tile aporta su cima y como mucho sus dos costados', () => {
+  it('cada tile aporta su cima, sus dos costados y sus dos senales', () => {
     const world = new World(7);
     const counts = new Map<string, number>();
     for (const piece of groundPieces(world, chunkWithRelief(world))) {
@@ -157,8 +165,64 @@ describe('La geometria de cada pieza', () => {
     }
     expect(counts.size).toBe(CHUNK_SIZE * CHUNK_SIZE);
     for (const [key, n] of counts) {
-      expect(n, `el tile (${key}) aporta ${n} piezas`).toBeLessThanOrEqual(3);
+      expect(n, `el tile (${key}) aporta ${n} piezas`).toBeLessThanOrEqual(5);
       expect(n).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('Las dos caras que se ven, y las dos que no', () => {
+  it('en cada vista se dibujan los dos costados que dan a la camara', () => {
+    // Cuales son los dos cambia al girar. Si se quedaran fijos, en tres de las
+    // cuatro vistas se dibujarian las paredes del lado que el propio bloque tapa
+    // y faltarian las que si se ven.
+    for (let v = 0; v < VIEW_COUNT; v++) {
+      setView(v);
+      const world = new World(12345);
+      const pieces = groundPieces(world, chunkWithRelief(world));
+      const ahead = { east: toWorldSpace(1, 0), south: toWorldSpace(0, 1) };
+
+      let checked = 0;
+      for (const piece of pieces) {
+        if (piece.kind !== 'east' && piece.kind !== 'south') continue;
+        const d = ahead[piece.kind];
+        const here = world.levelAt(piece.wx, piece.wy);
+        const there = world.levelAt(piece.wx + d.x, piece.wy + d.y);
+        // El costado cuelga hacia el vecino que queda DELANTE, y ese vecino tiene
+        // que estar mas abajo: si no, no habria pared que ver.
+        expect(there, `vista ${v}: cara hacia arriba en (${piece.wx}, ${piece.wy})`).toBeLessThan(
+          here + 1,
+        );
+        checked++;
+      }
+      expect(checked, `vista ${v}: ni un costado`).toBeGreaterThan(10);
+    }
+  });
+
+  it('las senales de altura van solo en las dos aristas SIN cara', () => {
+    // Son las traseras: las que tapa el propio bloque. Puestas delante, taparian
+    // la pared que si se ve, y ademas serian redundantes.
+    for (let v = 0; v < VIEW_COUNT; v++) {
+      setView(v);
+      const world = new World(7);
+      const pieces = groundPieces(world, chunkWithRelief(world));
+      const behind = { backEast: toWorldSpace(0, -1), backWest: toWorldSpace(-1, 0) };
+
+      let cues = 0;
+      for (const piece of pieces) {
+        if (piece.kind !== 'backEast' && piece.kind !== 'backWest') continue;
+        const d = behind[piece.kind];
+        const here = world.levelAt(piece.wx, piece.wy);
+        const there = world.levelAt(piece.wx + d.x, piece.wy + d.y);
+        // La senal solo existe donde hay desnivel de verdad hacia atras.
+        expect(there, `vista ${v}: senal sin desnivel en (${piece.wx}, ${piece.wy})`).toBeLessThan(
+          here,
+        );
+        expect(piece.drop).toBeGreaterThan(0);
+        expect(piece.drop).toBeLessThanOrEqual(MAX_CUE_DROP);
+        cues++;
+      }
+      expect(cues, `vista ${v}: ni una senal de altura`).toBeGreaterThan(0);
     }
   });
 });
