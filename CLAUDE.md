@@ -138,10 +138,18 @@ Esto es el resumen operativo.
 
 20. **Un escalon mirado por detras no se ve, asi que se dibuja lo que deja.** Los
     dos costados traseros de un bloque los tapa el propio bloque; sin nada mas,
-    un escalon por detras es indistinguible de terreno llano. En su sitio van dos
-    cosas que si se ven: el **filo iluminado** de la arista y la **sombra**
-    translucida que proyecta hacia atras. Translucida a proposito: detras hay
-    terreno de verdad y tiene que seguir viendose.
+    un escalon por detras es indistinguible de terreno llano —de hecho, un bloque
+    subido un nivel cae en pantalla justo donde estaria el suelo llano dos filas
+    mas atras, asi que la ambiguedad es exacta—. En su sitio van dos cosas que si
+    se ven: el **filo iluminado** de la arista y la **sombra** translucida que
+    proyecta hacia atras. Translucida a proposito: detras hay terreno de verdad y
+    tiene que seguir viendose.
+
+    La sombra va **tumbada en el plano del suelo**, alejandose en la direccion de
+    «una fila hacia atras». Extruirla en vertical dibuja una superficie vertical,
+    y en isometrica eso es una PARED: se veia como un panel oscuro de pie sobre
+    la arista, y el autor lo noto a la primera. `tests/terrain-draw.test.ts` fija
+    la direccion.
 
 ## Regla de trabajo con el autor
 

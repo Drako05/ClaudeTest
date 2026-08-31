@@ -163,46 +163,67 @@ export function makeTopArt(
  * no se ve, sino sus DOS consecuencias: el canto, que da la luz, y la sombra que
  * proyecta hacia atras. El ojo reconstruye la altura solo.
  *
- * La sombra es translucida a proposito: por detras hay terreno de verdad y tiene
- * que seguir viendose. Un relleno opaco seria inventarse una pared.
+ * La sombra va **tumbada en el plano del suelo**, alejandose de la arista hacia
+ * atras. Extruirla en vertical dibuja una superficie vertical, y en isometrica
+ * eso es una pared: se veia como un panel oscuro de pie sobre la arista, que fue
+ * lo que el autor noto mal a la primera.
  */
-export function makeEdgeCueArt(kind: 'backEast' | 'backWest', drop: number): FeatureArt | null {
-  const rise = drop * LEVEL_PX;
-  const width = TILE_W / 2 + 2;
-  const height = TILE_H / 2 + rise + 2;
-  const made = newCanvas(Math.ceil(width), Math.ceil(height));
+export function makeEdgeCueArt(
+  kind: 'backEast' | 'backWest',
+  offset: { x: number; y: number },
+): FeatureArt | null {
+  // La arista, en pixeles y relativa a la esquina norte del tile: baja hacia la
+  // derecha en la de atras-este y hacia la izquierda en la de atras-oeste.
+  const far = { x: kind === 'backEast' ? TILE_W / 2 : -TILE_W / 2, y: TILE_H / 2 };
+  const quad = [
+    { x: 0, y: 0 },
+    far,
+    { x: far.x + offset.x, y: far.y + offset.y },
+    offset,
+  ];
+
+  const minX = Math.min(...quad.map((p) => p.x));
+  const maxX = Math.max(...quad.map((p) => p.x));
+  const minY = Math.min(...quad.map((p) => p.y));
+  const maxY = Math.max(...quad.map((p) => p.y));
+
+  const made = newCanvas(Math.ceil(maxX - minX) + 2, Math.ceil(maxY - minY) + 2);
   if (!made) return null;
   const [canvas, ctx] = made;
 
-  // Origen: la esquina norte del tile. La arista baja hacia la derecha en la de
-  // atras-este y hacia la izquierda en la de atras-oeste.
-  const ox = kind === 'backEast' ? 1 : width - 1;
-  const oy = rise + 1;
-  const fx = kind === 'backEast' ? width - 1 : 1;
-  const fy = oy + TILE_H / 2;
+  // El ancla es la esquina norte del tile; el lienzo se coloca alrededor.
+  const ox = 1 - minX;
+  const oy = 1 - minY;
+  const at = (p: { x: number; y: number }) => ({ x: ox + p.x, y: oy + p.y });
 
-  // La sombra ocupa justo donde estaria el muro que no se ve.
-  const gradient = ctx.createLinearGradient(0, oy - rise, 0, oy);
-  gradient.addColorStop(0, 'rgba(8,12,20,0)');
-  gradient.addColorStop(1, 'rgba(8,12,20,0.42)');
+  // La sombra se degrada A LO LARGO de su desplazamiento: negra pegada a la
+  // arista y transparente en su extremo. Translucida a proposito: por detras hay
+  // terreno de verdad y tiene que seguir viendose.
+  const mid = at({ x: far.x / 2, y: far.y / 2 });
+  const gradient = ctx.createLinearGradient(mid.x, mid.y, mid.x + offset.x, mid.y + offset.y);
+  gradient.addColorStop(0, 'rgba(8,12,20,0.30)');
+  gradient.addColorStop(1, 'rgba(8,12,20,0)');
   ctx.fillStyle = gradient;
   ctx.beginPath();
-  ctx.moveTo(ox, oy);
-  ctx.lineTo(fx, fy);
-  ctx.lineTo(fx, fy - rise);
-  ctx.lineTo(ox, oy - rise);
+  quad.forEach((p, i) => {
+    const q = at(p);
+    if (i === 0) ctx.moveTo(q.x, q.y);
+    else ctx.lineTo(q.x, q.y);
+  });
   ctx.closePath();
   ctx.fill();
 
   // Y el canto, del lado del tile alto.
+  const a = at({ x: 0, y: 0 });
+  const b = at(far);
   ctx.strokeStyle = 'rgba(255,255,255,0.30)';
   ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.moveTo(ox, oy);
-  ctx.lineTo(fx, fy);
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
   ctx.stroke();
 
-  return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height, riseAbove: 0 };
+  return { canvas, anchorX: a.x / canvas.width, anchorY: a.y / canvas.height, riseAbove: 0 };
 }
 
 /** De que lado de un tile cuelga una cara. */

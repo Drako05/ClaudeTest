@@ -69,6 +69,31 @@ export interface GroundPiece {
 export const MAX_CUE_DROP = 3;
 
 /**
+ * Cuanto se aleja la sombra de su arista, en fraccion de casilla.
+ *
+ * Crece con el desnivel —un bloque mas alto proyecta mas sombra— pero acotada:
+ * pasada la casilla, la mancha se derramaria sobre varias filas de terreno de
+ * atras y dejaria de leerse como la sombra de ESTE escalon.
+ */
+export function cueExtent(drop: number): number {
+  return 0.2 + 0.15 * Math.min(drop, MAX_CUE_DROP);
+}
+
+/**
+ * Direccion en la que se tumba la sombra de una arista trasera, en pixeles.
+ *
+ * Es el desplazamiento de «una fila hacia atras» en pantalla, o sea el vector
+ * que separa un tile de su vecino de detras. Esto es lo que hace que la sombra
+ * quede **tumbada en el plano del suelo**. Extruirla en vertical, que es lo que
+ * hacia antes, dibuja una superficie vertical: en isometrica eso es una PARED,
+ * no una sombra, y se veia como un panel oscuro flotando sobre la arista.
+ */
+export function cueOffset(kind: 'backEast' | 'backWest', drop: number): { x: number; y: number } {
+  const t = cueExtent(drop);
+  return { x: (kind === 'backEast' ? TILE_W / 2 : -TILE_W / 2) * t, y: (-TILE_H / 2) * t };
+}
+
+/**
  * Profundidad de una pieza. Es lo unico que decide quien tapa a quien.
  *
  * Pasa por `depthOf`, que rota con la camara. Sumar `wx + wy` a pelo funciona en
@@ -259,17 +284,23 @@ function neighbourEdgeHeight(
   return groundHeight(world.gen.levelAt(nx, ny), world.gen.rampDirAt(nx, ny), theirs.fx, theirs.fy);
 }
 
-/** Caja de una senal de arista trasera: la arista y la sombra que sube de ella. */
+/**
+ * Caja de una senal de arista trasera: la arista y la sombra tumbada tras ella.
+ *
+ * La sombra se aleja HACIA ATRAS, hacia profundidad menor, que es donde esta el
+ * terreno que se dibujo antes y sobre el que puede pintar. Si creciera hacia
+ * delante pisaria piezas que van despues y romperia el orden.
+ */
 function cueBox(wx: number, wy: number, kind: 'backEast' | 'backWest', level: number, drop: number): Box {
   const o = worldToScreen(wx, wy);
   const lift = heightOffset(level);
   const far = kind === 'backEast' ? TILE_DIAMOND[1] : TILE_DIAMOND[3];
-  const shade = drop * -heightOffset(1);
+  const d = cueOffset(kind, drop);
   return boxOf([
-    { x: o.x, y: o.y + lift - shade },
-    { x: o.x + far.x, y: o.y + far.y + lift - shade },
-    { x: o.x + far.x, y: o.y + far.y + lift },
     { x: o.x, y: o.y + lift },
+    { x: o.x + far.x, y: o.y + far.y + lift },
+    { x: o.x + far.x + d.x, y: o.y + far.y + lift + d.y },
+    { x: o.x + d.x, y: o.y + lift + d.y },
   ]);
 }
 
