@@ -26,7 +26,7 @@ import type { Chunk, GameState, World } from '@verdant/sim';
 import { actionArea, daylight, groundHeight, MAX_LEVEL } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
 import { progressOf, type Effects } from './effects.js';
-import { cueOffset, groundPieces, type GroundPiece } from './terrain-draw.js';
+import { cueOffset, groundPieces, type Box, type GroundPiece } from './terrain-draw.js';
 import type { TileBounds } from './relief-faces.js';
 import {
   currentView,
@@ -35,16 +35,15 @@ import {
   heightOffset,
   LEVEL_PX,
   screenToWorld,
+  type ScreenPoint,
   setView,
   TILE_DIAMOND,
   TILE_H,
   TILE_W,
+  tileOrigin,
   worldToScreen,
 } from './projection.js';
 import {
-  CHUNK_BOX_H,
-  CHUNK_BOX_OFFSET_X,
-  CHUNK_BOX_W,
   blockReliefMargin,
   makeEdgeCueArt,
   makeFaceArt,
@@ -135,6 +134,24 @@ const OCCLUSION_ROWS = 24;
 /** Buffer reutilizado al leer las features efectivas de un chunk. */
 const featureScratch = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
 
+/**
+ * Caja en pantalla de un cuadrado de `side` tiles, por sus cuatro esquinas.
+ *
+ * Proyectar las cuatro y quedarse con los extremos es exacto en las cuatro
+ * vistas. Tomar una sola esquina como «la de arriba» solo vale sin girar: al
+ * girar, esa esquina del mundo pasa a caer en otro sitio de la pantalla.
+ */
+function screenBoxOf(x0: number, y0: number, side: number): Box {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const [dx, dy] of [[0, 0], [side, 0], [side, side], [0, side]]) {
+    const s = worldToScreen(x0 + dx, y0 + dy);
+    xs.push(s.x);
+    ys.push(s.y);
+  }
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) };
+}
+
 export class Renderer {
   readonly app: Application;
   private readonly camera = new Container();
@@ -180,6 +197,8 @@ export class Renderer {
    * que recorrer miles de sprites para encontrar los pocos que estorban.
    */
   private readonly groundByTile = new Map<string, Sprite[]>();
+  /** Separacion entre el pie del personaje y el rombo que pisa. Ver `footGap`. */
+  private foot: { dx: number; dy: number } | null = null;
   /** Features atenuadas este frame, para poder restaurarlas en el siguiente. */
   private readonly faded: Sprite[] = [];
   private player!: Sprite;
@@ -324,9 +343,10 @@ export class Renderer {
     for (const [key, view] of this.borders) {
       if (view.segments === 0) continue;
       const comma = key.indexOf(',');
-      const origin = worldToScreen(
+      const box = screenBoxOf(
         Number(key.slice(0, comma)) * CHUNK_SIZE,
         Number(key.slice(comma + 1)) * CHUNK_SIZE,
+        CHUNK_SIZE,
       );
       // Con la posicion del propio Graphics sumada, que es donde estaba el
       // fallo. Sin ella el error quedaria justo fuera de la medida.
@@ -339,10 +359,10 @@ export class Renderer {
       // a la cima de cada tile, asi que sobre una meseta sube por encima del
       // rombo plano, pero solo lo que ese chunk suba de verdad.
       const inside =
-        x0 >= origin.x - CHUNK_BOX_OFFSET_X - 1 &&
-        x1 <= origin.x + CHUNK_BOX_OFFSET_X + 1 &&
-        y0 >= origin.y - MAX_LEVEL * LEVEL_PX - 1 &&
-        y1 <= origin.y + CHUNK_BOX_H + LEVEL_PX + 1;
+        x0 >= box.x0 - 1 &&
+        x1 <= box.x1 + 1 &&
+        y0 >= box.y0 - MAX_LEVEL * LEVEL_PX - 1 &&
+        y1 <= box.y1 + LEVEL_PX + 1;
       if (!inside) bad++;
     }
     return bad;
@@ -423,12 +443,44 @@ export class Renderer {
     playerScreen.y += this.aimLift;
     this.player.position.set(playerScreen.x, playerScreen.y);
     this.rowAt(depthRowOf(wx, wy)).props.addChild(this.player);
+    this.measureFoot(wx, wy, playerScreen);
 
     this.fadeOccluders(wx, wy, playerScreen);
     this.drawReticle(state.world, entities, playerId);
     this.drawEffects(state.world, effects);
     this.drawChunkGrid(state);
     this.drawSky(state.tick, view.width, view.height);
+  }
+
+  /**
+   * Cuanto se separa el pie del personaje del centro del rombo que pisa.
+   *
+   * Se mide contra el SPRITE realmente dibujado —su posicion es la esquina norte
+   * del rombo—, no contra la formula que lo coloco: medirlo con `tileOrigin`
+   * seria comprobar que una funcion es igual a si misma, y este proyecto ya se
+   * ha llevado un susto con una prueba que pasaba por el motivo equivocado.
+   *
+   * Existe porque el terreno estuvo medio tile fuera de sitio en las tres vistas
+   * giradas y **no habia forma de verlo desde fuera**: el paisaje se desplazaba
+   * entero y seguia siendo coherente consigo mismo. Lo que se descolgaba era lo
+   * que se apoya en el, que es justo lo que esto mide.
+   */
+  private measureFoot(wx: number, wy: number, playerScreen: ScreenPoint): void {
+    const pieces = this.groundByTile.get(`${Math.floor(wx)},${Math.floor(wy)}`);
+    const top = pieces?.[0];
+    if (!top) {
+      this.foot = null;
+      return;
+    }
+    this.foot = {
+      dx: playerScreen.x - top.position.x,
+      dy: playerScreen.y - (top.position.y + TILE_H / 2),
+    };
+  }
+
+  /** Lo anterior, para la prueba de humo. `null` si el tile no esta dibujado. */
+  get footGap(): { dx: number; dy: number } | null {
+    return this.foot;
   }
 
   /**
@@ -579,7 +631,7 @@ export class Renderer {
     this.reticle.clear();
     const area = actionArea(entities, playerId);
     for (let i = 0; i < area.length; i++) {
-      const p = worldToScreen(area[i].x, area[i].y);
+      const p = tileOrigin(area[i].x, area[i].y);
       // Cada casilla se marca a SU altura, que es lo que hace ver de un vistazo
       // que la de arriba de una pared no esta al alcance.
       const lift = heightOffset(world.levelAt(area[i].x, area[i].y));
@@ -635,9 +687,9 @@ export class Renderer {
       const [aimed, left, right] = slash.tiles;
       const path = [left, aimed, right].filter(Boolean);
       const points = path.map((tile) => {
-        const p = worldToScreen(tile.x, tile.y);
+        const p = worldToScreen(tile.x + 0.5, tile.y + 0.5);
         const lift = heightOffset(world.levelAt(tile.x, tile.y));
-        return { x: p.x, y: p.y + lift + TILE_H / 2 - TILE_H * 0.9 };
+        return { x: p.x, y: p.y + lift - TILE_H * 0.9 };
       });
       if (points.length < 2) continue;
 
@@ -656,7 +708,11 @@ export class Renderer {
       const x = screen.x - half;
       // La altura del escombro es la del mundo, asi que se mide con la misma
       // vara que el relieve: si no, los escombros de una meseta caerian al mar.
-      const y = screen.y + TILE_H / 2 - p.z * LEVEL_PX - half;
+      // Sin medio tile de mas: la particula ya lleva posicion continua dentro de
+      // su casilla, asi que `worldToScreen` da su punto exacto. Sumarle medio
+      // tile era el ajuste de «esquina norte a centro» aplicado donde no tocaba,
+      // y dejaba los escombros medio tile por debajo de donde caian.
+      const y = screen.y - p.z * LEVEL_PX - half;
       // Se apaga al final, no de golpe.
       const alpha = Math.min(1, (1 - t) * 2.2);
 
@@ -682,11 +738,15 @@ export class Renderer {
     const baseX = chunk.cx * CHUNK_SIZE + bounds.x0;
     const baseY = chunk.cy * CHUNK_SIZE + bounds.y0;
     const side = bounds.x1 - bounds.x0;
-    const origin = worldToScreen(baseX, baseY);
-    const boxW = side * TILE_W;
-    const boxH = side * TILE_H + relief.top + relief.bottom;
-    const left = this.camera.x + (origin.x - boxW / 2) * scale;
-    const top = this.camera.y + (origin.y - relief.top) * scale;
+    // La caja sale de las CUATRO esquinas del bloque proyectadas, no de una sola
+    // dando por hecho que es la de arriba. Al girar la camara esa esquina pasa a
+    // ser otra y la caja se iba hasta 128 px de ancho: con una holgura de un
+    // tile, eso descartaba bloques que si se veian.
+    const box = screenBoxOf(baseX, baseY, side);
+    const boxW = box.x1 - box.x0;
+    const boxH = box.y1 - box.y0 + relief.top + relief.bottom;
+    const left = this.camera.x + box.x0 * scale;
+    const top = this.camera.y + (box.y0 - relief.top) * scale;
     const margin = TILE_W * scale; // holgura para objetos altos que sobresalen
     return (
       left + boxW * scale > -margin &&
@@ -808,7 +868,7 @@ export class Renderer {
       const art = this.pieceTexture(piece, shadeStepAt(world.seed, piece.wx, piece.wy));
       if (!art) continue;
 
-      const o = worldToScreen(piece.wx, piece.wy);
+      const o = tileOrigin(piece.wx, piece.wy);
       // La cima y las senales traseras se anclan en la esquina norte; una cara,
       // en la esquina cercana de su borde: la E para la del este y la O para la
       // del sur.

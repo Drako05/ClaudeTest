@@ -13,9 +13,7 @@
 
 import { biomeOfTerrain, CHUNK_SIZE, type Terrain } from '@verdant/shared';
 import { groundHeight, type Chunk, type World } from '@verdant/sim';
-import { heightOffset, TILE_DIAMOND, worldToScreen } from './projection.js';
-
-const [, EAST, SOUTH, WEST] = TILE_DIAMOND;
+import { heightOffset, worldToScreen } from './projection.js';
 
 /**
  * Segmentos `[x0, y0, x1, y1, ...]` del contorno de biomas de un chunk.
@@ -50,23 +48,32 @@ export function collectBiomeEdges(world: World, chunk: Chunk): number[] {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
       const idx = ly * CHUNK_SIZE + lx;
       const mine = biomeAt(lx, ly);
-      const p = worldToScreen(baseX + lx, baseY + ly);
-      // El contorno se pega a la cima del tile, no al plano cero: sobre relieve,
-      // trazarlo a ras de suelo lo dejaria flotando bajo los acantilados.
+      const wx = baseX + lx;
+      const wy = baseY + ly;
       const level = chunk.level[idx];
       const ramp = chunk.rampDir[idx];
-      const east = heightOffset(groundHeight(level, ramp, 1, 0));
-      const south = heightOffset(groundHeight(level, ramp, 1, 1));
-      const west = heightOffset(groundHeight(level, ramp, 0, 1));
 
-      // Al este: la arista compartida va de la esquina este a la sur.
+      // Una esquina del tile, por sus coordenadas del MUNDO. Proyectar el punto
+      // del mundo es exacto en las cuatro vistas; ir por la esquina de PANTALLA
+      // no lo es, porque al girar cada esquina cambia de sitio y la altura que le
+      // toca cambia con ella. El contorno se pega a la cima y no al plano cero:
+      // sobre relieve, a ras de suelo quedaria flotando bajo los acantilados.
+      const corner = (dx: number, dy: number): { x: number; y: number } => {
+        const s = worldToScreen(wx + dx, wy + dy);
+        return { x: s.x, y: s.y + heightOffset(groundHeight(level, ramp, dx, dy)) };
+      };
+
+      // La arista que se comparte con el vecino del este va de la esquina (1,0)
+      // a la (1,1); la del sur, de la (1,1) a la (0,1).
       if (biomeAt(lx + 1, ly) !== mine) {
-        segments.push(p.x + EAST.x, p.y + EAST.y + east, p.x + SOUTH.x, p.y + SOUTH.y + south);
+        const a = corner(1, 0);
+        const b = corner(1, 1);
+        segments.push(a.x, a.y, b.x, b.y);
       }
-
-      // Al sur: de la esquina sur a la oeste.
       if (biomeAt(lx, ly + 1) !== mine) {
-        segments.push(p.x + SOUTH.x, p.y + SOUTH.y + south, p.x + WEST.x, p.y + WEST.y + west);
+        const a = corner(1, 1);
+        const b = corner(0, 1);
+        segments.push(a.x, a.y, b.x, b.y);
       }
     }
   }

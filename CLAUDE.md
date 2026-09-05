@@ -38,6 +38,24 @@ Esto es el resumen operativo.
    movimiento se rota en `input.ts` **antes** de entrar en la Intent, para que la
    Intent siga siendo de mundo y pueda viajar por red (regla 5).
 
+   **`worldToScreen(wx, wy)` NO es la esquina norte del rombo del tile**, aunque
+   lo sea en la vista 0. La rotacion gira alrededor del origen, no del centro de
+   la casilla, asi que ese punto pasa a ser la esquina oeste en la vista 1, la sur
+   en la 2 y la este en la 3: dibujar el rombo desde ahi lo deja **medio tile
+   fuera de sitio** en tres de las cuatro vistas. Para eso esta `tileOrigin`, que
+   sale del centro —lo unico que el giro respeta— y baja media altura de tile.
+
+   Lo que hace ese fallo dificil de ver es que **no se nota en el terreno**: todas
+   sus piezas se corren igual y el paisaje sigue siendo coherente consigo mismo.
+   Se nota en lo que se apoya en el, que se situa por el centro del tile y por
+   tanto cae bien: arboles a caballo entre dos casillas y personajes naciendo del
+   costado de un bloque. El test de orden tampoco lo ve, porque afirma quien tapa
+   a quien, que es RELATIVO. Lo que lo cierra es afirmar **donde cae el rombo**:
+   sus cuatro esquinas tienen que ser las de su cuadrado del mundo, proyectadas.
+   Cuando necesites una esquina concreta, pidela por sus coordenadas de mundo
+   —`worldCorner`, o proyectar el punto directamente— y no por su sitio en
+   pantalla.
+
    Se gira porque con una sola vista la cara oculta de una montana es
    inexplorable: lo que hay al otro lado lo tapa la montana misma. Girar de forma
    continua no es posible —el arte lleva la proyeccion horneada dentro, asi que a

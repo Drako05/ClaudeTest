@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { CHUNK_SIZE } from '@verdant/shared';
-import { World } from '@verdant/sim';
+import { groundHeight, NO_RAMP, World } from '@verdant/sim';
 import {
   heightOffset,
   setView,
+  TILE_H,
+  TILE_W,
+  tileOrigin,
   toWorldSpace,
   VIEW_COUNT,
   worldToScreen,
@@ -281,7 +284,7 @@ describe('La sombra de una arista trasera va tumbada, y hacia atras', () => {
       let checked = 0;
       for (const piece of groundPieces(world, chunkWithRelief(world))) {
         if (piece.kind !== 'backEast' && piece.kind !== 'backWest') continue;
-        const tile = worldToScreen(piece.wx, piece.wy);
+        const tile = tileOrigin(piece.wx, piece.wy);
         // La caja llega mas arriba que la esquina norte del tile: eso es «hacia
         // atras» en pantalla. Con la sombra bien tumbada siempre se cumple.
         expect(piece.box.y0, `vista ${v}: la senal no se aleja hacia atras`).toBeLessThan(
@@ -290,6 +293,89 @@ describe('La sombra de una arista trasera va tumbada, y hacia atras', () => {
         checked++;
       }
       expect(checked, `vista ${v}: ni una senal`).toBeGreaterThan(0);
+    }
+  });
+});
+
+/**
+ * Donde cae el rombo de un tile.
+ *
+ * Faltaba, y por eso paso lo que paso. El terreno se dibuja desde
+ * `worldToScreen(wx, wy)` dando por hecho que es la esquina NORTE del rombo, y
+ * eso **solo es cierto en la vista 0**: `toViewSpace` gira alrededor del origen,
+ * asi que ese mismo punto del mundo pasa a ser la esquina oeste en la vista 1,
+ * la sur en la 2 y la este en la 3. El rombo entero acababa medio tile fuera de
+ * sitio.
+ *
+ * No se veia en el terreno —todas sus piezas se corren igual y el paisaje sigue
+ * siendo coherente consigo mismo— sino en lo que se apoya en el: la feature y el
+ * personaje se situan por el CENTRO del tile, que la rotacion respeta, asi que
+ * quedaban medio tile descolgados de su propio suelo. El autor lo describio como
+ * rocas a caballo entre dos casillas y arboles naciendo del costado de un bloque.
+ *
+ * El test de orden no podia verlo: afirma quien tapa a quien, que es RELATIVO, y
+ * un desplazamiento uniforme lo conserva entero.
+ */
+describe('El rombo de un tile cae donde esta el tile', () => {
+  /** Un tile llano del chunk, que es donde el rombo tiene forma exacta. */
+  function flatTops(world: World, chunk: ReturnType<World['getChunk']>): GroundPiece[] {
+    return groundPieces(world, chunk).filter(
+      (p) => p.kind === 'top' && p.rampDir === NO_RAMP && p.corners.every((c) => c === 0),
+    );
+  }
+
+  it('sus cuatro esquinas son las de su cuadrado del mundo', () => {
+    for (let v = 0; v < VIEW_COUNT; v++) {
+      setView(v);
+      const world = new World(12345);
+      const tops = flatTops(world, chunkWithRelief(world));
+      expect(tops.length, `vista ${v}: ni un tile llano`).toBeGreaterThan(0);
+
+      for (const piece of tops) {
+        // Las cuatro esquinas del MUNDO, proyectadas y subidas a su altura. Da
+        // igual cual de ellas caiga al norte en pantalla: la caja es la misma.
+        const lift = heightOffset(piece.anchorHeight);
+        const xs: number[] = [];
+        const ys: number[] = [];
+        for (const [dx, dy] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+          const s = worldToScreen(piece.wx + dx, piece.wy + dy);
+          xs.push(s.x);
+          ys.push(s.y + lift);
+        }
+        expect(piece.box.x0, `vista ${v}: rombo fuera de sitio en x`).toBeCloseTo(Math.min(...xs), 6);
+        expect(piece.box.x1, `vista ${v}: rombo fuera de sitio en x`).toBeCloseTo(Math.max(...xs), 6);
+        expect(piece.box.y0, `vista ${v}: rombo fuera de sitio en y`).toBeCloseTo(Math.min(...ys), 6);
+        expect(piece.box.y1, `vista ${v}: rombo fuera de sitio en y`).toBeCloseTo(Math.max(...ys), 6);
+      }
+    }
+  });
+
+  it('el pie de lo que se apoya en el tile cae DENTRO de su rombo', () => {
+    // El sintoma del autor, escrito tal cual: un arbol se coloca en el centro de
+    // su casilla y a la altura de ese centro, asi que tiene que pisar su propio
+    // rombo. Se comprueba contra el rombo y no contra su caja: medio tile de
+    // desfase cae justo en la esquina de la caja y se colaria.
+    for (let v = 0; v < VIEW_COUNT; v++) {
+      setView(v);
+      const world = new World(12345);
+      const chunk = chunkWithRelief(world);
+      let checked = 0;
+
+      for (const piece of groundPieces(world, chunk)) {
+        if (piece.kind !== 'top') continue;
+        const idx =
+          (piece.wy - chunk.cy * CHUNK_SIZE) * CHUNK_SIZE + (piece.wx - chunk.cx * CHUNK_SIZE);
+        const foot = worldToScreen(piece.wx + 0.5, piece.wy + 0.5);
+        foot.y += heightOffset(groundHeight(chunk.level[idx], chunk.rampDir[idx], 0.5, 0.5));
+
+        // Centro del rombo dibujado, y distancia al pie en unidades de rombo.
+        const cx = (piece.box.x0 + piece.box.x1) / 2;
+        const cy = (piece.box.y0 + piece.box.y1) / 2;
+        const inside = Math.abs(foot.x - cx) / (TILE_W / 2) + Math.abs(foot.y - cy) / (TILE_H / 2);
+        expect(inside, `vista ${v}: el pie no pisa su tile en (${piece.wx},${piece.wy})`).toBeLessThan(1.001);
+        checked++;
+      }
+      expect(checked, `vista ${v}: ni una cima`).toBeGreaterThan(0);
     }
   });
 });

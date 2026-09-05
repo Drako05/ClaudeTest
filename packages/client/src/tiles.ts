@@ -17,13 +17,6 @@ import type { Chunk } from '@verdant/sim';
 import { LOOKS, MINERAL_FACES, ROCK_FACES } from './palette.js';
 import { LEVEL_PX, TILE_H, TILE_W, worldToScreen } from './projection.js';
 
-/** Caja que ocupa el rombo de un chunk completo, en pixeles. */
-export const CHUNK_BOX_W = CHUNK_SIZE * TILE_W;
-/** Alto del rombo de un chunk sin contar el relieve. */
-export const CHUNK_BOX_H = CHUNK_SIZE * TILE_H;
-/** El rombo se extiende a izquierda y derecha del origen: hay que recentrarlo. */
-export const CHUNK_BOX_OFFSET_X = CHUNK_BOX_W / 2;
-
 /**
  * Cuanto sobresale un trozo de chunk por arriba y por abajo de su rombo plano.
  *

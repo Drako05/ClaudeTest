@@ -896,6 +896,21 @@ async function rotationPass(browser, baseUrl) {
     const now = await waitForLoop(page);
     check(now.view === i, `se esperaba la vista ${i} y hay la ${now.view}`);
     check(now.faces.drawn > 0, `la vista ${i} no dibujo relieve`);
+
+    // Que se dibujen caras no dice DONDE se dibujan. El terreno estuvo medio
+    // tile fuera de sitio en las tres vistas giradas y esta pasada no se entero:
+    // el paisaje se corre entero y sigue siendo coherente consigo mismo. Lo que
+    // se descuelga es lo que se apoya en el, asi que se mide eso — el pie del
+    // personaje contra el rombo que pisa, sobre el sprite realmente dibujado.
+    const gap = now.footGap;
+    check(gap !== null, `la vista ${i} no dibujo el suelo bajo el personaje`);
+    if (gap) {
+      console.log(`  vista ${i}: pie a (${gap.dx.toFixed(1)}, ${gap.dy.toFixed(1)}) px de su rombo`);
+      // En x no influye el relieve: un desfase ahi es geometria mal puesta.
+      check(Math.abs(gap.dx) < 4, `vista ${i}: el suelo va ${gap.dx.toFixed(1)} px corrido en x`);
+      // En y se deja holgura para un talud, que inclina el rombo medio nivel.
+      check(Math.abs(gap.dy) < 10, `vista ${i}: el suelo va ${gap.dy.toFixed(1)} px corrido en y`);
+    }
     seen.push(now.faces.drawn);
     await page.screenshot({ path: join(SHOTS, `17-vista-${i}.png`) });
     await page.keyboard.press('Period');

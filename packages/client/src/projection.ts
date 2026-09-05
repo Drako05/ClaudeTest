@@ -111,6 +111,25 @@ export function screenToWorld(sx: number, sy: number): ScreenPoint {
 }
 
 /**
+ * Esquina NORTE del rombo de un tile: el origen desde el que se dibuja.
+ *
+ * **No es `worldToScreen(wx, wy)`**, y confundirlos costo caro. `toViewSpace`
+ * gira alrededor del ORIGEN, no del centro de la casilla, asi que el punto del
+ * mundo `(wx, wy)` —la esquina norte en la vista 0— pasa a ser la oeste en la
+ * vista 1, la sur en la 2 y la este en la 3. Dibujar el rombo desde ahi lo dejaba
+ * medio tile fuera de sitio en tres de las cuatro vistas.
+ *
+ * Lo que si respeta el giro es el CENTRO: la rotacion es lineal y el tile es
+ * simetrico, asi que el centro del cuadrado del mundo cae siempre en el centro
+ * del rombo. Desde el, la esquina norte esta a media altura de tile. Es la misma
+ * idea con la que `worldCorner` resolvio las caras.
+ */
+export function tileOrigin(wx: number, wy: number): ScreenPoint {
+  const c = worldToScreen(wx + 0.5, wy + 0.5);
+  return { x: c.x, y: c.y - TILE_H / 2 };
+}
+
+/**
  * Clave de ordenacion por profundidad.
  *
  * En isometrica el orden de dibujado ES la sensacion de volumen: lo que esta al

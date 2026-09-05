@@ -449,6 +449,7 @@ async function main(): Promise<void> {
       faces: renderer.faceCount,
       playerHidden: renderer.playerHidden,
       view: renderer.view,
+      footGap: renderer.footGap,
       faded: renderer.fadedCount,
       /** Roca visible mas cercana. La usa la prueba de humo para ir a la montana. */
       mineralSpot: mineralSpot(state),

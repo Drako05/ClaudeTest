@@ -1,8 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { groundHeight, World } from '@verdant/sim';
 import { biomeOfTerrain, CHUNK_SIZE, type Terrain } from '@verdant/shared';
 import { collectBiomeEdges } from '../packages/client/src/biome-edges.js';
-import { heightOffset, TILE_DIAMOND, worldToScreen } from '../packages/client/src/projection.js';
+import {
+  heightOffset,
+  setView,
+  TILE_DIAMOND,
+  VIEW_COUNT,
+  worldToScreen,
+} from '../packages/client/src/projection.js';
 
 /**
  * El contorno de biomas de las herramientas de desarrollo.
@@ -14,6 +20,8 @@ import { heightOffset, TILE_DIAMOND, worldToScreen } from '../packages/client/sr
  */
 
 const [, EAST, SOUTH, WEST] = TILE_DIAMOND;
+
+afterEach(() => setView(0));
 
 /** Los segmentos como cuartetos, para poder buscarlos. */
 function quads(segments: number[]): string[] {
@@ -199,5 +207,56 @@ describe('Contorno de biomas', () => {
     }
 
     expect(collectBiomeEdges(world, uniform).length / 4).toBe(expected);
+  });
+});
+
+/**
+ * El contorno con la camara girada.
+ *
+ * El resto del fichero mide en la vista 0, y ahi el fallo era invisible: el
+ * contorno se trazaba por las esquinas de PANTALLA —este, sur, oeste— desde
+ * `worldToScreen(wx, wy)`, y ese punto solo es la esquina norte sin girar. Al
+ * girar pasa a ser otra esquina, y ademas la altura que le tocaba a cada una
+ * cambiaba con ella: dos errores en el mismo trazo.
+ *
+ * Ahora la arista se define por sus dos esquinas del MUNDO y se proyecta el
+ * punto, que es exacto en las cuatro vistas.
+ */
+describe('El contorno de biomas gira con la camara', () => {
+  it('cada arista une las dos esquinas del mundo que comparten los vecinos', () => {
+    for (let v = 0; v < VIEW_COUNT; v++) {
+      setView(v);
+      const world = new World(31337);
+      const { cx, cy } = chunkWithEdges(world);
+      const chunk = world.getChunk(cx, cy);
+      const found = new Set(quads(collectBiomeEdges(world, chunk)));
+
+      /** Esquina `(dx, dy)` del tile, proyectada desde el mundo y a su altura. */
+      const corner = (wx: number, wy: number, dx: number, dy: number): [number, number] => {
+        const s = worldToScreen(wx + dx, wy + dy);
+        return [s.x, s.y + lift(world, wx, wy, dx, dy)];
+      };
+
+      let checked = 0;
+      for (let ly = 0; ly < CHUNK_SIZE && checked < 12; ly++) {
+        for (let lx = 0; lx < CHUNK_SIZE && checked < 12; lx++) {
+          const wx = cx * CHUNK_SIZE + lx;
+          const wy = cy * CHUNK_SIZE + ly;
+          const mine = biomeOf(world, wx, wy);
+
+          if (biomeOf(world, wx + 1, wy) !== mine) {
+            const quad = [...corner(wx, wy, 1, 0), ...corner(wx, wy, 1, 1)].join(',');
+            expect(found, `vista ${v}: falta la arista este de (${wx}, ${wy})`).toContain(quad);
+            checked++;
+          }
+          if (biomeOf(world, wx, wy + 1) !== mine) {
+            const quad = [...corner(wx, wy, 1, 1), ...corner(wx, wy, 0, 1)].join(',');
+            expect(found, `vista ${v}: falta la arista sur de (${wx}, ${wy})`).toContain(quad);
+            checked++;
+          }
+        }
+      }
+      expect(checked, `vista ${v}: ni una arista comprobada`).toBeGreaterThan(0);
+    }
   });
 });

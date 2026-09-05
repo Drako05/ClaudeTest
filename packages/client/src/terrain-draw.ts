@@ -25,8 +25,8 @@ import {
   TILE_DIAMOND,
   TILE_H,
   TILE_W,
+  tileOrigin,
   toWorldSpace,
-  worldToScreen,
 } from './projection.js';
 
 /** Rectangulo en coordenadas de pantalla absolutas. */
@@ -125,7 +125,7 @@ function boxOf(points: ReadonlyArray<{ x: number; y: number }>): Box {
  * se pide con `worldCorner`, que hace esa traduccion.
  */
 function topCorners(wx: number, wy: number, level: number, rampDir: number) {
-  const o = worldToScreen(wx, wy);
+  const o = tileOrigin(wx, wy);
   return [0, 1, 2, 3].map((i) => {
     const c = worldCorner(...([[0, 0], [1, 0], [1, 1], [0, 1]][i] as [number, number]));
     const h = groundHeight(level, rampDir, c.fx, c.fy);
@@ -139,7 +139,7 @@ function topCorners(wx: number, wy: number, level: number, rampDir: number) {
 
 /** Las cuatro esquinas del cuadrilatero de una cara, ya en pantalla. */
 function faceCorners(face: ReliefFace) {
-  const o = worldToScreen(face.wx, face.wy);
+  const o = tileOrigin(face.wx, face.wy);
   // La cara este cuelga del borde E-S; la sur, del borde O-S.
   const near = face.side === 'east' ? { x: TILE_W / 2, y: TILE_H / 2 } : { x: -TILE_W / 2, y: TILE_H / 2 };
   const far = { x: 0, y: TILE_H };
@@ -292,7 +292,7 @@ function neighbourEdgeHeight(
  * delante pisaria piezas que van despues y romperia el orden.
  */
 function cueBox(wx: number, wy: number, kind: 'backEast' | 'backWest', level: number, drop: number): Box {
-  const o = worldToScreen(wx, wy);
+  const o = tileOrigin(wx, wy);
   const lift = heightOffset(level);
   const far = kind === 'backEast' ? TILE_DIAMOND[1] : TILE_DIAMOND[3];
   const d = cueOffset(kind, drop);
