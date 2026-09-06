@@ -1,14 +1,18 @@
 /**
- * Mando del spike: andar y girar la camara a la vez.
+ * Mando del spike: la capa de DOM sobre `gestures.ts`.
  *
- * En tactil se reparte la pantalla, que es el convenio de cualquier 3D en movil:
- * **la mitad izquierda es joystick y la derecha gira la camara**. Sin eso, un
- * arrastre no puede significar dos cosas.
+ * Aqui no hay ninguna regla, solo traduccion: los eventos del navegador se
+ * reducen a numeros y se le pasan a `Gestures`, que es puro y donde vive de
+ * verdad quien manda sobre cada dedo. Se separo asi porque el fallo que trajo el
+ * autor —andar y girar a la vez cambiaba el zoom— era una regla de esas, y una
+ * regla no se comprueba jugando con dos pulgares en un headless.
  *
- * No reutiliza `input.ts` a proposito: aquel rota el vector de movimiento con la
- * camara isometrica de cuatro pasos, y aqui el angulo es continuo. Es codigo de
- * spike y se tira con el.
+ * No reutiliza `input.ts`: aquel rota el vector de movimiento con la camara
+ * isometrica de cuatro pasos, y aqui el angulo es continuo. Es codigo de spike y
+ * se tira con el.
  */
+
+import { Gestures, STICK_RADIUS } from './gestures.js';
 
 export interface Move {
   /** Vector en el plano de la PANTALLA, sin rotar. Lo rota la camara. */
@@ -18,94 +22,90 @@ export interface Move {
 
 export class Controls {
   private readonly keys = new Set<string>();
-  private stickId: number | null = null;
-  private stickOrigin = { x: 0, y: 0 };
-  private stick = { x: 0, y: 0 };
-  private lookId: number | null = null;
-  private lookLast = { x: 0, y: 0 };
-  private pinch = 0;
-
-  /** Giro pendiente de aplicar a la camara, en pixeles arrastrados. */
-  look = { dx: 0, dy: 0 };
-  /** Factor de zoom pendiente. */
-  zoom = 1;
+  private readonly gestures: Gestures;
   onToggleProjection: (() => void) | null = null;
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    private readonly stickEl: HTMLElement | null = null,
+    private readonly knobEl: HTMLElement | null = null,
+  ) {
+    this.gestures = new Gestures(window.innerWidth, window.innerHeight);
+    window.addEventListener('resize', () =>
+      this.gestures.resize(window.innerWidth, window.innerHeight),
+    );
+
     window.addEventListener('keydown', (e) => {
       this.keys.add(e.code);
       if (e.code === 'KeyP') this.onToggleProjection?.();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', () => {
+      this.keys.clear();
+      this.gestures.clear();
+      this.drawStick();
+    });
 
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    canvas.addEventListener('pointerdown', (e) => this.down(e));
-    canvas.addEventListener('pointermove', (e) => this.move(e));
+    canvas.addEventListener('pointerdown', (e) => {
+      // La captura puede fallar —un puntero ya soltado, un evento sintetico— y
+      // si lanza aqui se lleva por delante el registro del dedo, que es lo que
+      // de verdad importa. Es una comodidad, no un requisito.
+      try {
+        canvas.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignorado a proposito: sin captura el gesto sigue funcionando.
+      }
+      this.gestures.down(e.pointerId, e.clientX, e.clientY, e.pointerType === 'touch');
+      this.drawStick();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      this.gestures.move(e.pointerId, e.clientX, e.clientY);
+      this.drawStick();
+    });
     for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
-      canvas.addEventListener(type, (e) => this.up(e as PointerEvent));
+      canvas.addEventListener(type, (e) => {
+        this.gestures.up((e as PointerEvent).pointerId);
+        this.drawStick();
+      });
     }
-    canvas.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      this.zoom *= e.deltaY > 0 ? 1.1 : 1 / 1.1;
-    }, { passive: false });
 
-    canvas.addEventListener('touchmove', (e) => this.pinchMove(e), { passive: false });
-    canvas.addEventListener('touchend', () => { this.pinch = 0; });
-  }
-
-  private down(e: PointerEvent): void {
-    this.canvas.setPointerCapture(e.pointerId);
-    // La mitad izquierda anda, la derecha mira. Con raton, cualquier boton mira:
-    // para andar ya esta WASD.
-    if (e.pointerType === 'touch' && e.clientX < window.innerWidth / 2) {
-      this.stickId = e.pointerId;
-      this.stickOrigin = { x: e.clientX, y: e.clientY };
-      this.stick = { x: 0, y: 0 };
-    } else {
-      this.lookId = e.pointerId;
-      this.lookLast = { x: e.clientX, y: e.clientY };
-    }
-  }
-
-  private move(e: PointerEvent): void {
-    if (e.pointerId === this.stickId) {
-      const dx = e.clientX - this.stickOrigin.x;
-      const dy = e.clientY - this.stickOrigin.y;
-      const len = Math.hypot(dx, dy);
-      const max = 58;
-      const scale = len > max ? max / len : 1;
-      this.stick = { x: (dx * scale) / max, y: (dy * scale) / max };
-    } else if (e.pointerId === this.lookId) {
-      this.look.dx += e.clientX - this.lookLast.x;
-      this.look.dy += e.clientY - this.lookLast.y;
-      this.lookLast = { x: e.clientX, y: e.clientY };
-    }
-  }
-
-  private up(e: PointerEvent): void {
-    if (e.pointerId === this.stickId) {
-      this.stickId = null;
-      this.stick = { x: 0, y: 0 };
-    }
-    if (e.pointerId === this.lookId) this.lookId = null;
-  }
-
-  private pinchMove(e: TouchEvent): void {
-    if (e.touches.length < 2) return;
-    e.preventDefault();
-    const d = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY,
+    canvas.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        this.wheelZoom *= e.deltaY > 0 ? 1.1 : 1 / 1.1;
+      },
+      { passive: false },
     );
-    if (this.pinch > 0) this.zoom *= this.pinch / d;
-    this.pinch = d;
+    // El navegador hace su propio zoom de pagina con dos dedos si no se le dice
+    // que no; con `touch-action: none` en el CSS y esto, el pellizco es nuestro.
+    canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  }
+
+  private wheelZoom = 1;
+
+  /** Pinta el joystick flotante donde nacio el pulgar, si hay alguno. */
+  private drawStick(): void {
+    if (!this.stickEl || !this.knobEl) return;
+    const center = this.gestures.stickCenter();
+    if (!center) {
+      this.stickEl.classList.remove('on');
+      return;
+    }
+    const stick = this.gestures.stick();
+    this.stickEl.classList.add('on');
+    this.stickEl.style.left = `${center.x}px`;
+    this.stickEl.style.top = `${center.y}px`;
+    this.knobEl.style.transform =
+      `translate(-50%, -50%) translate(${stick.x * STICK_RADIUS}px, ${stick.y * STICK_RADIUS}px)`;
   }
 
   /** El vector de movimiento en coordenadas de pantalla, sin rotar aun. */
   moveVector(): Move {
-    let x = this.stick.x;
-    let y = this.stick.y;
+    const stick = this.gestures.stick();
+    let x = stick.x;
+    let y = stick.y;
     if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) x -= 1;
     if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) x += 1;
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) y -= 1;
@@ -116,14 +116,12 @@ export class Controls {
 
   /** Consume el giro acumulado desde el frame anterior. */
   takeLook(): { dx: number; dy: number } {
-    const out = { ...this.look };
-    this.look = { dx: 0, dy: 0 };
-    return out;
+    return this.gestures.takeOrbit();
   }
 
   takeZoom(): number {
-    const out = this.zoom;
-    this.zoom = 1;
+    const out = this.gestures.takeZoom() * this.wheelZoom;
+    this.wheelZoom = 1;
     return out;
   }
 }

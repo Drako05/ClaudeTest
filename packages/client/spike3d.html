@@ -35,6 +35,26 @@
         font-weight: 400; letter-spacing: .04em; text-transform: none; color: #8fb4dd;
       }
 
+      /* El joystick flotante: nace donde apoyas el pulgar dentro del cuadrante
+         inferior izquierdo. Verlo es lo que hace evidente que esa zona es del
+         personaje y el resto de la camara. */
+      #stick {
+        position: fixed; z-index: 11; width: 116px; height: 116px;
+        margin: -58px 0 0 -58px; border-radius: 50%;
+        border: 2px solid rgba(180, 215, 255, 0.30);
+        background: radial-gradient(circle, rgba(20,34,60,.42), rgba(20,34,60,.14));
+        opacity: 0; visibility: hidden; transition: opacity .12s ease;
+        pointer-events: none;
+      }
+      #stick.on { opacity: 1; visibility: visible; }
+      #stickKnob {
+        position: absolute; left: 50%; top: 50%;
+        width: 46px; height: 46px; border-radius: 50%;
+        background: rgba(143, 196, 255, .58);
+        border: 2px solid rgba(226, 240, 255, .72);
+        transform: translate(-50%, -50%);
+      }
+
       #hud {
         position: fixed; top: 12px; left: 12px; z-index: 10;
         padding: 9px 12px; border-radius: 10px;
@@ -46,13 +66,34 @@
       }
 
       @media (max-width: 560px) {
-        #hud { font-size: 10.5px; padding: 7px 9px; }
+        /* El joystick flotante: nace donde apoyas el pulgar dentro del cuadrante
+         inferior izquierdo. Verlo es lo que hace evidente que esa zona es del
+         personaje y el resto de la camara. */
+      #stick {
+        position: fixed; z-index: 11; width: 116px; height: 116px;
+        margin: -58px 0 0 -58px; border-radius: 50%;
+        border: 2px solid rgba(180, 215, 255, 0.30);
+        background: radial-gradient(circle, rgba(20,34,60,.42), rgba(20,34,60,.14));
+        opacity: 0; visibility: hidden; transition: opacity .12s ease;
+        pointer-events: none;
+      }
+      #stick.on { opacity: 1; visibility: visible; }
+      #stickKnob {
+        position: absolute; left: 50%; top: 50%;
+        width: 46px; height: 46px; border-radius: 50%;
+        background: rgba(143, 196, 255, .58);
+        border: 2px solid rgba(226, 240, 255, .72);
+        transform: translate(-50%, -50%);
+      }
+
+      #hud { font-size: 10.5px; padding: 7px 9px; }
         #proj { min-width: 104px; padding: 10px 12px; font-size: 11px; }
       }
     </style>
   </head>
   <body>
     <canvas id="view"></canvas>
+    <div id="stick" aria-hidden="true"><i id="stickKnob"></i></div>
     <button id="proj" type="button">
       Ortográfica
       <small>tocar para cambiar</small>

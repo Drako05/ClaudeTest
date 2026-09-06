@@ -63,7 +63,9 @@ export class OrbitCamera {
   }
 
   zoom(factor: number): void {
-    this.distance = clamp(this.distance * factor, 6, 90);
+    // El minimo no es «lo mas cerca posible»: por debajo de unas diez casillas
+    // la camara se mete dentro del relieve y deja de verse nada.
+    this.distance = clamp(this.distance * factor, 10, 90);
   }
 
   resize(width: number, height: number): void {

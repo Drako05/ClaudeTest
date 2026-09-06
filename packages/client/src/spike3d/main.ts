@@ -67,7 +67,11 @@ state.entities.y[state.playerId] = spawn.y;
 state.world.ensureAround(spawn.x, spawn.y, RADIUS);
 
 const camera = new OrbitCamera();
-const controls = new Controls(canvas);
+const controls = new Controls(
+  canvas,
+  document.getElementById('stick'),
+  document.getElementById('stickKnob'),
+);
 
 /**
  * El interruptor de proyeccion, con boton propio.
@@ -247,12 +251,30 @@ function frame(now: number): void {
     `${fps.toFixed(0)} FPS · ${camera.projection}\n` +
     `${(triangles / 1000).toFixed(1)}k triangulos · ${info.calls} draw calls\n` +
     `pos ${px.toFixed(0)}, ${py.toFixed(0)} · altura ${ph.toFixed(1)} · semilla ${seed}\n` +
-    `arrastra a la derecha para girar`;
+    `abajo-izq anda · el resto gira · 2 dedos zoom`;
 
   requestAnimationFrame(frame);
 }
 
 requestAnimationFrame(frame);
+
+/**
+ * Estado legible desde fuera, para poder MEDIR los gestos en un navegador de
+ * verdad. El fallo que trajo el autor solo se manifiesta con dos dedos a la vez,
+ * que es lo que ninguna prueba ve si no se le da con que compararlo.
+ */
+Object.defineProperty(window, '__spike', {
+  get: () => ({
+    distance: camera.distance,
+    yaw: camera.yaw,
+    pitch: camera.pitch,
+    projection: camera.projection,
+    x: state.entities.x[state.playerId],
+    y: state.entities.y[state.playerId],
+    fps,
+    triangles,
+  }),
+});
 
 function seedFromLocation(): number {
   try {
