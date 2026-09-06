@@ -4,6 +4,7 @@ import { groundHeight, NO_RAMP, World } from '@verdant/sim';
 import {
   heightOffset,
   setView,
+  TILE_DIAMOND,
   TILE_H,
   TILE_W,
   tileOrigin,
@@ -12,8 +13,6 @@ import {
   worldToScreen,
 } from '../packages/client/src/projection.js';
 import {
-  cueExtent,
-  cueOffset,
   depthOfPiece,
   groundPieces,
   MAX_CUE_DROP,
@@ -238,58 +237,69 @@ describe('Las dos caras que se ven, y las dos que no', () => {
   });
 });
 
-describe('La sombra de una arista trasera va tumbada, y hacia atras', () => {
-  it('se aleja de la arista hacia profundidad MENOR, no hacia arriba', () => {
-    // El fallo que esto cierra: la sombra se extruia en vertical, y en
-    // isometrica una superficie vertical es una PARED. Se veia como un panel
-    // oscuro de pie sobre la arista en vez de como una sombra en el suelo.
-    //
-    // Tumbada significa que se desplaza en la direccion de «una fila hacia
-    // atras», que en pantalla sube Y se mueve de lado. La comprobacion mira las
-    // dos cosas: que se aleja en horizontal —una extrusion vertical no lo hace—
-    // y que va hacia el lado correcto de la arista.
-    for (const kind of ['backEast', 'backWest'] as const) {
-      for (let drop = 1; drop <= MAX_CUE_DROP; drop++) {
-        const d = cueOffset(kind, drop);
-        expect(Math.abs(d.x), `${kind} con caida ${drop} no se aleja de lado`).toBeGreaterThan(0);
-        expect(d.y, `${kind} con caida ${drop} no sube`).toBeLessThan(0);
-        // Y en la direccion de la casilla de detras: la de atras-este se aleja
-        // hacia la derecha de la pantalla y la de atras-oeste hacia la izquierda.
-        expect(Math.sign(d.x)).toBe(kind === 'backEast' ? 1 : -1);
-        // Sobre el plano del suelo la proporcion es la de la isometrica, 2:1.
-        expect(Math.abs(d.x / d.y)).toBeCloseTo(2, 6);
+/**
+ * La senal de una arista trasera: solo el filo iluminado.
+ *
+ * Hubo una sombra y se quito. Estaba dibujada en el plano del suelo del PROPIO
+ * emisor, asi que sobre un escalon hacia el mar era un paralelogramo plano
+ * flotando a la altura de la arena sobre agua que esta un nivel mas abajo: se
+ * leia como una losa que no existe, y el autor lo vio.
+ *
+ * Bajarla a su sitio tampoco valia. El suelo que deberia recibirla no se ve
+ * NUNCA: una casilla una fila mas atras y un nivel mas abajo cae en pantalla
+ * justo donde cae la de una fila mas adelante a tu propia altura, y esa se
+ * dibuja despues y la tapa entera. Lo fija `tests/projection.test.ts`.
+ */
+describe('La senal de una arista trasera no se sale de su tile', () => {
+  it('su caja cabe dentro del rombo de su propio tile', () => {
+    // Es la regla general detras de lo que vio el autor: no se dibuja nada
+    // sobre suelo que no existe. Con la sombra de ayer falla por definicion,
+    // porque su unico proposito era extenderse hacia fuera.
+    for (let v = 0; v < VIEW_COUNT; v++) {
+      setView(v);
+      const world = new World(12345);
+      const pieces = groundPieces(world, chunkWithRelief(world));
+      const tops = new Map<string, GroundPiece>();
+      for (const piece of pieces) {
+        if (piece.kind === 'top') tops.set(`${piece.wx},${piece.wy}`, piece);
       }
+
+      let checked = 0;
+      for (const piece of pieces) {
+        if (piece.kind !== 'backEast' && piece.kind !== 'backWest') continue;
+        const top = tops.get(`${piece.wx},${piece.wy}`);
+        expect(top, `vista ${v}: senal sin cima en (${piece.wx}, ${piece.wy})`).toBeDefined();
+        if (!top) continue;
+        const donde = `vista ${v}: la senal de (${piece.wx}, ${piece.wy}) se sale de su rombo`;
+        expect(piece.box.x0, donde).toBeGreaterThanOrEqual(top.box.x0 - 0.001);
+        expect(piece.box.x1, donde).toBeLessThanOrEqual(top.box.x1 + 0.001);
+        expect(piece.box.y0, donde).toBeGreaterThanOrEqual(top.box.y0 - 0.001);
+        expect(piece.box.y1, donde).toBeLessThanOrEqual(top.box.y1 + 0.001);
+        checked++;
+      }
+      expect(checked, `vista ${v}: ni una senal`).toBeGreaterThan(0);
     }
   });
 
-  it('una caida mayor proyecta mas sombra, pero acotada', () => {
-    let previous = 0;
-    for (let drop = 1; drop <= MAX_CUE_DROP; drop++) {
-      const extent = cueExtent(drop);
-      expect(extent).toBeGreaterThan(previous);
-      previous = extent;
-    }
-    // Pasada la casilla la mancha se derramaria sobre varias filas de atras y
-    // dejaria de leerse como la sombra de ESTE escalon.
-    expect(cueExtent(MAX_CUE_DROP)).toBeLessThan(1);
-    expect(cueExtent(99)).toBe(cueExtent(MAX_CUE_DROP));
-  });
-
-  it('la caja de la senal se extiende hacia atras de su tile', () => {
-    // Es lo que permite que la sombra pinte sobre terreno ya dibujado sin pisar
-    // a nadie: hacia delante hay piezas que van despues.
+  it('cae justo sobre la arista trasera que le toca', () => {
+    // Sus dos extremos son la esquina norte del tile y la este o la oeste: son
+    // las dos aristas que el propio bloque tapa y que por eso hay que delatar.
     for (let v = 0; v < VIEW_COUNT; v++) {
       setView(v);
       const world = new World(12345);
       let checked = 0;
       for (const piece of groundPieces(world, chunkWithRelief(world))) {
         if (piece.kind !== 'backEast' && piece.kind !== 'backWest') continue;
-        const tile = tileOrigin(piece.wx, piece.wy);
-        // La caja llega mas arriba que la esquina norte del tile: eso es «hacia
-        // atras» en pantalla. Con la sombra bien tumbada siempre se cumple.
-        expect(piece.box.y0, `vista ${v}: la senal no se aleja hacia atras`).toBeLessThan(
-          tile.y + heightOffset(world.levelAt(piece.wx, piece.wy)),
-        );
+        const o = tileOrigin(piece.wx, piece.wy);
+        const lift = heightOffset(piece.anchorHeight);
+        const far = piece.kind === 'backEast' ? TILE_DIAMOND[1] : TILE_DIAMOND[3];
+        const xs = [o.x, o.x + far.x];
+        const ys = [o.y + lift, o.y + far.y + lift];
+        const donde = `vista ${v}: la senal de (${piece.wx}, ${piece.wy}) no cae en su arista`;
+        expect(piece.box.x0, donde).toBeCloseTo(Math.min(...xs), 6);
+        expect(piece.box.x1, donde).toBeCloseTo(Math.max(...xs), 6);
+        expect(piece.box.y0, donde).toBeCloseTo(Math.min(...ys), 6);
+        expect(piece.box.y1, donde).toBeCloseTo(Math.max(...ys), 6);
         checked++;
       }
       expect(checked, `vista ${v}: ni una senal`).toBeGreaterThan(0);

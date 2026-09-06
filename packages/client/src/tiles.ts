@@ -15,6 +15,7 @@ import { CHUNK_SIZE, Feature, isSapling, maturesInto, Terrain } from '@verdant/s
 import { groundHeight, hash2DFloat } from '@verdant/sim';
 import type { Chunk } from '@verdant/sim';
 import { LOOKS, MINERAL_FACES, ROCK_FACES } from './palette.js';
+import { MAX_CUE_DROP } from './terrain-draw.js';
 import { LEVEL_PX, TILE_H, TILE_W, worldToScreen } from './projection.js';
 
 /**
@@ -163,60 +164,39 @@ export function makeTopArt(
  */
 export function makeEdgeCueArt(
   kind: 'backEast' | 'backWest',
-  offset: { x: number; y: number },
+  drop: number,
 ): FeatureArt | null {
   // La arista, en pixeles y relativa a la esquina norte del tile: baja hacia la
   // derecha en la de atras-este y hacia la izquierda en la de atras-oeste.
   const far = { x: kind === 'backEast' ? TILE_W / 2 : -TILE_W / 2, y: TILE_H / 2 };
-  const quad = [
-    { x: 0, y: 0 },
-    far,
-    { x: far.x + offset.x, y: far.y + offset.y },
-    offset,
-  ];
 
-  const minX = Math.min(...quad.map((p) => p.x));
-  const maxX = Math.max(...quad.map((p) => p.x));
-  const minY = Math.min(...quad.map((p) => p.y));
-  const maxY = Math.max(...quad.map((p) => p.y));
+  // El filo se refuerza con el desnivel: un escalon de tres tiene que poder
+  // distinguirse de uno de uno, y desde atras el canto es lo unico que queda
+  // para decirlo. Los extremos son deduccion mia, no numeros del autor.
+  const t = (Math.min(Math.max(drop, 1), MAX_CUE_DROP) - 1) / (MAX_CUE_DROP - 1);
+  const alpha = 0.3 + 0.25 * t;
+  const width = 1.4 + 0.8 * t;
 
-  const made = newCanvas(Math.ceil(maxX - minX) + 2, Math.ceil(maxY - minY) + 2);
+  // El lienzo es la caja del segmento mas el grosor del trazo, que se reparte a
+  // los dos lados de la linea.
+  const pad = Math.ceil(width) + 1;
+  const made = newCanvas(Math.abs(far.x) + pad * 2, far.y + pad * 2);
   if (!made) return null;
   const [canvas, ctx] = made;
 
   // El ancla es la esquina norte del tile; el lienzo se coloca alrededor.
-  const ox = 1 - minX;
-  const oy = 1 - minY;
-  const at = (p: { x: number; y: number }) => ({ x: ox + p.x, y: oy + p.y });
+  const ox = pad + (far.x < 0 ? -far.x : 0);
+  const oy = pad;
 
-  // La sombra se degrada A LO LARGO de su desplazamiento: negra pegada a la
-  // arista y transparente en su extremo. Translucida a proposito: por detras hay
-  // terreno de verdad y tiene que seguir viendose.
-  const mid = at({ x: far.x / 2, y: far.y / 2 });
-  const gradient = ctx.createLinearGradient(mid.x, mid.y, mid.x + offset.x, mid.y + offset.y);
-  gradient.addColorStop(0, 'rgba(8,12,20,0.30)');
-  gradient.addColorStop(1, 'rgba(8,12,20,0)');
-  ctx.fillStyle = gradient;
+  ctx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(3)})`;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  quad.forEach((p, i) => {
-    const q = at(p);
-    if (i === 0) ctx.moveTo(q.x, q.y);
-    else ctx.lineTo(q.x, q.y);
-  });
-  ctx.closePath();
-  ctx.fill();
-
-  // Y el canto, del lado del tile alto.
-  const a = at({ x: 0, y: 0 });
-  const b = at(far);
-  ctx.strokeStyle = 'rgba(255,255,255,0.30)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  ctx.lineTo(b.x, b.y);
+  ctx.moveTo(ox, oy);
+  ctx.lineTo(ox + far.x, oy + far.y);
   ctx.stroke();
 
-  return { canvas, anchorX: a.x / canvas.width, anchorY: a.y / canvas.height, riseAbove: 0 };
+  return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height, riseAbove: 0 };
 }
 
 /** De que lado de un tile cuelga una cara. */

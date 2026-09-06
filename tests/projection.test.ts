@@ -3,6 +3,7 @@ import {
   currentView,
   depthOf,
   depthRowOf,
+  LEVEL_PX,
   screenToWorld,
   setView,
   TILE_H,
@@ -156,6 +157,58 @@ describe('Girar la camara', () => {
         expect(back.x, `vista ${v}`).toBeCloseTo(x, 10);
         expect(back.y, `vista ${v}`).toBeCloseTo(y, 10);
       }
+    }
+  });
+});
+
+/**
+ * La ambiguedad que obliga a delatar los escalones, y que impide dibujar su
+ * sombra donde de verdad caeria.
+ *
+ * Un nivel mide 16 px y una fila de profundidad, 8. Asi que subir un nivel
+ * equivale exactamente a retroceder dos filas, y —lo que aqui importa— una
+ * casilla que esta una fila mas ATRAS y un nivel mas ABAJO cae en pantalla justo
+ * donde cae la de una fila mas ADELANTE a tu propia altura.
+ *
+ * De ahi salen las dos cosas: un escalon visto por detras es indistinguible de
+ * terreno llano, y el suelo a su pie queda tapado por la casilla de delante, que
+ * se dibuja despues. Se intento poner ahi una sombra dos veces y las dos
+ * quedaron mal; esto existe para que no haya una tercera.
+ */
+describe('El pie de un escalon visto por detras queda tapado', () => {
+  it('una casilla detras y un nivel abajo cae donde la que la tapa por delante', () => {
+    // Los dos pares: la arista trasera este mira al vecino de vista (0,-1), y a
+    // ese lo tapa el de (1,0); la trasera oeste mira al (-1,0) y lo tapa el
+    // (0,1). En los dos casos el de detras esta una fila mas lejos y el que lo
+    // tapa se dibuja despues.
+    for (let v = 0; v < VIEW_COUNT; v++) {
+      setView(v);
+      const pares = [
+        [toWorldSpace(0, -1), toWorldSpace(1, 0)],
+        [toWorldSpace(-1, 0), toWorldSpace(0, 1)],
+      ] as const;
+      for (const [wx, wy] of [[0, 0], [5, -3], [-7, 12]] as const) {
+        for (const [atras, tapa] of pares) {
+          // El de detras, bajado un nivel: en pantalla eso suma LEVEL_PX en Y.
+          const bajo = worldToScreen(wx + atras.x, wy + atras.y);
+          const delante = worldToScreen(wx + tapa.x, wy + tapa.y);
+          expect(bajo.x, `vista ${v}`).toBeCloseTo(delante.x, 9);
+          expect(bajo.y + LEVEL_PX, `vista ${v}`).toBeCloseTo(delante.y, 9);
+        }
+      }
+    }
+  });
+
+  it('subir un nivel equivale a retroceder dos filas', () => {
+    // Dos filas hacia atras sin moverse de columna es (-1,-1) en espacio de
+    // vista: cada eje aporta una fila y sus desplazamientos en X se cancelan.
+    for (let v = 0; v < VIEW_COUNT; v++) {
+      setView(v);
+      const dos = toWorldSpace(-1, -1);
+      const aqui = worldToScreen(4, 4);
+      const atras = worldToScreen(4 + dos.x, 4 + dos.y);
+      expect(atras.x, `vista ${v}`).toBeCloseTo(aqui.x, 9);
+      expect(atras.y + LEVEL_PX, `vista ${v}`).toBeCloseTo(aqui.y, 9);
     }
   });
 });

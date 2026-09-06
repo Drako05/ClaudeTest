@@ -65,33 +65,14 @@ export interface GroundPiece {
   readonly face: ReliefFace | null;
 }
 
-/** Desnivel maximo que dibuja una senal de arista trasera. */
+/**
+ * Desnivel a partir del cual la senal de una arista trasera deja de crecer.
+ *
+ * Acota la INTENSIDAD del filo, que es lo unico que escala con la caida desde
+ * que no hay sombra: un escalon de tres se distingue de uno de uno, y de ahi
+ * hacia arriba ya no hace falta mas.
+ */
 export const MAX_CUE_DROP = 3;
-
-/**
- * Cuanto se aleja la sombra de su arista, en fraccion de casilla.
- *
- * Crece con el desnivel —un bloque mas alto proyecta mas sombra— pero acotada:
- * pasada la casilla, la mancha se derramaria sobre varias filas de terreno de
- * atras y dejaria de leerse como la sombra de ESTE escalon.
- */
-export function cueExtent(drop: number): number {
-  return 0.2 + 0.15 * Math.min(drop, MAX_CUE_DROP);
-}
-
-/**
- * Direccion en la que se tumba la sombra de una arista trasera, en pixeles.
- *
- * Es el desplazamiento de «una fila hacia atras» en pantalla, o sea el vector
- * que separa un tile de su vecino de detras. Esto es lo que hace que la sombra
- * quede **tumbada en el plano del suelo**. Extruirla en vertical, que es lo que
- * hacia antes, dibuja una superficie vertical: en isometrica eso es una PARED,
- * no una sombra, y se veia como un panel oscuro flotando sobre la arista.
- */
-export function cueOffset(kind: 'backEast' | 'backWest', drop: number): { x: number; y: number } {
-  const t = cueExtent(drop);
-  return { x: (kind === 'backEast' ? TILE_W / 2 : -TILE_W / 2) * t, y: (-TILE_H / 2) * t };
-}
 
 /**
  * Profundidad de una pieza. Es lo unico que decide quien tapa a quien.
@@ -242,7 +223,7 @@ export function groundPieces(world: World, chunk: Chunk, bounds?: TileBounds): G
           anchorHeight: level,
           corners: FLAT,
           drop,
-          box: cueBox(wx, wy, kind, level, drop),
+          box: cueBox(wx, wy, kind, level),
           face: null,
         });
       }
@@ -285,22 +266,23 @@ function neighbourEdgeHeight(
 }
 
 /**
- * Caja de una senal de arista trasera: la arista y la sombra tumbada tras ella.
+ * Caja de una senal de arista trasera: la propia arista y nada mas.
  *
- * La sombra se aleja HACIA ATRAS, hacia profundidad menor, que es donde esta el
- * terreno que se dibujo antes y sobre el que puede pintar. Si creciera hacia
- * delante pisaria piezas que van despues y romperia el orden.
+ * Hubo una sombra tumbada tras ella y se quito. Iba dibujada en el plano del
+ * suelo del PROPIO tile, asi que sobre un escalon hacia el mar era una losa
+ * plana flotando a la altura de la arena sobre agua que esta un nivel mas abajo.
+ * Y bajarla a su sitio tampoco valia: el suelo que la recibiria queda SIEMPRE
+ * tapado —una casilla una fila atras y un nivel abajo cae justo donde la de una
+ * fila adelante a tu altura, que se dibuja despues—, que es la misma razon por
+ * la que el escalon no se ve y hay que delatarlo.
  */
-function cueBox(wx: number, wy: number, kind: 'backEast' | 'backWest', level: number, drop: number): Box {
+function cueBox(wx: number, wy: number, kind: 'backEast' | 'backWest', level: number): Box {
   const o = tileOrigin(wx, wy);
   const lift = heightOffset(level);
   const far = kind === 'backEast' ? TILE_DIAMOND[1] : TILE_DIAMOND[3];
-  const d = cueOffset(kind, drop);
   return boxOf([
     { x: o.x, y: o.y + lift },
     { x: o.x + far.x, y: o.y + far.y + lift },
-    { x: o.x + far.x + d.x, y: o.y + far.y + lift + d.y },
-    { x: o.x + d.x, y: o.y + lift + d.y },
   ]);
 }
 

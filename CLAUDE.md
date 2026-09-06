@@ -154,20 +154,31 @@ Esto es el resumen operativo.
     el arbol y el bloque que tenia justo delante. Aparecia y desaparecia al
     caminar, que es lo que lo hacia dificil de ver.
 
-20. **Un escalon mirado por detras no se ve, asi que se dibuja lo que deja.** Los
-    dos costados traseros de un bloque los tapa el propio bloque; sin nada mas,
-    un escalon por detras es indistinguible de terreno llano —de hecho, un bloque
-    subido un nivel cae en pantalla justo donde estaria el suelo llano dos filas
-    mas atras, asi que la ambiguedad es exacta—. En su sitio van dos cosas que si
-    se ven: el **filo iluminado** de la arista y la **sombra** translucida que
-    proyecta hacia atras. Translucida a proposito: detras hay terreno de verdad y
-    tiene que seguir viendose.
+20. **Un escalon mirado por detras no se ve, asi que se delata con el filo.** Los
+    dos costados traseros de un bloque los tapa el propio bloque, y sin nada mas
+    un escalon por detras es indistinguible de terreno llano: un nivel mide 16 px
+    y una fila 8, asi que subir un nivel equivale exactamente a retroceder dos
+    filas. En su sitio va el **filo iluminado** de la arista, que se refuerza con
+    el desnivel.
 
-    La sombra va **tumbada en el plano del suelo**, alejandose en la direccion de
-    «una fila hacia atras». Extruirla en vertical dibuja una superficie vertical,
-    y en isometrica eso es una PARED: se veia como un panel oscuro de pie sobre
-    la arista, y el autor lo noto a la primera. `tests/terrain-draw.test.ts` fija
-    la direccion.
+    **No hay sombra, y no puede haberla.** Se intento dos veces y las dos
+    quedaron mal. Primero extruida en vertical, que en isometrica dibuja una
+    PARED y se veia como un panel oscuro de pie sobre la arista. Luego tumbada en
+    el plano del suelo, pero **al nivel del propio emisor**: sobre un escalon
+    hacia el mar era una losa plana flotando a la altura de la arena sobre agua
+    que esta un nivel mas abajo, y se leia como terreno que no existe.
+
+    Bajarla a su sitio tampoco vale, y esto es lo que cierra la cuestion: el
+    suelo que la recibiria **no se ve nunca**. Una casilla una fila mas atras y un
+    nivel mas abajo cae en pantalla justo donde cae la que la tapa por delante a
+    tu propia altura, y esa se dibuja despues. Es la misma aritmetica de la
+    ambiguedad, por el otro lado — y es tambien la razon de que el escalon
+    necesite una senal. `tests/projection.test.ts` fija las dos identidades.
+
+    De ahi sale la regla general que lo gobierna, y que vale para cualquier senal
+    que se anada: **nada se dibuja fuera del rombo de su propio tile**, porque
+    fuera de el no hay garantia de que haya suelo a esa altura.
+    `tests/terrain-draw.test.ts` lo afirma.
 
 ## Regla de trabajo con el autor
 

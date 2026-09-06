@@ -26,7 +26,7 @@ import type { Chunk, GameState, World } from '@verdant/sim';
 import { actionArea, daylight, groundHeight, MAX_LEVEL } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
 import { progressOf, type Effects } from './effects.js';
-import { cueOffset, groundPieces, type Box, type GroundPiece } from './terrain-draw.js';
+import { groundPieces, type Box, type GroundPiece } from './terrain-draw.js';
 import type { TileBounds } from './relief-faces.js';
 import {
   currentView,
@@ -917,7 +917,7 @@ export class Renderer {
     const art =
       piece.kind === 'top'
         ? makeTopArt(piece.terrain, shadeStep, piece.corners)
-        : makeEdgeCueArt(piece.kind, cueOffset(piece.kind, piece.drop));
+        : makeEdgeCueArt(piece.kind, piece.drop);
     if (!art) {
       this.topTextures.set(key, null);
       return null;
