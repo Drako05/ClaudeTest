@@ -14,7 +14,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "smoke": "npm run build && node tools/smoke.mjs",
     "build:single": "npm run build:single -w @verdant/client",
-    "artifact": "npm run build:single && node tools/make-artifact.mjs"
+    "artifact": "npm run build:single && node tools/make-artifact.mjs",
+    "spike": "npm run build:spike -w @verdant/client",
+    "spike:shots": "npm run spike && node tools/spike-shots.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

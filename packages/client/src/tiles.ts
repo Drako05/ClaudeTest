@@ -41,7 +41,15 @@ export function blockReliefMargin(
   return { top: highest * LEVEL_PX, bottom: -lowest * LEVEL_PX };
 }
 
-const TERRAIN_RGB: Record<Terrain, [number, number, number]> = {
+/**
+ * El color base de cada terreno.
+ *
+ * Exportado porque el spike de 3D lo usa para colorear los vertices de la malla:
+ * comparar la vista nueva con la de hoy solo vale si el mundo se pinta con la
+ * misma paleta. Si el spike gana, su sitio es `palette.ts`, con el resto de la
+ * tabla de colores.
+ */
+export const TERRAIN_RGB: Record<Terrain, [number, number, number]> = {
   [Terrain.DeepWater]: [22, 48, 82],
   [Terrain.Water]: [41, 96, 148],
   [Terrain.Sand]: [214, 197, 142],
