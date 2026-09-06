@@ -30,10 +30,15 @@ for (const [i, dx] of [[1, 260], [2, 260], [3, 260]]) {
   await page.screenshot({ path: `screenshots/spike-0${i + 1}-giro.png` });
 }
 
-await page.keyboard.press('KeyP');
+// El boton, que es lo que hay en un telefono: la tecla P no existe alli.
+await page.click('#proj');
 await page.waitForTimeout(900);
 console.log('HUD:', await page.textContent('#hud'));
+console.log('BOTON:', (await page.textContent('#proj')).replace(/\s+/g, ' ').trim());
 await page.screenshot({ path: 'screenshots/spike-05-perspectiva.png' });
+await page.click('#proj');
+await page.waitForTimeout(700);
+console.log('BOTON de vuelta:', (await page.textContent('#proj')).replace(/\s+/g, ' ').trim());
 
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 await browser.close();

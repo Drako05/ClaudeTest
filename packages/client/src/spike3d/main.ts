@@ -42,6 +42,7 @@ const WATER_Y = -0.18;
 
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const hud = document.getElementById('hud') as HTMLElement;
+const projButton = document.getElementById('proj') as HTMLButtonElement;
 
 const renderer = new WebGLRenderer({ canvas, antialias: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -67,7 +68,24 @@ state.world.ensureAround(spawn.x, spawn.y, RADIUS);
 
 const camera = new OrbitCamera();
 const controls = new Controls(canvas);
-controls.onToggleProjection = () => camera.toggleProjection();
+
+/**
+ * El interruptor de proyeccion, con boton propio.
+ *
+ * La tecla P no existe en un telefono, y el telefono es justo donde hay que
+ * juzgar esto: sin boton, la mitad del experimento —comparar ortografica contra
+ * perspectiva— quedaba fuera de alcance en el unico sitio donde importa.
+ */
+function toggleProjection(): void {
+  camera.toggleProjection();
+  const orto = camera.projection === 'orto';
+  projButton.firstChild!.textContent = orto ? 'Ortográfica' : 'Perspectiva';
+  projButton.querySelector('small')!.textContent = orto
+    ? 'tocar para perspectiva'
+    : 'tocar para ortográfica';
+}
+projButton.addEventListener('click', toggleProjection);
+controls.onToggleProjection = toggleProjection;
 
 const billboards = new BillboardSet();
 const player = billboards.spawnPlayer();
@@ -229,7 +247,7 @@ function frame(now: number): void {
     `${fps.toFixed(0)} FPS · ${camera.projection}\n` +
     `${(triangles / 1000).toFixed(1)}k triangulos · ${info.calls} draw calls\n` +
     `pos ${px.toFixed(0)}, ${py.toFixed(0)} · altura ${ph.toFixed(1)} · semilla ${seed}\n` +
-    `arrastra a la derecha para girar · P cambia proyeccion`;
+    `arrastra a la derecha para girar`;
 
   requestAnimationFrame(frame);
 }
