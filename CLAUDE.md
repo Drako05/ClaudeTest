@@ -23,13 +23,7 @@ Esto es el resumen operativo.
    enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
    nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`): con raton la fija el
-   cursor, en tactil el joystick, y en reposo se conserva la que hubiera. a tres casillas: la apuntada y sus dos vecinas en el
-    anillo de 8 direcciones** (`sim/aim.ts`). De esa unica regla salen los dos
-    casos que describio el autor —en recto las flanqueantes quedan en diagonal,
-    en diagonal quedan ortogonales— y `tests/aim.test.ts` las tiene todas.
-    El area parte de la casilla que se PISA. Antes se apuntaba con
-    `floor(pos + mirada * 1.1)`, que pegado al borde de la casilla podia saltar a
-    dos de distancia; con tres casillas eso deja de ser inadvertido.
+   cursor, en tactil el joystick, y en reposo se conserva la que hubiera.
 6. **La vista es isometrica, GIRABLE en cuatro, y vive solo en el cliente.** La
    transformacion esta entera en `packages/client/src/projection.ts`, que lleva
    una orientacion de modulo y la aplica dentro de `worldToScreen`,
@@ -210,6 +204,12 @@ Sus leyes se traducen a tests en `tests/world-laws.test.ts`, y el estado de cada
 una se lleva en `docs/leyes.md`, que si mantiene el agente. Al implementar algo
 que cumpla o acerque una ley, actualiza esa tabla en el mismo cambio.
 
+**`docs/pendiente.md` es lo primero que hay que leer al empezar una tanda.** Lleva
+las decisiones del autor que aun no son codigo —el diseno del salto con su
+enunciado literal, el giro a 3D ya decidido— y los cabos sueltos. Esta en el repo
+a proposito: las notas de trabajo del agente viven en un contenedor efimero y
+mueren con la sesion, asi que lo que no este aqui se pierde.
+
 Tres leyes condicionan el diseno entero y conviene tenerlas presentes antes de
 tocar la simulacion:
 
@@ -224,6 +224,25 @@ tocar la simulacion:
   crecimiento vale exactamente cero.
 - **«Segun su naturaleza, pueden ser finitos, consumibles y renovables»**: no
   todo recurso vuelve. `regrowTicksOf` devuelve 0 para lo finito.
+
+## Como trabajar sin quemar la ventana de uso
+
+Cada llamada a una herramienta reenvia la conversacion entera, asi que el coste
+va como **contexto x numero de idas y vueltas**. Dos habitos que lo disparan y
+que este proyecto ya se comio una vez:
+
+- **Edita con la herramienta de edicion, no con `sed` ni heredocs de `python`.**
+  Cuando un fichero cambia por fuera, el sistema lo vuelca **entero** en el
+  contexto para que no trabajes sobre una copia vieja. En una tanda,
+  `spike3d/main.ts` se volco completo siete veces: decenas de miles de tokens
+  en re-volcados que no aportaron nada.
+- **Una captura por ronda, no cuatro.** Cada PNG son 1.200-1.800 tokens y se
+  queda en contexto reenviandose el resto del turno. Mira la que decide; las
+  demas, solo si la comparacion lo exige de verdad.
+
+Y lo que no es cosa del agente: la sesion crece sin parar, asi que el corte
+natural es **empezar sesion nueva al cerrar cada tanda**, y `/usage` desglosa a
+donde se fue el gasto.
 
 ## Antes de dar algo por bueno
 
