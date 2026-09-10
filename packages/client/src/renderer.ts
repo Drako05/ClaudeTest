@@ -23,7 +23,7 @@
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { CHUNK_SIZE, Feature } from '@verdant/shared';
 import type { Chunk, GameState, World } from '@verdant/sim';
-import { actionArea, daylight, groundHeight, MAX_LEVEL } from '@verdant/sim';
+import { actionReach, daylight, groundHeight, MAX_LEVEL } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
 import { progressOf, type Effects } from './effects.js';
 import { groundPieces, type Box, type GroundPiece } from './terrain-draw.js';
@@ -424,11 +424,14 @@ export class Renderer {
     const scale = minAxis / (this.tilesOnScreen * TILE_H);
     this.camera.scale.set(scale);
 
-    // El personaje se apoya en la altura REAL del suelo bajo sus pies, con
-    // decimales: sobre un talud sube poco a poco en vez de dar un tiron al
-    // cambiar de casilla. Y la camara le sigue tambien en altura: sin esto,
-    // subir a una meseta le empujaria hacia el borde de arriba de la pantalla.
-    const playerHeight = state.world.groundHeightAt(wx, wy);
+    // El personaje se dibuja a la altura que LLEVA, no a la del suelo bajo sus
+    // pies: desde que hay gravedad las dos dejan de ser la misma cosa, y leer
+    // el suelo aqui pegaria al personaje al terreno tambien en pleno salto y en
+    // plena caida. En el suelo sigue valiendo lo de siempre —la altura propia
+    // ES la del suelo, con decimales, asi que un talud se sube sin tirones—. Y
+    // la camara le sigue en altura: sin esto, subir a una meseta le empujaria
+    // hacia el borde de arriba de la pantalla.
+    const playerHeight = state.entities.z[state.playerId];
     this.aimLift = heightOffset(playerHeight);
 
     const focus = worldToScreen(wx, wy);
@@ -629,7 +632,11 @@ export class Renderer {
    */
   private drawReticle(world: World, entities: GameState['entities'], playerId: number): void {
     this.reticle.clear();
-    const area = actionArea(entities, playerId);
+    // Solo lo que esta al ALCANCE, o sea a la altura propia. Marcar tambien lo
+    // inalcanzable prometeria algo que la accion ya no cumple: el comentario de
+    // abajo sobre «ver de un vistazo que la de arriba de una pared no esta al
+    // alcance» dejo de bastar cuando la altura empezo a estorbar de verdad.
+    const area = actionReach(world, entities, playerId);
     for (let i = 0; i < area.length; i++) {
       const p = tileOrigin(area[i].x, area[i].y);
       // Cada casilla se marca a SU altura, que es lo que hace ver de un vistazo

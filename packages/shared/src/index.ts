@@ -322,6 +322,14 @@ export interface Intent {
   /** Sembrar en el tile mirado. */
   plant: boolean;
   /**
+   * Saltar. Solo hace algo con los pies en el suelo.
+   *
+   * Viaja en la Intent como todo lo demas (regla 5): el salto es una decision
+   * del jugador, no un estado del cliente, y tiene que poder ir por red igual
+   * que andar.
+   */
+  jump: boolean;
+  /**
    * Direccion a la que se quiere mirar, independiente de hacia donde se anda.
    *
    * En (0,0) no hay apuntado y la mirada sigue al movimiento, que es como se
@@ -334,5 +342,14 @@ export interface Intent {
 }
 
 export function emptyIntent(): Intent {
-  return { moveX: 0, moveY: 0, harvest: false, eat: false, plant: false, aimX: 0, aimY: 0 };
+  return {
+    moveX: 0,
+    moveY: 0,
+    harvest: false,
+    eat: false,
+    plant: false,
+    jump: false,
+    aimX: 0,
+    aimY: 0,
+  };
 }

@@ -9,7 +9,8 @@
 
 import { CHUNK_SIZE, DAY_TICKS, RESOURCE_COUNT, TICK_DT, type Intent } from '@verdant/shared';
 import { EntityKind, EntityStore } from './entities.js';
-import { moveEntity } from './systems/movement.js';
+import { moveAirborne, moveEntity } from './systems/movement.js';
+import { applyVertical, takeOff } from './systems/jump.js';
 import { updateSurvival } from './systems/survival.js';
 import { tryEat, tryHarvestArea, tryPlant, type HarvestResult } from './systems/gathering.js';
 import { directionOf, facingOf } from './aim.js';
@@ -58,6 +59,9 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
   const spawn = world.findSpawn(0, 0);
   const entities = new EntityStore();
   const playerId = entities.spawn(EntityKind.Player, spawn.x, spawn.y);
+  // El almacen no conoce el mundo, asi que la altura de nacimiento se pone
+  // aqui. Sin esto se nace a nivel 0 y el primer tick te sube de golpe.
+  entities.z[playerId] = world.groundHeightAt(spawn.x, spawn.y);
 
   const state: GameState = {
     world,
@@ -101,7 +105,18 @@ export function step(state: GameState, intent: Intent): void {
   world.setNow(state.tick);
 
   if (entities.alive[playerId]) {
-    moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT);
+    // Andar y volar son dos leyes distintas, y por eso se bifurca aqui y no
+    // dentro: en el suelo se manda sobre la velocidad, en el aire solo se
+    // corrige la que ya se llevaba. El eje vertical va DESPUES de los dos,
+    // porque la altura del suelo que decide todo es la del sitio al que se ha
+    // llegado, no la del que se salio.
+    if (entities.grounded[playerId]) {
+      moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT);
+      if (intent.jump) takeOff(entities, playerId);
+    } else {
+      moveAirborne(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT);
+    }
+    applyVertical(world, entities, playerId, TICK_DT);
 
     // El apuntado manda sobre la mirada que acaba de fijar el movimiento: con
     // raton se mira a donde apunta el cursor aunque se ande en otra direccion.
@@ -150,6 +165,12 @@ export function skipTime(state: GameState, ticks: number): void {
 
   for (let i = 0; i < span; i++) {
     state.world.setNow(state.tick);
+    // La gravedad tambien: no es movimiento, es el mundo actuando sobre uno. Sin
+    // esto, saltar una hora en pleno vuelo dejaria al personaje colgado en el
+    // aire y la equivalencia «saltar una hora == vivirla quieto» se romperia
+    // justo cuando mas se nota. Quieto en el suelo no cambia nada, que es el
+    // caso normal de usar el panel.
+    applyVertical(state.world, state.entities, state.playerId, TICK_DT);
     if (!state.survivalFrozen) updateSurvival(state.entities, state.playerId, TICK_DT);
     state.tick++;
   }

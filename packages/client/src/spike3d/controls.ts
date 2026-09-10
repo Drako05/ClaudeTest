@@ -36,6 +36,12 @@ export class Controls {
     );
 
     window.addEventListener('keydown', (e) => {
+      // La repeticion del sistema operativo no encadena saltos: una pulsacion
+      // es un salto. El pestillo lo consume el bucle con `takeJump`.
+      if (!e.repeat && e.code === 'Space') {
+        this.jumpQueued = true;
+        e.preventDefault();
+      }
       this.keys.add(e.code);
       if (e.code === 'KeyP') this.onToggleProjection?.();
     });
@@ -84,6 +90,34 @@ export class Controls {
   }
 
   private wheelZoom = 1;
+  private jumpQueued = false;
+
+  /** Consume el salto pedido desde el frame anterior, si lo hubo. */
+  takeJump(): boolean {
+    const out = this.jumpQueued;
+    this.jumpQueued = false;
+    return out;
+  }
+
+  /**
+   * El boton de saltar del movil.
+   *
+   * Va conectado aparte del lienzo a proposito: los dedos del lienzo tienen
+   * dueno (`gestures.ts`) y este no es de ninguno de los dos —ni anda ni gira—,
+   * asi que si naciera dentro contaria como dedo de camara y el pulgar de
+   * saltar giraria la vista, o peor, formaria pinza con el que ya gira.
+   */
+  bindJumpButton(el: HTMLElement | null): void {
+    if (!el) return;
+    const press = (e: Event) => {
+      e.preventDefault();
+      this.jumpQueued = true;
+    };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('pointerdown', (e) => {
+      if ((e as PointerEvent).pointerType !== 'touch') press(e);
+    });
+  }
 
   /** Pinta el joystick flotante donde nacio el pulgar, si hay alguno. */
   private drawStick(): void {

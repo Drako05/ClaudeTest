@@ -71,6 +71,33 @@ export const RAMP_DIRS: ReadonlyArray<{ readonly x: number; readonly y: number }
 /** Ningun talud. */
 export const NO_RAMP = -1;
 
+/**
+ * Cuantos niveles se ganan pasando de un tile al vecino.
+ *
+ * Uno: o hay talud y se sube andando, o se sube de un salto —el apice del salto
+ * son 1.16 niveles a una casilla exacta, que es justo lo que hace falta—. Dos ya
+ * es pared, y de eso van los salientes.
+ *
+ * Vive aqui, en el modulo sin dependencias, porque lo necesitan a la vez el
+ * mundo (para no nacer en un pozo), el medidor de conectividad y quien mida el
+ * relieve desde fuera. En `movement.ts` no puede estar: `world.ts` tendria que
+ * importarlo y ese es justo el ciclo que el proyecto ya se comio una vez.
+ */
+export const CLIMB_LIMIT = 1;
+
+/**
+ * Si se puede pasar de un nivel al vecino. Bajar siempre se puede: caer es caer.
+ *
+ * **Es un modelo, no la fisica.** La fisica de verdad esta en `movement.ts` y
+ * mide alturas continuas; esto compara niveles enteros para poder recorrer el
+ * mapa a saltos de casilla. Se queda del lado optimista —da por hecho que hay
+ * carrerilla para el salto—, asi que lo que declare inconexo lo es de verdad.
+ */
+export function canClimbTo(fromLevel: number, toLevel: number): boolean {
+  if (toLevel < 0) return false;
+  return toLevel - fromLevel <= CLIMB_LIMIT;
+}
+
 /** Nivel entero que corresponde a una elevacion. Negativo es agua. */
 export function levelFrom(elevation: number): number {
   if (elevation < SEA_LEVEL) return WATER_LEVEL;

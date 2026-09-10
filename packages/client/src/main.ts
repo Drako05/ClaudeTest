@@ -8,7 +8,7 @@
  */
 
 import {
-  actionArea,
+  actionReach,
   clockLabel,
   createGame,
   dayNumber,
@@ -263,6 +263,13 @@ async function main(): Promise<void> {
     if (place) {
       target.entities.x[target.playerId] = place.x;
       target.entities.y[target.playerId] = place.y;
+      // Y los pies en el suelo del sitio nuevo. La vertical sabe recuperarse
+      // —pega al suelo lo que este cerca y deja caer lo que este alto—, pero
+      // llegar a una cima de nivel 27 con la altura de la costa seria una caida
+      // de 27 bloques nada mas abrir.
+      target.entities.z[target.playerId] = target.world.groundHeightAt(place.x, place.y);
+      target.entities.vz[target.playerId] = 0;
+      target.entities.grounded[target.playerId] = 1;
       // El streaming se pone al dia solo en el primer tick, que ve el cambio de
       // chunk contra los `NaN` con los que nace el estado.
       target.world.ensureAround(place.x, place.y, 2);
@@ -343,6 +350,9 @@ async function main(): Promise<void> {
   let worstFrame = 0;
   let fps = 0;
   let worstFrameMs = 0;
+  /** Saltos efectuados y separacion maxima de los pies respecto al suelo. */
+  let jumps = 0;
+  let airPeak = 0;
 
   renderer.app.ticker.add(() => {
     const now = performance.now();
@@ -376,9 +386,21 @@ async function main(): Promise<void> {
       // La Intent se guarda en vez de pasarse en linea: hace falta saber si se
       // acciono para lanzar el slash, aunque no se derribara nada.
       const intent = input.consume();
+      const pisabaAntes = state.entities.grounded[state.playerId];
       step(state, intent);
+      // Saltos EFECTUADOS, acumulados. Es un contador y no «esta en el aire
+      // ahora» por lo mismo que el de slashes: un vuelo dura 0.4 s y en una
+      // maquina lenta cabe entero entre dos sondeos, asi que preguntar por el
+      // instante se acierta a suertes. Cuenta el despegue de verdad, no la
+      // tecla, asi que saltar contra el techo de un salto imposible no suma.
+      if (pisabaAntes && !state.entities.grounded[state.playerId] && intent.jump) jumps++;
+      const gap = state.entities.z[state.playerId] - state.world.groundHeightAt(
+        state.entities.x[state.playerId],
+        state.entities.y[state.playerId],
+      );
+      if (gap > airPeak) airPeak = gap;
       if (intent.harvest) {
-        effects.spawnSlash(actionArea(state.entities, state.playerId));
+        effects.spawnSlash(actionReach(state.world, state.entities, state.playerId));
       }
       for (const hit of state.lastHarvest) {
         // Los escombros se posan en la cima del tile del que salieron, no en el
@@ -456,7 +478,13 @@ async function main(): Promise<void> {
       effects: effects.tally,
       /** Slashes TRAZADOS desde el arranque; ver `Renderer.slashesDrawn`. */
       slashesDrawn: renderer.slashesDrawn,
-      area: actionArea(state.entities, state.playerId).map((t) => [t.x, t.y]),
+      area: actionReach(state.world, state.entities, state.playerId).map((t) => [t.x, t.y]),
+      /** Altura de los pies y si tocan suelo. */
+      z: state.entities.z[state.playerId],
+      grounded: !!state.entities.grounded[state.playerId],
+      /** Saltos efectuados y cuanto se han separado los pies del suelo. */
+      jumps,
+      airPeak,
       biome: BIOME_NAMES[
         state.world.biomeAt(
           Math.floor(state.entities.x[state.playerId]),

@@ -34,6 +34,43 @@ function runTicks(state: ReturnType<typeof createGame>, n: number, i: Intent): v
   for (let k = 0; k < n; k++) step(state, i);
 }
 
+/**
+ * Centro de una zona `2·half+1` sin nada solido y **toda al mismo nivel**.
+ *
+ * Lo del nivel se anadio con la fisica de altura: ahora una pared detiene el
+ * paso, asi que medir velocidades sobre relieve mediria ademas contra que se
+ * choca. Es la misma razon por la que esto no se mide en el navegador.
+ */
+function flatOpenSpot(world: World, half = 3): { x: number; y: number } {
+  for (let radius = 0; radius < 240; radius++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        let clear = true;
+        const level = world.levelAt(dx, dy);
+        for (let ty = -half; ty <= half && clear; ty++) {
+          for (let tx = -half; tx <= half; tx++) {
+            if (world.isSolidAt(dx + tx, dy + ty) || world.levelAt(dx + tx, dy + ty) !== level) {
+              clear = false;
+              break;
+            }
+          }
+        }
+        if (clear) return { x: dx + 0.5, y: dy + 0.5 };
+      }
+    }
+  }
+  throw new Error('no se encontro una zona llana y abierta en el mundo de prueba');
+}
+
+/** Planta al jugador en un sitio concreto, con los pies en su suelo. */
+function placePlayer(state: ReturnType<typeof createGame>, at: { x: number; y: number }): void {
+  const { entities, playerId, world } = state;
+  entities.x[playerId] = at.x;
+  entities.y[playerId] = at.y;
+  entities.z[playerId] = world.groundHeightAt(at.x, at.y);
+}
+
 describe('simulacion', () => {
   it('el jugador aparece en un tile transitable', () => {
     for (const seed of [1, 2, 3, 100, 9999]) {
@@ -93,20 +130,21 @@ describe('simulacion', () => {
   });
 
   it('la diagonal no es mas rapida que la ortogonal', () => {
+    // En zona llana y despejada: desde que el relieve estorba, arrancar donde
+    // caiga mediria contra que se choca cada uno, no su velocidad.
     const a = createGame(31);
     const b = createGame(31);
+    const spot = flatOpenSpot(a.world, 5);
+    placePlayer(a, spot);
+    placePlayer(b, spot);
+
     runTicks(a, 30, intent({ moveX: 1 }));
     runTicks(b, 30, intent({ moveX: 1, moveY: 1 }));
 
-    const distA = Math.hypot(a.entities.x[a.playerId] - a.entities.x[a.playerId], 0) + 0;
-    // Comparamos el desplazamiento total recorrido por cada uno.
-    const start = createGame(31);
-    const sx = start.entities.x[start.playerId];
-    const sy = start.entities.y[start.playerId];
-    const moveA = Math.hypot(a.entities.x[a.playerId] - sx, a.entities.y[a.playerId] - sy);
-    const moveB = Math.hypot(b.entities.x[b.playerId] - sx, b.entities.y[b.playerId] - sy);
+    const moveA = Math.hypot(a.entities.x[a.playerId] - spot.x, a.entities.y[a.playerId] - spot.y);
+    const moveB = Math.hypot(b.entities.x[b.playerId] - spot.x, b.entities.y[b.playerId] - spot.y);
+    expect(moveA).toBeGreaterThan(0);
     expect(moveB).toBeLessThanOrEqual(moveA + 1e-9);
-    expect(distA).toBe(0);
   });
 
   it('recolectar un arbol da madera y vacia el tile', () => {
@@ -170,34 +208,15 @@ describe('simulacion', () => {
  * exactamente igual que antes, y eso es lo que mas importa proteger aqui.
  */
 describe('movimiento analogico', () => {
-  /** Centro de una zona 7x7 sin nada solido: asi ninguna colision falsea la medida. */
-  function openSpot(world: World): { x: number; y: number } {
-    for (let radius = 0; radius < 240; radius++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
-          let clear = true;
-          for (let ty = -3; ty <= 3 && clear; ty++) {
-            for (let tx = -3; tx <= 3; tx++) {
-              if (world.isSolidAt(dx + tx, dy + ty)) {
-                clear = false;
-                break;
-              }
-            }
-          }
-          if (clear) return { x: dx + 0.5, y: dy + 0.5 };
-        }
-      }
-    }
-    throw new Error('no se encontro una zona abierta en el mundo de prueba');
-  }
-
   /** Distancia recorrida en `ticks` empujando con el vector dado. */
   function travel(moveX: number, moveY: number, ticks = 30): number {
     const world = new World(2468);
-    const spot = openSpot(world);
+    const spot = flatOpenSpot(world);
     const store = new EntityStore(4);
     const id = store.spawn(EntityKind.Player, spot.x, spot.y);
+    // Los pies, a la altura del suelo: sin esto el cuerpo esta por debajo del
+    // terreno y no puede entrar en ninguna casilla, ni siquiera la de al lado.
+    store.z[id] = world.groundHeightAt(spot.x, spot.y);
     for (let i = 0; i < ticks; i++) moveEntity(world, store, id, moveX, moveY, TICK_DT);
     return Math.hypot(store.x[id] - spot.x, store.y[id] - spot.y);
   }
@@ -362,7 +381,14 @@ describe('Mirada y area de efecto', () => {
         store.facingX[id] = 1;
         store.facingY[id] = 0;
         const tiles = actionArea(store, id);
-        if (tiles.every((t) => lifeKindOf(world.featureAt(t.x, t.y)) !== null)) {
+        // Las tres, ademas, a la altura del jugador: desde que la altura
+        // estorba, la accion no alcanza lo que esta subido a un bloque.
+        const level = world.levelAt(x, y);
+        if (
+          tiles.every(
+            (t) => lifeKindOf(world.featureAt(t.x, t.y)) !== null && world.levelAt(t.x, t.y) === level,
+          )
+        ) {
           placed = { id, tiles };
           break;
         }

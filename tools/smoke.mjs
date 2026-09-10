@@ -55,6 +55,61 @@ function serve(root) {
   });
 }
 
+/** Centro de la pantalla en la pasada de escritorio: ahi esta el personaje. */
+const CENTRE = { x: 640, y: 360 };
+
+/**
+ * Recolecta mientras se anda en las cuatro direcciones.
+ *
+ * La accion es el **clic derecho** desde que Espacio se fue al salto, y con
+ * raton la mirada la manda el cursor: por eso el cursor se mueve a cada paso al
+ * lado hacia el que se camina. Manteniendolo quieto se golpearia siempre al
+ * mismo sitio y la comprobacion pasaria a depender de que ahi hubiera algo.
+ */
+async function harvestSweep(page, centre = CENTRE, ms = 450) {
+  const dirs = [
+    ['KeyW', 0, -110],
+    ['KeyD', 110, 0],
+    ['KeyS', 0, 110],
+    ['KeyA', -110, 0],
+  ];
+  await page.mouse.move(centre.x, centre.y + 110);
+  await page.mouse.down({ button: 'right' });
+  for (const [key, dx, dy] of dirs) {
+    await page.mouse.move(centre.x + dx, centre.y + dy);
+    await page.keyboard.down(key);
+    await page.waitForTimeout(ms);
+    await page.keyboard.up(key);
+  }
+  await page.mouse.up({ button: 'right' });
+}
+
+/**
+ * Cuanto se anda en la mejor de las cuatro direcciones, volviendo al sitio.
+ *
+ * Desde que la altura estorba, que una direccion concreta no avance ya no es un
+ * atasco: puede ser una pared, y una pared es lo correcto. Lo que si seria un
+ * fallo es no poder ir a ningun lado.
+ */
+async function bestWalk(page, from, ms = 700) {
+  let best = 0;
+  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(ms);
+    await page.keyboard.up(key);
+    const now = await waitForLoop(page);
+    best = Math.max(best, Math.hypot(now.x - from.x, now.y - from.y));
+    // Se vuelve andando en sentido contrario, para que las cuatro midan desde
+    // el mismo sitio. No se teletransporta: eso es justo lo que ya no existe.
+    const back = { KeyW: 'KeyS', KeyS: 'KeyW', KeyA: 'KeyD', KeyD: 'KeyA' }[key];
+    await page.keyboard.down(back);
+    await page.waitForTimeout(ms);
+    await page.keyboard.up(back);
+    await waitForLoop(page);
+  }
+  return best;
+}
+
 const failures = [];
 function fail(msg) {
   console.error(`  FALLO: ${msg}`);
@@ -211,19 +266,13 @@ async function desktopPass(browser, baseUrl) {
 
   await page.screenshot({ path: join(SHOTS, '02-explorando.png') });
 
-  // Mantener espacio debe encadenar recolecciones sin soltar la tecla.
-  await page.keyboard.down('Space');
-  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
-    await page.keyboard.down(key);
-    await page.waitForTimeout(450);
-    await page.keyboard.up(key);
-  }
-  await page.keyboard.up('Space');
+  // Mantener el clic derecho debe encadenar recolecciones sin soltarlo.
+  await harvestSweep(page);
 
   const gathered = await waitForLoop(page);
   console.log('  inventario tras recolectar:', JSON.stringify(gathered.inventory));
   const total = gathered.inventory.reduce((a, b) => a + b, 0);
-  check(total > 0, 'mantener Espacio no recolecto nada');
+  check(total > 0, 'mantener el clic derecho no recolecto nada');
 
   // El zoom por teclado tiene que cambiar el encuadre de verdad, no solo no fallar.
   const beforeZoom = (await waitForLoop(page)).tilesOnScreen;
@@ -253,17 +302,46 @@ async function desktopPass(browser, baseUrl) {
   check(!(await page.isVisible('#statsPanel')), 'el panel no se replego al volver a pulsar');
 
   // Sembrar: recolectar deja semillas y F las planta.
-  const withSeeds = await waitForLoop(page);
-  const seeds = withSeeds.inventory[3] + withSeeds.inventory[4];
+  //
+  // Se insiste cambiando de sitio hasta dar con vegetacion. Antes bastaba la
+  // primera tanda porque se nacia en la costa; ahora el nacimiento exige un
+  // rellano llano y puede caer tierra adentro, sobre roca, donde lo unico que
+  // se recolecta es piedra y la piedra no da semillas. Quedarse con la primera
+  // tanda seria depender de que el spawn caiga junto a un arbol.
+  let withSeeds = await waitForLoop(page);
+  let seeds = withSeeds.inventory[3] + withSeeds.inventory[4];
+  for (let round = 0; round < 4 && seeds === 0; round++) {
+    await walkToOpenGround(page, 1.4);
+    await harvestSweep(page);
+    withSeeds = await waitForLoop(page);
+    seeds = withSeeds.inventory[3] + withSeeds.inventory[4];
+  }
   console.log(`  semillas tras recolectar: ${seeds}`);
   check(seeds > 0, 'recolectar no dejo ninguna semilla');
-  for (let i = 0; i < 6; i++) {
-    await page.keyboard.press('KeyF');
-    await page.keyboard.down('KeyW');
+  // Sembrar apunta a donde mira el CURSOR, no a donde se anda, desde que la
+  // accion se fue al clic derecho. Y la casilla apuntada tiene que estar a la
+  // altura propia, estar vacia y admitir esa especie, asi que se prueban varias
+  // direcciones en vez de dar por hecho que la de delante sirve.
+  let afterPlanting = withSeeds;
+  for (const [dx, dy] of [
+    [0, -110],
+    [110, 0],
+    [0, 110],
+    [-110, 0],
+    [110, 110],
+    [-110, -110],
+  ]) {
+    await page.mouse.move(CENTRE.x + dx, CENTRE.y + dy);
     await page.waitForTimeout(120);
+    await page.keyboard.press('KeyF');
+    await page.waitForTimeout(160);
+    afterPlanting = await waitForLoop(page);
+    if (afterPlanting.inventory[3] + afterPlanting.inventory[4] < seeds) break;
+    // Un paso corto para cambiar de casilla y volver a probar.
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(140);
     await page.keyboard.up('KeyW');
   }
-  const afterPlanting = await waitForLoop(page);
   check(
     afterPlanting.inventory[3] + afterPlanting.inventory[4] < seeds,
     'sembrar no consumio ninguna semilla',
@@ -330,12 +408,40 @@ async function desktopPass(browser, baseUrl) {
   {
     let faded = 0;
     let where = null;
-    for (let i = 0; i < 10 && faded === 0; i++) {
-      await page.keyboard.down('KeyS');
-      await page.keyboard.down('KeyD');
+
+    // Si hay una pared de dos bloques en coordenadas positivas, se va a su pie:
+    // ahi hay algo que tapa por construccion. Pasearse a ver si aparece algo
+    // dejo de valer cuando el nacimiento se mudo a una meseta despejada —se
+    // recorrieron 25 casillas sin que nada estorbara nunca—, y una comprobacion
+    // que depende del paisaje no afirma nada.
+    const wall = beforeClick.cliffSpot;
+    if (wall && wall.stand.x > 1 && wall.stand.y > 1) {
+      await page.goto(`${baseUrl}/?seed=${SEED}&x=${wall.stand.x}&y=${wall.stand.y}`, {
+        waitUntil: 'load',
+      });
+      await page.evaluate(() => delete window.__smokeBaseTick);
+      const atWall = await waitForLoop(page);
+      if (atWall.faded > 0) {
+        faded = atWall.faded;
+        where = atWall;
+      }
+    }
+
+    // Y si aun asi no estorba nada, se pasea rotando el par de teclas: contra
+    // una pared, diez vueltas de S+D son diez muestras del mismo sitio.
+    const pares = [
+      ['KeyS', 'KeyD'],
+      ['KeyW', 'KeyD'],
+      ['KeyS', 'KeyA'],
+      ['KeyW', 'KeyA'],
+    ];
+    for (let i = 0; i < 12 && faded === 0; i++) {
+      const [a, b] = pares[i % pares.length];
+      await page.keyboard.down(a);
+      await page.keyboard.down(b);
       await page.waitForTimeout(700);
-      await page.keyboard.up('KeyS');
-      await page.keyboard.up('KeyD');
+      await page.keyboard.up(a);
+      await page.keyboard.up(b);
       const now = await waitForLoop(page);
       if (now.x > 1 && now.y > 1) {
         faded = now.faded;
@@ -350,6 +456,12 @@ async function desktopPass(browser, baseUrl) {
     check(faded > 0, 'nada se atenuo estando en coordenadas positivas');
   }
 
+  // Ir a la pared recarga la pagina, asi que el inventario de referencia de
+  // antes ya no vale: el mundo empieza de cero. Se vuelve a tomar aqui. Sin
+  // esto, lo recolectado despues se comparaba contra un inventario de otra
+  // partida y salia en negativo.
+  const beforeRing = await waitForLoop(page);
+
   // Se barre el anillo entero de direcciones y, si la vuelta no da nada, se
   // cambia de sitio y se repite. Golpear siempre hacia el mismo lado depende de
   // que ahi hubiera algo, y eso es echarlo a suertes: lo que se comprueba es que
@@ -362,11 +474,11 @@ async function desktopPass(browser, baseUrl) {
     [0, -90],
     [120, -60],
   ];
-  let afterClick = beforeClick;
-  const before = beforeClick.inventory.reduce((a, b) => a + b, 0);
-  for (let round = 0; round < 3; round++) {
+  let afterClick = beforeRing;
+  const before = beforeRing.inventory.reduce((a, b) => a + b, 0);
+  for (let round = 0; round < 4; round++) {
     for (const [dx, dy] of ring) {
-      await page.mouse.click(centre.x + dx, centre.y + dy);
+      await page.mouse.click(centre.x + dx, centre.y + dy, { button: 'right' });
       await page.waitForTimeout(220);
     }
     afterClick = await waitForLoop(page);
@@ -374,10 +486,9 @@ async function desktopPass(browser, baseUrl) {
     await walkToOpenGround(page, 1.1);
     await waitForLoop(page);
   }
-  const clicked = afterClick.inventory.reduce((a, b) => a + b, 0)
-    - beforeClick.inventory.reduce((a, b) => a + b, 0);
-  console.log(`  clic izquierdo: +${clicked} recursos tras andar ${walked.toFixed(1)} casillas`);
-  check(clicked > 0, 'el clic izquierdo no recolecto nada');
+  const clicked = afterClick.inventory.reduce((a, b) => a + b, 0) - before;
+  console.log(`  clic derecho: +${clicked} recursos tras andar ${walked.toFixed(1)} casillas`);
+  check(clicked > 0, 'el clic derecho no recolecto nada');
 
   // Los efectos. El bloque anterior dejo la zona talada, asi que se golpea
   // MIENTRAS se camina: sobre una casilla vacia solo saldria el slash, y de que
@@ -395,7 +506,7 @@ async function desktopPass(browser, baseUrl) {
   // corre a 4-4,9 FPS, justo encima del corte.
   const slashesBefore = (await page.evaluate(() => window.__verdant)).slashesDrawn;
   let sawDebris = 0;
-  await page.mouse.down();
+  await page.mouse.down({ button: 'right' });
   for (const key of ['KeyS', 'KeyD', 'KeyS', 'KeyA', 'KeyW', 'KeyD', 'KeyS', 'KeyA', 'KeyD', 'KeyS']) {
     await page.keyboard.down(key);
     await page.waitForTimeout(420);
@@ -403,7 +514,7 @@ async function desktopPass(browser, baseUrl) {
     const now = await page.evaluate(() => window.__verdant);
     if (now.effects.particles > sawDebris) sawDebris = now.effects.particles;
   }
-  await page.mouse.up();
+  await page.mouse.up({ button: 'right' });
   const slashes = (await page.evaluate(() => window.__verdant)).slashesDrawn - slashesBefore;
   console.log(`  al golpear: ${slashes} slashes trazados, hasta ${sawDebris} escombros`);
   check(slashes > 0, 'accionar no dibujo ningun slash');
@@ -561,19 +672,40 @@ async function mobilePass(browser, baseUrl) {
 
   // Mantener pulsado el boton de recolectar mientras se camina con el joystick:
   // es el uso real, y ejercita a la vez la repeticion y los dos dedos.
-  await touch(page, 'touchstart', { id: 2, x: 330, y: 760, selector: '#btnHarvest' });
-  for (const [dx, dy] of [
-    [0, -80],
-    [80, 0],
-    [0, 80],
-    [-80, 0],
-  ]) {
-    await touch(page, 'touchstart', { x: originX, y: originY });
-    await touch(page, 'touchmove', { x: originX + dx, y: originY + dy });
-    await page.waitForTimeout(600);
-    await touch(page, 'touchend', { x: originX + dx, y: originY + dy });
+  //
+  // Se repite hasta que caiga algo. Una sola vuelta bastaba cuando se nacia en
+  // la costa; ahora el nacimiento exige un rellano llano y puede caer en roca,
+  // donde una vuelta de cuatro direcciones puede no topar con nada
+  // recolectable. Que el boton funcione no depende de que haya un arbol al lado.
+  async function sweepWithStick() {
+    await touch(page, 'touchstart', { id: 2, x: 330, y: 760, selector: '#btnHarvest' });
+    for (const [dx, dy] of [
+      [0, -80],
+      [80, 0],
+      [0, 80],
+      [-80, 0],
+    ]) {
+      await touch(page, 'touchstart', { x: originX, y: originY });
+      await touch(page, 'touchmove', { x: originX + dx, y: originY + dy });
+      await page.waitForTimeout(600);
+      await touch(page, 'touchend', { x: originX + dx, y: originY + dy });
+    }
+    await touch(page, 'touchend', { id: 2, x: 330, y: 760, selector: '#btnHarvest' });
+    const now = await waitForLoop(page);
+    return now.inventory.reduce((a, b) => a + b, 0);
   }
-  await touch(page, 'touchend', { id: 2, x: 330, y: 760, selector: '#btnHarvest' });
+
+  for (let round = 0; round < 4; round++) {
+    if ((await sweepWithStick()) > 0) break;
+    // A otro sitio: dos dedos largos de joystick en diagonal, que es lo que mas
+    // terreno cubre sin depender de que una direccion concreta este libre.
+    for (const [dx, dy] of [[70, 70], [-70, 70]]) {
+      await touch(page, 'touchstart', { x: originX, y: originY });
+      await touch(page, 'touchmove', { x: originX + dx, y: originY + dy });
+      await page.waitForTimeout(900);
+      await touch(page, 'touchend', { x: originX + dx, y: originY + dy });
+    }
+  }
 
   // El panel y el boton de sembrar tienen que funcionar tambien al tacto.
   await page.tap('#statsToggle');
@@ -643,11 +775,19 @@ async function devToolsPass(browser, baseUrl) {
   // El contorno tiene que sobrevivir a cambiar de chunk y a mover el zoom, que
   // es justo donde se veia aparecer y desaparecer.
   const startChunk = [Math.floor(withBorders.x) >> 5, Math.floor(withBorders.y) >> 5];
-  await page.keyboard.down('KeyD');
-  await page.waitForTimeout(2600);
-  await page.keyboard.up('KeyD');
-  const walked = await waitForLoop(page);
-  const walkedChunk = [Math.floor(walked.x) >> 5, Math.floor(walked.y) >> 5];
+  // Rotando la direccion: con la altura estorbando, insistir hacia el este
+  // puede ser insistir contra una pared, y entonces esto medía el paisaje y no
+  // el contorno. Un chunk son 32 casillas, asi que hacen falta varias tandas.
+  let walked = withBorders;
+  let walkedChunk = startChunk;
+  for (const key of ['KeyD', 'KeyS', 'KeyW', 'KeyA', 'KeyD', 'KeyS']) {
+    await page.keyboard.down(key);
+    await page.waitForTimeout(2600);
+    await page.keyboard.up(key);
+    walked = await waitForLoop(page);
+    walkedChunk = [Math.floor(walked.x) >> 5, Math.floor(walked.y) >> 5];
+    if (walkedChunk[0] !== startChunk[0] || walkedChunk[1] !== startChunk[1]) break;
+  }
   console.log(`  chunk ${startChunk} -> ${walkedChunk}, segmentos ${withBorders.borderSegments} -> ${walked.borderSegments}`);
   check(
     walkedChunk[0] !== startChunk[0] || walkedChunk[1] !== startChunk[1],
@@ -715,13 +855,7 @@ async function devToolsPass(browser, baseUrl) {
   await page.click('[data-toggle="survival"]');
 
   // Registro: recolectar tiene que dejar constancia.
-  await page.keyboard.down('Space');
-  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
-    await page.keyboard.down(key);
-    await page.waitForTimeout(450);
-    await page.keyboard.up(key);
-  }
-  await page.keyboard.up('Space');
+  await harvestSweep(page);
   await page.waitForTimeout(300);
   const log = await page.evaluate(() => (document.getElementById('devLog') || {}).textContent || '');
   console.log(`  registro: ${JSON.stringify(log.split('\n')[0] ?? '')}`);
@@ -743,7 +877,7 @@ async function devToolsPass(browser, baseUrl) {
   await walkToOpenGround(page, 1.2);
 
   let shot = false;
-  await page.mouse.down();
+  await page.mouse.down({ button: 'right' });
   for (const key of ['KeyS', 'KeyD', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyW', 'KeyA']) {
     await page.keyboard.down(key);
     for (let i = 0; i < 12 && !shot; i++) {
@@ -760,7 +894,7 @@ async function devToolsPass(browser, baseUrl) {
     await page.keyboard.up(key);
     if (shot) break;
   }
-  await page.mouse.up();
+  await page.mouse.up({ button: 'right' });
   check(shot, 'no se pudo fotografiar un golpe con escombros');
 
   // F3 cierra el panel y devuelve el tiempo a su sitio.
@@ -828,18 +962,71 @@ async function reliefPass(browser, baseUrl) {
 
   await page.screenshot({ path: join(SHOTS, '15-relieve.png') });
 
-  // Caminar por el relieve no puede atascar: en esta fase la altura solo se ve,
-  // asi que el personaje sigue moviendose como en llano. Va ANTES de subir a la
-  // cima: puesto despues medía el teletransporte y pasaba por el motivo
-  // equivocado, que es peor que fallar.
-  await page.keyboard.down('KeyD');
-  await page.waitForTimeout(700);
-  await page.keyboard.up('KeyD');
-  const walked = await waitForLoop(page);
-  const moved = Math.hypot(walked.x - arrived.x, walked.y - arrived.y);
-  console.log(`  camino ${moved.toFixed(2)} casillas junto a la pared`);
-  check(moved > 1, 'el jugador se quedo atascado junto a la pared');
+  // Caminar junto al relieve no puede atascar: se anda a lo largo de la pared,
+  // no contra ella. Va ANTES de subir a la cima: puesto despues medía el
+  // teletransporte y pasaba por el motivo equivocado, que es peor que fallar.
+  // Se prueban las cuatro y se mira la MEJOR. Insistir en una sola dejo de
+  // valer cuando la altura empezo a estorbar: al pie de una pared hay
+  // direcciones que topan a media casilla, y eso ahora es lo correcto, no un
+  // atasco. Lo que seria un fallo es no poder ir a ningun lado.
+  const moved = await bestWalk(page, arrived);
+  console.log(`  camino ${moved.toFixed(2)} casillas junto a la pared, en la mejor direccion`);
+  check(moved > 1, 'el jugador no pudo andar en ninguna direccion junto a la pared');
   check(moved < 30, `no camino, se teletransporto: ${moved.toFixed(1)} casillas`);
+
+  // --------------------------------------------------- la altura estorba
+  //
+  // Lo que pidio el autor en esta tanda: **ya no se cambia de nivel andando**.
+  // Se comprueba de las dos formas, porque son dos fallos distintos: que la
+  // pared detenga, y que el salto exista y devuelva al suelo.
+
+  // 1. Contra la pared. Lo que se afirma NO es «andando no se sube»: un talud
+  //    sube un nivel andando y para eso existe. Lo que ya no puede pasar es
+  //    **subir un muro**, o sea ganar dos niveles o mas sin saltar, que es
+  //    exactamente el teletransporte que habia antes. Se prueban las cuatro
+  //    direcciones y se guarda la que mas suba, porque hacia donde cae la pared
+  //    depende del sitio y dar por hecho una direccion seria echarlo a suertes.
+  let peor = null;
+  for (const key of ['KeyW', 'KeyA', 'KeyS', 'KeyD']) {
+    await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
+      waitUntil: 'load',
+    });
+    await page.evaluate(() => delete window.__smokeBaseTick);
+    const antes = await waitForLoop(page);
+    await page.keyboard.down(key);
+    await page.waitForTimeout(900);
+    await page.keyboard.up(key);
+    const despues = await waitForLoop(page);
+    const subida = despues.level - antes.level;
+    if (!peor || subida > peor.subida) peor = { key, subida, antes, despues };
+  }
+  console.log(
+    `  contra la pared: lo mas que se sube andando es ${peor.subida} nivel(es) ` +
+      `(${peor.key}, ${peor.antes.level} -> ${peor.despues.level})`,
+  );
+  check(peor.subida <= 1, `andar salvo un muro sin saltar: subio ${peor.subida} niveles`);
+
+  // 2. El salto. Se cuenta por los saltos EFECTUADOS y por la separacion
+  //    maxima que llegaron a tener los pies del suelo, no preguntando «esta en
+  //    el aire ahora»: un vuelo dura 0.4 s y aqui se sondea cada varios cientos
+  //    de milisegundos, asi que el instante se acierta a suertes. Es la misma
+  //    leccion que el slash.
+  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
+    waitUntil: 'load',
+  });
+  await page.evaluate(() => delete window.__smokeBaseTick);
+  const antesDelSalto = await waitForLoop(page);
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(1500);
+  const trasCaer = await page.evaluate(() => window.__verdant);
+  console.log(
+    `  salto: ${trasCaer.jumps - antesDelSalto.jumps} despegue(s), ` +
+      `hasta ${trasCaer.airPeak.toFixed(2)} niveles sobre el suelo, ` +
+      `acaba ${trasCaer.grounded ? 'en suelo' : 'EN EL AIRE'}`,
+  );
+  check(trasCaer.jumps > antesDelSalto.jumps, 'Espacio no despego al personaje del suelo');
+  check(trasCaer.airPeak > 1, `el salto no levanto ni un bloque: ${trasCaer.airPeak}`);
+  check(trasCaer.grounded, 'el personaje se quedo flotando tras saltar');
 
   // La cima. Es lo que el autor no encontraba explorando: subir a un punto alto
   // y ver que el mundo tiene escala de verdad.
@@ -990,9 +1177,12 @@ async function mountainPass(browser, baseUrl) {
   await page.keyboard.down('KeyS');
   await page.waitForTimeout(120);
   await page.keyboard.up('KeyS');
-  await page.keyboard.down('Space');
+  // El cursor al sur, que es donde quedo el mineral apuntado: la accion es el
+  // clic derecho y con raton la mirada la manda el cursor.
+  await page.mouse.move(CENTRE.x, CENTRE.y + 110);
+  await page.mouse.down({ button: 'right' });
   await page.waitForTimeout(500);
-  await page.keyboard.up('Space');
+  await page.mouse.up({ button: 'right' });
   await page.screenshot({ path: join(SHOTS, '14-montana.png') });
 
   const end = await page.evaluate(() => window.__verdant);

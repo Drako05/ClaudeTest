@@ -44,7 +44,47 @@ import {
 } from '@verdant/shared';
 import { collectBiome, type BiomeStats } from './biome.js';
 import { chunkKey, localCoord, toChunkCoord } from './coords.js';
-import { groundHeight } from './relief.js';
+import { canClimbTo, groundHeight } from './relief.js';
+
+/**
+ * Casillas que tiene que haber al alcance para nacer en un sitio, contando con
+ * que se puede saltar. Bajo esto, el sitio es un bolsillo sellado.
+ */
+const SPAWN_MIN_ROOM = 100;
+
+/**
+ * Y cuantas de ellas tienen que alcanzarse **andando, sin saltar**.
+ *
+ * Las dos condiciones miden cosas distintas. La primera dice que del sitio se
+ * sale; esta, que se puede jugar desde el primer segundo. Sin ella la semilla
+ * de prueba nacia en una escalera de escalones de dos: se salia de ahi, si,
+ * pero saltando, y andando en cualquier direccion se topaba a media casilla.
+ * Peor aun, la accion solo alcanza casillas a la altura propia, asi que de las
+ * tres del area solo habia una util.
+ *
+ * Cuarenta es una plaza de 6x7 y **cuesta muy poco**: medido en siete semillas,
+ * exigirlo mueve el nacimiento tres casillas como mucho, y en tres de ellas no
+ * lo mueve nada.
+ */
+const SPAWN_MIN_FLOOR = 40;
+
+/** Media ventana en la que se cuentan las dos cosas. */
+const SPAWN_ROOM_HALF = 24;
+
+/**
+ * Y ademas, un rellano llano de 3x3 donde poner los pies.
+ *
+ * Es lo que hace que el juego empiece pudiendo hacer algo, y no solo pudiendo
+ * ir a alguna parte. Con las ocho vecinas al mismo nivel se anda en cualquier
+ * direccion y **las tres casillas del area de accion estan al alcance**; sin
+ * ello, en terreno escalonado la accion alcanza una de tres y la primera
+ * impresion del juego es que nada responde.
+ *
+ * Medido en nueve semillas: exigirlo aleja el nacimiento entre 8 y 15 casillas
+ * del origen. Es barato porque el mundo es infinito y el origen no significa
+ * nada; caro seria pedir 5x5, que ya se va a 19.
+ */
+const SPAWN_LANDING_HALF = 1;
 import { hash2D, hash2DFloat } from './rng.js';
 import { generateChunk, WorldGen } from './worldgen.js';
 
@@ -644,17 +684,88 @@ export class World {
     return this.biomeStats(cx, cy, biome).balanced;
   }
 
+  /**
+   * Donde nace el jugador.
+   *
+   * No basta con que el tile no sea solido, y esto es nuevo de la fase 2: desde
+   * que la altura estorba, un hueco entre el mar y un escalon de dos bloques es
+   * un tile perfectamente pisable del que **no se sale**. La semilla de prueba
+   * hacia exactamente eso —agua al noroeste, escalones de +2 al sureste— y el
+   * personaje nacia sin poder andar mas de una casilla en ninguna direccion.
+   *
+   * Asi que se le exige adem s sitio donde moverse, contado con la misma regla
+   * de transito que obedece el jugador. Es el mismo criterio que ya usaba
+   * `tests/world-quality.test.ts` para afirmar que el jugador no queda
+   * encerrado; ahora se aplica antes de que ocurra en vez de comprobarlo
+   * despues.
+   */
   findSpawn(originX = 0, originY = 0, maxRadius = 400): { x: number; y: number } {
+    let fallback: { x: number; y: number } | null = null;
     for (let r = 0; r <= maxRadius; r++) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const x = originX + dx;
           const y = originY + dy;
-          if (!this.isSolidAt(x, y)) return { x: x + 0.5, y: y + 0.5 };
+          if (this.isSolidAt(x, y)) continue;
+          // El primero pisable se guarda por si ninguno cumpliera: mejor un
+          // bolsillo que quedarse en el origen, que puede ser agua.
+          if (!fallback) fallback = { x: x + 0.5, y: y + 0.5 };
+          // De lo mas barato a lo mas caro: nueve consultas, luego un recorrido
+          // corto que no cruza escalones, y solo al final el que si los cruza.
+          if (!this.isLanding(x, y)) continue;
+          if (this.roamRoom(x, y, false) < SPAWN_MIN_FLOOR) continue;
+          if (this.roamRoom(x, y, true) >= SPAWN_MIN_ROOM) return { x: x + 0.5, y: y + 0.5 };
         }
       }
     }
-    return { x: originX + 0.5, y: originY + 0.5 };
+    return fallback ?? { x: originX + 0.5, y: originY + 0.5 };
+  }
+
+  /**
+   * Cuantas casillas se alcanzan desde una, sin salir de una ventana pequena.
+   *
+   * Es la inundacion de `debug.reachableArea` con la ventana acotada, repetida
+   * aqui y no importada porque `world.ts` no puede depender de `debug.ts`: ese
+   * es el ciclo de importacion que revienta el bundle del navegador y que solo
+   * ve la prueba de humo. Corta en cuanto tiene bastante, asi que en terreno
+   * normal termina enseguida.
+   */
+  /** True si el tile y sus ocho vecinas son pisables y estan al mismo nivel. */
+  private isLanding(sx: number, sy: number): boolean {
+    const level = this.levelAt(sx, sy);
+    if (level < 0) return false;
+    for (let dy = -SPAWN_LANDING_HALF; dy <= SPAWN_LANDING_HALF; dy++) {
+      for (let dx = -SPAWN_LANDING_HALF; dx <= SPAWN_LANDING_HALF; dx++) {
+        if (this.levelAt(sx + dx, sy + dy) !== level) return false;
+        if (this.isSolidAt(sx + dx, sy + dy)) return false;
+      }
+    }
+    return true;
+  }
+
+  private roamRoom(sx: number, sy: number, climbing: boolean): number {
+    const cap = climbing ? SPAWN_MIN_ROOM : SPAWN_MIN_FLOOR;
+    const seen = new Set<number>();
+    const stack: Array<[number, number]> = [[sx, sy]];
+    let reached = 0;
+    while (stack.length) {
+      const [x, y] = stack.pop()!;
+      if (Math.abs(x - sx) > SPAWN_ROOM_HALF || Math.abs(y - sy) > SPAWN_ROOM_HALF) continue;
+      // Clave numerica: la ventana es pequena y cabe en un solo entero.
+      const key = (x - sx + SPAWN_ROOM_HALF) * 256 + (y - sy + SPAWN_ROOM_HALF);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (this.isSolidAt(x, y)) continue;
+      if (++reached >= cap) return reached;
+      const level = this.levelAt(x, y);
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
+        const next = this.levelAt(nx, ny);
+        // Andando solo se baja o se sigue igual; saltando se gana un nivel.
+        const ok = climbing ? canClimbTo(level, next) : next >= 0 && next <= level;
+        if (ok) stack.push([nx, ny]);
+      }
+    }
+    return reached;
   }
 }

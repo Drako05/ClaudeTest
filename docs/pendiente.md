@@ -48,10 +48,68 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
 
 ---
 
-## Fase 2 del relieve: la altura estorba
+## Fase 2 del relieve: la altura estorba — HECHA
 
-Disenada con el autor y **sin empezar**. Vive en `packages/sim`, asi que es
-agnostica de la camara y **no se ve afectada por el giro a 3D**.
+Implementada. Lo que sigue es el diseno tal y como lo fijo el autor, que se
+conserva porque los numeros marcados como deduccion **siguen siendo suyos para
+corregir**, y debajo lo que aparecio al construirlo.
+
+### Lo que se midio al terminarla
+
+| Medida | Valor | Contra que |
+|---|---|---|
+| Apice del salto | 1.160 niveles | 1.161 en papel |
+| Alcance a paso completo | 2.17 casillas | 2 de diseno |
+| Duracion del vuelo | 0.400 s | 0.387 s en papel |
+| Conectividad del relieve | pierde 0.14-0.77 pt | presupuesto de 1 pt (regla 14) |
+| Coste del spawn nuevo | 8-15 casillas | nueve semillas |
+
+### Lo que aparecio construyendola, y que el codigo no cuenta
+
+1. **Euler se comia un decimo del apice.** Integrando «resta la gravedad y avanza
+   con la velocidad ya frenada» el apice medido era 1.06 en vez de 1.16, o sea
+   un pelo de un pixel sobre un bloque de 16. Se integra por el promedio de las
+   dos velocidades, que con aceleracion constante es exacto.
+2. **El spawn de la semilla de prueba era injugable.** Agua al noroeste,
+   escalones de +2 al sureste: cuatro casillas andables. `findSpawn` solo miraba
+   si el tile era solido, y eso basto mientras el relieve no estorbaba.
+3. **El rellano de 3x3 no es comodidad.** Sin el, la accion —que solo alcanza la
+   altura propia— llegaba a **una casilla de las tres** nada mas empezar.
+4. **La conectividad estaba bien calibrada de antemano.** `analyze-world` ya
+   media con «se sube un bloque de un salto», asi que el presupuesto de la regla
+   14 se fijo para esta fisica. `debug.reachableArea` no, y se corrigio.
+5. **Las comprobaciones de direccion fija dejaron de valer.** Media docena de
+   ellas —en tests y en el humo— daban por hecho que andar hacia un lado avanza.
+   Ahora una pared es una respuesta correcta, y lo que hay que afirmar es que se
+   puede ir a **alguna** parte.
+6. **`actionArea` no se filtro; se le anadio `actionReach` al lado.** El plan
+   decia filtrar dentro, pero aquella es geometria pura del anillo de
+   direcciones y sus 21 tests no conocen el mundo ni deben. El filtro por altura
+   es una pregunta sobre el relieve y vive aparte; quien acciona y quien dibuja
+   el reticulo usan la version filtrada, para que lo marcado sea justo lo que se
+   alcanza.
+
+### Lo que queda pendiente de tu juicio
+
+- **`GRAVITY = 62` y `JUMP_SPEED = 12` siguen siendo deduccion mia.** Salen de tu
+  caso, y la tabla de arriba dice exactamente que producen.
+- **Soltar el mando en el aire conserva el impulso, no frena.** Tambien
+  deduccion mia. Dijiste «impulso conservado» y «en el aire, correccion
+  parcial»; leer «no pido nada» como «quiero pararme» convertiria soltar el
+  mando en un freno del 30 % del alcance, y eso es una correccion que nadie
+  pide. Si lo quieres al reves, es un `if`.
+- **El mundo es empinado.** Con la altura estorbando se nota mucho mas que
+  viendola: hay direcciones que topan a media casilla constantemente. Si quieres
+  laderas mas suaves, eso es mover la calibracion del relieve, que es tuya
+  (regla 14).
+- **Los arboles siguen frenando tambien en el aire.** No lo dijiste, asi que no
+  lo he cambiado: se mantiene la colision de siempre y no se salta por encima de
+  un arbusto. Es una linea si prefieres lo contrario.
+
+### El diseno, como lo fijaste
+
+Vive en `packages/sim`, asi que es agnostica de la camara y **no se ve afectada
+por el giro a 3D**.
 
 ### Reglas, fijadas por el autor
 

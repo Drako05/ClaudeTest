@@ -90,6 +90,7 @@ function toggleProjection(): void {
 }
 projButton.addEventListener('click', toggleProjection);
 controls.onToggleProjection = toggleProjection;
+controls.bindJumpButton(document.getElementById('jump'));
 
 const billboards = new BillboardSet();
 const player = billboards.spawnPlayer();
@@ -218,10 +219,16 @@ function frame(now: number): void {
   const intent = emptyIntent();
   intent.moveX = fwd.x * -move.y + rgt.x * move.x;
   intent.moveY = fwd.y * -move.y + rgt.y * move.x;
+  // El salto se consume una vez y solo entra en el PRIMER tick del frame: con
+  // un frame lento el bucle corre varios ticks seguidos, y repartir el mismo
+  // salto entre todos encadenaria saltos en el aire.
+  let jump = controls.takeJump();
 
   accumulator += dt;
   let guard = 8;
   while (accumulator >= TICK_DT && guard-- > 0) {
+    intent.jump = jump;
+    jump = false;
     step(state, intent);
     accumulator -= TICK_DT;
   }
@@ -235,7 +242,9 @@ function frame(now: number): void {
 
   const px = state.entities.x[state.playerId];
   const py = state.entities.y[state.playerId];
-  const ph = state.world.groundHeightAt(px, py);
+  // La altura que LLEVA, no la del suelo: con gravedad dejan de ser lo mismo, y
+  // leyendo el suelo el personaje seguiria pegado al terreno saltando.
+  const ph = state.entities.z[state.playerId];
   if (player) billboards.moveTo(player, px, ph, py);
   water.position.set(px, WATER_Y, py);
 
@@ -251,7 +260,7 @@ function frame(now: number): void {
     `${fps.toFixed(0)} FPS · ${camera.projection}\n` +
     `${(triangles / 1000).toFixed(1)}k triangulos · ${info.calls} draw calls\n` +
     `pos ${px.toFixed(0)}, ${py.toFixed(0)} · altura ${ph.toFixed(1)} · semilla ${seed}\n` +
-    `abajo-izq anda · el resto gira · 2 dedos zoom`;
+    `abajo-izq anda · el resto gira · 2 dedos zoom · espacio salta`;
 
   requestAnimationFrame(frame);
 }
@@ -271,6 +280,8 @@ Object.defineProperty(window, '__spike', {
     projection: camera.projection,
     x: state.entities.x[state.playerId],
     y: state.entities.y[state.playerId],
+    z: state.entities.z[state.playerId],
+    grounded: !!state.entities.grounded[state.playerId],
     fps,
     triangles,
   }),

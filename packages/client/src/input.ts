@@ -55,6 +55,11 @@ export class Input {
   private harvestTicks = 0;
   private eatQueued = false;
   private plantQueued = false;
+  /**
+   * Salto pedido. Por FLANCO y no por mantenido: se ignora la repeticion del
+   * sistema operativo, asi que una pulsacion es un salto y no una ristra.
+   */
+  private jumpQueued = false;
 
   /** Ultima posicion conocida del raton, o null si nunca se ha movido. */
   private pointerX: number | null = null;
@@ -97,8 +102,10 @@ export class Input {
       this.held.add(e.code);
 
       switch (e.code) {
+        // Espacio pasa a ser el salto y deja de accionar: decision del autor al
+        // disenar la fase 2, y por eso la accion se va al clic derecho.
         case 'Space':
-          this.pressHarvest();
+          this.jumpQueued = true;
           e.preventDefault();
           break;
         case 'KeyE':
@@ -134,7 +141,6 @@ export class Input {
 
     window.addEventListener('keyup', (e) => {
       this.held.delete(e.code);
-      if (e.code === 'Space') this.releaseHarvest();
     });
 
     // Sin esto, salir de la pestana con una tecla pulsada deja al jugador
@@ -149,10 +155,12 @@ export class Input {
   }
 
   /**
-   * Raton: la mirada sigue al cursor y el clic izquierdo acciona.
+   * Raton: la mirada sigue al cursor y el clic DERECHO acciona.
    *
-   * El clic reutiliza el mismo pestillo que Espacio, asi que mantener pulsado
-   * repite igual y un clic brevisimo se registra igual de bien.
+   * El izquierdo dejo de accionar cuando Espacio se fue al salto: el autor
+   * quiso la accion «exclusivamente en el clic derecho», y con el izquierdo
+   * haciendo lo mismo la distincion no significaria nada. Mantener pulsado
+   * repite, y un clic brevisimo se registra igual, porque es el mismo pestillo.
    */
   private bindPointer(): void {
     window.addEventListener('pointermove', (e) => {
@@ -161,8 +169,14 @@ export class Input {
       this.pointerY = e.clientY;
     });
 
+    // Sin esto el menu contextual se come el clic derecho y no se acciona nada.
+    window.addEventListener('contextmenu', (e) => {
+      if ((e.target as Element | null)?.closest?.(UI_SELECTOR)) return;
+      e.preventDefault();
+    });
+
     window.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'touch' || e.button !== 0) return;
+      if (e.pointerType === 'touch' || e.button !== 2) return;
       // Sobre la interfaz no se acciona: los botones y el HUD son suyos. Se
       // reutiliza el mismo selector que impide que el joystick nazca ahi.
       if ((e.target as Element | null)?.closest?.(UI_SELECTOR)) return;
@@ -226,6 +240,8 @@ export class Input {
     // Comer y sembrar son acciones de un solo toque: no repiten al mantener.
     for (const [element, run] of [
       [eat, () => (this.eatQueued = true)],
+      // Saltar es de un solo toque como comer: mantenerlo no encadena saltos.
+      [document.getElementById('btnJump'), () => (this.jumpQueued = true)],
       [document.getElementById('btnPlant'), () => (this.plantQueued = true)],
       [document.getElementById('btnRotL'), () => this.actions.onRotate(-1)],
       [document.getElementById('btnRotR'), () => this.actions.onRotate(1)],
@@ -435,6 +451,8 @@ export class Input {
       }
     }
 
+    intent.jump = this.jumpQueued;
+    this.jumpQueued = false;
     intent.eat = this.eatQueued;
     this.eatQueued = false;
     intent.plant = this.plantQueued;

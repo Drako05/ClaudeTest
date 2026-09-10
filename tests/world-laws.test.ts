@@ -345,6 +345,64 @@ describe('Capitulo I — «Existen el pasar del tiempo y las leyes fisicas funda
     const state = createGame(2024);
     expect(daylight(state.tick)).toBeGreaterThan(0.5);
   });
+
+  /**
+   * La gravedad, afirmada en el MUNDO GENERADO y a traves de `step`.
+   *
+   * `tests/jump.test.ts` fija la fisica sobre un campo de alturas escrito a
+   * mano, que es la unica forma de reproducir el caso literal del autor. Esto es
+   * lo otro: que la ley se cumple donde de verdad se juega, con el relieve que
+   * salga y sin escoger el sitio.
+   */
+  it('los pies acaban siempre en el suelo, en cualquier semilla', () => {
+    for (const seed of [1, 2024, 31337]) {
+      const state = createGame(seed);
+      const { entities: e, playerId: p } = state;
+      const intent = emptyIntent();
+      intent.jump = true;
+      step(state, intent);
+      expect(e.grounded[p], `semilla ${seed}: saltar no despego`).toBe(0);
+
+      // Y se cae solo, sin pedir nada.
+      const quieto = emptyIntent();
+      for (let t = 0; t < 120 && !e.grounded[p]; t++) step(state, quieto);
+      expect(e.grounded[p], `semilla ${seed}: no volvio al suelo`).toBe(1);
+      expect(e.z[p], `semilla ${seed}: los pies no coinciden con el suelo`).toBeCloseTo(
+        state.world.groundHeightAt(e.x[p], e.y[p]),
+        9,
+      );
+    }
+  });
+
+  it('no se cambia de nivel andando mas de lo que una rampa permite', () => {
+    // El teletransporte de un tile bajo a uno alto era exactamente esto: andar
+    // y aparecer arriba. Una rampa sube UN nivel y para eso existe; dos o mas
+    // sin saltar seria atravesar un muro.
+    for (const seed of [1, 2024, 31337]) {
+      for (const [mx, my] of [
+        [0, -1],
+        [0, 1],
+        [1, 0],
+        [-1, 0],
+      ]) {
+        const state = createGame(seed);
+        const { entities: e, playerId: p, world } = state;
+        const intent = emptyIntent();
+        intent.moveX = mx;
+        intent.moveY = my;
+        let previo = world.levelAt(Math.floor(e.x[p]), Math.floor(e.y[p]));
+        for (let t = 0; t < 240; t++) {
+          step(state, intent);
+          const ahora = world.levelAt(Math.floor(e.x[p]), Math.floor(e.y[p]));
+          expect(
+            ahora - previo,
+            `semilla ${seed} hacia ${mx},${my}: subio ${ahora - previo} niveles de golpe`,
+          ).toBeLessThanOrEqual(1);
+          previo = ahora;
+        }
+      }
+    }
+  });
 });
 
 describe('El mundo sigue siendo determinista con la vida en marcha', () => {

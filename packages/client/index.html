@@ -111,6 +111,9 @@
       body.touch-active #rotButtons { display: flex; }
       #btnEat { width: 58px; height: 58px; margin-bottom: 6px; }
       #btnPlant { width: 70px; height: 70px; margin-bottom: 2px; }
+      /* El salto, entre sembrar y recoger: se usa a menudo y va a la altura del
+         pulgar, pero mas pequeno que recoger, que sigue siendo el principal. */
+      #btnJump { width: 70px; height: 70px; margin-bottom: 2px; }
 
       /* En tactil los atajos de teclado no sirven de nada. */
       body.touch-active #help { display: none; }
@@ -122,6 +125,13 @@
                padding: 8px 10px; font-size: 11px; min-width: 148px; }
         #hud h1 { font-size: 10px; margin-bottom: 5px; }
         #help { font-size: 10px; padding: 7px 10px; }
+        /* Con cuatro botones en fila, a 390 px la hilera medía 340 de 390 y se
+           comia el sitio del joystick. Se aprietan: el de recoger conserva su
+           tamano porque es el que mas se usa. */
+        #touchButtons { gap: 8px; }
+        #btnEat { width: 50px; height: 50px; }
+        #btnPlant, #btnJump { width: 58px; height: 58px; }
+        #btnHarvest { width: 84px; height: 84px; }
       }
 
 
@@ -292,7 +302,7 @@
     </div>
 
     <div id="help">
-      <kbd>WASD</kbd> moverse &nbsp; <kbd>clic</kbd> / <kbd>Espacio</kbd> recolectar &nbsp; <kbd>E</kbd> comer bayas<br />
+      <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic dcho</kbd> recolectar &nbsp; <kbd>E</kbd> comer bayas<br />
       <kbd>F</kbd> sembrar &nbsp; <kbd>,</kbd>/<kbd>.</kbd> girar la vista &nbsp;
       <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
     </div>
@@ -336,6 +346,12 @@
       <button id="btnPlant" class="touch-btn" type="button" aria-label="Sembrar">
         <span class="glyph" aria-hidden="true">&#127793;</span>
         <span class="label">SEMBRAR</span>
+      </button>
+      <!-- En tactil no hay Espacio, y sin salto la altura deja de ser
+           atravesable: media montana quedaria fuera de alcance en el movil. -->
+      <button id="btnJump" class="touch-btn" type="button" aria-label="Saltar">
+        <span class="glyph" aria-hidden="true">&#8593;</span>
+        <span class="label">SALTAR</span>
       </button>
       <button id="btnHarvest" class="touch-btn" type="button" aria-label="Recolectar">
         <span class="glyph" aria-hidden="true">&#9874;</span>

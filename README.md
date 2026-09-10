@@ -10,8 +10,8 @@ semilla y la misma simulacion, con camara libre en vez de isometrica. Es hacia
 donde va el proyecto (`docs/pendiente.md`); el isometrico de la raiz sigue siendo
 el juego completo mientras dure la migracion. En el movil, el pulgar en el
 cuadrante inferior izquierdo anda, el resto de la pantalla gira la camara, y dos
-dedos de camara hacen zoom. El boton de abajo a la derecha cambia entre
-ortografica y perspectiva.
+dedos de camara hacen zoom. Los dos botones de la derecha son saltar y cambiar
+entre ortografica y perspectiva; con teclado, Espacio salta.
 
 El nombre es provisional.
 
@@ -49,7 +49,8 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Tecla | Accion |
 |---|---|
 | `WASD` / flechas | Moverse |
-| `Espacio` | Recolectar el tile marcado (mantener repite) |
+| `Espacio` | Saltar |
+| Clic derecho | Recolectar las casillas marcadas (mantener repite) |
 | `E` | Comer bayas |
 | `R` | Mundo nuevo |
 | `+` / `-` | Zoom |
@@ -60,6 +61,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 |---|---|
 | Apoyar y arrastrar en la mitad izquierda | Joystick flotante, analogico |
 | Boton RECOGER | Recolectar; mantener repite 4 veces por segundo |
+| Boton SALTAR | Saltar; no encadena si se mantiene |
 | Boton COMER | Comer bayas |
 | Pellizcar con dos dedos | Zoom |
 

@@ -174,6 +174,54 @@ Esto es el resumen operativo.
     fuera de el no hay garantia de que haya suelo a esa altura.
     `tests/terrain-draw.test.ts` lo afirma.
 
+21. **La altura estorba, y estorba con UNA regla: no se entra donde el suelo
+    esta por encima de los pies.** De ahi salen las tres cosas a la vez y sin
+    casos especiales — un talud se sube andando porque su suelo sube poco a
+    poco, una pared no se sube porque el suyo sube de golpe, y en el aire uno se
+    estampa contra la cara de un bloque porque a esa altura su suelo sigue
+    estando encima. Lo unico que cambia entre andar y volar es **cuanto** margen
+    hay: andando, `STEP_UP`; volando, ninguno.
+
+    Ese margen y su gemelo `SNAP_DOWN` no son alturas de escalon elegidas a ojo:
+    son la holgura que separa un talud de una pared. Subiendo un talud a paso
+    completo el suelo asciende `WALK_SPEED · TICK_DT ≈ 0.087` niveles por tick y
+    la pared mas baja mide 1 entero, asi que cualquier valor entre esas dos
+    cifras da el mismo mundo. Sin la holgura de bajada el personaje iria dando
+    saltitos ladera abajo.
+
+    La altura del personaje es **suya** (`entities.z`), no la del suelo bajo sus
+    pies, y el que dibuja tiene que leer esa. Leyendo el suelo el personaje
+    queda pegado al terreno tambien en pleno salto, que es como si no hubiera
+    salto.
+
+    **La gravedad se integra por el promedio de las dos velocidades**, no con el
+    Euler de toda la vida. Con aceleracion constante eso no es una aproximacion,
+    es la parabola exacta; con Euler el apice medido salia 1.06 en vez de los
+    1.16 de la derivacion, y ese decimo es justo el margen que el autor pidio
+    para que subirse a un bloque no fuera al milimetro.
+
+22. **Donde se nace hay que ganarselo.** `findSpawn` miraba solo si el tile era
+    solido, y eso basto mientras el relieve solo se veia. Con la altura
+    estorbando, un hueco entre el mar y un escalon de dos bloques es un tile
+    perfectamente pisable del que **no se sale**: la semilla de prueba hacia
+    exactamente eso. Ahora se exigen tres cosas, de la mas barata a la mas cara
+    — un rellano llano de 3x3, sitio para andar sin saltar, y sitio del que
+    salir contando con el salto—. Medido en nueve semillas, cuesta mover el
+    nacimiento entre 8 y 15 casillas, que en un mundo infinito no es nada.
+
+    El rellano no es lujo: sin el, en terreno escalonado **la accion alcanza una
+    casilla de las tres**, porque solo llega a las de la altura propia, y el
+    juego empieza pareciendo roto.
+
+23. **Cualquier medida de conectividad tiene que obedecer la fisica.** El
+    recorrido de `debug.reachableArea` inundaba mirando solo los solidos, y
+    desde que una pared detiene el paso eso dejo de medir lo que el jugador
+    recorre. Sus cifras de antes y las de ahora **no son comparables**.
+    `tools/analyze-world.ts` ya lo hacia bien —mide con «se sube un bloque de un
+    salto»—, asi que la calibracion de la regla 14 estaba hecha para esta fisica
+    y aguanta: el relieve cuesta 0.14-0.77 puntos sobre la linea base solo-agua,
+    por debajo del punto acordado.
+
 ## Regla de trabajo con el autor
 
 **La interpretacion de las leyes es del autor, no del agente.** Antes de escribir
@@ -335,9 +383,8 @@ panel era el que mataba.
 
 El mundo tiene altura desde `packages/sim/src/relief.ts`: hasta 41 niveles,
 escalon de 0.06 de elevacion, y `groundHeightAt` devuelve la altura real de un
-punto con decimales. **Por ahora el relieve solo se ve**: la colision no ha
-cambiado y el jugador camina por donde caminaba. La gravedad, el salto y las
-paredes que estorban son la fase siguiente, ya disenada con el autor.
+punto con decimales. **El relieve estorba** desde la fase 2: hay gravedad, salto
+y caida, y ya no se cambia de nivel andando (regla 21).
 
 Un nivel mide **16 px**, que es `TILE_W / 2`: en una isometrica 2:1 esa es la
 arista vertical de un cubo. Estuvo en 8 y el autor lo noto a la primera —los
@@ -352,16 +399,23 @@ sustituirlas, para no mover el mundo llano ni un tile.
 La camara gira con **coma y punto**, no con Q y E: la E ya era comer, y cambiar
 una tecla que funciona para meter otra no es decision del agente.
 
+Los controles cambiaron con la fase 2, y fue decision del autor: **Espacio pasa
+a ser el salto** y la accion se va **al clic derecho, en exclusiva**. En tactil
+hay boton de saltar, en el isometrico y en el 3D. Dejar tambien el clic
+izquierdo accionando habria vaciado la distincion de sentido.
+
 Numeros del autor, que no se tocan sin preguntarle: el escalon (0.06), los 16 px
 por nivel, el 15 % de fronteras que son rampa y el tope de 40 niveles. El umbral
 de salientes y la ganancia de cordillera, en cambio, son calibraciones: se eligen
 midiendo (regla 14).
 
-Lo que la fase siguiente traera, para no disenarlo dos veces: el salto es una
-parabola simetrica cuyo apice cae **a una casilla exacta** y cuyo alcance son dos
-—de ahi salen `GRAVITY` y `JUMP_SPEED`, derivados del caso concreto que describio
-el autor—, conserva el impulso que se llevaba, admite un 30 % de correccion en el
-aire, y el agua sigue siendo muro tambien volando.
+El salto, ya implementado: parabola simetrica con el apice **a una casilla
+exacta** y alcance dos, conserva el impulso que se llevaba, admite un 30 % de
+desviacion en el aire, y el agua es muro tambien volando. Medido con la
+integracion exacta: apice 1.160 niveles contra 1.161 en papel, alcance 2.17
+casillas a paso completo, vuelo 0.400 s. `GRAVITY = 62` y `JUMP_SPEED = 12` son
+**deduccion del agente** a partir del caso que describio el autor, no numeros
+suyos: puede corregirlos, y `tests/jump.test.ts` afirma la relacion que los ata.
 
 ## Si tocas la generacion del mundo
 

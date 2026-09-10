@@ -29,6 +29,24 @@
         touch-action: manipulation;
       }
       #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
+      /* El salto, justo encima del de proyeccion y bajo el mismo pulgar. Es
+         redondo y grande porque se usa constantemente, al reves que aquel. */
+      #jump {
+        position: fixed; z-index: 11;
+        bottom: calc(84px + env(safe-area-inset-bottom));
+        right: calc(14px + env(safe-area-inset-right));
+        -webkit-appearance: none; appearance: none;
+        width: 86px; height: 86px; border-radius: 50%;
+        font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: .1em; text-transform: uppercase;
+        color: #e8eef7; background: rgba(8, 14, 28, 0.82);
+        border: 1px solid rgba(140, 190, 255, 0.34);
+        backdrop-filter: blur(6px); cursor: pointer;
+        touch-action: manipulation;
+      }
+      #jump b { display: block; font-size: 22px; line-height: 1; margin-bottom: 3px; }
+      #jump:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
+      #jump:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
       #proj:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
       #proj small {
         display: block; margin-top: 3px; font-size: 10px;
@@ -94,6 +112,10 @@
   <body>
     <canvas id="view"></canvas>
     <div id="stick" aria-hidden="true"><i id="stickKnob"></i></div>
+    <button id="jump" type="button" aria-label="Saltar">
+      <b aria-hidden="true">&#8593;</b>
+      Saltar
+    </button>
     <button id="proj" type="button">
       Ortográfica
       <small>tocar para cambiar</small>

@@ -3,6 +3,7 @@
  * puedan comprobar el mundo sin dibujar nada.
  */
 
+import { canClimbTo } from './relief.js';
 import type { World } from './world.js';
 import type { WorldGen } from './worldgen.js';
 import { generateChunk } from './worldgen.js';
@@ -53,7 +54,15 @@ export function reachableArea(world: World, sx: number, sy: number, half = 100):
     seen.add(key);
     if (world.isSolidAt(x, y)) continue;
     reached++;
-    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
+    // La altura estorba desde la fase 2, asi que este recorrido tiene que
+    // obedecerla: antes inundaba mirando solo los solidos y desde que una pared
+    // detiene el paso eso dejo de medir lo que el jugador puede recorrer. El
+    // presupuesto de conectividad del relieve se fijo con la version vieja, asi
+    // que las cifras de antes y las de ahora **no son comparables**.
+    const level = world.levelAt(x, y);
+    for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
+      if (canClimbTo(level, world.levelAt(nx, ny))) stack.push([nx, ny]);
+    }
   }
   return reached;
 }

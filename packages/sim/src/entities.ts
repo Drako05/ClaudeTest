@@ -22,6 +22,27 @@ export class EntityStore {
   readonly y: Float64Array;
   readonly vx: Float64Array;
   readonly vy: Float64Array;
+  /**
+   * Altura de los pies, en NIVELES, con decimales.
+   *
+   * La misma vara que `World.groundHeightAt`, y a proposito: pisar suelo es
+   * exactamente `z === groundHeightAt(x, y)`, sin conversiones ni casos
+   * especiales para los taludes.
+   */
+  readonly z: Float64Array;
+  /** Velocidad vertical, en niveles por segundo. */
+  readonly vz: Float64Array;
+  /** 1 si los pies tocan el suelo. En el aire manda la gravedad. */
+  readonly grounded: Uint8Array;
+  /**
+   * Velocidad horizontal en el instante del despegue.
+   *
+   * Se guarda porque el control en el aire es un **tope de desviacion** sobre
+   * ella, no una velocidad nueva: sin recordar de que impulso se salio no hay
+   * con que medir cuanto se ha desviado.
+   */
+  readonly takeoffVx: Float64Array;
+  readonly takeoffVy: Float64Array;
   /** Ultima direccion no nula de movimiento: define el tile que se recolecta. */
   readonly facingX: Float32Array;
   readonly facingY: Float32Array;
@@ -36,6 +57,11 @@ export class EntityStore {
     this.y = new Float64Array(capacity);
     this.vx = new Float64Array(capacity);
     this.vy = new Float64Array(capacity);
+    this.z = new Float64Array(capacity);
+    this.vz = new Float64Array(capacity);
+    this.grounded = new Uint8Array(capacity);
+    this.takeoffVx = new Float64Array(capacity);
+    this.takeoffVy = new Float64Array(capacity);
     this.facingX = new Float32Array(capacity);
     this.facingY = new Float32Array(capacity);
     this.health = new Float32Array(capacity);
@@ -51,6 +77,13 @@ export class EntityStore {
     this.y[id] = y;
     this.vx[id] = 0;
     this.vy[id] = 0;
+    // Nace en el suelo. La altura de verdad la pone quien conoce el mundo: aqui
+    // no hay `World`, y no lo va a haber — el almacen son datos planos.
+    this.z[id] = 0;
+    this.vz[id] = 0;
+    this.grounded[id] = 1;
+    this.takeoffVx[id] = 0;
+    this.takeoffVy[id] = 0;
     this.facingX[id] = 0;
     this.facingY[id] = 1;
     this.health[id] = 100;

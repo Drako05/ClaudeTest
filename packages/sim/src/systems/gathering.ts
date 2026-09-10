@@ -65,6 +65,24 @@ export function actionArea(store: EntityStore, id: number): Offset[] {
   return actionTiles(tileX, tileY, dir < 0 ? 4 : dir);
 }
 
+/**
+ * Las casillas del area que estan **al alcance**, o sea a la altura propia.
+ *
+ * «La accion solo alcanza casillas a la misma altura»: para talar un arbol
+ * subido a un bloque hay que subirse. Va aparte de `actionArea` y no dentro
+ * porque aquella es geometria pura del anillo de direcciones —no conoce el
+ * mundo y sus tests no deben necesitarlo—, mientras que esto es una pregunta
+ * sobre el relieve.
+ *
+ * Se comparan NIVELES enteros y no la altura continua: es lo que dijo el autor
+ * («la misma altura»), y ademas hace que estar a media rampa no cambie lo que
+ * se alcanza a cada paso.
+ */
+export function actionReach(world: World, store: EntityStore, id: number): Offset[] {
+  const level = world.levelAt(Math.floor(store.x[id]), Math.floor(store.y[id]));
+  return actionArea(store, id).filter((t) => world.levelAt(t.x, t.y) === level);
+}
+
 /** Tile al que apunta la entidad. */
 export function targetTile(store: EntityStore, id: number): { x: number; y: number } {
   const [aimed] = actionArea(store, id);
@@ -103,7 +121,7 @@ export function tryHarvestArea(
   tick: number,
 ): HarvestResult[] {
   const out: HarvestResult[] = [];
-  for (const tile of actionArea(store, id)) {
+  for (const tile of actionReach(world, store, id)) {
     const result = harvestTile(world, tile.x, tile.y, inventory, tick);
     if (result) out.push(result);
   }
@@ -173,7 +191,11 @@ export function tryPlant(
   id: number,
   inventory: Int32Array,
 ): Feature | null {
-  const { x, y } = targetTile(store, id);
+  // Sembrar alcanza lo mismo que recolectar: no se planta en la cima de un
+  // bloque desde abajo, por la misma razon por la que no se tala desde abajo.
+  const [aimed] = actionReach(world, store, id);
+  if (!aimed) return null;
+  const { x, y } = aimed;
   if (world.featureAt(x, y) !== Feature.None) return null;
 
   const terrain = world.terrainAt(x, y);
