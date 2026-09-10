@@ -280,6 +280,25 @@ primer retoque. Sobre hierba los verdes de un arbol desaparecen, asi que cada
 cuadrado lleva un contorno oscuro debajo; cambiarles el color habria sido
 traicionar el encargo.
 
+**Un efecto recien nacido sobrevive a su primer `advance`, dure lo que dure el
+fotograma.** El bucle corre todos los ticks pendientes de golpe —y dentro de
+ellos nace el slash—, luego envejece los efectos **una sola vez** con el frame
+entero, y solo despues dibuja: sin esa garantia, cualquier efecto mas corto que
+un fotograma nace y muere sin llegar a dibujarse. Con `SLASH_SECONDS = 0.22` el
+corte cae en **4,5 FPS** y es exacto, no probabilistico: medido, a 219 ms por
+frame se ven los 35 slashes y a 221 ms cero de 35. Ahi vivio meses el fallo, y
+alargar el slash lo habria tapado tocando un numero de sensacion que es del
+autor.
+
+Lo que ese fallo enseña sobre las comprobaciones, y vale para cualquiera que se
+anada: **la prueba de humo preguntaba si habia un slash vivo en ese instante**,
+con una vida de 0,22 s y un sondeo cada 420 ms. Dos defectos en uno — se
+acertaba a suertes, y miraba la LISTA de efectos, asi que no distinguia «no se
+lanza» de «se lanza y no se dibuja», que era justo el caso. Ahora el renderizador
+lleva un acumulador de slashes **trazados** (`Renderer.slashesDrawn`) y el humo
+afirma que crece. Una comprobacion que puede pasar por suerte es peor que una que
+falla.
+
 ## Herramientas de desarrollo
 
 `packages/client/src/devtools.ts`, con `?dev=1` en la URL o F3. Pausa,

@@ -386,7 +386,14 @@ async function desktopPass(browser, baseUrl) {
   // vacia, y sobre casillas vacias solo saldria el slash.
   await walkToOpenGround(page, 1.1);
 
-  let sawSlash = false;
+  // El slash se cuenta por los que se han TRAZADO, no preguntando si hay uno
+  // vivo ahora. Preguntar por el vivo era echarlo a suertes —dura 0,22 s y aqui
+  // se sondea cada 420 ms—, y ademas miraba la lista de efectos, asi que no
+  // distinguia «no se lanza» de «se lanza y no se dibuja». Lo segundo era un
+  // fallo de verdad y esta comprobacion lo dejaba pasar: por debajo de 4,5 FPS
+  // el slash moria dentro del mismo fotograma en que nacia. El runner de CI
+  // corre a 4-4,9 FPS, justo encima del corte.
+  const slashesBefore = (await page.evaluate(() => window.__verdant)).slashesDrawn;
   let sawDebris = 0;
   await page.mouse.down();
   for (const key of ['KeyS', 'KeyD', 'KeyS', 'KeyA', 'KeyW', 'KeyD', 'KeyS', 'KeyA', 'KeyD', 'KeyS']) {
@@ -394,12 +401,12 @@ async function desktopPass(browser, baseUrl) {
     await page.waitForTimeout(420);
     await page.keyboard.up(key);
     const now = await page.evaluate(() => window.__verdant);
-    if (now.effects.slashes > 0) sawSlash = true;
     if (now.effects.particles > sawDebris) sawDebris = now.effects.particles;
   }
   await page.mouse.up();
-  console.log(`  al golpear: slash ${sawSlash ? 'si' : 'no'}, hasta ${sawDebris} escombros`);
-  check(sawSlash, 'accionar no dibujo ningun slash');
+  const slashes = (await page.evaluate(() => window.__verdant)).slashesDrawn - slashesBefore;
+  console.log(`  al golpear: ${slashes} slashes trazados, hasta ${sawDebris} escombros`);
+  check(slashes > 0, 'accionar no dibujo ningun slash');
   check(sawDebris > 0, 'derribar no solto ningun escombro');
 
   // Y se apagan solos: no se quedan pegados en pantalla.

@@ -454,6 +454,8 @@ async function main(): Promise<void> {
       /** Roca visible mas cercana. La usa la prueba de humo para ir a la montana. */
       mineralSpot: mineralSpot(state),
       effects: effects.tally,
+      /** Slashes TRAZADOS desde el arranque; ver `Renderer.slashesDrawn`. */
+      slashesDrawn: renderer.slashesDrawn,
       area: actionArea(state.entities, state.playerId).map((t) => [t.x, t.y]),
       biome: BIOME_NAMES[
         state.world.biomeAt(

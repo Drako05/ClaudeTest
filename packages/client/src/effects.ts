@@ -57,6 +57,8 @@ export interface Particle {
   /** Segundos que lleva vivo y los que dura en total. */
   age: number;
   ttl: number;
+  /** True hasta el primer `advance`; ver la regla del fotograma alli. */
+  fresh: boolean;
 }
 
 export interface Slash {
@@ -64,6 +66,8 @@ export interface Slash {
   tiles: ReadonlyArray<{ x: number; y: number }>;
   age: number;
   ttl: number;
+  /** True hasta el primer `advance`; ver la regla del fotograma alli. */
+  fresh: boolean;
 }
 
 export class Effects {
@@ -95,7 +99,12 @@ export class Effects {
 
   /** Un barrido sobre las tres casillas del area. */
   spawnSlash(tiles: ReadonlyArray<{ x: number; y: number }>): void {
-    this.slashList.push({ tiles: tiles.map((t) => ({ x: t.x, y: t.y })), age: 0, ttl: SLASH_SECONDS });
+    this.slashList.push({
+      tiles: tiles.map((t) => ({ x: t.x, y: t.y })),
+      age: 0,
+      ttl: SLASH_SECONDS,
+      fresh: true,
+    });
   }
 
   /**
@@ -137,6 +146,7 @@ export class Effects {
         color: colors[Math.floor(random() * colors.length) % colors.length],
         age: 0,
         ttl: DEBRIS_SECONDS * (0.7 + random() * 0.6),
+        fresh: true,
       });
     }
   }
@@ -148,12 +158,31 @@ export class Effects {
    * apagan ahi, sin rebotar. Es el «cayendo al suelo» del enunciado, y es la
    * razon de que la altura sea una magnitud propia y no una posicion de pantalla
    * ya proyectada.
+   *
+   * **Un efecto recien nacido sobrevive a este primer paso, dure lo que dure el
+   * fotograma.** Sin esa garantia, un efecto mas corto que un fotograma nace y
+   * muere sin llegar a dibujarse nunca: el bucle corre todos los ticks de golpe
+   * —y es dentro de ellos donde se lanza el slash—, luego envejece los efectos
+   * **una sola vez** con el frame entero, y solo despues dibuja. Con
+   * `SLASH_SECONDS = 0.22` eso quiere decir que por debajo de 4,5 FPS el slash
+   * **no se ve jamas**. No es una carrera ni mala suerte: es un corte exacto, y
+   * el runner de CI vive justo encima de el (4-4,9 FPS renderizando por
+   * software), asi que la prueba de humo pasaba o fallaba segun el humor de la
+   * maquina. `tests/effects.test.ts` fija las dos mitades del corte.
+   *
+   * Alargar el slash habria tapado el fallo tocando un numero de sensacion, que
+   * es del autor. Esto no toca ninguno: el efecto dura lo mismo y solo se le
+   * garantiza el fotograma en el que se le ve.
    */
   advance(dt: number): void {
     if (dt <= 0) return;
 
     for (let i = this.live.length - 1; i >= 0; i--) {
       const p = this.live[i];
+      if (p.fresh) {
+        p.fresh = false;
+        continue;
+      }
       p.age += dt;
       if (p.age >= p.ttl) {
         this.live.splice(i, 1);
@@ -177,6 +206,10 @@ export class Effects {
 
     for (let i = this.slashList.length - 1; i >= 0; i--) {
       const s = this.slashList[i];
+      if (s.fresh) {
+        s.fresh = false;
+        continue;
+      }
       s.age += dt;
       if (s.age >= s.ttl) this.slashList.splice(i, 1);
     }

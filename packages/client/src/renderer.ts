@@ -672,6 +672,8 @@ export class Renderer {
    * Los escombros son cuadraditos con la altura restada en Y, que es como se
    * dibuja en isometrica todo lo que se levanta del suelo.
    */
+  private slashStrokes = 0;
+
   private drawEffects(world: World, effects: Effects | undefined): void {
     this.effectLayer.clear();
     if (!effects) return;
@@ -699,6 +701,7 @@ export class Renderer {
         this.effectLayer.lineTo(points[i].x, points[i].y);
       }
       this.effectLayer.stroke({ width: 3 - t * 1.5, color: 0xffffff, alpha });
+      this.slashStrokes++;
     }
 
     for (const p of effects.particles) {
@@ -1085,6 +1088,21 @@ export class Renderer {
    */
   get fadedCount(): number {
     return this.faded.length;
+  }
+
+  /**
+   * Cuantos slashes se han llegado a TRAZAR desde que arranco el juego.
+   *
+   * Es un acumulador, y esa es toda la gracia. Preguntar «hay un slash vivo
+   * ahora mismo» obliga a acertarle a una ventana de 0,22 s con un sondeo que va
+   * cada 420 ms, asi que la comprobacion pasaba o fallaba a suertes; y ademas
+   * miraba la LISTA de efectos, con lo que no distinguia «no se lanza» de «se
+   * lanza y no se dibuja» —que era justo el fallo—. Contando aqui, dentro del
+   * dibujado, la prueba de humo afirma lo que de verdad quiere afirmar y no
+   * depende de la velocidad de la maquina.
+   */
+  get slashesDrawn(): number {
+    return this.slashStrokes;
   }
 
   /** Piezas de mundo dibujadas: suelo, relieve, features y personaje. */

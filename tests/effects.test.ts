@@ -188,6 +188,10 @@ describe('El slash de la accion', () => {
     effects.spawnSlash([{ x: 0, y: 0 }]);
     expect(progressOf(effects.slashes[0])).toBe(0);
 
+    // El primer paso es el fotograma regalado: nace y se dibuja sin envejecer.
+    effects.advance(1 / 60);
+    expect(progressOf(effects.slashes[0])).toBe(0);
+
     effects.advance(SLASH_SECONDS / 2);
     expect(progressOf(effects.slashes[0])).toBeCloseTo(0.5, 5);
 
@@ -202,6 +206,56 @@ describe('El slash de la accion', () => {
     effects.advance(0);
     effects.advance(-1);
     expect(JSON.stringify(effects.particles)).toBe(before);
+  });
+});
+
+/**
+ * El fallo que llevaba semanas mandando correos de CI.
+ *
+ * No era una carrera ni mala suerte del muestreo: era un corte exacto. El bucle
+ * de `main.ts` corre todos los ticks pendientes de golpe —y dentro de ellos nace
+ * el slash—, luego llama a `advance` **una sola vez** con el frame entero, y solo
+ * despues dibuja. Un frame mas largo que `SLASH_SECONDS` mataba el slash entre su
+ * nacimiento y el dibujo, asi que por debajo de 4,5 FPS no se veia **jamas**. El
+ * runner de CI corre a 4-4,9 FPS renderizando por software, o sea a caballo del
+ * corte, y de ahi que unas veces pasara y otras no.
+ */
+describe('Un efecto nace y se ve, por lento que vaya el fotograma', () => {
+  it('el slash sobrevive a un fotograma mas largo que su propia vida', () => {
+    const effects = new Effects();
+    effects.spawnSlash([{ x: 0, y: 0 }]);
+
+    // El peor fotograma medido en CI: 840 ms, casi cuatro vidas del slash.
+    effects.advance(0.84);
+    expect(effects.slashes).toHaveLength(1);
+    expect(progressOf(effects.slashes[0])).toBe(0);
+
+    // Y no es inmortal: al siguiente paso se apaga como siempre.
+    effects.advance(0.84);
+    expect(effects.slashes).toHaveLength(0);
+  });
+
+  it('los escombros tambien, que caducan mas tarde pero caducan', () => {
+    const effects = new Effects(7);
+    effects.spawnDebris(0, 0, PALETTE);
+    effects.advance(5);
+    expect(effects.particles.length).toBe(DEBRIS_PER_BURST);
+    effects.advance(5);
+    expect(effects.particles).toHaveLength(0);
+  });
+
+  it('a los dos lados del corte de 4,5 FPS se ve igual', () => {
+    // Modelo del bucle de `main.ts`: golpear, envejecer con el frame entero, y
+    // solo entonces mirar, que es cuando dibuja el renderizador.
+    const seen = (frame: number): boolean => {
+      const effects = new Effects();
+      effects.spawnSlash([{ x: 0, y: 0 }]);
+      effects.advance(frame);
+      return effects.slashes.length > 0;
+    };
+    expect(seen(SLASH_SECONDS - 0.001)).toBe(true);
+    expect(seen(SLASH_SECONDS + 0.001)).toBe(true);
+    expect(seen(0.84)).toBe(true);
   });
 });
 
