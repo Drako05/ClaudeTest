@@ -5,6 +5,14 @@ para crecer hacia multijugador online y, mas adelante, una version nativa.
 
 **Jugar: https://drako05.github.io/ClaudeTest/**
 
+**El 3D: https://drako05.github.io/ClaudeTest/3d/** — el mismo mundo, la misma
+semilla y la misma simulacion, con camara libre en vez de isometrica. Es hacia
+donde va el proyecto (`docs/pendiente.md`); el isometrico de la raiz sigue siendo
+el juego completo mientras dure la migracion. En el movil, el pulgar en el
+cuadrante inferior izquierdo anda, el resto de la pantalla gira la camara, y dos
+dedos de camara hacen zoom. El boton de abajo a la derecha cambia entre
+ortografica y perspectiva.
+
 El nombre es provisional.
 
 ## Arrancar
