@@ -515,15 +515,23 @@ async function desktopPass(browser, baseUrl) {
   // corre a 4-4,9 FPS, justo encima del corte.
   const slashesBefore = (await page.evaluate(() => window.__verdant)).slashesDrawn;
   let sawDebris = 0;
-  await page.mouse.down({ button: 'right' });
-  for (const key of ['KeyS', 'KeyD', 'KeyS', 'KeyA', 'KeyW', 'KeyD', 'KeyS', 'KeyA', 'KeyD', 'KeyS']) {
-    await page.keyboard.down(key);
-    await page.waitForTimeout(420);
-    await page.keyboard.up(key);
-    const now = await page.evaluate(() => window.__verdant);
-    if (now.effects.particles > sawDebris) sawDebris = now.effects.particles;
+
+  // Se repite cambiando de sitio hasta que caiga algo. Los escombros solo
+  // salen si se DERRIBA, y con la altura estorbando «hay algo talable justo
+  // aqui y a mi altura» dejo de ser una apuesta segura: una vuelta puede
+  // gastarse entera contra una pared o sobre casillas ya vacias.
+  for (let round = 0; round < 4 && sawDebris === 0; round++) {
+    if (round > 0) await walkToOpenGround(page, 1.1);
+    await page.mouse.down({ button: 'right' });
+    for (const key of ['KeyS', 'KeyD', 'KeyS', 'KeyA', 'KeyW', 'KeyD', 'KeyS', 'KeyA', 'KeyD', 'KeyS']) {
+      await page.keyboard.down(key);
+      await page.waitForTimeout(420);
+      await page.keyboard.up(key);
+      const now = await page.evaluate(() => window.__verdant);
+      if (now.effects.particles > sawDebris) sawDebris = now.effects.particles;
+    }
+    await page.mouse.up({ button: 'right' });
   }
-  await page.mouse.up({ button: 'right' });
   const slashes = (await page.evaluate(() => window.__verdant)).slashesDrawn - slashesBefore;
   console.log(`  al golpear: ${slashes} slashes trazados, hasta ${sawDebris} escombros`);
   check(slashes > 0, 'accionar no dibujo ningun slash');
