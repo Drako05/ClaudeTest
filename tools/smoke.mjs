@@ -784,18 +784,24 @@ async function devToolsPass(browser, baseUrl) {
   // El contorno tiene que sobrevivir a cambiar de chunk y a mover el zoom, que
   // es justo donde se veia aparecer y desaparecer.
   const startChunk = [Math.floor(withBorders.x) >> 5, Math.floor(withBorders.y) >> 5];
-  // Rotando la direccion: con la altura estorbando, insistir hacia el este
-  // puede ser insistir contra una pared, y entonces esto medía el paisaje y no
-  // el contorno. Un chunk son 32 casillas, asi que hacen falta varias tandas.
+  // Un chunk son 32 casillas y a 5.2 por segundo eso son mas de seis segundos
+  // seguidos, asi que se INSISTE en una direccion antes de probar otra. Rotar a
+  // cada tanda no vale y ademas se cancela: este, sur, norte y oeste dejan al
+  // jugador donde estaba, que es exactamente como fallaba esto. Probar varias
+  // direcciones hace falta porque con la altura estorbando una puede ser pared,
+  // pero cada una se agota antes de pasar a la siguiente.
   let walked = withBorders;
   let walkedChunk = startChunk;
-  for (const key of ['KeyD', 'KeyS', 'KeyW', 'KeyA', 'KeyD', 'KeyS']) {
-    await page.keyboard.down(key);
-    await page.waitForTimeout(2600);
-    await page.keyboard.up(key);
-    walked = await waitForLoop(page);
-    walkedChunk = [Math.floor(walked.x) >> 5, Math.floor(walked.y) >> 5];
-    if (walkedChunk[0] !== startChunk[0] || walkedChunk[1] !== startChunk[1]) break;
+  const cambio = () => walkedChunk[0] !== startChunk[0] || walkedChunk[1] !== startChunk[1];
+  for (const key of ['KeyD', 'KeyS', 'KeyA', 'KeyW']) {
+    for (let burst = 0; burst < 3 && !cambio(); burst++) {
+      await page.keyboard.down(key);
+      await page.waitForTimeout(2600);
+      await page.keyboard.up(key);
+      walked = await waitForLoop(page);
+      walkedChunk = [Math.floor(walked.x) >> 5, Math.floor(walked.y) >> 5];
+    }
+    if (cambio()) break;
   }
   console.log(`  chunk ${startChunk} -> ${walkedChunk}, segmentos ${withBorders.borderSegments} -> ${walked.borderSegments}`);
   check(
