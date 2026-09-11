@@ -796,7 +796,14 @@ async function devToolsPass(browser, baseUrl) {
   for (const key of ['KeyD', 'KeyS', 'KeyA', 'KeyW']) {
     for (let burst = 0; burst < 3 && !cambio(); burst++) {
       await page.keyboard.down(key);
-      await page.waitForTimeout(2600);
+      // Saltando por el camino, que es como se viaja desde que la altura
+      // estorba. Sin esto la prueba no cruzaba: el nacimiento solo garantiza
+      // unas 40 casillas ANDABLES, y salir de ahi es justo lo que el salto
+      // resuelve. Andar y nada mas mide un juego que ya no existe.
+      for (let i = 0; i < 4; i++) {
+        await page.waitForTimeout(650);
+        await page.keyboard.press('Space');
+      }
       await page.keyboard.up(key);
       walked = await waitForLoop(page);
       walkedChunk = [Math.floor(walked.x) >> 5, Math.floor(walked.y) >> 5];

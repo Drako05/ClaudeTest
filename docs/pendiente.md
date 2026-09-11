@@ -107,10 +107,24 @@ corregir**, y debajo lo que aparecio al construirlo.
   parcial»; leer «no pido nada» como «quiero pararme» convertiria soltar el
   mando en un freno del 30 % del alcance, y eso es una correccion que nadie
   pide. Si lo quieres al reves, es un `if`.
-- **El mundo es empinado.** Con la altura estorbando se nota mucho mas que
-  viendola: hay direcciones que topan a media casilla constantemente. Si quieres
-  laderas mas suaves, eso es mover la calibracion del relieve, que es tuya
-  (regla 14).
+- **El mundo es empinado, y aqui esta la medida.** Desde el nacimiento de la
+  semilla de prueba, empujando ocho segundos en cada una de las cuatro
+  direcciones:
+
+  | | Andando | Saltando |
+  |---|---|---|
+  | Este | 2.4 casillas | **17.2, cruza de chunk** |
+  | Norte | 6.2 | 6.2 |
+  | Sur | 1.1 | 1.1 |
+  | Oeste | 1.1 | 1.1 |
+
+  O sea: **de cuatro direcciones solo una lleva a alguna parte, y solo
+  saltando.** Y eso es en un sitio elegido por ser llano y habitable. No es un
+  fallo —la altura estorba, que era el encargo— pero si es mucho mas restrictivo
+  de lo que se intuia viendo el relieve sin chocar con el. Si quieres laderas
+  mas suaves, la palanca es la calibracion del relieve, que es tuya (regla 14):
+  `RIDGE_GAIN` y `OUTCROP_THRESHOLD`, midiendo antes con
+  `npx vite-node tools/analyze-world.ts`.
 - **Los arboles siguen frenando tambien en el aire.** No lo dijiste, asi que no
   lo he cambiado: se mantiene la colision de siempre y no se salta por encima de
   un arbusto. Es una linea si prefieres lo contrario.
