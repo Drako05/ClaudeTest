@@ -379,6 +379,15 @@ async function desktopPass(browser, baseUrl) {
     check(reach === 1, `casilla del area a distancia ${reach}: ${tx},${ty}`);
   }
 
+  // Y lo que de verdad se acciona es un SUBCONJUNTO de esas tres: las que estan
+  // a la altura propia. Puede quedarse en una, o en ninguna al pie de un muro;
+  // lo que no puede es inventarse casillas que el apuntado no dio.
+  const enElArea = new Set(aimRight.area.map((t) => t.join(',')));
+  check(
+    aimRight.reach.length <= 3 && aimRight.reach.every((t) => enElArea.has(t.join(','))),
+    `lo alcanzable no sale del area: ${JSON.stringify(aimRight.reach)} vs ${JSON.stringify(aimRight.area)}`,
+  );
+
   await page.screenshot({ path: join(SHOTS, '12-area-apuntada.png') });
 
   // Ritmo en REPOSO, ya construida la escena: el `fps` del estado inicial mide

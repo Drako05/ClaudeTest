@@ -711,8 +711,9 @@ export class World {
           // El primero pisable se guarda por si ninguno cumpliera: mejor un
           // bolsillo que quedarse en el origen, que puede ser agua.
           if (!fallback) fallback = { x: x + 0.5, y: y + 0.5 };
-          // De lo mas barato a lo mas caro: nueve consultas, luego un recorrido
-          // corto que no cruza escalones, y solo al final el que si los cruza.
+          // De lo mas barato a lo mas caro: una consulta, luego nueve, luego un
+          // recorrido corto que no cruza escalones, y solo al final el que si.
+          if (!this.sustainsLife(x, y)) continue;
           if (!this.isLanding(x, y)) continue;
           if (this.roamRoom(x, y, false) < SPAWN_MIN_FLOOR) continue;
           if (this.roamRoom(x, y, true) >= SPAWN_MIN_ROOM) return { x: x + 0.5, y: y + 0.5 };
@@ -731,6 +732,26 @@ export class World {
    * ve la prueba de humo. Corta en cuanto tiene bastante, asi que en terreno
    * normal termina enseguida.
    */
+  /**
+   * True si en ese terreno puede crecer algo.
+   *
+   * Corrige un sesgo que metio el rellano llano: en este mundo **lo llano son
+   * las mesetas, y las mesetas son roca**, asi que pedir suelo liso mudo el
+   * nacimiento a piedra pelada en cinco de nueve semillas, a niveles de hasta
+   * 16, donde no hay nada que comer y el hambre corre desde el primer tick.
+   *
+   * Cuesta practicamente nada, y por eso no es una preferencia estetica sino
+   * quitar un efecto secundario: medido en las mismas nueve semillas, el radio
+   * de busqueda pasa de 8-15 a 8-17 casillas y las nueve nacen en hierba o
+   * bosque entre los niveles 1 y 4, que es donde nacian antes de todo esto.
+   */
+  private sustainsLife(sx: number, sy: number): boolean {
+    const terrain = this.terrainAt(sx, sy);
+    return (
+      densityOfKind(terrain, LifeKind.Tree) > 0 || densityOfKind(terrain, LifeKind.Plant) > 0
+    );
+  }
+
   /** True si el tile y sus ocho vecinas son pisables y estan al mismo nivel. */
   private isLanding(sx: number, sy: number): boolean {
     const level = this.levelAt(sx, sy);

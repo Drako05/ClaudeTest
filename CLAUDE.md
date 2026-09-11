@@ -213,6 +213,14 @@ Esto es el resumen operativo.
     casilla de las tres**, porque solo llega a las de la altura propia, y el
     juego empieza pareciendo roto.
 
+    Y una cuarta condicion, que aparecio como efecto secundario de la tercera:
+    el terreno tiene que **sostener vida**. En este mundo lo llano son las
+    mesetas y las mesetas son roca, asi que pedir suelo liso mudo el nacimiento
+    a piedra pelada en cinco de nueve semillas, a niveles de hasta 16, sin nada
+    que comer y con el hambre corriendo desde el primer tick. Cuesta nada —el
+    radio de busqueda pasa de 8-15 a 8-17 casillas—, y no es una preferencia:
+    es quitar un sesgo que metio la regla anterior.
+
 23. **Cualquier medida de conectividad tiene que obedecer la fisica.** El
     recorrido de `debug.reachableArea` inundaba mirando solo los solidos, y
     desde que una pared detiene el paso eso dejo de medir lo que el jugador

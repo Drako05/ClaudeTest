@@ -8,6 +8,7 @@
  */
 
 import {
+  actionArea,
   actionReach,
   clockLabel,
   createGame,
@@ -478,7 +479,15 @@ async function main(): Promise<void> {
       effects: effects.tally,
       /** Slashes TRAZADOS desde el arranque; ver `Renderer.slashesDrawn`. */
       slashesDrawn: renderer.slashesDrawn,
-      area: actionReach(state.world, state.entities, state.playerId).map((t) => [t.x, t.y]),
+      // Las dos cosas, y por separado: `area` es la GEOMETRIA del apuntado
+      // —siempre tres casillas del anillo de direcciones, sin repetir— y
+      // `reach` es cuales de ellas estan a la altura propia y por tanto se
+      // pueden accionar. Devolver solo la filtrada como `area` rompio la
+      // comprobacion que defiende la geometria, y con razon: en terreno
+      // escalonado le llegaba una sola casilla y parecia que el apuntado se
+      // habia roto.
+      area: actionArea(state.entities, state.playerId).map((t) => [t.x, t.y]),
+      reach: actionReach(state.world, state.entities, state.playerId).map((t) => [t.x, t.y]),
       /** Altura de los pies y si tocan suelo. */
       z: state.entities.z[state.playerId],
       grounded: !!state.entities.grounded[state.playerId],

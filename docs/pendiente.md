@@ -75,6 +75,15 @@ corregir**, y debajo lo que aparecio al construirlo.
    si el tile era solido, y eso basto mientras el relieve no estorbaba.
 3. **El rellano de 3x3 no es comodidad.** Sin el, la accion —que solo alcanza la
    altura propia— llegaba a **una casilla de las tres** nada mas empezar.
+   Pero el rellano trajo su propio sesgo, y lo destapo la CI, no el humo local:
+   **lo llano de este mundo son las mesetas, y las mesetas son roca**, asi que
+   cinco de nueve semillas pasaron a nacer en piedra pelada a nivel 16, sin nada
+   que comer. Se arreglo exigiendo ademas terreno que sostenga vida, y sale
+   gratis: el radio de busqueda pasa de 8-15 a 8-17 casillas.
+
+   Dice algo del mundo, no del spawn: **si hace falta filtrar para encontrar
+   suelo llano habitable, es que el relieve es muy empinado.** Es la misma
+   observacion de mas abajo, por otra puerta.
 4. **La conectividad estaba bien calibrada de antemano.** `analyze-world` ya
    media con «se sube un bloque de un salto», asi que el presupuesto de la regla
    14 se fijo para esta fisica. `debug.reachableArea` no, y se corrigio.
