@@ -11,6 +11,13 @@ Lo permanente del *como* esta en `CLAUDE.md`; las leyes del mundo, en
 
 ## Decision tomada: el juego pasa a 3D con estetica de sprites
 
+**Y desde el 2026-09-12, el isometrico esta congelado por decision suya:**
+no se gasta trabajo en el, no se le portan los cambios nuevos y no se le
+anaden mecanicas. Lo que venga de ahora en adelante se hace en `sim` (que es
+comun) y en el cliente 3D. `CLAUDE.md` lo lleva como nota de cabecera, con el
+detalle de que ficheros abarca y de que hacer si un cambio en `sim` tumba el
+humo del isometrico.
+
 El autor probo un spike de 3D (`packages/client/src/spike3d/`, `npm run spike`) y
 **decidio girar**. Motivo, medido y no opinado: en una isometrica de angulo fijo
 la informacion para entender el relieve **no esta en la imagen** —subir un nivel

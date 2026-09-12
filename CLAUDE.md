@@ -3,6 +3,31 @@
 Lee tambien el README: explica la arquitectura y el porque de cada decision.
 Esto es el resumen operativo.
 
+## El isometrico esta CONGELADO
+
+Decision del autor, 2026-09-12: **no se gasta mas trabajo en el juego
+isometrico.** No se le anaden mecanicas, no se le portan los cambios nuevos y no
+se pule. El desarrollo va al cliente 3D (`packages/client/src/spike3d/`,
+`npm run spike`), segun la decision que ya esta escrita en `docs/pendiente.md`.
+
+Lo congelado es **la capa de presentacion isometrica**: `projection.ts`,
+`terrain-draw.ts`, `relief-faces.ts`, `biome-edges.ts`, el arte de terreno de
+`tiles.ts`, `renderer.ts` y la parte de `main.ts` / `input.ts` que sea suya.
+`packages/sim` y `packages/shared` no estan congelados: son el nucleo del juego y
+entran intactos en el 3D, asi que ahi se sigue trabajando igual.
+
+Las reglas de abajo que describen la isometrica (6, 7, 16, 17, 18, 19, 20) se
+quedan escritas por dos motivos: varias son verdades del mundo, no de la camara
+—el orden por profundidad, las filas, lo que tapa a quien— y vuelven a aparecer
+en 3D; y las que no, cuentan **por que** se giro.
+
+**Interpretacion mia, corregible:** congelado no es roto. Si un cambio en `sim`
+deja el isometrico sin compilar o tumba `npm run smoke`, hago el arreglo minimo
+para devolverlo al verde, porque hoy el humo es la unica prueba de integracion
+que existe. Lo que no hago es llevarle nada nuevo. Si prefieres que el
+isometrico salga del `typecheck` y del humo en cuanto el 3D tenga su propia
+prueba de humo, dilo y se retira.
+
 ## Reglas duras
 
 1. **`packages/sim` jamas toca el navegador.** Sin DOM, canvas, WebGL, PixiJS ni
