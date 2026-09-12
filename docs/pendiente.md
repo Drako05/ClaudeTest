@@ -203,6 +203,86 @@ medible en un test, no una sensacion.
 
 ---
 
+## Diagnosticado y APARCADO por el autor: saltos que se pierden
+
+El autor lo vio jugando: **saltando repetidamente sobre el mismo tile a
+intervalos constantes, hay saltos que no se efectuan.** Diagnosticado el
+2026-09-12 y **deliberadamente no arreglado**: se deja asi por ahora. Esto queda
+escrito para que la proxima tanda no tenga que volver a encontrarlo.
+
+### La causa, que son dos lineas
+
+El salto se encola en un **booleano** (`client/src/input.ts`, `jumpQueued`) y se
+consume **incondicionalmente** en el primer tick del fotograma:
+
+```ts
+intent.jump = this.jumpQueued;
+this.jumpQueued = false;   // se vacia MIRE O NO si se puede saltar
+```
+
+Pero solo se ejecuta si en ese mismo tick se pisa suelo (`sim/tick.ts`, dentro
+de la rama `if (entities.grounded[playerId])`). **Una pulsacion que cae en pleno
+vuelo se descarta en silencio**: no espera al aterrizaje. No hay buffer de
+entrada de ningun tipo.
+
+Que no se encadenen saltos en el aire es correcto y es lo que el autor pidio. Lo
+que no es correcto es **tirar la peticion** en vez de retenerla unas decimas.
+
+### Lo medido
+
+Modelo del bucle real (`main.ts` + el pestillo de `input.ts`) a 60 fps, con un
+12 % de temblor humano en el ritmo de pulsacion. El vuelo dura **0.400 s**:
+
+| Periodo de pulsacion | Saltos efectuados | Con un buffer de 0.15 s |
+|---|---|---|
+| 0.35 s | 51 % | 79 % |
+| 0.40 s | 70 % | 98 % |
+| 0.45 s | 99 % | 100 % |
+| ≥ 0.50 s | 100 % | 100 % |
+
+El corte cae justo donde uno pulsa al saltar repetido en el sitio —unas 2.5
+pulsaciones por segundo—, y **no es aleatorio**: depende de la fase entre el
+ritmo y el aterrizaje. Por eso se siente como «algunos saltos no salen» y no
+como un fallo sistematico.
+
+**Honestidad sobre esta medida:** el mecanismo esta confirmado leyendo el codigo
+y el autor lo ve jugando, pero **el porcentaje sale de un modelo, no del juego**.
+La medida en navegador quedo sin cerrar, y merece la pena saber por que para no
+repetir el intento:
+
+- Con `page.keyboard.press` se perdio **1 de 12 a 300 ms** y ninguno de 400 a
+  1000 ms. Confirma que el fallo existe, pero no el ritmo: la latencia de
+  Playwright alarga el intervalo real y lo saca de la ventana.
+- Despachando los eventos **dentro** de la pagina con `setTimeout` la sonda se
+  quedo colgada sin devolver nada. Sospecha: en headless los temporizadores se
+  estrangulan, y ademas el juego ahi va a 13 fps, que no es el ritmo del autor.
+
+O sea que para cerrarlo hace falta medirlo **a 60 fps de verdad**, no en el
+headless de la prueba de humo. El 30 % es la cifra a batir, no un hecho.
+
+Segundo canal de perdida, menor pero real: al ser un **booleano y no un
+contador**, dos pulsaciones dentro del mismo fotograma se funden en una. Solo
+importa con fotogramas largos.
+
+### El plan, para cuando se retome
+
+1. **Buffer de salto**: que la peticion viva unas decimas en vez de tirarse, de
+   modo que pulsar justo antes de tocar suelo salte al aterrizar. En
+   `input.ts` es cambiar el booleano por un contador de ticks que decrece, y
+   limpiarlo cuando el despegue ocurre de verdad.
+2. **Cuanto margen es decision del autor**, no del agente: 0.15 s es lo habitual
+   en plataformas, pero un buffer largo hace que el personaje salte «solo» un
+   instante despues de soltar. Preguntarselo antes de fijar el numero.
+3. **El *coyote time* —poder saltar unas decimas despues de salir de un borde—
+   es otra decision aparte** y no se da por supuesta. Se menciona porque es el
+   pariente natural del buffer y conviene decidir los dos a la vez.
+4. **Como afirmarlo sin echarlo a suertes**: el contador `__verdant.jumps` ya
+   existe y cuenta despegues EFECTUADOS, asi que la prueba es pulsar N veces a
+   un periodo fijo y comparar. Ojo con medirlo desde Playwright por lo dicho
+   arriba: los eventos hay que despacharlos dentro de la pagina.
+
+---
+
 ## Cabos sueltos que el autor tiene que mirar
 
 1. **El bonus de equilibrio no lo cobra lo inerte** (piedra y los tres minerales).
