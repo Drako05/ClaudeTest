@@ -4,6 +4,7 @@ import {
   PINCH_THRESHOLD,
   STICK_DEAD,
   STICK_RADIUS,
+  TAP_SLOP,
 } from '../packages/client/src/spike3d/gestures.js';
 
 /**
@@ -184,5 +185,63 @@ describe('La pinza no se dispara sola', () => {
     // El primer movimiento tras rehacer la pinza solo fija la referencia.
     g.move(3, 370, 400);
     expect(g.takeZoom()).toBe(1);
+  });
+});
+
+/**
+ * Clic contra arrastre.
+ *
+ * En el 3D la camara se gira arrastrando con el raton, y el autor quiso la
+ * accion en el clic izquierdo: las dos cosas comparten boton, asi que hay que
+ * distinguirlas. Se decide al SOLTAR, porque hasta entonces no se sabe cual de
+ * las dos era.
+ */
+describe('Un clic no es un arrastre', () => {
+  const fresh = () => new Gestures(800, 600);
+
+  it('soltar sin haberse movido es un clic', () => {
+    const g = fresh();
+    g.down(1, 400, 300, false);
+    const out = g.up(1);
+    expect(out?.tap).toBe(true);
+    expect(out?.isTouch).toBe(false);
+  });
+
+  it('un temblor de pocos pixeles sigue siendo un clic', () => {
+    const g = fresh();
+    g.down(1, 400, 300, false);
+    g.move(1, 400 + TAP_SLOP - 1, 300);
+    expect(g.up(1)?.tap).toBe(true);
+  });
+
+  it('pasado el umbral ya es arrastre, y gira la camara', () => {
+    const g = fresh();
+    g.down(1, 400, 300, false);
+    g.move(1, 400 + TAP_SLOP + 40, 300);
+    expect(g.up(1)?.tap).toBe(false);
+    // Y lo que hizo fue girar: el arrastre acumulo giro.
+    expect(g.takeOrbit().dx).not.toBe(0);
+  });
+
+  it('ir y volver al origen sigue siendo arrastre', () => {
+    // Se mide el maximo alejamiento, no la distancia final: si no, arrastrar la
+    // camara y devolverla contaria como clic y accionaria sin querer.
+    const g = fresh();
+    g.down(1, 400, 300, false);
+    g.move(1, 500, 300);
+    g.move(1, 400, 300);
+    expect(g.up(1)?.tap).toBe(false);
+  });
+
+  it('un dedo dice que es un dedo, para que no accione como el raton', () => {
+    const g = fresh();
+    g.down(1, 700, 100, true);
+    const out = g.up(1);
+    expect(out?.isTouch).toBe(true);
+    expect(out?.tap).toBe(true);
+  });
+
+  it('soltar un puntero que no existe no inventa nada', () => {
+    expect(fresh().up(99)).toBeNull();
   });
 });

@@ -26,6 +26,28 @@ interface Touch {
   /** Donde nacio. En el stick es el centro del joystick flotante. */
   originX: number;
   originY: number;
+  /** Si viene de un dedo. Un raton no acciona igual que un pulgar. */
+  isTouch: boolean;
+  /** Lo mas que se ha alejado de donde nacio. Distingue un clic de un arrastre. */
+  travel: number;
+}
+
+/**
+ * Pixeles que puede moverse un puntero sin dejar de ser un CLIC.
+ *
+ * El raton gira la camara arrastrando, asi que el clic de accion tiene que
+ * convivir con eso: se decide al soltar, y lo que no se ha movido era un clic.
+ * Un raton quieto nunca se mueve exactamente cero —la mano tiembla y el sensor
+ * lo nota—, y seis pixeles es holgura de sobra sin que un arrastre corto cuele.
+ */
+export const TAP_SLOP = 6;
+
+/** Lo que se sabe de un puntero al soltarlo. */
+export interface Release {
+  readonly role: Role;
+  readonly isTouch: boolean;
+  /** True si apenas se movio: fue un clic, no un arrastre. */
+  readonly tap: boolean;
 }
 
 /** Radio en pixeles al que el joystick da su valor maximo. */
@@ -78,7 +100,7 @@ export class Gestures {
 
   down(id: number, x: number, y: number, isTouch: boolean): void {
     const role = this.roleFor(x, y, isTouch);
-    this.touches.set(id, { role, x, y, originX: x, originY: y });
+    this.touches.set(id, { role, x, y, originX: x, originY: y, isTouch, travel: 0 });
     // Que entre o salga un dedo de camara reinicia la referencia de la pinza:
     // sin esto, levantar uno de los dos daba un salto de zoom.
     this.resetPinch();
@@ -87,6 +109,11 @@ export class Gestures {
   move(id: number, x: number, y: number): void {
     const touch = this.touches.get(id);
     if (!touch) return;
+
+    // Se mide contra el ORIGEN y se queda con el maximo: ir y volver sigue
+    // siendo un arrastre, no un clic.
+    const travel = Math.hypot(x - touch.originX, y - touch.originY);
+    if (travel > touch.travel) touch.travel = travel;
 
     if (touch.role === 'look') {
       const looks = this.lookTouches();
@@ -106,9 +133,19 @@ export class Gestures {
     touch.y = y;
   }
 
-  up(id: number): void {
+  /**
+   * Suelta un puntero y cuenta que era.
+   *
+   * Devuelve lo que hacia falta para decidir la accion: de quien era, si venia
+   * de un dedo y si apenas se movio. Quien decide que hacer con eso es
+   * `controls.ts` — aqui no se sabe que existe una accion.
+   */
+  up(id: number): Release | null {
+    const touch = this.touches.get(id);
     this.touches.delete(id);
     this.resetPinch();
+    if (!touch) return null;
+    return { role: touch.role, isTouch: touch.isTouch, tap: touch.travel <= TAP_SLOP };
   }
 
   /** Se sueltan todos: al perder el foco de la ventana, por ejemplo. */

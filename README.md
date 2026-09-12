@@ -10,9 +10,11 @@ semilla y la misma simulacion, con camara libre en vez de isometrica. Es hacia
 donde va el proyecto (`docs/pendiente.md`); el isometrico de la raiz sigue siendo
 el juego completo mientras dure la migracion. En el movil, el pulgar en el
 cuadrante inferior izquierdo anda, el resto de la pantalla gira la camara, y dos
-dedos de camara hacen zoom. Los botones de la derecha son correr, saltar y
-cambiar entre ortografica y perspectiva; con teclado, Espacio salta y Shift
-enciende y apaga la carrera.
+dedos de camara hacen zoom. Abajo a la derecha estan correr, saltar y **accion**
+—la mas grande y la mas pegada al borde, que es donde cae el pulgar—, y debajo el
+cambio entre ortografica y perspectiva. Con teclado: Espacio salta, Shift
+enciende y apaga la carrera, y el **clic izquierdo acciona** siempre que no
+arrastre, porque arrastrar es girar la camara.
 
 El nombre es provisional.
 

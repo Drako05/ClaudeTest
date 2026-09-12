@@ -27,7 +27,14 @@ import {
   DoubleSide,
   MeshBasicMaterial,
 } from 'three';
-import { CHUNK_SIZE, Feature, TICK_DT, emptyIntent, type Terrain } from '@verdant/shared';
+import {
+  CHUNK_SIZE,
+  Feature,
+  RESOURCE_NAMES,
+  TICK_DT,
+  emptyIntent,
+  type Terrain,
+} from '@verdant/shared';
 import { createGame, step, type GameState } from '@verdant/sim';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from '../tiles.js';
 import { BillboardSet } from './billboards.js';
@@ -92,6 +99,7 @@ projButton.addEventListener('click', toggleProjection);
 controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));
 controls.bindRunButton(document.getElementById('run'));
+controls.bindActionButton(document.getElementById('action'));
 
 const billboards = new BillboardSet();
 const player = billboards.spawnPlayer();
@@ -199,6 +207,21 @@ let fpsWindow = 0;
 let fps = 0;
 let worstFrame = 0;
 
+/** Ticks desde la ultima accion, para repetir al mantener pulsado. */
+let actionTicks = 0;
+/** 15 ticks a 60 Hz son cuatro acciones por segundo, la cadencia de siempre. */
+const ACTION_REPEAT_TICKS = 15;
+/**
+ * Lo recolectado y lo ultimo que se saco, para decirlo en el HUD.
+ *
+ * Sin esto la accion no tiene ninguna senal: el 3D no dibuja slash ni escombros
+ * —eso es del isometrico, que esta congelado— y no lleva inventario en pantalla,
+ * asi que talar un arbol se veria como que el arbol desaparece y ya. Es lo
+ * minimo para que se sepa que la accion hizo algo.
+ */
+let gathered = 0;
+let lastResource = -1;
+
 function frame(now: number): void {
   const dt = Math.min(0.25, (now - last) / 1000);
   last = now;
@@ -225,13 +248,30 @@ function frame(now: number): void {
   // salto entre todos encadenaria saltos en el aire.
   let jump = controls.takeJump();
   intent.run = controls.running;
+  let action = controls.takeAction();
 
   accumulator += dt;
   let guard = 8;
   while (accumulator >= TICK_DT && guard-- > 0) {
     intent.jump = jump;
     jump = false;
+
+    // Mantener el boton repite cuatro veces por segundo, que es la cadencia de
+    // siempre (`HARVEST_REPEAT_TICKS`, 15 ticks a 60 Hz). Se cuenta en TICKS y
+    // no en tiempo real para que sea la misma con cualquier ritmo de fotograma.
+    intent.harvest = action;
+    action = false;
+    if (controls.actionHeld && ++actionTicks >= ACTION_REPEAT_TICKS) {
+      intent.harvest = true;
+      actionTicks = 0;
+    }
+    if (!controls.actionHeld) actionTicks = 0;
+
     step(state, intent);
+    for (const hit of state.lastHarvest) {
+      gathered += hit.amount + hit.seeds;
+      lastResource = hit.resource;
+    }
     accumulator -= TICK_DT;
   }
   accumulator = Math.min(accumulator, TICK_DT);
@@ -262,8 +302,11 @@ function frame(now: number): void {
     `${fps.toFixed(0)} FPS · ${camera.projection}\n` +
     `${(triangles / 1000).toFixed(1)}k triangulos · ${info.calls} draw calls\n` +
     `pos ${px.toFixed(0)}, ${py.toFixed(0)} · altura ${ph.toFixed(1)} · semilla ${seed}\n` +
-    `abajo-izq anda · el resto gira · 2 dedos zoom · espacio salta · ` +
-    `shift ${controls.running ? 'CORRE' : 'anda'}`;
+    `recogido ${gathered}` +
+    (lastResource >= 0 ? ` · ultimo: ${RESOURCE_NAMES[lastResource]}` : '') +
+    '\n' +
+    `abajo-izq anda · resto gira · 2 dedos zoom\n` +
+    `espacio salta · clic izq acciona · shift ${controls.running ? 'CORRE' : 'anda'}`;
 
   requestAnimationFrame(frame);
 }
@@ -282,6 +325,8 @@ Object.defineProperty(window, '__spike', {
     pitch: camera.pitch,
     projection: camera.projection,
     running: controls.running,
+    /** Lo recolectado, para poder comprobar la accion desde fuera. */
+    gathered,
     x: state.entities.x[state.playerId],
     y: state.entities.y[state.playerId],
     z: state.entities.z[state.playerId],

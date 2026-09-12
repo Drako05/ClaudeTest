@@ -456,6 +456,24 @@ personaje va como va.
 Y por eso mismo desaparecio el acelerador analogico (regla 5): la velocidad la
 elige el interruptor, no lo desplazado que este el pulgar.
 
+**En el 3D la accion es el clic izquierdo, y ahi hay un conflicto que resolver:**
+ese mismo boton gira la camara arrastrando. Se decide **al soltar** —lo que no se
+ha movido mas de `TAP_SLOP` era un clic; lo que si, era un arrastre y ya giro la
+vista—, y se mide contra el ORIGEN quedandose con el maximo, para que ir y volver
+siga contando como arrastre. La regla vive en `spike3d/gestures.ts`, que es puro,
+y `tests/gestures.test.ts` la afirma. En tactil no hay tal conflicto: acciona el
+boton, y un dedo sobre el mundo gira la camara y nada mas.
+
+El racimo de botones del movil lo ordeno el autor: **la accion es la mas grande y
+la mas pegada al borde derecho**, que es donde cae el pulgar en reposo, y salto y
+carrera se apartan a su izquierda y van mas pequenos. En fila y no en columna,
+para que sea el borde —y no la altura— lo que ordene la importancia.
+
+Ojo con una diferencia entre los dos mandos, que es deliberada: **el boton repite
+al mantenerlo** (cuatro veces por segundo, la cadencia de siempre) y **el raton
+no** —un clic es una accion—, porque mantener pulsado el raton significa
+arrastrar la camara y no se puede saber si es accion hasta que se suelta.
+
 Numeros del autor, que no se tocan sin preguntarle: el escalon (0.06), los 16 px
 por nivel, el 15 % de fronteras que son rampa y el tope de 40 niveles. El umbral
 de salientes y la ganancia de cordillera, en cambio, son calibraciones: se eligen

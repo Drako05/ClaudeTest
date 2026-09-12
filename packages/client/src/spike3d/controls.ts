@@ -77,7 +77,21 @@ export class Controls {
     });
     for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
       canvas.addEventListener(type, (e) => {
-        this.gestures.up((e as PointerEvent).pointerId);
+        const released = this.gestures.up((e as PointerEvent).pointerId);
+        // El clic izquierdo del raton acciona, pero SOLO si no arrastro: con la
+        // camara libre, arrastrar es girar la vista, y las dos cosas comparten
+        // boton. Se decide al soltar porque hasta entonces no se sabe cual de
+        // las dos era. En tactil no: ahi acciona el boton, y un dedo sobre el
+        // mundo gira la camara y nada mas.
+        if (
+          type === 'pointerup' &&
+          released &&
+          !released.isTouch &&
+          released.tap &&
+          (e as PointerEvent).button === 0
+        ) {
+          this.actionQueued = true;
+        }
         this.drawStick();
       });
     }
@@ -98,6 +112,50 @@ export class Controls {
   private wheelZoom = 1;
   private jumpQueued = false;
   private runEl: HTMLElement | null = null;
+
+  /** Accion pedida de un clic o de un toque. Se consume una vez. */
+  private actionQueued = false;
+  /** True mientras el boton de accion siga pulsado, para que repita. */
+  actionHeld = false;
+
+  /**
+   * Consume la accion pedida desde el frame anterior.
+   *
+   * Igual que el salto y por lo mismo: un pestillo, para que un clic que dura
+   * menos que un fotograma se registre igual.
+   */
+  takeAction(): boolean {
+    const out = this.actionQueued;
+    this.actionQueued = false;
+    return out;
+  }
+
+  /**
+   * El boton de accion del movil: acciona al tocarlo y REPITE si se mantiene,
+   * que es la cadencia que ya tenia el juego. El raton no repite —un clic es
+   * una accion— porque mantener pulsado ahi significa arrastrar la camara.
+   */
+  bindActionButton(el: HTMLElement | null): void {
+    if (!el) return;
+    const press = (e: Event) => {
+      e.preventDefault();
+      this.actionQueued = true;
+      this.actionHeld = true;
+      el.classList.add('on');
+    };
+    const release = () => {
+      this.actionHeld = false;
+      el.classList.remove('on');
+    };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('touchend', release);
+    el.addEventListener('touchcancel', release);
+    el.addEventListener('pointerdown', (e) => {
+      if ((e as PointerEvent).pointerType !== 'touch') press(e);
+    });
+    el.addEventListener('pointerup', release);
+    el.addEventListener('pointerleave', release);
+  }
 
   /** Carrera encendida. Interruptor, no tecla mantenida. */
   running = false;

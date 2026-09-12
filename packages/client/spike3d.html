@@ -31,46 +31,45 @@
       #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
       /* El salto, justo encima del de proyeccion y bajo el mismo pulgar. Es
          redondo y grande porque se usa constantemente, al reves que aquel. */
-      #jump {
+      /*
+        El racimo del pulgar derecho: accion, salto y correr.
+
+        La ACCION es la mas grande y la mas pegada al borde derecho, que es donde
+        cae el pulgar en reposo, porque es lo que mas se pulsa. Salto y carrera
+        se apartan hacia la izquierda y van mas pequenos. Van en fila y no en
+        columna para que sea el borde derecho —y no la altura— lo que ordene la
+        importancia.
+      */
+      #thumbPad {
         position: fixed; z-index: 11;
-        bottom: calc(84px + env(safe-area-inset-bottom));
+        bottom: calc(88px + env(safe-area-inset-bottom));
         right: calc(14px + env(safe-area-inset-right));
+        display: flex; align-items: flex-end; gap: 10px;
+      }
+      #thumbPad button {
         -webkit-appearance: none; appearance: none;
-        width: 86px; height: 86px; border-radius: 50%;
-        font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        letter-spacing: .1em; text-transform: uppercase;
+        border-radius: 50%;
+        font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: .08em; text-transform: uppercase;
         color: #e8eef7; background: rgba(8, 14, 28, 0.82);
         border: 1px solid rgba(140, 190, 255, 0.34);
         backdrop-filter: blur(6px); cursor: pointer;
         touch-action: manipulation;
       }
-      #jump b { display: block; font-size: 22px; line-height: 1; margin-bottom: 3px; }
-      #jump:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
-      #jump:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
-      /* Correr, encima del salto y con el mismo pulgar. Es un INTERRUPTOR, no
-         un boton que se mantiene: en un telefono no sobran dedos. */
-      #run {
-        position: fixed; z-index: 11;
-        bottom: calc(178px + env(safe-area-inset-bottom));
-        right: calc(14px + env(safe-area-inset-right));
-        -webkit-appearance: none; appearance: none;
-        width: 86px; height: 86px; border-radius: 50%;
-        font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        letter-spacing: .1em; text-transform: uppercase;
-        color: #e8eef7; background: rgba(8, 14, 28, 0.82);
-        border: 1px solid rgba(140, 190, 255, 0.34);
-        backdrop-filter: blur(6px); cursor: pointer;
-        touch-action: manipulation;
-      }
-      #run b { display: block; font-size: 22px; line-height: 1; margin-bottom: 3px; }
-      #run:active { transform: scale(.95); }
-      #run:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
-      /* Encendido: tiene que verse, porque cambia como responde el movimiento. */
-      #run.on {
+      #thumbPad button b { display: block; line-height: 1; margin-bottom: 3px; }
+      #thumbPad button:active { transform: scale(.95); }
+      #thumbPad button:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
+      /* Encendido o pulsado: tiene que verse, porque cambia lo que hace el juego. */
+      #thumbPad button.on {
         background: rgba(60, 104, 168, .86);
         border-color: rgba(170, 214, 255, .75);
         color: #f4f9ff;
       }
+
+      #action { width: 98px; height: 98px; font-size: 11px; }
+      #action b { font-size: 26px; }
+      #run, #jump { width: 66px; height: 66px; }
+      #run b, #jump b { font-size: 18px; }
       #proj:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
       #proj small {
         display: block; margin-top: 3px; font-size: 10px;
@@ -103,8 +102,12 @@
         background: rgba(8, 14, 28, 0.78);
         border: 1px solid rgba(140, 190, 255, 0.22);
         font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        color: #cfe0f5; white-space: pre; backdrop-filter: blur(6px);
-        max-width: calc(100vw - 24px); overflow-x: auto;
+        color: #cfe0f5; backdrop-filter: blur(6px);
+        max-width: calc(100vw - 24px);
+        /* Se respetan los saltos de linea pero se deja ENVOLVER: con `pre` a
+           secas la linea de controles se cortaba por la derecha en un telefono
+           de 390 px y el ultimo atajo no se leia. */
+        white-space: pre-wrap; overflow-wrap: anywhere;
       }
 
       @media (max-width: 560px) {
@@ -136,14 +139,22 @@
   <body>
     <canvas id="view"></canvas>
     <div id="stick" aria-hidden="true"><i id="stickKnob"></i></div>
-    <button id="run" type="button" aria-label="Correr" aria-pressed="false">
-      <b aria-hidden="true">&#187;</b>
-      Correr
-    </button>
-    <button id="jump" type="button" aria-label="Saltar">
-      <b aria-hidden="true">&#8593;</b>
-      Saltar
-    </button>
+    <!-- El orden del DOM es el de la pantalla: correr y saltar a la izquierda,
+         y la accion pegada al borde derecho, que es donde cae el pulgar. -->
+    <div id="thumbPad">
+      <button id="run" type="button" aria-label="Correr" aria-pressed="false">
+        <b aria-hidden="true">&#187;</b>
+        Correr
+      </button>
+      <button id="jump" type="button" aria-label="Saltar">
+        <b aria-hidden="true">&#8593;</b>
+        Saltar
+      </button>
+      <button id="action" type="button" aria-label="Accionar">
+        <b aria-hidden="true">&#9874;</b>
+        Accion
+      </button>
+    </div>
     <button id="proj" type="button">
       Ortográfica
       <small>tocar para cambiar</small>
