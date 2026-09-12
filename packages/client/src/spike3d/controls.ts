@@ -42,6 +42,12 @@ export class Controls {
         this.jumpQueued = true;
         e.preventDefault();
       }
+      // Correr es un interruptor: una pulsacion lo enciende, la siguiente lo
+      // apaga. `e.repeat` descartado, asi que mantener Shift no lo hace
+      // parpadear.
+      if (!e.repeat && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')) {
+        this.toggleRun();
+      }
       this.keys.add(e.code);
       if (e.code === 'KeyP') this.onToggleProjection?.();
     });
@@ -91,6 +97,30 @@ export class Controls {
 
   private wheelZoom = 1;
   private jumpQueued = false;
+  private runEl: HTMLElement | null = null;
+
+  /** Carrera encendida. Interruptor, no tecla mantenida. */
+  running = false;
+
+  private toggleRun(): void {
+    this.running = !this.running;
+    this.runEl?.classList.toggle('on', this.running);
+    this.runEl?.setAttribute('aria-pressed', String(this.running));
+  }
+
+  /** Conecta el boton de correr del movil, igual que el de saltar. */
+  bindRunButton(el: HTMLElement | null): void {
+    if (!el) return;
+    this.runEl = el;
+    const press = (e: Event) => {
+      e.preventDefault();
+      this.toggleRun();
+    };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('pointerdown', (e) => {
+      if ((e as PointerEvent).pointerType !== 'touch') press(e);
+    });
+  }
 
   /** Consume el salto pedido desde el frame anterior, si lo hubo. */
   takeJump(): boolean {
@@ -127,12 +157,15 @@ export class Controls {
       this.stickEl.classList.remove('on');
       return;
     }
-    const stick = this.gestures.stick();
+    // El mando dibujado sigue al PULGAR, no a la direccion que sale de el: la
+    // velocidad ya no depende del desplazamiento, pero el dedo si esta donde
+    // esta y el mando tiene que estar debajo.
+    const knob = this.gestures.stickKnob();
     this.stickEl.classList.add('on');
     this.stickEl.style.left = `${center.x}px`;
     this.stickEl.style.top = `${center.y}px`;
     this.knobEl.style.transform =
-      `translate(-50%, -50%) translate(${stick.x * STICK_RADIUS}px, ${stick.y * STICK_RADIUS}px)`;
+      `translate(-50%, -50%) translate(${knob.x * STICK_RADIUS}px, ${knob.y * STICK_RADIUS}px)`;
   }
 
   /** El vector de movimiento en coordenadas de pantalla, sin rotar aun. */

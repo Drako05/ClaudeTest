@@ -23,8 +23,40 @@ import { airVelocity, STEP_UP } from './jump.js';
 
 /** Medio ancho del cuerpo del jugador, en tiles. */
 export const BODY_RADIUS = 0.34;
-/** Velocidad en tiles por segundo. */
+/** Velocidad de marcha, en tiles por segundo. Es la de siempre. */
 export const WALK_SPEED = 5.2;
+
+/**
+ * Cuanto mas rapido se corre que se anda.
+ *
+ * **Deduccion del agente, no numero del autor**, y por tanto suyo para
+ * corregir: pidio la mecanica pero no la cifra. 1.6 es lo habitual —se nota de
+ * verdad sin que el mundo pase volando— y esta expresado como multiplicador
+ * justo para que cambiarlo sea una linea.
+ *
+ * No obliga a recalibrar nada de lo que ya habia, y esta comprobado: subiendo un
+ * talud a la carrera el suelo asciende `RUN_SPEED · TICK_DT ≈ 0.139` niveles por
+ * tick, todavia muy por debajo del medio nivel de `STEP_UP` (regla 21), y el
+ * paso por tick sigue siendo mucho menor que `BODY_RADIUS`, asi que no se
+ * atraviesan paredes.
+ */
+export const RUN_MULTIPLIER = 1.6;
+
+/** Velocidad de carrera, en tiles por segundo. */
+export const RUN_SPEED = WALK_SPEED * RUN_MULTIPLIER;
+
+/**
+ * La velocidad de desplazamiento: dos valores y nada entre medias.
+ *
+ * Antes era `WALK_SPEED · magnitud del mando`, o sea que el joystick hacia de
+ * acelerador. El autor lo cambio al pedir la carrera: **el mando apunta, el
+ * interruptor decide la velocidad.** Con teclado daba igual —un eje vale 1 y la
+ * diagonal raiz de 2, y ambos se acotaban a 1—, asi que quien lo nota es el
+ * movil, que es justo donde el autor lo queria distinto.
+ */
+export function speedOf(running: boolean): number {
+  return running ? RUN_SPEED : WALK_SPEED;
+}
 
 /** True si el AABB centrado en (cx, cy) solapa algun tile solido. */
 function collides(world: World, cx: number, cy: number): boolean {
@@ -90,6 +122,7 @@ export function moveEntity(
   moveX: number,
   moveY: number,
   dt: number,
+  running = false,
 ): void {
   const len = Math.hypot(moveX, moveY);
   if (len <= 1e-6) {
@@ -98,17 +131,14 @@ export function moveEntity(
     return;
   }
 
-  // La direccion siempre se normaliza (asi la diagonal no es mas rapida que la
-  // ortogonal), pero la MAGNITUD, acotada a 1, escala la velocidad. Es lo que
-  // hace analogico un joystick: apenas desplazado, se camina despacio.
-  // El teclado no nota el cambio: un eje da len = 1 y la diagonal da len = raiz
-  // de 2, y ambos se acotan a 1.
+  // La direccion se normaliza, y con eso la diagonal deja de ser mas rapida que
+  // la ortogonal. La magnitud NO se mira: el vector es direccion y ya esta.
   const dirX = moveX / len;
   const dirY = moveY / len;
   store.facingX[id] = dirX;
   store.facingY[id] = dirY;
 
-  const speed = WALK_SPEED * Math.min(1, len);
+  const speed = speedOf(running);
   store.vx[id] = dirX * speed;
   store.vy[id] = dirY * speed;
 
@@ -130,6 +160,7 @@ export function moveAirborne(
   moveX: number,
   moveY: number,
   dt: number,
+  running = false,
 ): void {
   const len = Math.hypot(moveX, moveY);
 
@@ -139,7 +170,7 @@ export function moveAirborne(
   // autor dijo «impulso conservado»; la correccion es algo que se HACE.
   let v = { x: store.takeoffVx[id], y: store.takeoffVy[id] };
   if (len > 1e-6) {
-    const speed = WALK_SPEED * Math.min(1, len);
+    const speed = speedOf(running);
     store.facingX[id] = moveX / len;
     store.facingY[id] = moveY / len;
     v = airVelocity(

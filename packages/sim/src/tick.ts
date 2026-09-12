@@ -111,10 +111,10 @@ export function step(state: GameState, intent: Intent): void {
     // porque la altura del suelo que decide todo es la del sitio al que se ha
     // llegado, no la del que se salio.
     if (entities.grounded[playerId]) {
-      moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT);
+      moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT, intent.run);
       if (intent.jump) takeOff(entities, playerId);
     } else {
-      moveAirborne(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT);
+      moveAirborne(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT, intent.run);
     }
     applyVertical(world, entities, playerId, TICK_DT);
 

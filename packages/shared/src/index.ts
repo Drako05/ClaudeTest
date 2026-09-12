@@ -314,7 +314,14 @@ export function seedFor(kind: LifeKind): Resource | null {
 
 /** Intencion del jugador para un tick. El cliente produce esto; nunca muta el estado. */
 export interface Intent {
-  /** Direccion deseada. La magnitud, acotada a 1, escala la velocidad. */
+  /**
+   * Direccion deseada. **Solo la direccion**: su magnitud no dice nada.
+   *
+   * Lo dijo el autor al pedir la carrera: antes el joystick hacia de acelerador
+   * —cuanto mas desplazado, mas rapido— y eso se sustituye por dos velocidades
+   * discretas, marcha y carrera, que elige `run`. Un mando analogico apunta;
+   * no dosifica.
+   */
   moveX: number;
   moveY: number;
   harvest: boolean;
@@ -329,6 +336,15 @@ export interface Intent {
    * que andar.
    */
   jump: boolean;
+  /**
+   * Correr. Es un ESTADO, no una pulsacion: viaja puesto en cada tick mientras
+   * el interruptor este encendido.
+   *
+   * Va en la Intent y no en el cliente por la regla 5: la velocidad a la que se
+   * mueve un personaje es cosa de la simulacion, y un servidor autoritativo
+   * tiene que poder saberla sin preguntarle al navegador.
+   */
+  run: boolean;
   /**
    * Direccion a la que se quiere mirar, independiente de hacia donde se anda.
    *
@@ -349,6 +365,7 @@ export function emptyIntent(): Intent {
     eat: false,
     plant: false,
     jump: false,
+    run: false,
     aimX: 0,
     aimY: 0,
   };

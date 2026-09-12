@@ -120,7 +120,15 @@ export class Gestures {
     this.zoomFactor = 1;
   }
 
-  /** El vector del joystick, de -1 a 1 y ya con zona muerta aplicada. */
+  /**
+   * La DIRECCION del joystick, unitaria, con zona muerta aplicada.
+   *
+   * Antes devolvia un vector de magnitud proporcional al desplazamiento del
+   * pulgar, y el nucleo lo usaba de acelerador. El autor lo cambio al pedir la
+   * carrera: el mando apunta y el interruptor decide la velocidad. La zona
+   * muerta se queda —apoyar el pulgar sin querer andar no debe mover a nadie—,
+   * pero al cruzarla ya se va a velocidad de marcha entera.
+   */
   stick(): { x: number; y: number } {
     for (const touch of this.touches.values()) {
       if (touch.role !== 'stick') continue;
@@ -128,6 +136,25 @@ export class Gestures {
       const dy = touch.y - touch.originY;
       const len = Math.hypot(dx, dy);
       if (len < STICK_RADIUS * STICK_DEAD) return { x: 0, y: 0 };
+      return { x: dx / len, y: dy / len };
+    }
+    return { x: 0, y: 0 };
+  }
+
+  /**
+   * Donde esta el pulgar dentro del joystick, para DIBUJARLO.
+   *
+   * Va aparte de `stick()` desde que aquella devuelve direccion pura: el mando
+   * de la pantalla tiene que seguir al pulgar de verdad, aunque la velocidad ya
+   * no dependa de cuanto se haya desplazado.
+   */
+  stickKnob(): { x: number; y: number } {
+    for (const touch of this.touches.values()) {
+      if (touch.role !== 'stick') continue;
+      const dx = touch.x - touch.originX;
+      const dy = touch.y - touch.originY;
+      const len = Math.hypot(dx, dy);
+      if (len === 0) return { x: 0, y: 0 };
       const scale = (len > STICK_RADIUS ? STICK_RADIUS / len : 1) / STICK_RADIUS;
       return { x: dx * scale, y: dy * scale };
     }

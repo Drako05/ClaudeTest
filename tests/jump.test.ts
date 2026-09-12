@@ -29,6 +29,7 @@ import {
   JUMP_SPEED,
   moveAirborne,
   moveEntity,
+  RUN_MULTIPLIER,
   skipTime,
   step,
   takeOff,
@@ -75,7 +76,7 @@ interface Run {
 function run(
   world: World,
   start: { x: number; y: number; z?: number },
-  opts: { moveX?: number; moveY?: number; jump?: boolean; ticks: number },
+  opts: { moveX?: number; moveY?: number; jump?: boolean; running?: boolean; ticks: number },
 ): Run {
   const store = new EntityStore(4);
   const id = store.spawn(EntityKind.Player, start.x, start.y);
@@ -90,12 +91,12 @@ function run(
       // Se para al aterrizar: seguir andando despues falsearia el alcance del
       // salto, que es lo que varias de estas pruebas miden.
       if (haVolado) break;
-      moveEntity(world, store, id, moveX, moveY, TICK_DT);
+      moveEntity(world, store, id, moveX, moveY, TICK_DT, opts.running);
       // Solo el primer tick salta: mantener pulsado no encadena saltos.
       if (opts.jump && t === 0) takeOff(store, id);
     } else {
       haVolado = true;
-      moveAirborne(world, store, id, moveX, moveY, TICK_DT);
+      moveAirborne(world, store, id, moveX, moveY, TICK_DT, opts.running);
     }
     applyVertical(world, store, id, TICK_DT);
     if (store.z[id] > peak) peak = store.z[id];
@@ -244,13 +245,24 @@ describe('El impulso y el control en el aire', () => {
     expect(alcance).toBeLessThan(2.3);
   });
 
-  it('a medio paso se llega a menos', () => {
-    const pleno = run(llano, { x: 0.5, y: 0.5 }, { moveX: 1, jump: true, ticks: HASTA_QUE_CAIGA });
-    const medio = run(llano, { x: 0.5, y: 0.5 }, { moveX: 0.5, jump: true, ticks: HASTA_QUE_CAIGA });
+  it('corriendo se llega mas lejos, andando sale el alcance de diseno', () => {
+    // El autor dijo «a paso completo llega a 2 casillas; a paso lento, menos»,
+    // y el paso lento era el joystick a medias. Al pedir la carrera lo sustituyo
+    // por dos velocidades, asi que el impulso conservado se nota ahora entre
+    // ANDAR y CORRER. Lo importante es que su caso sigue saliendo exacto al
+    // andar: el salto de diseno es el de marcha.
+    const andando = run(llano, { x: 0.5, y: 0.5 }, { moveX: 1, jump: true, ticks: HASTA_QUE_CAIGA });
+    const corriendo = run(llano, { x: 0.5, y: 0.5 }, {
+      moveX: 1,
+      jump: true,
+      running: true,
+      ticks: HASTA_QUE_CAIGA,
+    });
 
-    expect(medio.x - 0.5).toBeLessThan(pleno.x - 0.5);
-    // Y no es que no avance: conserva su impulso, mas corto.
-    expect(medio.x - 0.5).toBeGreaterThan(0.5);
+    expect(andando.x - 0.5).toBeGreaterThan(1.7);
+    expect(andando.x - 0.5).toBeLessThan(2.3);
+    // Y el salto corriendo alarga en la misma proporcion que la velocidad.
+    expect((corriendo.x - 0.5) / (andando.x - 0.5)).toBeCloseTo(RUN_MULTIPLIER, 2);
   });
 
   it('soltar el mando en el aire no frena: el impulso se conserva', () => {

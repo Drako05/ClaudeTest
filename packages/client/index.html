@@ -114,9 +114,28 @@
       /* El salto, entre sembrar y recoger: se usa a menudo y va a la altura del
          pulgar, pero mas pequeno que recoger, que sigue siendo el principal. */
       #btnJump { width: 70px; height: 70px; margin-bottom: 2px; }
+      #btnRun { width: 70px; height: 70px; margin-bottom: 2px; }
+      /* Encendido: el interruptor tiene que verse desde el otro lado de la
+         pantalla, porque cambia como responde TODO el movimiento. */
+      #btnRun.on {
+        background: rgba(60, 104, 168, 0.86);
+        border-color: rgba(170, 214, 255, 0.75);
+        color: #f4f9ff;
+      }
 
       /* En tactil los atajos de teclado no sirven de nada. */
       body.touch-active #help { display: none; }
+
+      /* La carrera es un INTERRUPTOR y con teclado no hay boton que mirar, asi
+         que el estado se dice en la ayuda: sin indicador, un interruptor deja al
+         jugador adivinando por que el personaje va como va. */
+      body.running #kbdRun {
+        background: rgba(60, 104, 168, 0.9);
+        border-color: rgba(170, 214, 255, 0.75);
+        color: #f4f9ff;
+      }
+      body.running #runState { color: #cfe4ff; font-weight: 600; }
+      body.running #runState::after { content: ' ACTIVADO'; }
 
       /* Pantallas estrechas: el HUD se compacta pero conserva los FPS, que es
          justo el numero que interesa medir en el movil real. */
@@ -128,10 +147,10 @@
         /* Con cuatro botones en fila, a 390 px la hilera medía 340 de 390 y se
            comia el sitio del joystick. Se aprietan: el de recoger conserva su
            tamano porque es el que mas se usa. */
-        #touchButtons { gap: 8px; }
-        #btnEat { width: 50px; height: 50px; }
-        #btnPlant, #btnJump { width: 58px; height: 58px; }
-        #btnHarvest { width: 84px; height: 84px; }
+        #touchButtons { gap: 6px; }
+        #btnEat { width: 46px; height: 46px; }
+        #btnPlant, #btnJump, #btnRun { width: 54px; height: 54px; }
+        #btnHarvest { width: 78px; height: 78px; }
       }
 
 
@@ -302,6 +321,7 @@
     </div>
 
     <div id="help">
+      <kbd id="kbdRun">Shift</kbd> <span id="runState">correr</span> &nbsp;
       <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic dcho</kbd> recolectar &nbsp; <kbd>E</kbd> comer bayas<br />
       <kbd>F</kbd> sembrar &nbsp; <kbd>,</kbd>/<kbd>.</kbd> girar la vista &nbsp;
       <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
@@ -352,6 +372,15 @@
       <button id="btnJump" class="touch-btn" type="button" aria-label="Saltar">
         <span class="glyph" aria-hidden="true">&#8593;</span>
         <span class="label">SALTAR</span>
+      </button>
+      <!-- Correr es un INTERRUPTOR, no un boton que se mantiene: en un telefono
+           mantener pulsado con un pulgar mientras el otro lleva el joystick no
+           deja dedos para nada mas. Por eso se queda encendido, y por eso lleva
+           un estado visible: un interruptor sin indicador no se sabe como esta. -->
+      <button id="btnRun" class="touch-btn" type="button" aria-label="Correr"
+              aria-pressed="false">
+        <span class="glyph" aria-hidden="true">&#187;</span>
+        <span class="label">CORRER</span>
       </button>
       <button id="btnHarvest" class="touch-btn" type="button" aria-label="Recolectar">
         <span class="glyph" aria-hidden="true">&#9874;</span>

@@ -494,6 +494,21 @@ async function main(): Promise<void> {
       /** Saltos efectuados y cuanto se han separado los pies del suelo. */
       jumps,
       airPeak,
+      /** Si el interruptor de correr esta encendido. */
+      running: input.isRunning,
+      /**
+       * Velocidad que el nucleo le esta dando al personaje, en casillas/s.
+       *
+       * Se expone porque es lo unico que permite comprobar la carrera sin que
+       * lo conteste el paisaje: la distancia recorrida mide contra que pared se
+       * choca, y con relieve eso no dice nada. `vx`/`vy` se fijan antes de
+       * resolver la colision, asi que valen marcha o carrera exactas aunque se
+       * este empujando contra un muro.
+       */
+      speed: Math.hypot(
+        state.entities.vx[state.playerId],
+        state.entities.vy[state.playerId],
+      ),
       biome: BIOME_NAMES[
         state.world.biomeAt(
           Math.floor(state.entities.x[state.playerId]),

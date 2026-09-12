@@ -671,8 +671,30 @@ async function mobilePass(browser, baseUrl) {
   );
 
   const partialDistance = Math.hypot(partial.x - spawn.x, partial.y - spawn.y);
-  console.log(`  deflexion parcial: ${partialDistance.toFixed(2)} tiles recorridos`);
+  // Deflexion PARCIAL, y a proposito: desde que el mando apunta en vez de
+  // dosificar, medio desplazamiento tiene que andar igual que el completo. La
+  // proporcion exacta se mide en `tests/simulation.test.ts`, sobre suelo llano
+  // verificado; aqui solo se comprueba que un desplazamiento corto mueve de
+  // verdad, que es lo que antes podia quedarse en un paso lentisimo.
+  console.log(`  joystick a media deflexion: ${partialDistance.toFixed(2)} tiles recorridos`);
   check(partialDistance > 0.2, `el joystick no movio al jugador (${partialDistance})`);
+
+  // El interruptor de correr, que es lo que ahora manda sobre la velocidad.
+  const antesDeCorrer = await page.evaluate(() => window.__verdant.running);
+  await touch(page, 'touchstart', { id: 4, x: 300, y: 700, selector: '#btnRun' });
+  await touch(page, 'touchend', { id: 4, x: 300, y: 700, selector: '#btnRun' });
+  await page.waitForTimeout(150);
+  const corriendo = await page.evaluate(() => window.__verdant.running);
+  const encendido = await page.isVisible('#btnRun.on');
+  await touch(page, 'touchstart', { id: 4, x: 300, y: 700, selector: '#btnRun' });
+  await touch(page, 'touchend', { id: 4, x: 300, y: 700, selector: '#btnRun' });
+  await page.waitForTimeout(150);
+  const apagado = await page.evaluate(() => window.__verdant.running);
+  console.log(`  boton correr: ${antesDeCorrer} -> ${corriendo} -> ${apagado} (se ilumina: ${encendido})`);
+  check(antesDeCorrer === false, 'se empieza corriendo, y se deberia empezar andando');
+  check(corriendo === true, 'el boton de correr no encendio la carrera');
+  check(encendido, 'el boton de correr no muestra que esta encendido');
+  check(apagado === false, 'el boton de correr no la apago al segundo toque');
 
   // Una deflexion por debajo de la zona muerta no debe mover nada: es lo que
   // evita que el pulgar simplemente apoyado haga derivar al personaje.
@@ -1057,6 +1079,55 @@ async function reliefPass(browser, baseUrl) {
   check(trasCaer.jumps > antesDelSalto.jumps, 'Espacio no despego al personaje del suelo');
   check(trasCaer.airPeak > 1, `el salto no levanto ni un bloque: ${trasCaer.airPeak}`);
   check(trasCaer.grounded, 'el personaje se quedo flotando tras saltar');
+
+  // --------------------------------------------------- correr va mas rapido
+  //
+  // Se mide la VELOCIDAD que el nucleo le da al personaje, no la distancia que
+  // recorre. La distancia la contesta el paisaje: al pie de una pared, correr
+  // puede avanzar MENOS que andar simplemente porque topa antes, y asi fallo la
+  // primera version de esta comprobacion —2.84 andando contra 1.94 corriendo—
+  // midiendo el terreno en vez de la mecanica. `vx`/`vy` se fijan antes de
+  // resolver la colision, asi que valen lo mismo se choque o no.
+  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
+    waitUntil: 'load',
+  });
+  await page.evaluate(() => delete window.__smokeBaseTick);
+  const antesDeCorrer = await waitForLoop(page);
+  check(antesDeCorrer.running === false, 'se empieza corriendo, y se deberia empezar andando');
+
+  /** Velocidad mientras se empuja en una direccion, en casillas por segundo. */
+  async function pushSpeed(key = 'KeyD') {
+    await page.keyboard.down(key);
+    let best = 0;
+    for (let i = 0; i < 6; i++) {
+      await page.waitForTimeout(120);
+      const now = await page.evaluate(() => window.__verdant.speed);
+      if (now > best) best = now;
+    }
+    await page.keyboard.up(key);
+    return best;
+  }
+
+  const vAndando = await pushSpeed();
+  await page.keyboard.press('ShiftLeft');
+  await page.waitForTimeout(150);
+  const trasShift = await page.evaluate(() => window.__verdant.running);
+  const vCorriendo = await pushSpeed();
+  await page.keyboard.press('ShiftLeft');
+  await page.waitForTimeout(150);
+  const trasSegundoShift = await page.evaluate(() => window.__verdant.running);
+
+  console.log(
+    `  correr: ${vAndando.toFixed(2)} -> ${vCorriendo.toFixed(2)} casillas/s ` +
+      `(x${(vCorriendo / vAndando).toFixed(2)}; shift: ${trasShift}, y otra vez: ${trasSegundoShift})`,
+  );
+  check(trasShift === true, 'Shift no encendio la carrera');
+  check(trasSegundoShift === false, 'Shift no la apago al segundo toque: no es un interruptor');
+  check(vAndando > 0, 'andando la velocidad salio cero: no se llego a empujar');
+  check(
+    vCorriendo > vAndando * 1.15,
+    `correr no acelero: ${vAndando.toFixed(2)} vs ${vCorriendo.toFixed(2)} casillas/s`,
+  );
 
   // La cima. Es lo que el autor no encontraba explorando: subir a un punto alto
   // y ver que el mundo tiene escala de verdad.

@@ -61,6 +61,13 @@ export class Input {
    */
   private jumpQueued = false;
 
+  /**
+   * Correr, como INTERRUPTOR: se enciende con una pulsacion y se apaga con la
+   * siguiente. Decision del autor, y es lo que hace que sirva igual en un
+   * telefono —donde mantener una tecla no existe— que con teclado.
+   */
+  private running = false;
+
   /** Ultima posicion conocida del raton, o null si nunca se ha movido. */
   private pointerX: number | null = null;
   private pointerY: number | null = null;
@@ -107,6 +114,12 @@ export class Input {
         case 'Space':
           this.jumpQueued = true;
           e.preventDefault();
+          break;
+        // Cualquiera de las dos Shift. `e.repeat` ya esta descartado arriba, asi
+        // que mantenerla pulsada no hace parpadear el interruptor.
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          this.toggleRun();
           break;
         case 'KeyE':
           this.eatQueued = true;
@@ -199,6 +212,28 @@ export class Input {
     });
   }
 
+  /**
+   * Enciende o apaga la carrera, y lo refleja en el boton.
+   *
+   * El estado visible importa mas de lo que parece: un interruptor sin indicador
+   * es un interruptor que no se sabe en que posicion esta, y con teclado no hay
+   * boton que mirar, asi que tambien lo dice el HUD.
+   */
+  private toggleRun(): void {
+    this.running = !this.running;
+    const button = document.getElementById('btnRun');
+    button?.classList.toggle('on', this.running);
+    button?.setAttribute('aria-pressed', String(this.running));
+    // En el cuerpo, para que la ayuda de teclado tambien lo diga: con teclado
+    // no hay boton que mirar.
+    document.body.classList.toggle('running', this.running);
+  }
+
+  /** Si la carrera esta encendida. Lo lee el HUD. */
+  get isRunning(): boolean {
+    return this.running;
+  }
+
   private pressHarvest(): void {
     this.harvestQueued = true;
     this.harvestHeld = true;
@@ -242,6 +277,7 @@ export class Input {
       [eat, () => (this.eatQueued = true)],
       // Saltar es de un solo toque como comer: mantenerlo no encadena saltos.
       [document.getElementById('btnJump'), () => (this.jumpQueued = true)],
+      [document.getElementById('btnRun'), () => this.toggleRun()],
       [document.getElementById('btnPlant'), () => (this.plantQueued = true)],
       [document.getElementById('btnRotL'), () => this.actions.onRotate(-1)],
       [document.getElementById('btnRotR'), () => this.actions.onRotate(1)],
@@ -402,11 +438,15 @@ export class Input {
       const { dx, dy } = this.stickVector(STICK_RADIUS_PX);
       const magnitude = Math.hypot(dx, dy) / STICK_RADIUS_PX;
       if (magnitude > STICK_DEADZONE) {
-        // Reescalar desde la zona muerta evita el salto de velocidad al cruzarla.
-        const scaled = (magnitude - STICK_DEADZONE) / (1 - STICK_DEADZONE);
+        // Vector UNITARIO: el joystick apunta, no dosifica. Antes se reescalaba
+        // desde la zona muerta para que la velocidad subiera de forma continua
+        // con el desplazamiento del pulgar; el autor lo cambio al pedir la
+        // carrera, y ahora la velocidad la elige el interruptor. Lo que si se
+        // conserva es la zona muerta: apoyar el pulgar sin querer andar no debe
+        // mover al personaje.
         const length = Math.hypot(dx, dy);
-        intent.moveX = (dx / length) * scaled;
-        intent.moveY = (dy / length) * scaled;
+        intent.moveX = dx / length;
+        intent.moveY = dy / length;
       }
     } else {
       if (this.held.has('KeyA') || this.held.has('ArrowLeft')) intent.moveX -= 1;
@@ -453,6 +493,8 @@ export class Input {
 
     intent.jump = this.jumpQueued;
     this.jumpQueued = false;
+    // Estado, no pulsacion: viaja puesto en cada tick mientras este encendido.
+    intent.run = this.running;
     intent.eat = this.eatQueued;
     this.eatQueued = false;
     intent.plant = this.plantQueued;

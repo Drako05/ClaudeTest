@@ -10,8 +10,9 @@ semilla y la misma simulacion, con camara libre en vez de isometrica. Es hacia
 donde va el proyecto (`docs/pendiente.md`); el isometrico de la raiz sigue siendo
 el juego completo mientras dure la migracion. En el movil, el pulgar en el
 cuadrante inferior izquierdo anda, el resto de la pantalla gira la camara, y dos
-dedos de camara hacen zoom. Los dos botones de la derecha son saltar y cambiar
-entre ortografica y perspectiva; con teclado, Espacio salta.
+dedos de camara hacen zoom. Los botones de la derecha son correr, saltar y
+cambiar entre ortografica y perspectiva; con teclado, Espacio salta y Shift
+enciende y apaga la carrera.
 
 El nombre es provisional.
 
@@ -48,7 +49,8 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 
 | Tecla | Accion |
 |---|---|
-| `WASD` / flechas | Moverse |
+| `WASD` / flechas | Moverse (a marcha) |
+| `Shift` | Correr: interruptor, se queda encendido |
 | `Espacio` | Saltar |
 | Clic derecho | Recolectar las casillas marcadas (mantener repite) |
 | `E` | Comer bayas |
@@ -59,9 +61,10 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 
 | Gesto | Accion |
 |---|---|
-| Apoyar y arrastrar en la mitad izquierda | Joystick flotante, analogico |
+| Apoyar y arrastrar en la mitad izquierda | Joystick flotante: apunta, no dosifica |
 | Boton RECOGER | Recolectar; mantener repite 4 veces por segundo |
 | Boton SALTAR | Saltar; no encadena si se mantiene |
+| Boton CORRER | Correr: interruptor, se queda encendido |
 | Boton COMER | Comer bayas |
 | Pellizcar con dos dedos | Zoom |
 
@@ -70,9 +73,12 @@ botones y para el pellizco. Si apoyas un segundo dedo sobre el mundo, el
 pellizco tiene prioridad y le quita el control al joystick; sin esa cesion el
 zoom seria inalcanzable, porque el primer dedo se queda siempre con el joystick.
 
-El joystick es analogico: la velocidad es proporcional a cuanto se desplace el
-pulgar, con una zona muerta para que el dedo simplemente apoyado no haga derivar
-al personaje.
+El joystick **apunta, no dosifica**: cruzada la zona muerta se anda a velocidad
+de marcha entera, se haya desplazado el pulgar poco o mucho. La velocidad la
+elige el interruptor de correr. Lo fue hasta la tanda de la carrera —la
+velocidad era proporcional al desplazamiento— y lo cambio el autor. La zona
+muerta se queda, para que el dedo simplemente apoyado no haga derivar al
+personaje.
 
 ## Estructura
 
@@ -132,10 +138,9 @@ Dos consecuencias que si son del render y no se pueden esquivar:
 
 **El input tactil no rompe la frontera del nucleo.** El joystick y los botones
 son una segunda fuente que produce la misma `Intent` que el teclado; el nucleo
-no se entera de que existe una pantalla tactil. La unica adaptacion en el nucleo
-fue que `moveEntity` respete la MAGNITUD del vector (acotada a 1) ademas de su
-direccion, que es lo que hace analogico al joystick y no cambia nada para el
-teclado.
+no se entera de que existe una pantalla tactil. El vector de la `Intent` es
+**direccion pura** y la velocidad la elige su campo `run`, asi que teclado y
+joystick producen exactamente lo mismo: uno con teclas, el otro con un pulgar.
 
 **Un sprite por chunk, no por tile.** Cada chunk se pinta una vez en un canvas 2D
 y se sube como una textura, y solo se repinta si cambia. Dibujar el terreno

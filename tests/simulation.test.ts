@@ -7,10 +7,13 @@ import {
   HUNGER_DECAY_PER_SEC,
   actionArea,
   moveEntity,
+  RUN_MULTIPLIER,
+  RUN_SPEED,
   skipTime,
   step,
   tryHarvestArea,
   tryPlant,
+  WALK_SPEED,
   World,
 } from '@verdant/sim';
 import {
@@ -207,9 +210,19 @@ describe('simulacion', () => {
  * el personaje camina despacio. El teclado tiene que seguir comportandose
  * exactamente igual que antes, y eso es lo que mas importa proteger aqui.
  */
-describe('movimiento analogico', () => {
+/**
+ * Dos velocidades y nada entre medias.
+ *
+ * Esto sustituye a los tests del movimiento ANALOGICO, que afirmaban justo lo
+ * contrario: que media deflexion del joystick recorria media distancia. El autor
+ * lo cambio al pedir la carrera —«el mando apunta, el interruptor decide la
+ * velocidad»—, asi que lo que antes era la regla es ahora el fallo, y se afirma
+ * al reves. La zona muerta del joystick no vive aqui sino en `client/input.ts`:
+ * el nucleo solo ve direcciones.
+ */
+describe('marcha y carrera', () => {
   /** Distancia recorrida en `ticks` empujando con el vector dado. */
-  function travel(moveX: number, moveY: number, ticks = 30): number {
+  function travel(moveX: number, moveY: number, running = false, ticks = 30): number {
     const world = new World(2468);
     const spot = flatOpenSpot(world);
     const store = new EntityStore(4);
@@ -217,37 +230,44 @@ describe('movimiento analogico', () => {
     // Los pies, a la altura del suelo: sin esto el cuerpo esta por debajo del
     // terreno y no puede entrar en ninguna casilla, ni siquiera la de al lado.
     store.z[id] = world.groundHeightAt(spot.x, spot.y);
-    for (let i = 0; i < ticks; i++) moveEntity(world, store, id, moveX, moveY, TICK_DT);
+    for (let i = 0; i < ticks; i++) {
+      moveEntity(world, store, id, moveX, moveY, TICK_DT, running);
+    }
     return Math.hypot(store.x[id] - spot.x, store.y[id] - spot.y);
   }
 
-  it('media deflexion recorre la mitad de distancia', () => {
+  it('la magnitud del mando ya NO cambia la velocidad', () => {
     const full = travel(1, 0);
-    const half = travel(0.5, 0);
     expect(full).toBeGreaterThan(0);
-    expect(half / full).toBeCloseTo(0.5, 3);
-  });
-
-  it('la velocidad escala de forma continua con la deflexion', () => {
-    const full = travel(1, 0);
-    for (const magnitude of [0.25, 0.4, 0.75]) {
-      expect(travel(magnitude, 0) / full).toBeCloseTo(magnitude, 3);
+    // Media deflexion, un cuarto o el triple: todas andan lo mismo.
+    for (const magnitude of [0.25, 0.4, 0.5, 0.75, 3]) {
+      expect(travel(magnitude, 0), `magnitud ${magnitude}`).toBeCloseTo(full, 6);
     }
   });
 
-  it('una magnitud mayor que 1 se acota a velocidad maxima', () => {
-    // El teclado en diagonal produce longitud raiz de 2; no debe correr mas.
-    expect(travel(3, 0)).toBeCloseTo(travel(1, 0), 6);
-    expect(travel(1, 1)).toBeCloseTo(travel(1, 0), 6);
+  it('correr recorre mas que andar, y justo lo que dice el multiplicador', () => {
+    const andando = travel(1, 0);
+    const corriendo = travel(1, 0, true);
+    expect(corriendo).toBeGreaterThan(andando);
+    expect(corriendo / andando).toBeCloseTo(RUN_MULTIPLIER, 6);
+  });
+
+  it('las velocidades son las dos constantes que las nombran', () => {
+    const ticks = 30;
+    expect(travel(1, 0, false, ticks)).toBeCloseTo(WALK_SPEED * ticks * TICK_DT, 6);
+    expect(travel(1, 0, true, ticks)).toBeCloseTo(RUN_SPEED * ticks * TICK_DT, 6);
   });
 
   it('el teclado sigue recorriendo lo mismo en diagonal que en ortogonal', () => {
     expect(travel(0, 1)).toBeCloseTo(travel(1, 0), 6);
     expect(travel(-1, -1)).toBeCloseTo(travel(1, 0), 6);
+    // Y corriendo tambien: normalizar la direccion es previo a elegir velocidad.
+    expect(travel(-1, -1, true)).toBeCloseTo(travel(1, 0, true), 6);
   });
 
   it('por debajo del umbral de ruido no hay movimiento', () => {
     expect(travel(1e-9, 0)).toBe(0);
+    expect(travel(1e-9, 0, true)).toBe(0);
   });
 });
 

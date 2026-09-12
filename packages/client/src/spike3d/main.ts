@@ -91,6 +91,7 @@ function toggleProjection(): void {
 projButton.addEventListener('click', toggleProjection);
 controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));
+controls.bindRunButton(document.getElementById('run'));
 
 const billboards = new BillboardSet();
 const player = billboards.spawnPlayer();
@@ -223,6 +224,7 @@ function frame(now: number): void {
   // un frame lento el bucle corre varios ticks seguidos, y repartir el mismo
   // salto entre todos encadenaria saltos en el aire.
   let jump = controls.takeJump();
+  intent.run = controls.running;
 
   accumulator += dt;
   let guard = 8;
@@ -260,7 +262,8 @@ function frame(now: number): void {
     `${fps.toFixed(0)} FPS · ${camera.projection}\n` +
     `${(triangles / 1000).toFixed(1)}k triangulos · ${info.calls} draw calls\n` +
     `pos ${px.toFixed(0)}, ${py.toFixed(0)} · altura ${ph.toFixed(1)} · semilla ${seed}\n` +
-    `abajo-izq anda · el resto gira · 2 dedos zoom · espacio salta`;
+    `abajo-izq anda · el resto gira · 2 dedos zoom · espacio salta · ` +
+    `shift ${controls.running ? 'CORRE' : 'anda'}`;
 
   requestAnimationFrame(frame);
 }
@@ -278,6 +281,7 @@ Object.defineProperty(window, '__spike', {
     yaw: camera.yaw,
     pitch: camera.pitch,
     projection: camera.projection,
+    running: controls.running,
     x: state.entities.x[state.playerId],
     y: state.entities.y[state.playerId],
     z: state.entities.z[state.playerId],

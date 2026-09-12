@@ -24,6 +24,12 @@ Esto es el resumen operativo.
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
    nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`): con raton la fija el
    cursor, en tactil el joystick, y en reposo se conserva la que hubiera.
+
+   **`moveX`/`moveY` son DIRECCION, no velocidad.** Su magnitud no dice nada. Lo
+   cambio el autor al pedir la carrera: el joystick hacia de acelerador —cuanto
+   mas desplazado, mas rapido— y eso se sustituyo por dos velocidades discretas
+   que elige `run`. Un mando analogico apunta; no dosifica. La zona muerta se
+   queda, pero vive en el cliente: el nucleo solo ve direcciones.
 6. **La vista es isometrica, GIRABLE en cuatro, y vive solo en el cliente.** La
    transformacion esta entera en `packages/client/src/projection.ts`, que lleva
    una orientacion de modulo y la aplica dentro de `worldToScreen`,
@@ -315,9 +321,11 @@ pasando.
 Reparto de responsabilidades entre las dos capas de test, que conviene respetar:
 la prueba de humo verifica **integracion** (que un toque llega a producir una
 Intent y el mundo reacciona), y los tests unitarios verifican **numeros**. Medir
-la escala analogica del joystick en el navegador daria un resultado contaminado
-por las colisiones con arboles y agua; por eso se mide en
-`tests/simulation.test.ts`, sobre una zona abierta verificada.
+la relacion entre marcha y carrera en el navegador daria un resultado contaminado
+por las colisiones con arboles, agua y paredes; por eso el multiplicador exacto
+se mide en `tests/simulation.test.ts`, sobre una zona llana y abierta verificada,
+y el humo solo afirma que el interruptor llega a la Intent y que corriendo se
+recorre mas.
 
 Ojo con los FPS que reporta la pasada movil: en headless se renderiza por
 software a 3x, asi que ese numero no dice nada del rendimiento en un movil real.
@@ -411,6 +419,17 @@ Los controles cambiaron con la fase 2, y fue decision del autor: **Espacio pasa
 a ser el salto** y la accion se va **al clic derecho, en exclusiva**. En tactil
 hay boton de saltar, en el isometrico y en el 3D. Dejar tambien el clic
 izquierdo accionando habria vaciado la distincion de sentido.
+
+**Correr es un INTERRUPTOR**, tambien decision suya: se enciende con Shift o con
+el boton del movil y se queda encendido hasta que se vuelva a pulsar. No es una
+tecla que se mantiene, y la razon es el telefono — con un pulgar en el joystick
+y otro en la camara no sobran dedos para sostener nada. Por eso lleva **estado
+visible** en los dos sitios: el boton se ilumina y, con teclado, la ayuda dice
+«ACTIVADO». Un interruptor sin indicador deja al jugador adivinando por que el
+personaje va como va.
+
+Y por eso mismo desaparecio el acelerador analogico (regla 5): la velocidad la
+elige el interruptor, no lo desplazado que este el pulgar.
 
 Numeros del autor, que no se tocan sin preguntarle: el escalon (0.06), los 16 px
 por nivel, el 15 % de fronteras que son rampa y el tope de 40 niveles. El umbral
