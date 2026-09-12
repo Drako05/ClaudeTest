@@ -379,6 +379,29 @@ frame se ven los 35 slashes y a 221 ms cero de 35. Ahi vivio meses el fallo, y
 alargar el slash lo habria tapado tocando un numero de sensacion que es del
 autor.
 
+**El 3D reutiliza `effects.ts` tal cual y solo pone el dibujado**
+(`spike3d/effects-view.ts`). Es la prueba de que el reparto estaba bien hecho: lo
+que se reutiliza —donde esta cada escombro, cuanto le queda de vida, con que
+colores— nunca fue del isometrico, asi que no roza el congelado.
+
+Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
+
+- **En el 3D un nivel mide lo mismo que una casilla**, porque `terrain-mesh.ts`
+  usa la altura tal cual como coordenada Y; en el isometrico un nivel son 16 px
+  y una casilla 32. Asi que la altura entra directa y el TAMANO, que `effects.ts`
+  da en pixeles del arte isometrico, se divide por 32.
+- **Los escombros se apagan encogiendo, no desvaneciendose.** Cada uno tiene su
+  edad y un `InstancedMesh` comparte material, asi que no hay transparencia por
+  instancia; se aplica la misma curva de apagado a la escala. El barrido si se
+  desvanece, porque son pocos y cada uno lleva su material.
+
+Y una leccion de metodo, de fotografiar un efecto que dura 0.22 s: **una captura
+tarda mas que el propio efecto**, asi que perseguirlo con sondeos es echarlo a
+suertes. Las dos formas que si funcionan son mantener pulsada la accion —repite
+cuatro veces por segundo, o sea que casi siempre hay uno vivo— o, para localizar
+uno concreto, subir `SLASH_SECONDS` a proposito y revertirlo. Se pinto de magenta
+una vez para comprobar que salia donde debia; salia.
+
 Lo que ese fallo enseña sobre las comprobaciones, y vale para cualquiera que se
 anada: **la prueba de humo preguntaba si habia un slash vivo en ese instante**,
 con una vida de 0,22 s y un sondeo cada 420 ms. Dos defectos en uno — se

@@ -35,7 +35,10 @@ import {
   emptyIntent,
   type Terrain,
 } from '@verdant/shared';
-import { createGame, step, type GameState } from '@verdant/sim';
+import { actionReach, createGame, step, type GameState } from '@verdant/sim';
+import { Effects } from '../effects.js';
+import { debrisPalette } from '../palette.js';
+import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from '../tiles.js';
 import { BillboardSet } from './billboards.js';
 import { OrbitCamera } from './camera.js';
@@ -100,6 +103,11 @@ controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));
 controls.bindRunButton(document.getElementById('run'));
 controls.bindActionButton(document.getElementById('action'));
+
+// El barrido y los escombros. El movimiento sale de `effects.ts`, que es puro y
+// ya existia; aqui solo se dibuja (`effects-view.ts`).
+const effects = new Effects();
+const effectsView = new EffectsView(scene);
 
 const billboards = new BillboardSet();
 const player = billboards.spawnPlayer();
@@ -267,14 +275,34 @@ function frame(now: number): void {
     }
     if (!controls.actionHeld) actionTicks = 0;
 
+    // La Intent se guarda en vez de pasarse en linea: hace falta saber si se
+    // acciono para lanzar el barrido, aunque no se derribara nada.
+    const accionando = intent.harvest;
     step(state, intent);
+    if (accionando) {
+      effects.spawnSlash(actionReach(state.world, state.entities, state.playerId));
+    }
     for (const hit of state.lastHarvest) {
       gathered += hit.amount + hit.seeds;
       lastResource = hit.resource;
+      // Los escombros se posan en la cima del tile del que salieron, no en el
+      // plano cero: talar en una meseta no puede tirar la madera al mar.
+      effects.spawnDebris(
+        hit.tileX,
+        hit.tileY,
+        debrisPalette(hit.feature),
+        state.world.levelAt(hit.tileX, hit.tileY),
+      );
     }
     accumulator -= TICK_DT;
   }
   accumulator = Math.min(accumulator, TICK_DT);
+
+  // Los efectos avanzan con el tiempo REAL del frame, una sola vez, y su propia
+  // regla les garantiza un fotograma de vida por corto que sea: un barrido dura
+  // 0.22 s y en una maquina lenta cabria entero entre dos fotogramas.
+  effects.advance(dt);
+  effectsView.update(effects, state.world);
 
   const look = controls.takeLook();
   camera.orbit(look.dx, look.dy);
@@ -327,6 +355,9 @@ Object.defineProperty(window, '__spike', {
     running: controls.running,
     /** Lo recolectado, para poder comprobar la accion desde fuera. */
     gathered,
+    /** Barridos y escombros DIBUJADOS, acumulados. Ver `EffectsView`. */
+    slashesDrawn: effectsView.slashesDrawn,
+    debrisDrawn: effectsView.debrisDrawn,
     x: state.entities.x[state.playerId],
     y: state.entities.y[state.playerId],
     z: state.entities.z[state.playerId],
