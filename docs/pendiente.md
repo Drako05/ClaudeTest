@@ -9,6 +9,33 @@ Lo permanente del *como* esta en `CLAUDE.md`; las leyes del mundo, en
 
 ---
 
+## El barrido del 3D, arreglado — y lo que queda de tu juicio
+
+El barrido «no salia completo y se desvanecia casi de inmediato». **No era la
+duracion ni la curva**: `SLASH_SECONDS = 0.22`, el barrido `t * 1.6` y el apagado
+`(1 - t) * 0.85` son los tuyos y los del isometrico, y estan intactos. Eran tres
+fallos de dibujado, cada uno confirmado reintroduciendolo y viendo caer la medida
+(`npm run spike:slash`, que cuenta pixeles de pantalla y no barridos lanzados):
+
+| Fallo | Con el fallo | Arreglado |
+|---|---|---|
+| La esfera envolvente se congelaba donde diste el **primer** golpe de la partida, asi que al alejarte se recortaba todo | 80 mandados, **0 pixeles** | 103 |
+| La prueba de profundidad dejaba que lo tapara lo que hubiera entre la camara y el arco | 2 pixeles | 104 |
+| La cinta iba tumbada en el suelo y se veia de canto segun el rumbo | 13 pixeles | 104 |
+
+Aviso honesto: **no pude ver tu video** —es H.264 y este contenedor no lleva
+codecs propietarios—, asi que el diagnostico sale de leer el codigo contra su
+original isometrico. Encaja con lo que describiste, pero si algo no cuadra con lo
+que viste, dilo.
+
+Y una cosa que decidi yo y puedes corregir: **el grosor**. El isometrico traza 3
+px con la casilla a 32, o sea 0.094 casillas de ancho de mundo; aqui lo puse en
+0.12 porque PixiJS suavizaba el trazo y el lienzo de three.js va sin antialias, y
+a 2,6 px un quad sin suavizar se deshilacha. Si lo quieres mas gordo o mas fino
+es un numero, y es de sensacion, o sea tuyo.
+
+---
+
 ## Decision tomada: el juego pasa a 3D con estetica de sprites
 
 **Y desde el 2026-09-12, el isometrico esta congelado por decision suya:**

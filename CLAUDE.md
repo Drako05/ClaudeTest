@@ -394,6 +394,29 @@ Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
   edad y un `InstancedMesh` comparte material, asi que no hay transparencia por
   instancia; se aplica la misma curva de apagado a la escala. El barrido si se
   desvanece, porque son pocos y cada uno lleva su material.
+- **El barrido se dibuja POR ENCIMA del mundo y MIRANDO a la camara.** Las dos
+  cosas son la traduccion de una sola: en el isometrico el trazo vive en
+  `effectLayer`, una capa de pantalla sobre el mundo entero, y ahi nada puede
+  taparlo ni escorzarlo. En 3D eso se compra con `depthTest: false` y con una
+  cinta que se ensancha perpendicular a la linea de vision. Sin lo primero se lo
+  come lo que haya entre la camara y el arco —un bloque, un arbol, el propio
+  personaje—; sin lo segundo se ve de canto cuando su ancho cae a lo largo del
+  rumbo desde el que se mira. Medido a 0.08 rad de elevacion: 104 pixeles
+  aclarados contra 2 y contra 13. Y **no lo tapa la pared de la casilla
+  golpeada**, que era mi primera sospecha y es falsa: el area solo alcanza
+  casillas de la altura propia, asi que el arco nunca cruza un desnivel.
+
+  La cinta se levanta 0.9 —la altura del pecho, los mismos `TILE_H * 0.9` del
+  isometrico leidos como niveles— y mide 0.12 casillas de ancho, que son sus 3 px
+  con la casilla a 32. Se redondea al alza desde 0.094 porque PixiJS suavizaba el
+  trazo y este lienzo va sin antialias.
+
+  **Y toda malla cuya geometria se reescriba cada frame lleva
+  `frustumCulled = false`.** three.js calcula la esfera envolvente **una sola
+  vez**, cuando la encuentra a `null`, asi que se queda clavada donde estuvo la
+  primera vez que se dibujo: el barrido se esfumaba entero en cuanto el jugador
+  se alejaba del sitio donde dio su primer golpe. Medido: 80 barridos mandados a
+  la escena, 0 pixeles en pantalla.
 
 Y una leccion de metodo, de fotografiar un efecto que dura 0.22 s: **una captura
 tarda mas que el propio efecto**, asi que perseguirlo con sondeos es echarlo a
@@ -401,6 +424,21 @@ suertes. Las dos formas que si funcionan son mantener pulsada la accion —repit
 cuatro veces por segundo, o sea que casi siempre hay uno vivo— o, para localizar
 uno concreto, subir `SLASH_SECONDS` a proposito y revertirlo. Se pinto de magenta
 una vez para comprobar que salia donde debia; salia.
+
+**Un contador de «dibujados» dice que se MANDA, no que se VEA.** `slashesDrawn`
+cuenta dentro del dibujado, y aun asi los tres fallos de arriba lo incrementaban
+igual: recortado por el frustum o tapado por el terreno, el contador subia. Es el
+mismo fallo de razonamiento que el de abajo, un escalon mas adentro. Para afirmar
+que algo llega a pantalla hay que contar **pixeles**: `npm run spike:slash` para
+una captura en reposo como referencia y cuenta los que el efecto aclara, porque
+con el jugador y la camara quietos dos fotogramas son identicos. Y compara
+**contra el peor de cuatro rumbos**, no contra uno: los dos defectos de
+orientacion van y vienen segun se gire, y mirando desde el sitio afortunado se
+ven perfectos.
+
+Ojo tambien con lo que se cuenta: la primera version buscaba pixeles «casi
+blancos» y daba cero con el barrido perfectamente visible, porque el trazo es
+translucido y blanco al 50 % sobre hierba es un verde palido.
 
 Lo que ese fallo enseña sobre las comprobaciones, y vale para cualquiera que se
 anada: **la prueba de humo preguntaba si habia un slash vivo en ese instante**,

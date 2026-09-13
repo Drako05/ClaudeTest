@@ -18,7 +18,8 @@
     "artifact": "npm run build:single && node tools/make-artifact.mjs",
     "spike": "npm run build:spike -w @verdant/client",
     "spike:shots": "npm run spike && node tools/spike-shots.mjs",
-    "spike:gestures": "npm run spike && node tools/spike-gestures.mjs"
+    "spike:gestures": "npm run spike && node tools/spike-gestures.mjs",
+    "spike:slash": "npm run spike && node tools/spike-slash.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

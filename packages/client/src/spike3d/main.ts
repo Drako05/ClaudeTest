@@ -222,10 +222,9 @@ const ACTION_REPEAT_TICKS = 15;
 /**
  * Lo recolectado y lo ultimo que se saco, para decirlo en el HUD.
  *
- * Sin esto la accion no tiene ninguna senal: el 3D no dibuja slash ni escombros
- * —eso es del isometrico, que esta congelado— y no lleva inventario en pantalla,
- * asi que talar un arbol se veria como que el arbol desaparece y ya. Es lo
- * minimo para que se sepa que la accion hizo algo.
+ * El barrido y los escombros ya se dibujan, pero son un destello de 0.22 s y no
+ * dicen QUE ha salido. El 3D no lleva inventario en pantalla, asi que sin esto
+ * talar un arbol se veria como que el arbol desaparece y ya.
  */
 let gathered = 0;
 let lastResource = -1;
@@ -302,7 +301,12 @@ function frame(now: number): void {
   // regla les garantiza un fotograma de vida por corto que sea: un barrido dura
   // 0.22 s y en una maquina lenta cabria entero entre dos fotogramas.
   effects.advance(dt);
-  effectsView.update(effects, state.world);
+  // La camara va con ellos porque la cinta del barrido se orienta hacia el ojo:
+  // tumbada en el suelo se veia de canto al bajar la elevacion. Se pasa la del
+  // frame ANTERIOR —`camera.follow` es unas lineas mas abajo—, y eso no se nota:
+  // un frame de desfase en el giro de una cinta de 3 px no tiene efecto visible,
+  // y adelantar el `follow` obligaria a recolocarlo todo por nada.
+  effectsView.update(effects, state.world, camera.active.position);
 
   const look = controls.takeLook();
   camera.orbit(look.dx, look.dy);
