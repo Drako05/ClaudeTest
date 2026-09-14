@@ -15,8 +15,17 @@
 
 import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three';
 
-/** Altura de la mirada sobre los pies del jugador, en casillas. */
-const EYE = 1.2;
+/**
+ * Altura del punto al que mira la orbita, sobre los pies del jugador.
+ *
+ * Sube de 1.2 a 1.6 al crecer el personaje: 1.2 le quedaba por encima de la
+ * cabeza cuando medía 0,78 bloques y le quedaría por las rodillas midiendo 1,8.
+ * 1.6 es su cabeza, y de paso la altura de ojos de Minecraft.
+ *
+ * **Es deduccion mia**, corregible: conservar la proporcion exacta de antes
+ * daria 2,8, que deja la camara mirando muy por encima del personaje.
+ */
+const EYE = 1.6;
 
 /** Apertura vertical de la perspectiva, en grados. */
 const FOV = 45;

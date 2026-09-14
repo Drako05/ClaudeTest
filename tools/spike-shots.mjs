@@ -18,6 +18,15 @@ page.on('pageerror', (e) => problems.push(String(e)));
 await page.goto(`http://127.0.0.1:${port}/?seed=12345`, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 console.log('HUD:', await page.textContent('#hud'));
+
+// Las proporciones, medidas del dibujo y no de una captura: es la unica forma de
+// afirmar «el jugador mide 1,8 bloques» en vez de que lo parezca.
+const sizes = await page.evaluate(() => window.__spike.sizes);
+console.log(
+  'PROPORCIONES (bloques):',
+  Object.entries(sizes).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(' · '),
+);
+
 await page.screenshot({ path: 'screenshots/spike-01-perspectiva.png' });
 
 // Girar la camara: arrastre en la mitad derecha.

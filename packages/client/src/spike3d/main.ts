@@ -375,6 +375,8 @@ Object.defineProperty(window, '__spike', {
     gathered,
     /** Barridos y escombros DIBUJADOS, acumulados. Ver `EffectsView`. */
     slashesDrawn: effectsView.slashesDrawn,
+    /** Lo que mide cada cosa en BLOQUES, medido del dibujo. Ver `BillboardSet`. */
+    sizes: billboards.sizes,
     debrisDrawn: effectsView.debrisDrawn,
     x: state.entities.x[state.playerId],
     y: state.entities.y[state.playerId],

@@ -491,6 +491,61 @@ herramientas no sirven para lo que se hicieron: a 64x se pierden unos 35 puntos
 de hambre por segundo real y saltar un dia son 264, asi que el boton mas util del
 panel era el que mataba.
 
+## Proporciones
+
+**Un bloque no es la unidad de nada vivo.** El arte nacio para el isometrico con
+el jugador midiendo 0,78 bloques y un arbol 1,22, y el autor lo comparo con
+Minecraft: alli mides poco menos de dos y un arbol pasa de tres. Los dos factores
+que hacian falta salian **casi iguales** —2,3 y 2,6—, y eso era el diagnostico
+entero: la relacion entre jugador y arbol ya era la buena y lo que sobraba era el
+bloque.
+
+Asi que **todo lo que se apoya en el suelo sube con el mismo `BASE = 2.3`**
+(`spike3d/billboards.ts`), y solo los arboles llevan su pizca de mas
+(`ARBOL = 2.6`). Eso conserva intactas las proporciones que el autor ya habia
+dado por buenas entre unos y otros, y cambia unicamente su tamano frente al
+terreno. Medido del dibujo:
+
+| | Antes | Ahora |
+|---|---|---|
+| Jugador | 0,78 | **1,93** |
+| Arbol | 1,22 | **3,17** |
+| Arbusto | 0,47 | 1,17 |
+| Brote | 0,29 | 0,88 |
+| Roca y minerales | 0,47 | 1,09 |
+
+**Esto es ARTE, no fisica.** El salto (apice 1,16), `STEP_UP` y la colision van en
+unidades de mundo y no saben lo que mide un sprite, asi que `packages/sim` no se
+entera. Y de paso queda mas cerca de Minecraft de lo que estaba: alli mides 1,8,
+subes 0,6 andando y saltas 1,25; aqui 1,93, `STEP_UP` 0,5 y apice 1,16. La regla
+21 se lee igual de bien con el personaje nuevo.
+
+**El arte se redibuja, no se estira**, que es lo que separa un 2D-HD de un
+pixelado. `makeFeatureArt(feature, detail)` y `makePlayerArt(detail)` crean el
+lienzo `detail` veces mas grande y le aplican `ctx.scale(detail, detail)`: **ni
+una coordenada de dibujo cambia**, y `anchorX`/`anchorY` salen bien solas porque
+ya eran fracciones. `riseAbove` va en pixeles y se multiplica. El isometrico pide
+`detail = 1` y obtiene byte por byte lo de siempre —lo afirma el humo con su «pie
+a (0,0) px de su rombo» en las cuatro vistas—.
+
+**Las proporciones se MIDEN, no se miran.** `BillboardSet.sizes` busca el pixel
+con tinta mas alto de cada lienzo y lo pasa a bloques; `npm run spike:shots` los
+imprime. No vale el alto del lienzo ni `riseAbove`: un arbol ocupa 39 px de un
+lienzo de 58 y `riseAbove` da la cota superior. Estimando por el lienzo me sali
+con que un brote mediria 1,52 bloques y una roca 2,88; medidos son 0,88 y 1,09.
+
+Dos cosas arrastro el cambio y no eran opcionales: **`EYE` de la camara** paso de
+1.2 a 1.6, porque 1.2 le quedaba por encima de la cabeza al personaje viejo y por
+las rodillas al nuevo (el 1.6 es deduccion mia); y **los escombros** llevan el
+mismo `BASE`, porque son astillas de lo que se derriba y sin el pasaban de chinas
+a polvo. El **alto** del barrido sube tambien —es el pecho del personaje— pero su
+**ancho** no: ese marca las casillas que la accion afecta, o sea que es del tile.
+
+Y una consecuencia que es de juicio del autor, no medible: **el relieve se lee
+menos de la mitad de alto**. Una pared de un bloque pasa de llegar al pecho a
+llegar a la rodilla, y una cima de 27 niveles de medir 34 personajes a medir 14.
+La fisica no cambia ni un decimal, pero los 16 px por nivel se calibraron a ojo.
+
 ## El relieve
 
 El mundo tiene altura desde `packages/sim/src/relief.ts`: hasta 41 niveles,

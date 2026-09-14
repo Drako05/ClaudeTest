@@ -9,6 +9,34 @@ Lo permanente del *como* esta en `CLAUDE.md`; las leyes del mundo, en
 
 ---
 
+## Proporciones nuevas — y una consecuencia que tienes que mirar tú
+
+Hecho lo que pediste, y las medidas salen justo en tu enunciado: **jugador 1,93
+bloques** («poco menos que 2») y **árbol 3,17** («poco más de 3»). Sube todo lo
+que se apoya en el suelo con el mismo factor, así que las proporciones entre unas
+cosas y otras son exactamente las de antes.
+
+Dos números salieron mejor de lo que te dije en el plan, porque allí los estimé
+del lienzo y luego los medí del dibujo: el **brote queda en 0,88** —por debajo de
+la cintura, no casi tan alto como tú— y la **roca en 1,09**. La pega que te
+señalé sobre los brotes desaparece sola.
+
+**Lo que sí tienes que mirar: el relieve se lee menos de la mitad de alto.** Una
+pared de un bloque pasa de llegarte al pecho a llegarte a la rodilla, y una cima
+de 27 niveles de medir 34 personajes a medir 14. La física no cambia ni un
+decimal —el salto sigue en 1,16 y `STEP_UP` en 0,5, que es casi exactamente
+Minecraft—, pero **los 16 px por nivel los calibraste a ojo** y esto toca justo lo
+que mirabas entonces. Si ahora el mundo te parece plano, la palanca no es el
+tamaño de los sprites sino la ganancia de cordillera (regla 14), midiendo antes.
+
+Y dos deducciones mías, corregibles: **`EYE = 1.6`** para la cámara (1.2 le
+quedaba por las rodillas al personaje nuevo; conservar la proporción de antes
+daría 2,8, que me pareció demasiado alto), y que **los árboles de 3,2 bloques
+tapan bastante más** con la cámara baja — que es justo la oclusión de cámara que
+sigue pendiente de la migración.
+
+---
+
 ## El barrido del 3D, arreglado — y lo que queda de tu juicio
 
 El barrido «no salia completo y se desvanecia casi de inmediato». **No era la

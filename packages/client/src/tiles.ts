@@ -296,12 +296,32 @@ export interface FeatureArt {
   riseAbove: number;
 }
 
-function newCanvas(width: number, height: number): [HTMLCanvasElement, CanvasRenderingContext2D] | null {
+/**
+ * Un lienzo y su contexto, opcionalmente a mayor densidad de pixeles.
+ *
+ * `detail` multiplica los pixeles del lienzo y **escala el contexto en el mismo
+ * factor**, asi que el dibujo sale identico pero con mas resolucion: ni una sola
+ * coordenada de las que dibujan conifera, frondoso, arbusto, brote o roca hay
+ * que tocar. Es lo que permite agrandar un sprite en el 3D sin que el pixel
+ * crezca con el.
+ *
+ * Con `detail` distinto de 1, `canvas.width` **deja de ser** la anchura logica.
+ * Quien calcule un ancla tiene que dividir por la logica, que es lo que hacen
+ * las de features y jugador; las de terreno dividen por `canvas.width`, y por eso
+ * se quedan en 1 —ademas de estar congeladas—.
+ */
+function newCanvas(
+  width: number,
+  height: number,
+  detail = 1,
+): [HTMLCanvasElement, CanvasRenderingContext2D] | null {
   const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = Math.ceil(width * detail);
+  canvas.height = Math.ceil(height * detail);
   const ctx = canvas.getContext('2d');
-  return ctx ? [canvas, ctx] : null;
+  if (!ctx) return null;
+  if (detail !== 1) ctx.scale(detail, detail);
+  return [canvas, ctx];
 }
 
 function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number): void {
@@ -320,18 +340,18 @@ function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: 
  * volumen sin necesidad de 3D real. La luz entra siempre por el noroeste, para
  * que todas las especies se lean como parte del mismo mundo.
  */
-export function makeFeatureArt(feature: Feature): FeatureArt | null {
-  if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES);
+export function makeFeatureArt(feature: Feature, detail = 1): FeatureArt | null {
+  if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES, detail);
   const mineral = MINERAL_FACES[feature];
-  if (mineral) return makeRockArt(mineral);
-  if (isSapling(feature)) return makeSaplingArt(feature);
+  if (mineral) return makeRockArt(mineral, detail);
+  if (isSapling(feature)) return makeSaplingArt(feature, detail);
 
   const look = LOOKS[feature];
   if (!look) return null;
 
   const width = 44;
   const height = 58;
-  const made = newCanvas(width, height);
+  const made = newCanvas(width, height, detail);
   if (!made) return null;
   const [canvas, ctx] = made;
 
@@ -397,14 +417,14 @@ export function makeFeatureArt(feature: Feature): FeatureArt | null {
     ctx.fill();
   }
 
-  return { canvas, anchorX: footX / width, anchorY: footY / height, riseAbove: footY };
+  return { canvas, anchorX: footX / width, anchorY: footY / height, riseAbove: footY * detail };
 }
 
 /** Brote recien sembrado: pequeno, sin fruto y sin estorbar el paso. */
-function makeSaplingArt(feature: Feature): FeatureArt | null {
+function makeSaplingArt(feature: Feature, detail = 1): FeatureArt | null {
   const adult = maturesInto(feature);
   const look = LOOKS[adult];
-  const made = newCanvas(28, 26);
+  const made = newCanvas(28, 26, detail);
   if (!made) return null;
   const [canvas, ctx] = made;
 
@@ -427,16 +447,16 @@ function makeSaplingArt(feature: Feature): FeatureArt | null {
   ctx.ellipse(footX + 3.5, footY - 9.5, 3.6, 2.2, 0.5, 0, Math.PI * 2);
   ctx.fill();
 
-  return { canvas, anchorX: footX / 28, anchorY: footY / 26, riseAbove: footY };
+  return { canvas, anchorX: footX / 28, anchorY: footY / 26, riseAbove: footY * detail };
 }
 
 /**
  * Roca y minerales comparten silueta y se distinguen por color: asi se leen como
  * vetas del mismo material y no como objetos ajenos entre si.
  */
-function makeRockArt(faces: readonly string[]): FeatureArt | null {
+function makeRockArt(faces: readonly string[], detail = 1): FeatureArt | null {
   const [base, face, highlight] = faces;
-  const made = newCanvas(40, 40);
+  const made = newCanvas(40, 40, detail);
   if (!made) return null;
   const [canvas, ctx] = made;
   const footX = 20;
@@ -467,18 +487,16 @@ function makeRockArt(faces: readonly string[]): FeatureArt | null {
   ctx.closePath();
   ctx.fill();
 
-  return { canvas, anchorX: footX / 40, anchorY: footY / 40, riseAbove: footY };
+  return { canvas, anchorX: footX / 40, anchorY: footY / 40, riseAbove: footY * detail };
 }
 
 /** El personaje, con el mismo criterio de apoyo y luz que las features. */
-export function makePlayerArt(): FeatureArt | null {
+export function makePlayerArt(detail = 1): FeatureArt | null {
   const width = 32;
   const height = 44;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
+  const made = newCanvas(width, height, detail);
+  if (!made) return null;
+  const [canvas, ctx] = made;
 
   const footX = width / 2;
   const footY = height - 5;
@@ -502,5 +520,5 @@ export function makePlayerArt(): FeatureArt | null {
   ctx.arc(footX, footY - 20.5, 6, Math.PI, 0);
   ctx.fill();
 
-  return { canvas, anchorX: footX / width, anchorY: footY / height, riseAbove: footY };
+  return { canvas, anchorX: footX / width, anchorY: footY / height, riseAbove: footY * detail };
 }

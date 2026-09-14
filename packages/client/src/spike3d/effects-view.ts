@@ -45,13 +45,27 @@ import type { World } from '@verdant/sim';
 const PX_PER_TILE = 32;
 
 /**
+ * Lo que crecieron los objetos del mundo (`billboards.ts`, `BASE`).
+ *
+ * Los escombros van con ellos: son astillas de lo que se derriba, asi que junto
+ * a un personaje 2,3 veces mas grande y sin este factor pasarian de chinas a
+ * polvo. No es un numero nuevo, es el mismo.
+ */
+const OBJECT_SCALE = 2.3;
+
+/**
  * Cuanto se levanta el barrido sobre el suelo, en casillas.
  *
  * Es la **altura del pecho**, el mismo sitio que en el isometrico: alli el trazo
- * sube `TILE_H * 0.9`, o sea 0.9 NIVELES, y aqui un nivel mide una casilla. A
- * media altura el barrido se lee como un tropiezo, no como un golpe.
+ * sube `TILE_H * 0.9`, o sea 0.9 NIVELES. A media altura el barrido se lee como
+ * un tropiezo, no como un golpe.
+ *
+ * Va atado al PERSONAJE, no al tile, asi que sube con el: 0.9 era el pecho de
+ * uno de 0,78 bloques y es la cintura de uno de 1,8. El ANCHO de la cinta, en
+ * cambio, se queda donde estaba —marca las casillas que la accion afecta, o sea
+ * que es del tile—.
  */
-const SLASH_LIFT = 0.9;
+const SLASH_LIFT = 1.3;
 
 /**
  * Medio ancho de la cinta del barrido, en casillas.
@@ -211,7 +225,7 @@ export class EffectsView {
       // La misma curva con la que el isometrico los desvanece, aplicada al
       // tamano: se apagan encogiendo. Ver la nota de cabecera.
       const fade = Math.min(1, (1 - progressOf(p)) * 2.2);
-      const side = (p.size / PX_PER_TILE) * fade;
+      const side = (p.size / PX_PER_TILE) * OBJECT_SCALE * fade;
       this.scratch.position.set(p.x, p.z + side / 2, p.y);
       this.scratch.scale.set(side, side, side);
       this.scratch.rotation.set(0, 0, 0);
