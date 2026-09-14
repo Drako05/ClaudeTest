@@ -513,13 +513,22 @@ async function desktopPass(browser, baseUrl) {
   // fallo de verdad y esta comprobacion lo dejaba pasar: por debajo de 4,5 FPS
   // el slash moria dentro del mismo fotograma en que nacia. El runner de CI
   // corre a 4-4,9 FPS, justo encima del corte.
-  const slashesBefore = (await page.evaluate(() => window.__verdant)).slashesDrawn;
-  let sawDebris = 0;
+  // Y los escombros van igual, que era la mitad sin arreglar de esa misma
+  // leccion: esto preguntaba por la LISTA de particulas vivas cada 420 ms, con
+  // un escombro viviendo entre 0,6 y 1,1 s y el runner a 4-6 FPS. O sea que
+  // acertaba a suertes, y ademas no distinguia «no se derribo nada» de «se
+  // derribo y no se dibujo». Aguanto varias tandas y un dia perdio la moneda:
+  // 221 slashes trazados y cero escombros vistos, con el mismo golpe soltando
+  // diez unas lineas mas abajo cuando el tiempo esta congelado.
+  const start = await page.evaluate(() => window.__verdant);
+  const slashesBefore = start.slashesDrawn;
+  const debrisBefore = start.debrisDrawn;
 
   // Se repite cambiando de sitio hasta que caiga algo. Los escombros solo
   // salen si se DERRIBA, y con la altura estorbando «hay algo talable justo
   // aqui y a mi altura» dejo de ser una apuesta segura: una vuelta puede
   // gastarse entera contra una pared o sobre casillas ya vacias.
+  let sawDebris = 0;
   for (let round = 0; round < 4 && sawDebris === 0; round++) {
     if (round > 0) await walkToOpenGround(page, 1.1);
     await page.mouse.down({ button: 'right' });
@@ -527,13 +536,12 @@ async function desktopPass(browser, baseUrl) {
       await page.keyboard.down(key);
       await page.waitForTimeout(420);
       await page.keyboard.up(key);
-      const now = await page.evaluate(() => window.__verdant);
-      if (now.effects.particles > sawDebris) sawDebris = now.effects.particles;
+      sawDebris = (await page.evaluate(() => window.__verdant)).debrisDrawn - debrisBefore;
     }
     await page.mouse.up({ button: 'right' });
   }
   const slashes = (await page.evaluate(() => window.__verdant)).slashesDrawn - slashesBefore;
-  console.log(`  al golpear: ${slashes} slashes trazados, hasta ${sawDebris} escombros`);
+  console.log(`  al golpear: ${slashes} slashes trazados, ${sawDebris} escombros dibujados`);
   check(slashes > 0, 'accionar no dibujo ningun slash');
   check(sawDebris > 0, 'derribar no solto ningun escombro');
 

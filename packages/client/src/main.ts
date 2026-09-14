@@ -479,6 +479,8 @@ async function main(): Promise<void> {
       effects: effects.tally,
       /** Slashes TRAZADOS desde el arranque; ver `Renderer.slashesDrawn`. */
       slashesDrawn: renderer.slashesDrawn,
+      /** Escombros DIBUJADOS desde el arranque; ver `Renderer.debrisDrawn`. */
+      debrisDrawn: renderer.debrisDrawn,
       // Las dos cosas, y por separado: `area` es la GEOMETRIA del apuntado
       // —siempre tres casillas del anillo de direcciones, sin repetir— y
       // `reach` es cuales de ellas estan a la altura propia y por tanto se

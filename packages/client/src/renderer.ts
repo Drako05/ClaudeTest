@@ -680,6 +680,7 @@ export class Renderer {
    * dibuja en isometrica todo lo que se levanta del suelo.
    */
   private slashStrokes = 0;
+  private debrisSpecks = 0;
 
   private drawEffects(world: World, effects: Effects | undefined): void {
     this.effectLayer.clear();
@@ -733,6 +734,7 @@ export class Renderer {
         .rect(x - 1, y - 1, p.size + 2, p.size + 2)
         .fill({ color: 0x101820, alpha: alpha * 0.55 });
       this.effectLayer.rect(x, y, p.size, p.size).fill({ color: p.color, alpha });
+      this.debrisSpecks++;
     }
   }
 
@@ -1110,6 +1112,23 @@ export class Renderer {
    */
   get slashesDrawn(): number {
     return this.slashStrokes;
+  }
+
+  /**
+   * Cuantos escombros se han llegado a DIBUJAR desde que arranco el juego.
+   *
+   * Gemelo del de arriba, y existe por el mismo motivo llevado un paso mas
+   * alla: cuando el slash se arreglo, la comprobacion de los escombros se
+   * quedo preguntando por la LISTA de particulas vivas —el mismo defecto, una
+   * linea mas abajo— y siguio pasando a suertes hasta que un dia el runner de
+   * CI perdio la moneda. Un escombro vive entre 0,6 y 1,1 s, el runner va a
+   * 4-6 FPS y el sondeo cae cada 420 ms: no habia por que acertar.
+   *
+   * Acumulando aqui, dentro del dibujado, la prueba afirma «se derribo algo y
+   * sus escombros se pintaron» sin depender de en que instante se mire.
+   */
+  get debrisDrawn(): number {
+    return this.debrisSpecks;
   }
 
   /** Piezas de mundo dibujadas: suelo, relieve, features y personaje. */

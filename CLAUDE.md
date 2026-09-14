@@ -449,6 +449,16 @@ lleva un acumulador de slashes **trazados** (`Renderer.slashesDrawn`) y el humo
 afirma que crece. Una comprobacion que puede pasar por suerte es peor que una que
 falla.
 
+**Y la moraleja de la moraleja: cuando se arreglo el slash, la comprobacion de
+los ESCOMBROS se quedo como estaba** —preguntando por la lista de particulas
+vivas, una linea mas abajo, con el arreglo del slash comentado justo encima—.
+Aguanto varias tandas y un dia el runner de CI perdio la moneda: 221 slashes
+trazados y cero escombros, con el mismo golpe soltando diez unas lineas mas
+abajo, donde el tiempo esta congelado. Un escombro vive entre 0,6 y 1,1 s, el
+runner va a 4-6 FPS y el sondeo cae cada 420 ms: no habia por que acertar. Ahora
+hay `Renderer.debrisDrawn`, gemelo del otro. **Al arreglar una comprobacion de
+estas, mira si su hermana tiene el mismo fallo.**
+
 ## Herramientas de desarrollo
 
 `packages/client/src/devtools.ts`, con `?dev=1` en la URL o F3. Pausa,
