@@ -8,13 +8,23 @@ para crecer hacia multijugador online y, mas adelante, una version nativa.
 **El 3D: https://drako05.github.io/ClaudeTest/3d/** — el mismo mundo, la misma
 semilla y la misma simulacion, con camara libre en vez de isometrica. Es hacia
 donde va el proyecto (`docs/pendiente.md`); el isometrico de la raiz sigue siendo
-el juego completo mientras dure la migracion. En el movil, el pulgar en el
-cuadrante inferior izquierdo anda, el resto de la pantalla gira la camara, y dos
-dedos de camara hacen zoom. Abajo a la derecha estan correr, saltar y **accion**
-—la mas grande y la mas pegada al borde, que es donde cae el pulgar—, y debajo el
-cambio entre ortografica y perspectiva. Con teclado: Espacio salta, Shift
+el juego completo mientras dure la migracion. Arranca **en perspectiva**, que es
+la vista que eligio el autor para el juego final.
+
+En el movil, el pulgar en el cuadrante inferior izquierdo anda, el resto de la
+pantalla gira la camara, y dos dedos de camara hacen zoom. Abajo a la derecha
+estan correr, saltar y **accion** —la mas grande y la mas pegada al borde, que es
+donde cae el pulgar—.
+
+**Esos tres botones no se ven en PC**, donde solo estorban: Espacio salta, Shift
 enciende y apaga la carrera, y el **clic izquierdo acciona** siempre que no
-arrastre, porque arrastrar es girar la camara.
+arrastre, porque arrastrar es girar la camara. Aparecen al detectar un puntero
+grueso o al primer toque, igual que en el isometrico.
+
+El que si se ve siempre es el **ojo de la esquina superior derecha**, que cambia
+entre perspectiva y ortografica: es el unico control sin tecla anunciada en
+ninguna parte. Abierto es perspectiva y entrecerrado ortografica, que es la que
+lo aplana todo.
 
 El nombre es provisional.
 

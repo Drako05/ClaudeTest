@@ -18,7 +18,7 @@ page.on('pageerror', (e) => problems.push(String(e)));
 await page.goto(`http://127.0.0.1:${port}/?seed=12345`, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 console.log('HUD:', await page.textContent('#hud'));
-await page.screenshot({ path: 'screenshots/spike-01-orto.png' });
+await page.screenshot({ path: 'screenshots/spike-01-perspectiva.png' });
 
 // Girar la camara: arrastre en la mitad derecha.
 for (const [i, dx] of [[1, 260], [2, 260], [3, 260]]) {
@@ -30,15 +30,19 @@ for (const [i, dx] of [[1, 260], [2, 260], [3, 260]]) {
   await page.screenshot({ path: `screenshots/spike-0${i + 1}-giro.png` });
 }
 
-// El boton, que es lo que hay en un telefono: la tecla P no existe alli.
+// El ojo, que es lo que hay en un telefono: la tecla P no existe alli. Su estado
+// se lee del `title` y de la clase, no del texto: es un icono y no lleva ninguno.
+const eye = async () =>
+  `${await page.getAttribute('#proj', 'title')} · ${(await page.getAttribute('#proj', 'class')) || 'ojo abierto'}`;
+console.log('OJO:', await eye());
 await page.click('#proj');
 await page.waitForTimeout(900);
 console.log('HUD:', await page.textContent('#hud'));
-console.log('BOTON:', (await page.textContent('#proj')).replace(/\s+/g, ' ').trim());
-await page.screenshot({ path: 'screenshots/spike-05-perspectiva.png' });
+console.log('OJO:', await eye());
+await page.screenshot({ path: 'screenshots/spike-05-orto.png' });
 await page.click('#proj');
 await page.waitForTimeout(700);
-console.log('BOTON de vuelta:', (await page.textContent('#proj')).replace(/\s+/g, ' ').trim());
+console.log('OJO de vuelta:', await eye());
 
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 await browser.close();

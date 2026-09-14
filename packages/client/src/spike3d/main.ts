@@ -88,16 +88,30 @@ const controls = new Controls(
  *
  * La tecla P no existe en un telefono, y el telefono es justo donde hay que
  * juzgar esto: sin boton, la mitad del experimento —comparar ortografica contra
- * perspectiva— quedaba fuera de alcance en el unico sitio donde importa.
+ * perspectiva— quedaba fuera de alcance en el unico sitio donde importa. Es
+ * ademas el unico control que se ve tambien en PC, porque es el unico que no
+ * tiene tecla anunciada en ninguna parte.
+ *
+ * Pintar y cambiar van separados **porque el boton tiene que arrancar
+ * sincronizado**: la vista de salida es la perspectiva, y llamar al interruptor
+ * para poner el icono en su sitio la voltearia al primer frame.
  */
+function renderProjButton(): void {
+  const orto = camera.projection === 'orto';
+  // El ojo se entrecierra en ortografica, que es la vista que lo aplana todo.
+  projButton.classList.toggle('flat', orto);
+  const label = orto
+    ? 'Vista ortográfica; tocar para perspectiva'
+    : 'Vista en perspectiva; tocar para ortográfica';
+  projButton.setAttribute('aria-label', label);
+  projButton.title = label;
+}
+
 function toggleProjection(): void {
   camera.toggleProjection();
-  const orto = camera.projection === 'orto';
-  projButton.firstChild!.textContent = orto ? 'Ortográfica' : 'Perspectiva';
-  projButton.querySelector('small')!.textContent = orto
-    ? 'tocar para perspectiva'
-    : 'tocar para ortográfica';
+  renderProjButton();
 }
+renderProjButton();
 projButton.addEventListener('click', toggleProjection);
 controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));

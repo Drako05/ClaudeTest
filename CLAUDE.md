@@ -530,6 +530,28 @@ la mas pegada al borde derecho**, que es donde cae el pulgar en reposo, y salto 
 carrera se apartan a su izquierda y van mas pequenos. En fila y no en columna,
 para que sea el borde —y no la altura— lo que ordene la importancia.
 
+**Y ese racimo no se ve en PC**, tambien decision suya: son controles de pulgar y
+con teclado sobran, porque Shift, Espacio y el clic izquierdo ya hacen lo mismo.
+El mecanismo es el del isometrico y se copio tal cual —`.touch-active` en el
+`body`, que pone `controls.ts` si el puntero es grueso y, si no, al primer toque
+de verdad—. **Esa segunda via no es adorno**: un portatil tactil declara puntero
+fino, asi que sin ella sus botones no apareceran nunca, y como `hasTouch` de
+Playwright ya hace que Chromium declare puntero grueso, medirla obliga a fingir
+uno fino (`tools/spike-slash.mjs` lo hace, y afirma «oculto al cargar, visible
+tras tocar»).
+
+La excepcion es **el ojo de la esquina superior derecha**, que cambia de
+proyeccion y se ve siempre: es el unico control que no tiene tecla anunciada en
+ningun sitio. Va en SVG y no en emoji —`👁` se pinta a color y distinto en cada
+sistema— y **dice cual esta activa con su propia forma**: abierto en perspectiva,
+que tiene fuga, y entrecerrado en ortografica, que lo aplana todo. Lo eligio asi
+el autor entre tres opciones; el simbolo cuenta la diferencia en vez de limitarse
+a senalar que hay un interruptor.
+
+**La vista de arranque es la perspectiva**, que es la que el autor eligio para el
+juego final tras probar las dos en su telefono. El interruptor se queda porque la
+ortografica conserva el aspecto plano del isometrico y sirve para comparar.
+
 Ojo con una diferencia entre los dos mandos, que es deliberada: **el boton repite
 al mantenerlo** (cuatro veces por segundo, la cadencia de siempre) y **el raton
 no** —un clic es una accion—, porque mantener pulsado el raton significa

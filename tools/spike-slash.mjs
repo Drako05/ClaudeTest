@@ -49,7 +49,21 @@ await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const port = server.address().port;
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT } });
+// `hasTouch` sin `isMobile`: hace falta un dedo de verdad para que aparezca el
+// racimo del pulgar —en PC esta oculto—, pero se quiere la maquetacion de
+// escritorio, que es donde se mide. Ver el toque de mas abajo.
+const page = await browser.newPage({ viewport: { width: WIDTH, height: HEIGHT }, hasTouch: true });
+
+// Se finge un puntero FINO, que es lo unico que `controls.ts` consulta.
+//
+// Con `hasTouch` a secas Chromium ya declara puntero grueso y el racimo del
+// pulgar aparece al cargar, asi que la via del primer toque —la que sostiene a un
+// portatil tactil, que declara puntero fino— no se probaria nunca. Anulando la
+// consulta solo queda esa, y lo de abajo la mide de verdad.
+await page.addInitScript(() => {
+  const real = window.matchMedia.bind(window);
+  window.matchMedia = (q) => (q.includes('pointer') ? { ...real(q), matches: false } : real(q));
+});
 const problems = [];
 page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()); });
 page.on('pageerror', (e) => problems.push(String(e)));
@@ -59,6 +73,21 @@ await page.waitForTimeout(3500);
 
 const spawn = await page.evaluate(() => window.__spike);
 console.log(`nace en ${spawn.x.toFixed(1)}, ${spawn.y.toFixed(1)}`);
+
+// El boton de accion esta oculto hasta que haya un dedo de por medio, asi que se
+// da uno. Con el puntero fingido fino de arriba, esto mide exactamente la via del
+// primer toque: tiene que salir «oculto al cargar, visible tras tocar».
+const padBefore = await page.isVisible('#thumbPad');
+await page.touchscreen.tap(WIDTH / 2, HEIGHT / 2);
+await page.waitForTimeout(300);
+const padAfter = await page.isVisible('#thumbPad');
+console.log(`racimo del pulgar: ${padBefore ? 'visible' : 'oculto'} al cargar, ${padAfter ? 'visible' : 'oculto'} tras tocar`);
+if (!padAfter) {
+  console.log('NO se revelan los botones al tocar; la medida no valdria');
+  await browser.close();
+  server.close();
+  process.exit(1);
+}
 
 // 1. Un golpe DIBUJADO aqui, y se le deja morir. Es lo que planta la esfera
 //    envolvente: three.js la calcula la primera vez que la malla se dibuja, y si

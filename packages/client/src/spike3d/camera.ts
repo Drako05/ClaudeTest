@@ -41,7 +41,15 @@ export class OrbitCamera {
   /** Distancia al jugador, en casillas. */
   distance = 26;
 
-  projection: Projection = 'orto';
+  /**
+   * La vista de arranque.
+   *
+   * **Perspectiva**, y es decision del autor: probo las dos en su telefono, vio
+   * los mismos 80+ FPS en ambas y eligio esta para el juego final. El
+   * interruptor se queda porque la ortografica conserva el aspecto plano del
+   * isometrico y sigue siendo util para comparar.
+   */
+  projection: Projection = 'perspectiva';
 
   readonly perspective = new PerspectiveCamera(FOV, 1, 0.5, 900);
   readonly orthographic = new OrthographicCamera(-1, 1, 1, -1, -400, 900);

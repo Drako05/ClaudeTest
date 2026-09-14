@@ -13,21 +13,42 @@
         -webkit-tap-highlight-color: transparent;
       }
       canvas { display: block; width: 100%; height: 100%; }
-      /* Abajo a la derecha: en un telefono ahi llega el pulgar, y arriba se
-         solapaba con el HUD en pantalla estrecha. */
+      /*
+        El cambio de vista: un ojo pequeno arriba a la derecha.
+
+        Es el unico control que se ve SIEMPRE, tambien con teclado, y por eso no
+        vive con los demas: correr, saltar y accionar tienen tecla y el racimo de
+        abajo es solo para el pulgar, pero cambiar de proyeccion no se anuncia en
+        ningun otro sitio.
+
+        El ojo lo dice todo por si solo: **abierto** en perspectiva, que es la que
+        tiene fuga y profundidad, y **entrecerrado** —una rendija, sin pupila— en
+        ortografica, que lo aplana todo. El simbolo cuenta la diferencia en vez de
+        limitarse a senalar que hay un interruptor.
+      */
       #proj {
-        position: fixed; z-index: 11;
-        bottom: calc(18px + env(safe-area-inset-bottom));
-        right: calc(14px + env(safe-area-inset-right));
+        position: fixed; z-index: 12;
+        top: calc(12px + env(safe-area-inset-top));
+        right: calc(12px + env(safe-area-inset-right));
         -webkit-appearance: none; appearance: none;
-        min-width: 118px; padding: 11px 14px; border-radius: 12px;
-        font: 600 12px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        letter-spacing: .08em; text-transform: uppercase;
+        display: flex; align-items: center; justify-content: center;
+        width: 44px; height: 44px; padding: 0; border-radius: 50%;
         color: #e8eef7; background: rgba(8, 14, 28, 0.82);
         border: 1px solid rgba(140, 190, 255, 0.34);
         backdrop-filter: blur(6px); cursor: pointer;
         touch-action: manipulation;
       }
+      #proj svg {
+        width: 24px; height: 24px; display: block;
+        fill: none; stroke: currentColor; stroke-width: 1.8;
+        stroke-linecap: round; stroke-linejoin: round;
+      }
+      /* La pupila es lo unico macizo, para que el ojo abierto se lea de un
+         vistazo a 24 px. */
+      #proj .eye-pupil { fill: currentColor; stroke: none; }
+      /* `.flat` es la ortografica: se cierra el parpado y desaparece la pupila. */
+      #proj.flat .eye-open, #proj.flat .eye-pupil { display: none; }
+      #proj:not(.flat) .eye-flat { display: none; }
       #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
       /* El salto, justo encima del de proyeccion y bajo el mismo pulgar. Es
          redondo y grande porque se usa constantemente, al reves que aquel. */
@@ -39,13 +60,24 @@
         se apartan hacia la izquierda y van mas pequenos. Van en fila y no en
         columna para que sea el borde derecho —y no la altura— lo que ordene la
         importancia.
+
+        **Ocultos mientras no haya un dedo de por medio**, igual que en el
+        isometrico y con el mismo mecanismo: `.touch-active` en el `body`, que
+        pone `controls.ts` al arrancar si el puntero es grueso y, si no, al
+        primer toque de verdad. En PC estorban y no hacen falta —Shift, Espacio y
+        el clic izquierdo ya hacen lo mismo—, y la segunda via no es adorno: un
+        portatil tactil declara puntero fino, asi que sin ella sus botones no
+        apareceran nunca.
+
+        El del ojo no entra aqui: ese se ve siempre. Ver su bloque arriba.
       */
       #thumbPad {
         position: fixed; z-index: 11;
-        bottom: calc(88px + env(safe-area-inset-bottom));
+        bottom: calc(18px + env(safe-area-inset-bottom));
         right: calc(14px + env(safe-area-inset-right));
-        display: flex; align-items: flex-end; gap: 10px;
+        display: none; align-items: flex-end; gap: 10px;
       }
+      body.touch-active #thumbPad { display: flex; }
       #thumbPad button {
         -webkit-appearance: none; appearance: none;
         border-radius: 50%;
@@ -71,10 +103,6 @@
       #run, #jump { width: 66px; height: 66px; }
       #run b, #jump b { font-size: 18px; }
       #proj:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
-      #proj small {
-        display: block; margin-top: 3px; font-size: 10px;
-        font-weight: 400; letter-spacing: .04em; text-transform: none; color: #8fb4dd;
-      }
 
       /* El joystick flotante: nace donde apoyas el pulgar dentro del cuadrante
          inferior izquierdo. Verlo es lo que hace evidente que esa zona es del
@@ -103,7 +131,10 @@
         border: 1px solid rgba(140, 190, 255, 0.22);
         font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         color: #cfe0f5; backdrop-filter: blur(6px);
-        max-width: calc(100vw - 24px);
+        /* Se le descuenta el ojo, que ahora vive en la esquina de enfrente: sin
+           eso, en un telefono estrecho la ultima linea del HUD se le mete
+           debajo. */
+        max-width: calc(100vw - 24px - 68px);
         /* Se respetan los saltos de linea pero se deja ENVOLVER: con `pre` a
            secas la linea de controles se cortaba por la derecha en un telefono
            de 390 px y el ultimo atajo no se leia. */
@@ -111,28 +142,7 @@
       }
 
       @media (max-width: 560px) {
-        /* El joystick flotante: nace donde apoyas el pulgar dentro del cuadrante
-         inferior izquierdo. Verlo es lo que hace evidente que esa zona es del
-         personaje y el resto de la camara. */
-      #stick {
-        position: fixed; z-index: 11; width: 116px; height: 116px;
-        margin: -58px 0 0 -58px; border-radius: 50%;
-        border: 2px solid rgba(180, 215, 255, 0.30);
-        background: radial-gradient(circle, rgba(20,34,60,.42), rgba(20,34,60,.14));
-        opacity: 0; visibility: hidden; transition: opacity .12s ease;
-        pointer-events: none;
-      }
-      #stick.on { opacity: 1; visibility: visible; }
-      #stickKnob {
-        position: absolute; left: 50%; top: 50%;
-        width: 46px; height: 46px; border-radius: 50%;
-        background: rgba(143, 196, 255, .58);
-        border: 2px solid rgba(226, 240, 255, .72);
-        transform: translate(-50%, -50%);
-      }
-
-      #hud { font-size: 10.5px; padding: 7px 9px; }
-        #proj { min-width: 104px; padding: 10px 12px; font-size: 11px; }
+        #hud { font-size: 10.5px; padding: 7px 9px; }
       }
     </style>
   </head>
@@ -155,9 +165,15 @@
         Accion
       </button>
     </div>
-    <button id="proj" type="button">
-      Ortográfica
-      <small>tocar para cambiar</small>
+    <!-- El ojo: en SVG y no un emoji, porque 👁 se pinta a color y distinto en
+         cada sistema, y aqui tiene que ir monocromo como el resto de glifos.
+         Las dos formas viven en el mismo SVG y las alterna la clase `.flat`. -->
+    <button id="proj" type="button" aria-label="Vista en perspectiva; tocar para ortográfica">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path class="eye-open" d="M1.8 12S5.8 5.6 12 5.6 22.2 12 22.2 12s-4 6.4-10.2 6.4S1.8 12 1.8 12z" />
+        <circle class="eye-pupil" cx="12" cy="12" r="3" />
+        <path class="eye-flat" d="M1.8 12S5.8 9.4 12 9.4 22.2 12 22.2 12s-4 2.6-10.2 2.6S1.8 12 1.8 12z" />
+      </svg>
     </button>
     <div id="hud">cargando…</div>
     <script type="module" src="/src/spike3d/main.ts"></script>

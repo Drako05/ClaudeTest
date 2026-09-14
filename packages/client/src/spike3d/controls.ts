@@ -25,6 +25,19 @@ export class Controls {
   private readonly gestures: Gestures;
   onToggleProjection: (() => void) | null = null;
 
+  /**
+   * Enciende los controles de pulgar.
+   *
+   * Mismo mecanismo que el isometrico (`input.ts:97`): una clase en el `body` y
+   * el CSS decide. Correr, saltar y accionar no se ven en PC —Shift, Espacio y
+   * el clic izquierdo ya hacen lo mismo, y ahi solo estorban—, pero el boton de
+   * vista no depende de esto: ese se ve siempre, porque es el unico sin tecla
+   * anunciada.
+   */
+  private static revealTouchUi(): void {
+    document.body.classList.add('touch-active');
+  }
+
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly stickEl: HTMLElement | null = null,
@@ -58,8 +71,17 @@ export class Controls {
       this.drawStick();
     });
 
+    // En un dispositivo de puntero grueso el racimo del pulgar se muestra de
+    // entrada, sin esperar a que el jugador adivine que existe.
+    if (window.matchMedia?.('(pointer: coarse)').matches) Controls.revealTouchUi();
+
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('pointerdown', (e) => {
+      // Y si no, al primer dedo de verdad. No es adorno: un portatil tactil
+      // declara puntero fino, asi que sin esta segunda via sus botones no
+      // aparecerian nunca.
+      if (e.pointerType === 'touch') Controls.revealTouchUi();
+
       // La captura puede fallar —un puntero ya soltado, un evento sintetico— y
       // si lanza aqui se lleva por delante el registro del dedo, que es lo que
       // de verdad importa. Es una comodidad, no un requisito.
