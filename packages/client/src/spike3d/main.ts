@@ -41,6 +41,7 @@ import { debrisPalette } from '../palette.js';
 import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from '../tiles.js';
 import { BillboardSet } from './billboards.js';
+import { buildShadows, type ShadowSpot } from './shadows.js';
 import { OrbitCamera } from './camera.js';
 import { Controls } from './controls.js';
 import { chunkMesh } from './terrain-mesh.js';
@@ -147,7 +148,9 @@ function colorOf(terrain: Terrain, wx: number, wy: number): readonly [number, nu
 
 interface ChunkView {
   readonly mesh: Mesh;
-  readonly props: import('three').Sprite[];
+  readonly props: import('three').Object3D[];
+  /** Todas las sombras del chunk en una malla. Null si no hay ninguna. */
+  readonly shadows: import('three').InstancedMesh | null;
   readonly triangles: number;
   revision: number;
 }
@@ -169,7 +172,8 @@ function buildChunk(cx: number, cy: number): ChunkView {
 
   // Las features, leidas del mundo EFECTIVO y no del potencial del generador:
   // es la regla 4, y aqui vale igual que en el isometrico.
-  const props: import('three').Sprite[] = [];
+  const props: import('three').Object3D[] = [];
+  const spots: ShadowSpot[] = [];
   const scratch = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   state.world.readFeatures(chunk, scratch);
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
@@ -178,14 +182,22 @@ function buildChunk(cx: number, cy: number): ChunkView {
       if (feature === Feature.None) continue;
       const wx = cx * CHUNK_SIZE + lx;
       const wy = cy * CHUNK_SIZE + ly;
-      const sprite = billboards.spawn(feature, wx + 0.5, state.world.groundHeightAt(wx + 0.5, wy + 0.5), wy + 0.5);
-      if (sprite) {
-        scene.add(sprite);
-        props.push(sprite);
+      const x = wx + 0.5;
+      const y = wy + 0.5;
+      const ground = state.world.groundHeightAt(x, y);
+      const prop = billboards.spawn(feature, x, ground, y, seed);
+      if (prop) {
+        scene.add(prop);
+        props.push(prop);
+        spots.push({ x, y: ground, z: y, width: billboards.widthOf(feature) });
       }
     }
   }
-  return { mesh, props, triangles: data.triangles, revision: chunk.revision };
+  // Todas las sombras del chunk en una malla: una draw call en vez de una por
+  // elemento. Ver `shadows.ts`.
+  const shadows = buildShadows(spots);
+  if (shadows) scene.add(shadows);
+  return { mesh, props, shadows, triangles: data.triangles, revision: chunk.revision };
 }
 
 function syncChunks(): void {
@@ -216,7 +228,15 @@ function dispose(key: string, view: ChunkView): void {
   scene.remove(view.mesh);
   view.mesh.geometry.dispose();
   (view.mesh.material as MeshLambertMaterial).dispose();
-  for (const sprite of view.props) scene.remove(sprite);
+  // Los aspas comparten geometria y material con las demas de su especie, asi
+  // que se quitan de la escena pero NO se liberan: siguen en uso. Las sombras
+  // si, que son propias del chunk.
+  for (const prop of view.props) scene.remove(prop);
+  if (view.shadows) {
+    scene.remove(view.shadows);
+    view.shadows.geometry.dispose();
+    (view.shadows.material as MeshBasicMaterial).dispose();
+  }
   views.delete(key);
 }
 

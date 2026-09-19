@@ -1,5 +1,6 @@
 /**
- * Los objetos del mundo como sprites que siempre miran a la camara.
+ * Los objetos del mundo: las features como **aspas de dos laminas**, el jugador
+ * como sprite que mira a la camara.
  *
  * **El arte no se rehace.** `makeFeatureArt` y `makePlayerArt` (`tiles.ts`) ya
  * dibujan cada especie a un canvas, asi que ese mismo canvas se sube como
@@ -7,16 +8,75 @@
  * aqui ya estaba escrito, porque el arte de este proyecto es codigo y no
  * ficheros de un artista.
  *
- * Un billboard plano se lee bien en un arbol o una roca, que son simetricos. En
- * un humanoide se lee regular, y si la estetica convence habra que decidir entre
- * sprites de cuatro u ocho direcciones o un modelo simple. Eso queda fuera del
- * spike a proposito: lo que se esta midiendo es si se entiende la geografia.
+ * **Por que las features dejaron de ser billboards.** Un sprite se reorienta a
+ * la camara en cada frame, y con la camara libre eso delata que son cromos: los
+ * arboles giran contigo y el bosque no tiene lados. Dos laminas cruzadas a 90
+ * grados les dan un frente que no depende de donde mires, y la segunda lamina es
+ * justo lo que impide que una sola desaparezca vista de canto: la silueta del
+ * aspa nunca baja de `cos 45º` de su ancho. `tests/cross.test.ts` lo afirma.
+ *
+ * **El jugador no.** Un aspa en un humanoide es verlo de frente y de perfil a la
+ * vez, dos figuras atravesadas. Para el personaje la solucion son sprites de
+ * cuatro u ocho direcciones, que siguen pendientes; mientras tanto sigue siendo
+ * un billboard, que es lo que menos miente.
  */
 
-import { CanvasTexture, NearestFilter, Sprite, SpriteMaterial, type Texture } from 'three';
+import {
+  BufferAttribute,
+  BufferGeometry,
+  CanvasTexture,
+  DoubleSide,
+  Mesh,
+  MeshBasicMaterial,
+  NearestFilter,
+  Sprite,
+  SpriteMaterial,
+  type Texture,
+} from 'three';
 import { Feature } from '@verdant/shared';
+import { hash2DFloat } from '@verdant/sim';
 import { LOOKS } from '../palette.js';
 import { makeFeatureArt, makePlayerArt, type FeatureArt } from '../tiles.js';
+
+/**
+ * Dos quads cruzados a 90 grados, con el PIE EN `y = 0`.
+ *
+ * Que el pie sea el origen es lo que deja colocar un elemento con
+ * `position.set(wx, sueloY, wy)` y nada mas. Un `Sprite` se centra en su caja y
+ * por eso hacia falta la aritmetica de `lift`; aqui esa cuenta vive una sola vez
+ * en la geometria, que ademas se comparte entre todas las instancias de la
+ * especie.
+ *
+ * Se exporta para poder afirmar en Node lo que el aspa promete: que la silueta
+ * no se adelgaza mas alla de `cos 45º` por mucho que gire la camara.
+ */
+export function crossGeometry(w: number, above: number, below: number): BufferGeometry {
+  const half = w / 2;
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  // Una lamina en el plano XY y otra en el ZY. El orden de vertices es el mismo
+  // en las dos —abajo-izquierda, abajo-derecha, arriba-izquierda,
+  // arriba-derecha—, asi que comparten el mismo par de triangulos.
+  for (const alongZ of [false, true]) {
+    const base = positions.length / 3;
+    for (const [u, v] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
+      const off = (u - 0.5) * 2 * half;
+      positions.push(alongZ ? 0 : off, v === 0 ? -below : above, alongZ ? off : 0);
+      // La V de la textura va al reves que la Y del mundo: el lienzo crece hacia
+      // abajo y el mundo hacia arriba.
+      uvs.push(u, v);
+    }
+    indices.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+  }
+
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
+  geometry.setAttribute('uv', new BufferAttribute(new Float32Array(uvs), 2));
+  geometry.setIndex(indices);
+  return geometry;
+}
 
 /** Pixeles de arte por unidad de mundo: un tile de 32 px es una casilla. */
 const PX_PER_TILE = 32;
@@ -71,6 +131,14 @@ interface Billboard {
   readonly lift: number;
   /** Lo que el DIBUJO levanta del suelo, en bloques. Ver `inkHeight`. */
   readonly visible: number;
+  /**
+   * Geometria y material del aspa, UNO por especie y compartidos por todas sus
+   * instancias. Antes cada sprite se creaba su propio material.
+   *
+   * Nulos para el jugador, que sigue siendo un billboard.
+   */
+  readonly geometry: BufferGeometry | null;
+  readonly material: MeshBasicMaterial | null;
 }
 
 /**
@@ -101,7 +169,7 @@ function inkHeight(art: FeatureArt, unitsPerPixel: number): number {
   return 0;
 }
 
-function fromArt(art: FeatureArt | null, scale: number): Billboard | null {
+function fromArt(art: FeatureArt | null, scale: number, cross: boolean): Billboard | null {
   if (!art) return null;
   const texture = new CanvasTexture(art.canvas);
   // Sin filtrado: el arte es de pixeles y suavizarlo lo emborrona, que es
@@ -118,12 +186,34 @@ function fromArt(art: FeatureArt | null, scale: number): Billboard | null {
   // ancla. `anchorY` va de arriba abajo del lienzo, asi que desde el BORDE DE
   // ABAJO el punto de apoyo esta a `(1 - anchorY) * h`. Para que ese punto caiga
   // en el suelo hay que subir el centro `h / 2 - eso`.
+  const above = art.anchorY * h;
+  const below = h - above;
   return {
     texture,
     w,
     h,
-    lift: (1 - art.anchorY) * h,
+    lift: below,
     visible: inkHeight(art, scale / (PX_PER_TILE * DETAIL)),
+    geometry: cross ? crossGeometry(w, above, below) : null,
+    // Basic y no Lambert: el arte ya lleva su luz horneada desde el noroeste y
+    // el sprite tampoco se iluminaba, asi que asi el ASPECTO no cambia y solo
+    // cambia la orientacion. Con Lambert, las dos laminas de una misma aspa se
+    // iluminarian distinto y el dibujo se ensuciaria.
+    //
+    // Y se recorta por alfa en vez de mezclar: dos laminas que se cruzan se
+    // atraviesan, y con `transparent` a secas el orden entre ellas es una
+    // loteria. Recortando, cada fragmento se pinta o se descarta, escribe
+    // profundidad y el orden deja de importar. El umbral va por ENCIMA del 26 %
+    // con que el arte pinta su sombra, a proposito: conservarla con el material
+    // opaco la pintaria negra maciza. La sombra buena va aparte y tumbada.
+    material: cross
+      ? new MeshBasicMaterial({
+          map: texture,
+          alphaTest: 0.4,
+          side: DoubleSide,
+          transparent: false,
+        })
+      : null,
   };
 }
 
@@ -135,10 +225,10 @@ export class BillboardSet {
   constructor() {
     for (const feature of Object.values(Feature)) {
       if (typeof feature !== 'number' || feature === Feature.None) continue;
-      const art = fromArt(makeFeatureArt(feature, DETAIL), scaleOf(feature));
+      const art = fromArt(makeFeatureArt(feature, DETAIL), scaleOf(feature), true);
       if (art) this.byFeature.set(feature, art);
     }
-    this.player = fromArt(makePlayerArt(DETAIL), BASE);
+    this.player = fromArt(makePlayerArt(DETAIL), BASE, false);
   }
 
   /**
@@ -163,10 +253,27 @@ export class BillboardSet {
     return out;
   }
 
-  /** Un sprite nuevo para esa feature, ya colocado sobre el suelo. */
-  spawn(feature: Feature, wx: number, height: number, wy: number): Sprite | null {
+  /**
+   * Un aspa nueva para esa feature, ya apoyada en el suelo.
+   *
+   * Cada una lleva **su propio giro**, para que el bosque no se vea alineado a
+   * la rejilla. Sale de `hash2DFloat` y no de `Math.random`, y eso no es
+   * purismo: los chunks se descartan y se regeneran constantemente, asi que con
+   * azar vivo los arboles girarian solos al alejarte y volver. Un cuarto de
+   * vuelta basta, porque el aspa se repite cada 90 grados.
+   */
+  spawn(feature: Feature, wx: number, height: number, wy: number, seed: number): Mesh | null {
     const art = this.byFeature.get(feature);
-    return art ? place(art, wx, height, wy) : null;
+    if (!art || !art.geometry || !art.material) return null;
+    const mesh = new Mesh(art.geometry, art.material);
+    mesh.position.set(wx, height, wy);
+    mesh.rotation.y = hash2DFloat(seed, Math.floor(wx), Math.floor(wy)) * (Math.PI / 2);
+    return mesh;
+  }
+
+  /** Cuanto mide de ancho lo que se apoya en un tile, para su sombra. */
+  widthOf(feature: Feature): number {
+    return this.byFeature.get(feature)?.w ?? 0;
   }
 
   spawnPlayer(): Sprite | null {

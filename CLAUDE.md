@@ -491,6 +491,55 @@ herramientas no sirven para lo que se hicieron: a 64x se pierden unos 35 puntos
 de hambre por segundo real y saltar un dia son 264, asi que el boton mas util del
 panel era el que mataba.
 
+## Las features son aspas; el jugador, no
+
+**Cada elemento del mundo son dos laminas cruzadas a 90 grados**, no un billboard.
+Un sprite se reorienta a la camara en cada frame, y con la camara libre eso
+delata que son cromos: los arboles giran contigo y el bosque no tiene lados. La
+segunda lamina es lo que impide que la primera desaparezca vista de canto, y eso
+es afirmable con un numero: **la silueta del aspa nunca baja de `cos 45º`** de su
+ancho, mire la camara desde donde mire. `tests/cross.test.ts` lo mide sobre la
+geometria de verdad, y mide tambien **media aspa para verla dar cero** en dos
+rumbos — sin ese contraste seria una comprobacion que no puede fallar.
+
+**El jugador sigue siendo billboard**, y es decision del autor: un aspa en un
+humanoide es verlo de frente y de perfil a la vez, dos figuras atravesadas. Su
+solucion son los sprites de cuatro u ocho direcciones, que siguen pendientes.
+
+**El aspa obliga a recortar por alfa, y eso decide dos cosas mas.** Dos laminas
+que se cruzan se atraviesan, y con `transparent` a secas el orden de pintado
+entre ellas es una loteria; con `alphaTest` cada fragmento se pinta o se
+descarta, escribe profundidad y el orden deja de importar. De ahi salen:
+
+- **El umbral es 0.4 y no puede ser menor**, porque el arte pinta su sombra **al
+  26 %** y con el material opaco cualquier umbral que la conserve la pintaria
+  **negra maciza**. O sea que la sombra del arte se descarta por fuerza.
+- **Por eso la sombra va aparte y tumbada** (`spike3d/shadows.ts`), que ademas es
+  donde debia estar: la pintada era una elipse VERTICAL pegada al pie, herencia
+  de que el arte nacio para una camara isometrica fija. Sin ella unos arboles de
+  tres bloques parecen pegatinas flotando. Medido quitandolas: 60.429 pixeles
+  oscurecidos con sombras contra 32.882 sin ellas.
+
+**El material es `MeshBasicMaterial`, no Lambert.** El arte ya lleva su luz
+horneada desde el noroeste y el sprite tampoco se iluminaba, asi que asi el
+ASPECTO no cambia y solo cambia la orientacion. Con Lambert las dos laminas de
+una misma aspa se iluminarian distinto y el dibujo se ensuciaria.
+
+**Cada aspa lleva su propio giro, y sale de `hash2DFloat`, no de
+`Math.random`.** No es purismo: los chunks se descartan y se regeneran
+constantemente (regla 3), asi que con azar vivo los arboles girarian solos al
+alejarte y volver. Un cuarto de vuelta basta, porque el aspa se repite cada 90
+grados.
+
+**Las sombras de un chunk van en UN `InstancedMesh`.** Una por elemento
+duplicaria las ~700 draw calls que ya cuesta el mundo; asi cuestan una por chunk
+—medido, 32 de mas en total—. Geometria y material de cada especie tambien se
+comparten entre todas sus instancias; antes cada sprite se creaba su material.
+
+Lo siguiente por aqui, que ya estaba en la lista de la migracion: **agrupar las
+aspas por (chunk, especie) en `InstancedMesh`**, que es lo que bajaria de verdad
+las draw calls.
+
 ## Proporciones
 
 **Un bloque no es la unidad de nada vivo.** El arte nacio para el isometrico con

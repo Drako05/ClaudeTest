@@ -9,6 +9,42 @@ Lo permanente del *como* esta en `CLAUDE.md`; las leyes del mundo, en
 
 ---
 
+## Las features ya son aspas — y lo que queda por ahí
+
+Hecho lo que pediste: cada elemento son dos láminas cruzadas y el jugador sigue
+mirando a la cámara, como elegiste. Las proporciones no se movieron ni un
+decimal (1,93 / 3,17 / 1,17 / 0,88 / 1,09), que era el listón.
+
+Lo que el aspa arregla está afirmado con un número y no con una captura: **la
+silueta nunca baja de `cos 45º`** del ancho, mire la cámara desde donde mire, y
+el mismo test mide media aspa para verla dar **cero** en dos rumbos. Ése era el
+defecto que anticipaste.
+
+Tres cosas que decidí yo y puedes corregir:
+
+- **Cada aspa lleva un cuarto de vuelta propio**, sacado de la semilla, para que
+  el bosque no se vea alineado a la rejilla. Sin giro queda más ordenado y más
+  parecido a Minecraft; es un número.
+- **La sombra tumbada** mide el 62 % del ancho del elemento y va al 26-42 % de
+  negro. Es lo que las asienta; si la quieres más marcada o más sutil, son dos
+  números en `spike3d/shadows.ts`.
+- **El material no se ilumina** (`MeshBasicMaterial`), para que el aspecto sea
+  exactamente el de antes. Si prefieres que el sol afecte a los árboles, se
+  cambia a Lambert — pero entonces las dos láminas de una misma aspa se iluminan
+  distinto, que es feo, y habría que repensar el arte.
+
+Y lo que conviene mirar: **una roca vista desde arriba se lee como dos cartas
+cruzadas**, porque no tiene la simetría radial que tiene un árbol. Si te chirría,
+la salida no es volver al billboard sino darles un modelo de verdad: son pocas
+formas y son inertes.
+
+**Lo siguiente natural por aquí, que ya estaba en tu lista de la migración:
+agrupar las aspas por (chunk, especie) en `InstancedMesh`.** Hoy el mundo cuesta
+~725 draw calls y casi todas son una por elemento; esta ronda no las subió, pero
+tampoco las bajó.
+
+---
+
 ## Proporciones nuevas — y una consecuencia que tienes que mirar tú
 
 Hecho lo que pediste, y las medidas salen justo en tu enunciado: **jugador 1,93
