@@ -3,6 +3,27 @@
 Lee tambien el README: explica la arquitectura y el porque de cada decision.
 Esto es el resumen operativo.
 
+## Arranque de una sesion nueva
+
+**El contenedor es efimero y se reaprovisiona entre sesiones.** Puede tocarte
+empezar con el repo literalmente vacio: sin ficheros, sin refs, solo un `.git`
+con el remoto puesto. Paso antes de una tanda, asi que no es teorico y no es
+sintoma de nada roto.
+
+```bash
+git fetch origin main
+git checkout -B main FETCH_HEAD
+npm install
+```
+
+El trabajo va a **`main`**. Hasta el 2026-09-23 el proyecto vivio entero en una
+rama llamada `claude/capabilities-workflow-confirmation-mgqdm5` —nombre de
+andamiaje de la herramienta, y la unica que habia— y el autor decidio mudarse.
+Las dos apuntan al mismo sitio mientras dure el solape.
+
+Y por eso existe `docs/pendiente.md`: **las notas del agente mueren con la
+sesion**, asi que lo que no este escrito en el repo se pierde. Leelo primero.
+
 ## El isometrico esta CONGELADO
 
 Decision del autor, 2026-09-12: **no se gasta mas trabajo en el juego
@@ -307,8 +328,9 @@ tocar la simulacion:
   anades un proceso que dependa del orden fino entre chunks, esa equivalencia se
   rompe y el test de independencia del observador te avisara.
 - **«Las entidades vivas no surgen automaticamente»** prohibe generar vida de la
-  nada. En `sim/life.ts` esta codificado en la aritmetica: con densidad cero el
-  crecimiento vale exactamente cero.
+  nada. El paso de vida vive en `sim/world.ts` (`lifeStep`) con sus constantes en
+  `shared/ecology.ts`, y ahi esta codificado en la aritmetica: con densidad cero
+  el crecimiento vale exactamente cero.
 - **«Segun su naturaleza, pueden ser finitos, consumibles y renovables»**: no
   todo recurso vuelve. `regrowTicksOf` devuelve 0 para lo finito.
 

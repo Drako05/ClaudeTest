@@ -40,10 +40,20 @@ Otros comandos:
 ```bash
 npm test         # tests del nucleo (Node, sin navegador)
 npm run typecheck
-npm run build    # build estatico del cliente
+npm run build    # build estatico del cliente isometrico
 npm run smoke    # construye y juega el build en Chromium headless
 npm run artifact # build de un solo fichero autocontenido
 npx vite-node tools/analyze-world.ts   # estadisticas del mundo generado
+```
+
+Y el cliente 3D, que es por donde va el desarrollo:
+
+```bash
+npm run spike           # build del 3D
+npm run spike:shots     # capturas y proporciones medidas en bloques
+npm run spike:slash     # cuenta los pixeles que el barrido llega a pintar
+npm run spike:gestures  # los gestos tactiles, medidos en un navegador de verdad
+npm run build:pages     # los dos clientes juntos, como se publican
 ```
 
 La semilla se puede fijar por URL: `?seed=12345`. Sin ella se elige una al azar.
@@ -125,6 +135,14 @@ del futuro multijugador, la reproducibilidad de los bugs y los tests.
 
 ## Decisiones tomadas y por que
 
+**El isometrico esta congelado desde el 2026-09-12, y el desarrollo va al 3D.**
+Es la decision viva mas grande del proyecto: al isometrico no se le anaden
+mecanicas ni se le portan los cambios nuevos, y solo se le hace el arreglo minimo
+si algo lo deja sin compilar. Lo congelado es su **capa de presentacion**;
+`packages/sim` y `packages/shared` son el nucleo y siguen creciendo igual, que es
+justo lo que permitio que el 3D naciera leyendo el mismo mundo sin tocar una
+regla. El porque y el alcance exacto estan en `CLAUDE.md`.
+
 **TypeScript en vez de Rust/WASM, por ahora.** Un nucleo en WASM seria mas rapido,
 pero multiplicaria el coste de iterar justo en la fase donde lo unico que importa
 es averiguar si el juego es divertido. El criterio para portar esta fijado de
@@ -171,8 +189,27 @@ correcto. `tools/analyze-world.ts` mide los percentiles reales y
 
 ## Estado y siguientes pasos
 
-Esto es el Milestone 1: mundo infinito por chunks con ocho biomas, movimiento con
-colision, recoleccion y un bucle basico de hambre y salud.
+El Milestone 1 esta hecho y desbordado: mundo infinito por chunks con ocho
+biomas, movimiento con colision, recoleccion, hambre y salud, ecologia que avanza
+mire alguien o no, y herramientas de desarrollo para poder comprobarla sin
+esperar horas reales.
+
+Encima de eso, lo que vino despues:
+
+- **El mundo tiene altura, y estorba.** Hasta 41 niveles, laderas escalonadas,
+  mesetas y acantilados; y desde la fase 2 hay gravedad, salto y caida, asi que
+  ya no se cambia de nivel andando.
+- **El cliente 3D con camara libre**, que es donde va el desarrollo: el mismo
+  mundo y la misma simulacion, con los elementos como aspas de dos laminas,
+  proporciones al estilo Minecraft —el jugador dos bloques, un arbol tres— y los
+  efectos reutilizando la fisica que ya existia.
+
+**Lo siguiente es cerrar esa migracion, no empezar el multijugador.** Queda por
+resolver la oclusion del jugador por el terreno, los sprites de varias
+direcciones para el personaje y agrupar las aspas para bajar las draw calls; los
+cabos sueltos y las decisiones que esperan al autor estan en `docs/pendiente.md`.
+
+Despues, y en este orden:
 
 - **M2 — Multijugador**: `packages/server` en Node importando `packages/sim`,
   servidor autoritativo, protocolo binario sobre WebSocket, prediccion en cliente

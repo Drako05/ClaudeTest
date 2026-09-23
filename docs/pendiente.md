@@ -1,11 +1,85 @@
-# Lo que esta por hacer
+# Lo que está por hacer, y el registro de lo aprendido
 
 Este fichero existe porque las notas de trabajo del agente viven en un contenedor
 efimero y **mueren con la sesion**. Lo que hay aqui son decisiones del autor y
 deuda tecnica que ninguna sesion nueva podria reconstruir leyendo el codigo.
 
 Lo permanente del *como* esta en `CLAUDE.md`; las leyes del mundo, en
-`docs/el-libro-del-mundo.md` y `docs/leyes.md`. Esto es el *que falta*.
+`docs/el-libro-del-mundo.md` y `docs/leyes.md`.
+
+**Como leerlo.** Va de lo mas urgente a lo mas historico:
+
+1. **Esperando tu juicio** — la lista de abajo. Son decisiones que tomo el agente
+   por deduccion y que el autor puede corregir, mas lo que quedo senalado para
+   que lo mire. **Empieza aqui.**
+2. **Aparcado a proposito** — lo que el autor decidio dejar para luego.
+3. **Tandas cerradas** — que se hizo, que se midio y que aparecio por el camino.
+   Es historia, pero es historia que el codigo no cuenta.
+
+---
+
+## Esperando tu juicio
+
+Todo esto esta **vivo en el codigo** y funcionando; son numeros y criterios que
+elegi yo por deduccion, no tu. Cada uno remite a la seccion donde esta el
+razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
+
+| Qué | Dónde está contado | Cuesta cambiarlo |
+|---|---|---|
+| `GRAVITY = 62` y `JUMP_SPEED = 12`, deducidos de tu enunciado del salto | Fase 2 del relieve | dos numeros |
+| Soltar el mando en el aire **conserva** el impulso, no frena | Fase 2 del relieve | un `if` |
+| Los arboles siguen frenando tambien en el aire | Fase 2 del relieve | una linea |
+| **El mundo es empinado**: de cuatro direcciones solo una lleva a alguna parte, y saltando | Fase 2 del relieve | calibracion del relieve (regla 14) |
+| El bonus de equilibrio **no lo cobra lo inerte** (piedra y minerales) | Cabos sueltos | una linea |
+| Como se agrupa un bioma: la conexion es por chunk y `isTracked` no caduca | Cabos sueltos | trabajo de verdad |
+| `EYE = 1.6` para la camara, al crecer el personaje | Proporciones nuevas | un numero |
+| **El relieve se lee menos de la mitad de alto** tras las proporciones | Proporciones nuevas | calibracion del relieve |
+| El grosor del barrido: 0,12 casillas, redondeado al alza por el antialias | El barrido del 3D | un numero |
+| El cuarto de vuelta propio de cada aspa | Las features ya son aspas | un numero |
+| El tamano y la intensidad de la sombra tumbada | Las features ya son aspas | dos numeros |
+| El material de las aspas **no se ilumina**, para que el aspecto no cambiara | Las features ya son aspas | cambiar a Lambert, con pegas |
+| Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
+
+Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
+al encadenarlos. La causa esta localizada y el plan escrito, esperando a que
+decidas retomarlo.
+
+---
+
+## El estado del repositorio, revisado el 2026-09-23
+
+Auditoría a petición tuya. Lo que salió, para que no haya que volver a buscarlo:
+
+**El proyecto vivió entero en una sola rama.** `claude/capabilities-workflow-confirmation-mgqdm5`,
+que era además la rama por defecto porque era la única, y **nunca ha habido un
+PR**. Cuarenta y tantos commits bajo un nombre que es andamiaje de la
+herramienta. Decidiste mudarte a `main`, y se creó **en el mismo commit**, así
+que no hay historia migrada ni nada que pueda diverger.
+
+**Queda una cosa en tus manos:** cambiar la rama por defecto en GitHub →
+Settings → General → Default branch. No hay API para eso entre las herramientas
+del agente. Y hasta que no se mueva, la rama vieja **no se puede borrar**, porque
+GitHub no deja borrar la de por defecto. Cuando lo hagas, se borra y `deploy.yml`
+deja de nombrarla.
+
+**Restos que se retiraron en la misma tanda:**
+
+- 13 PNG rastreados bajo `screenshots/`, que el propio `.gitignore` ignoraba. Se
+  ensuciaban en cada `npm run smoke` —hubo que descartarlos tres veces— y encima
+  eran del isométrico, anteriores al 3D. Ya no se rastrean; siguen generándose en
+  disco y CI los sigue subiendo como artefacto de cada ejecución, que es donde de
+  verdad se miran.
+- La cabecera del cliente 3D seguía diciendo «spike de usar y tirar; si esto no
+  convence se borra la carpeta». Era el texto más desactualizado del repo.
+- `CLAUDE.md` citaba un sim/life.ts que no existe (sin comillas a propósito: no
+  es una ruta del repo). La aritmética del crecimiento
+  vive en `sim/world.ts` (`lifeStep`) con sus constantes en `shared/ecology.ts`.
+
+**Lo que se revisó y estaba limpio**, para no repetir el trabajo: no hay ni un
+`TODO`, `FIXME`, `HACK` ni `@ts-ignore` en todo el código; no quedó ninguna
+herramienta de usar y tirar de las que el agente fue creando; `docs/leyes.md`
+está mantenido; y de todos los ficheros citados en `CLAUDE.md`, `README.md` y
+`docs/*.md` solo uno no existía —el de arriba—.
 
 ---
 

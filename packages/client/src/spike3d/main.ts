@@ -1,15 +1,23 @@
 /**
- * Spike de 3D con estetica de sprites. **De usar y tirar.**
+ * El cliente 3D. **Es el juego**, y ya no un experimento.
  *
- * Existe para decidir una cosa con una medida en vez de discutiendola: si un
- * mundo con relieve de verdad se entiende con la camara libre, y a cuantos FPS
- * va en el telefono del autor. El isometrico no se toca; si esto no convence, se
- * borra la carpeta y no se ha perdido nada.
+ * Nacio como un spike de usar y tirar para decidir una cosa con una medida en
+ * vez de discutiendola: si un mundo con relieve de verdad se entiende con la
+ * camara libre, y a cuantos FPS va en el telefono del autor. La respuesta fue
+ * que si —80+ FPS, y eligio la perspectiva—, y desde entonces esto es por donde
+ * va el desarrollo: tiene gravedad, salto, carrera, accion, efectos, aspas de
+ * dos laminas y proporciones propias. El isometrico es el que esta congelado.
  *
- * Lo importante: lee el **mismo `World`** con la **misma semilla** que el juego.
- * `packages/sim` no sabe que existe una camara —regla 1 y regla 6—, asi que
- * mundo, relieve, biomas, ecologia y reloj entran aqui intactos. De hecho el
- * bucle es el de `main.ts` recortado.
+ * **Sigue en su carpeta y con su build aparte a proposito.** Mientras el
+ * isometrico siga en pie —hoy es la unica prueba de integracion que existe, ver
+ * `npm run smoke`— los dos clientes conviven, y lo que comparten es lo que
+ * siempre estuvo bien repartido: `packages/sim`, `packages/shared`, el arte de
+ * `tiles.ts` y la fisica de `effects.ts`.
+ *
+ * Lo importante no ha cambiado: lee el **mismo `World`** con la **misma
+ * semilla** que el juego. `packages/sim` no sabe que existe una camara —regla 1
+ * y regla 6—, asi que mundo, relieve, biomas, ecologia y reloj entran aqui
+ * intactos.
  */
 
 import {

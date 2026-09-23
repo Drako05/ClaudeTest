@@ -1,9 +1,10 @@
 /**
- * Build del spike de 3D, en un unico fichero autocontenido.
+ * Build del cliente 3D, en un unico fichero autocontenido.
  *
- * Va aparte del juego a proposito: el spike es de usar y tirar y **no debe
- * entrar en el build de produccion**. Publicandolo como Artifact propio, la URL
- * del juego que funciona sigue intacta mientras se juzga el experimento.
+ * Va aparte del isometrico a proposito, y ya no porque esto fuera un
+ * experimento: son **dos clientes del mismo juego** conviviendo mientras dure
+ * la migracion, cada uno con su entrada y su bundle. `npm run build:pages` los
+ * publica juntos — el isometrico en la raiz y este en `/3d/`.
  */
 import { defineConfig } from 'vite';
 import { viteSingleFile } from 'vite-plugin-singlefile';
