@@ -28,6 +28,10 @@ desplegar lo decide el entorno `github-pages` (Settings → Environments), con
 una lista de ramas que se fija al configurar Pages y **no sigue a la rama por
 defecto**. Si un `deploy` muere en un segundo sin ejecutar un paso, es eso.
 
+Y el proxy git de la sesion deja empujar pero **no borrar ramas**: responde 403,
+y un 403 del proxy no se reintenta ni se esquiva. Borrar una rama remota es
+cosa del autor, desde la web.
+
 Y por eso existe `docs/pendiente.md`: **las notas del agente mueren con la
 sesion**, asi que lo que no este escrito en el repo se pierde. Leelo primero.
 

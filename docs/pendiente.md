@@ -56,27 +56,30 @@ PR**. Cuarenta y tantos commits bajo un nombre que es andamiaje de la
 herramienta. Decidiste mudarte a `main`, y se creó **en el mismo commit**, así
 que no hay historia migrada ni nada que pueda diverger.
 
-**Casi hecho, y lo que falta es tuyo.** Moviste la rama por defecto a `main` y
-está verificado contra el remoto (`HEAD` apunta a `refs/heads/main`). Pero el
-primer despliegue desde `main` **falló igual que antes del cambio**, y eso
-corrigió un diagnóstico del agente:
+**Hecho, salvo un clic tuyo.** Moviste la rama por defecto a `main` y está
+verificado contra el remoto (`HEAD` apunta a `refs/heads/main`). El primer
+despliegue desde `main` falló igual que antes del cambio, y eso corrigió un
+diagnóstico del agente:
 
 - Lo que se había escrito —«Pages solo acepta despliegues de la rama por
   defecto»— **era falso**. Quien decide es el **entorno `github-pages`**, con una
   lista de ramas permitidas que se fijó al configurar Pages y que **no sigue a la
-  rama por defecto**. Todo encaja: antes desplegaba la vieja y `main` no; ahora
-  `main` es la de por defecto y sigue sin poder. No se pudo leer esa lista para
-  confirmarlo —el proxy de la sesión bloquea esa parte de la API—, así que es la
-  explicación que cuadra con los dos fallos, no una lectura directa.
+  rama por defecto**. El agente no pudo leer esa lista —el proxy de la sesión
+  bloquea esa parte de la API—, así que al principio era solo la explicación que
+  cuadraba con los dos fallos. **Quedó confirmada** cuando añadiste `main` a la
+  lista: el despliegue relanzado desde `main` salió en verde a la primera, sin
+  cambiar una línea más.
 - El guardia que se metió en `deploy.yml` se basaba en esa creencia falsa y **se
   quitó**: era una segunda compuerta con otra regla, y habría dejado sin
   desplegar a la única rama que el entorno aceptaba.
 
-**Lo que tienes que hacer:** GitHub → Settings → Environments → `github-pages` →
-*Deployment branches and tags* → añadir `main`. Después se relanza el despliegue
-fallido y, cuando `main` publique en verde, se borra la rama vieja. **No antes:**
-hoy es la única que puede desplegar. El sitio no se ha resentido — sirve el
-último commit con cambios visibles, que sí se publicó.
+**Lo que queda, y es tuyo:** borrar la rama vieja. No tiene nada que `main` no
+tenga —comprobado: su último commit es antecesor de `main`, cero commits
+propios—, pero **el proxy de la sesión del agente rechaza borrar ramas** (HTTP
+403), y un 403 del proxy no se reintenta ni se esquiva. Desde la web es un clic:
+GitHub → la pestaña de ramas del repo → la papelera junto a
+`claude/capabilities-workflow-confirmation-mgqdm5`. Si alguna vez hiciera falta,
+se recrea desde el commit `c9c1518`.
 
 Lo que costó por el camino, para que no se repita: con las dos ramas disparando
 a la vez, el push de la auditoría no publicó nada porque el grupo de
