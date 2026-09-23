@@ -56,18 +56,34 @@ PR**. Cuarenta y tantos commits bajo un nombre que es andamiaje de la
 herramienta. Decidiste mudarte a `main`, y se creó **en el mismo commit**, así
 que no hay historia migrada ni nada que pueda diverger.
 
-**Hecho del todo.** Moviste la rama por defecto a `main` en los ajustes de
-GitHub —no hay API para eso entre las herramientas del agente— y, verificado
-contra el remoto (`HEAD` apunta a `refs/heads/main`), la vieja se borró y
-`deploy.yml` dejó de nombrarla. No se perdió nada: las dos estaban en el mismo
-commit, y ese commit sigue en `main`.
+**Casi hecho, y lo que falta es tuyo.** Moviste la rama por defecto a `main` y
+está verificado contra el remoto (`HEAD` apunta a `refs/heads/main`). Pero el
+primer despliegue desde `main` **falló igual que antes del cambio**, y eso
+corrigió un diagnóstico del agente:
 
-Lo que costó por el camino, para que no se repita: **Pages solo acepta
-despliegues de la rama por defecto**, así que con las dos ramas disparando a la
-vez el push de la auditoría no publicó nada. Ahora el `deploy` lleva un guardia
-que se lo pregunta a GitHub. Y al meter ese guardia el agente rompió el YAML sin
-mirarlo antes de empujar: un workflow es el único fichero del repo que no cubren
-ni el typecheck, ni los tests, ni el humo.
+- Lo que se había escrito —«Pages solo acepta despliegues de la rama por
+  defecto»— **era falso**. Quien decide es el **entorno `github-pages`**, con una
+  lista de ramas permitidas que se fijó al configurar Pages y que **no sigue a la
+  rama por defecto**. Todo encaja: antes desplegaba la vieja y `main` no; ahora
+  `main` es la de por defecto y sigue sin poder. No se pudo leer esa lista para
+  confirmarlo —el proxy de la sesión bloquea esa parte de la API—, así que es la
+  explicación que cuadra con los dos fallos, no una lectura directa.
+- El guardia que se metió en `deploy.yml` se basaba en esa creencia falsa y **se
+  quitó**: era una segunda compuerta con otra regla, y habría dejado sin
+  desplegar a la única rama que el entorno aceptaba.
+
+**Lo que tienes que hacer:** GitHub → Settings → Environments → `github-pages` →
+*Deployment branches and tags* → añadir `main`. Después se relanza el despliegue
+fallido y, cuando `main` publique en verde, se borra la rama vieja. **No antes:**
+hoy es la única que puede desplegar. El sitio no se ha resentido — sirve el
+último commit con cambios visibles, que sí se publicó.
+
+Lo que costó por el camino, para que no se repita: con las dos ramas disparando
+a la vez, el push de la auditoría no publicó nada porque el grupo de
+concurrencia canceló a la única que podía. Y al meter el guardia el agente rompió
+el YAML sin mirarlo antes de empujar: un workflow es el único fichero del repo
+que no cubren ni el typecheck, ni los tests, ni el humo. Desde entonces se valida
+con un parser de YAML de verdad antes de cada push.
 
 **Restos que se retiraron en la misma tanda:**
 

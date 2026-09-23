@@ -19,9 +19,14 @@ npm install
 El trabajo va a **`main`**, que es la rama por defecto. Hasta el 2026-09-23 el
 proyecto vivio entero en una rama llamada
 `claude/capabilities-workflow-confirmation-mgqdm5` —nombre de andamiaje de la
-herramienta, y la unica que habia—; el autor decidio mudarse, movio la rama por
-defecto y la vieja se borro. Si alguna herramienta te la propone como rama de
-trabajo, es un eco de aquello: el trabajo va a `main`.
+herramienta, y la unica que habia—, y el autor decidio mudarse. Si alguna
+herramienta te propone esa rama como rama de trabajo, es un eco de aquello: el
+trabajo va a `main`.
+
+**Ojo con Pages**, que es donde se tropezo la mudanza: desde que ramas se puede
+desplegar lo decide el entorno `github-pages` (Settings → Environments), con
+una lista de ramas que se fija al configurar Pages y **no sigue a la rama por
+defecto**. Si un `deploy` muere en un segundo sin ejecutar un paso, es eso.
 
 Y por eso existe `docs/pendiente.md`: **las notas del agente mueren con la
 sesion**, asi que lo que no este escrito en el repo se pierde. Leelo primero.

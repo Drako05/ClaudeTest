@@ -40,16 +40,17 @@ jobs:
 
   deploy:
     needs: build
-    # Pages SOLO acepta despliegues de la rama por defecto: su entorno los
-    # rechaza desde cualquier otra, y el job muere en un segundo sin ejecutar un
-    # paso. Se aprendio en la mudanza a `main`: con dos ramas apuntando al mismo
-    # commit, las dos disparaban y la del grupo de concurrencia cancelaba a la
-    # buena, asi que no se publicaba nada.
+    # Quien decide desde que ramas se puede desplegar es el ENTORNO
+    # `github-pages` (Settings → Environments → github-pages → Deployment
+    # branches), no este fichero. Si la rama no esta en su lista, el job muere en
+    # un segundo sin ejecutar un solo paso: esa es la firma.
     #
-    # Terminada la mudanza, el disparo por push ya solo mira a `main`, pero el
-    # guardia se queda: `workflow_dispatch` se puede lanzar desde cualquier rama,
-    # y asi un despliegue que Pages iba a rechazar ni se intenta.
-    if: github.ref_name == github.event.repository.default_branch
+    # Esa lista se fija al configurar Pages y NO sigue a la rama por defecto.
+    # Se aprendio en la mudanza a `main`: con `main` ya por defecto, el entorno
+    # seguia aceptando solo la rama vieja. Hubo aqui un guardia que comparaba con
+    # la rama por defecto, y era peor que nada: una segunda compuerta con OTRA
+    # regla, que habria dejado sin desplegar a la unica rama que el entorno
+    # aceptaba. Una sola compuerta, la de verdad.
     runs-on: ubuntu-latest
     environment:
       name: github-pages
