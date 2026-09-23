@@ -56,8 +56,8 @@ PR**. Cuarenta y tantos commits bajo un nombre que es andamiaje de la
 herramienta. Decidiste mudarte a `main`, y se creó **en el mismo commit**, así
 que no hay historia migrada ni nada que pueda diverger.
 
-**Hecho, salvo un clic tuyo.** Moviste la rama por defecto a `main` y está
-verificado contra el remoto (`HEAD` apunta a `refs/heads/main`). El primer
+**Hecho.** El repo tiene una sola rama, `main`, que es la de por defecto y la
+que despliega a Pages. Verificado contra el remoto el 2026-09-23. El primer
 despliegue desde `main` falló igual que antes del cambio, y eso corrigió un
 diagnóstico del agente:
 
@@ -73,13 +73,11 @@ diagnóstico del agente:
   quitó**: era una segunda compuerta con otra regla, y habría dejado sin
   desplegar a la única rama que el entorno aceptaba.
 
-**Lo que queda, y es tuyo:** borrar la rama vieja. No tiene nada que `main` no
-tenga —comprobado: su último commit es antecesor de `main`, cero commits
-propios—, pero **el proxy de la sesión del agente rechaza borrar ramas** (HTTP
-403), y un 403 del proxy no se reintenta ni se esquiva. Desde la web es un clic:
-GitHub → la pestaña de ramas del repo → la papelera junto a
-`claude/capabilities-workflow-confirmation-mgqdm5`. Si alguna vez hiciera falta,
-se recrea desde el commit `c9c1518`.
+**La rama vieja la borraste tú desde la web**, porque el proxy de la sesión del
+agente rechaza borrar ramas (HTTP 403) y un 403 del proxy no se reintenta ni se
+esquiva. No se perdió nada: antes de borrarla se comprobó que su último commit,
+`c9c1518`, era antecesor de `main` y que no aportaba ningún commit propio. Si
+alguna vez hiciera falta, se recrea desde ese commit.
 
 Lo que costó por el camino, para que no se repita: con las dos ramas disparando
 a la vez, el push de la auditoría no publicó nada porque el grupo de
