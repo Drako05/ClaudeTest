@@ -56,11 +56,18 @@ PR**. Cuarenta y tantos commits bajo un nombre que es andamiaje de la
 herramienta. Decidiste mudarte a `main`, y se creó **en el mismo commit**, así
 que no hay historia migrada ni nada que pueda diverger.
 
-**Queda una cosa en tus manos:** cambiar la rama por defecto en GitHub →
-Settings → General → Default branch. No hay API para eso entre las herramientas
-del agente. Y hasta que no se mueva, la rama vieja **no se puede borrar**, porque
-GitHub no deja borrar la de por defecto. Cuando lo hagas, se borra y `deploy.yml`
-deja de nombrarla.
+**Hecho del todo.** Moviste la rama por defecto a `main` en los ajustes de
+GitHub —no hay API para eso entre las herramientas del agente— y, verificado
+contra el remoto (`HEAD` apunta a `refs/heads/main`), la vieja se borró y
+`deploy.yml` dejó de nombrarla. No se perdió nada: las dos estaban en el mismo
+commit, y ese commit sigue en `main`.
+
+Lo que costó por el camino, para que no se repita: **Pages solo acepta
+despliegues de la rama por defecto**, así que con las dos ramas disparando a la
+vez el push de la auditoría no publicó nada. Ahora el `deploy` lleva un guardia
+que se lo pregunta a GitHub. Y al meter ese guardia el agente rompió el YAML sin
+mirarlo antes de empujar: un workflow es el único fichero del repo que no cubren
+ni el typecheck, ni los tests, ni el humo.
 
 **Restos que se retiraron en la misma tanda:**
 

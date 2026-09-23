@@ -16,10 +16,12 @@ git checkout -B main FETCH_HEAD
 npm install
 ```
 
-El trabajo va a **`main`**. Hasta el 2026-09-23 el proyecto vivio entero en una
-rama llamada `claude/capabilities-workflow-confirmation-mgqdm5` —nombre de
-andamiaje de la herramienta, y la unica que habia— y el autor decidio mudarse.
-Las dos apuntan al mismo sitio mientras dure el solape.
+El trabajo va a **`main`**, que es la rama por defecto. Hasta el 2026-09-23 el
+proyecto vivio entero en una rama llamada
+`claude/capabilities-workflow-confirmation-mgqdm5` —nombre de andamiaje de la
+herramienta, y la unica que habia—; el autor decidio mudarse, movio la rama por
+defecto y la vieja se borro. Si alguna herramienta te la propone como rama de
+trabajo, es un eco de aquello: el trabajo va a `main`.
 
 Y por eso existe `docs/pendiente.md`: **las notas del agente mueren con la
 sesion**, asi que lo que no este escrito en el repo se pierde. Leelo primero.

@@ -2,7 +2,7 @@ name: Deploy a GitHub Pages
 
 on:
   push:
-    branches: ['claude/capabilities-workflow-confirmation-mgqdm5', 'main']
+    branches: ['main']
   workflow_dispatch:
 
 permissions:
@@ -42,13 +42,13 @@ jobs:
     needs: build
     # Pages SOLO acepta despliegues de la rama por defecto: su entorno los
     # rechaza desde cualquier otra, y el job muere en un segundo sin ejecutar un
-    # paso. Con dos ramas apuntando al mismo commit mientras dura la mudanza a
-    # `main`, las dos disparaban y la del grupo de concurrencia cancelaba a la
+    # paso. Se aprendio en la mudanza a `main`: con dos ramas apuntando al mismo
+    # commit, las dos disparaban y la del grupo de concurrencia cancelaba a la
     # buena, asi que no se publicaba nada.
     #
-    # Preguntandole a GitHub cual es la de por defecto, esto vale ANTES y DESPUES
-    # de mover la rama sin tocar nada: hoy publica la vieja, y en cuanto la
-    # cambies pasa a publicar `main` sola.
+    # Terminada la mudanza, el disparo por push ya solo mira a `main`, pero el
+    # guardia se queda: `workflow_dispatch` se puede lanzar desde cualquier rama,
+    # y asi un despliegue que Pages iba a rechazar ni se intenta.
     if: github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     environment:
