@@ -439,10 +439,12 @@ Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
   golpeada**, que era mi primera sospecha y es falsa: el area solo alcanza
   casillas de la altura propia, asi que el arco nunca cruza un desnivel.
 
-  La cinta se levanta 0.9 —la altura del pecho, los mismos `TILE_H * 0.9` del
-  isometrico leidos como niveles— y mide 0.12 casillas de ancho, que son sus 3 px
-  con la casilla a 32. Se redondea al alza desde 0.094 porque PixiJS suavizaba el
-  trazo y este lienzo va sin antialias.
+  La cinta va a la **altura del pecho**: nacio en 0.9 —los mismos `TILE_H * 0.9`
+  del isometrico leidos como niveles— y subio a **1.3** cuando el personaje paso
+  a medir casi dos bloques (ver Proporciones), porque 0.9 ya era su cintura. Mide
+  0.12 casillas de ancho, que son sus 3 px con la casilla a 32, y ese ancho no
+  cambio: es del tile, no del personaje. Se redondea al alza desde 0.094 porque
+  PixiJS suavizaba el trazo y este lienzo va sin antialias.
 
   **Y toda malla cuya geometria se reescriba cada frame lleva
   `frustumCulled = false`.** three.js calcula la esfera envolvente **una sola
