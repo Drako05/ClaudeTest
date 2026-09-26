@@ -11,8 +11,9 @@
  * **Sigue en su carpeta y con su build aparte a proposito.** Mientras el
  * isometrico siga en pie —hoy es la unica prueba de integracion que existe, ver
  * `npm run smoke`— los dos clientes conviven, y lo que comparten es lo que
- * siempre estuvo bien repartido: `packages/sim`, `packages/shared`, el arte de
- * `tiles.ts` y la fisica de `effects.ts`.
+ * siempre estuvo bien repartido: `packages/sim`, `packages/shared`, los colores de
+ * `palette.ts` y la fisica de `effects.ts`. El arte es del 3D (`art.ts`) y el
+ * isometrico lo importa de aqui, no al reves.
  *
  * Lo importante no ha cambiado: lee el **mismo `World`** con la **misma
  * semilla** que el juego. `packages/sim` no sabe que existe una camara —regla 1
@@ -47,7 +48,7 @@ import { actionReach, createGame, step, type GameState } from '@verdant/sim';
 import { Effects } from '../effects.js';
 import { debrisPalette } from '../palette.js';
 import { EffectsView } from './effects-view.js';
-import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from '../tiles.js';
+import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
 import { OrbitCamera } from './camera.js';
@@ -149,7 +150,7 @@ scene.add(water);
 /** El color de un tile: la paleta del juego con su misma franja de brillo. */
 function colorOf(terrain: Terrain, wx: number, wy: number): readonly [number, number, number] {
   const rgb = TERRAIN_RGB[terrain] ?? TERRAIN_RGB[3 as Terrain];
-  // La franja de brillo es la de `tiles.ts`, para que el mundo se vea el mismo.
+  // La franja de brillo es la de `art.ts`, para que el mundo se vea el mismo.
   const k = 0.9 + (shadeStepAt(seed, wx, wy) / (SHADE_STEPS - 1)) * 0.2;
   return [(rgb[0] / 255) * k, (rgb[1] / 255) * k, (rgb[2] / 255) * k];
 }

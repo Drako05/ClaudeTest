@@ -1,14 +1,13 @@
 /**
  * Los colores de cada especie, en un sitio y sin DOM.
  *
- * Estaban dentro de `tiles.ts`, junto al codigo que los pinta. Salieron aqui
+ * Estaban junto al codigo que los pinta, hoy `spike3d/art.ts`. Salieron aqui
  * porque ahora hay un segundo consumidor: los escombros que saltan al recolectar
  * algo tienen que ser **los colores de ese objeto**, no unos parecidos. Con la
  * tabla compartida no pueden separarse; con una copia, se separarian al primer
  * retoque.
  *
- * Sin dependencias del navegador, para poder comprobarlo en Node igual que
- * `projection.ts`.
+ * Sin dependencias del navegador, para poder comprobarlo en Node.
  */
 
 import { Feature } from '@verdant/shared';

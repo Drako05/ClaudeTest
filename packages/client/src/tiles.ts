@@ -1,22 +1,16 @@
 /**
- * Pintado procedural en vista isometrica.
+ * El arte de terreno del cliente isometrico: cimas, caras y filos.
  *
- * No hay ni un solo asset externo: cada bioma y cada feature se dibuja por
- * codigo sobre un canvas 2D.
- *
- * El terreno de un chunk entero se pinta en un unico canvas que sube a la GPU
- * como una sola textura, asi que dibujar el suelo cuesta un sprite por chunk
- * visible en vez de mil por tile. Las features, en cambio, NO se hornean ahi:
- * necesitan ordenarse por profundidad junto al personaje para que este pueda
- * pasar por detras de un arbol, y algo horneado en el suelo no puede hacer eso.
+ * El arte de especies, jugador y colores del terreno vive en `spike3d/art.ts`,
+ * que es del 3D; este fichero lo importa de alli y no al reves, para que el 3D
+ * no arrastre nada isometrico.
  */
 
-import { CHUNK_SIZE, Feature, isSapling, maturesInto, Terrain } from '@verdant/shared';
-import { groundHeight, hash2DFloat } from '@verdant/sim';
+import { CHUNK_SIZE, Terrain } from '@verdant/shared';
 import type { Chunk } from '@verdant/sim';
-import { LOOKS, MINERAL_FACES, ROCK_FACES } from './palette.js';
+import { newCanvas, SHADE_STEPS, TERRAIN_RGB, type FeatureArt } from './spike3d/art.js';
 import { MAX_CUE_DROP } from './terrain-draw.js';
-import { LEVEL_PX, TILE_H, TILE_W, worldToScreen } from './projection.js';
+import { LEVEL_PX, TILE_H, TILE_W } from './projection.js';
 
 /**
  * Cuanto sobresale un trozo de chunk por arriba y por abajo de su rombo plano.
@@ -40,25 +34,6 @@ export function blockReliefMargin(
   }
   return { top: highest * LEVEL_PX, bottom: -lowest * LEVEL_PX };
 }
-
-/**
- * El color base de cada terreno.
- *
- * Exportado porque el spike de 3D lo usa para colorear los vertices de la malla:
- * comparar la vista nueva con la de hoy solo vale si el mundo se pinta con la
- * misma paleta. Si el spike gana, su sitio es `palette.ts`, con el resto de la
- * tabla de colores.
- */
-export const TERRAIN_RGB: Record<Terrain, [number, number, number]> = {
-  [Terrain.DeepWater]: [22, 48, 82],
-  [Terrain.Water]: [41, 96, 148],
-  [Terrain.Sand]: [214, 197, 142],
-  [Terrain.Grass]: [88, 140, 72],
-  [Terrain.Forest]: [56, 100, 52],
-  [Terrain.Rock]: [116, 116, 124],
-  [Terrain.Snow]: [226, 234, 242],
-  [Terrain.Tundra]: [150, 156, 130],
-};
 
 /** Cuanto varia el brillo tile a tile. Sin esto el terreno parece plastico. */
 const SPECKLE = 14;
@@ -102,22 +77,6 @@ function traceTop(
 }
 
 /**
- * Cuantas franjas de brillo distintas tiene el terreno.
- *
- * El moteado que rompe el aspecto plastico era continuo mientras el suelo se
- * horneaba de una pieza; con una cima por sprite tiene que discretizarse para
- * que los lienzos se puedan cachear. Ocho franjas siguen leyendose como ruido y
- * dejan el numero de texturas distintas en unas pocas docenas.
- */
-export const SHADE_STEPS = 8;
-
-/** Franja de brillo de un tile, de 0 a `SHADE_STEPS - 1`. */
-export function shadeStepAt(seed: number, wx: number, wy: number): number {
-  const roll = hash2DFloat(seed ^ 0x1f2e3d4c, wx, wy);
-  return Math.min(SHADE_STEPS - 1, Math.floor(roll * SHADE_STEPS));
-}
-
-/**
  * La cima de un tile: el rombo de arriba, con sus cuatro esquinas a su altura.
  *
  * Deja de estar horneada en la textura del chunk. Una cima tiene altura —sobre
@@ -153,7 +112,7 @@ export function makeTopArt(
   traceTop(ctx, ox, oy, -dn / LEVEL_PX, -de / LEVEL_PX, -ds / LEVEL_PX, -dw / LEVEL_PX);
   ctx.fill();
 
-  return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height, riseAbove: 0 };
+  return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height };
 }
 
 /**
@@ -204,7 +163,7 @@ export function makeEdgeCueArt(
   ctx.lineTo(ox + far.x, oy + far.y);
   ctx.stroke();
 
-  return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height, riseAbove: 0 };
+  return { canvas, anchorX: ox / canvas.width, anchorY: oy / canvas.height };
 }
 
 /** De que lado de un tile cuelga una cara. */
@@ -282,243 +241,6 @@ export function makeFaceArt(
     canvas,
     anchorX: xNear / canvas.width,
     anchorY: y(top0) / canvas.height,
-    riseAbove: 0,
   };
 }
 
-/** Tamano del lienzo de una feature y donde se apoya sobre el tile. */
-export interface FeatureArt {
-  canvas: HTMLCanvasElement;
-  /** Punto de apoyo dentro del lienzo, en fraccion (0-1). */
-  anchorX: number;
-  anchorY: number;
-  /** Pixeles que el dibujo se eleva sobre su punto de apoyo. */
-  riseAbove: number;
-}
-
-/**
- * Un lienzo y su contexto, opcionalmente a mayor densidad de pixeles.
- *
- * `detail` multiplica los pixeles del lienzo y **escala el contexto en el mismo
- * factor**, asi que el dibujo sale identico pero con mas resolucion: ni una sola
- * coordenada de las que dibujan conifera, frondoso, arbusto, brote o roca hay
- * que tocar. Es lo que permite agrandar un sprite en el 3D sin que el pixel
- * crezca con el.
- *
- * Con `detail` distinto de 1, `canvas.width` **deja de ser** la anchura logica.
- * Quien calcule un ancla tiene que dividir por la logica, que es lo que hacen
- * las de features y jugador; las de terreno dividen por `canvas.width`, y por eso
- * se quedan en 1 —ademas de estar congeladas—.
- */
-function newCanvas(
-  width: number,
-  height: number,
-  detail = 1,
-): [HTMLCanvasElement, CanvasRenderingContext2D] | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(width * detail);
-  canvas.height = Math.ceil(height * detail);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  if (detail !== 1) ctx.scale(detail, detail);
-  return [canvas, ctx];
-}
-
-function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number): void {
-  ctx.fillStyle = 'rgba(0,0,0,0.26)';
-  ctx.beginPath();
-  ctx.ellipse(x, y, (TILE_W / 2.6) * scale, (TILE_H / 2.6) * scale, 0, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-/**
- * Dibuja cada especie una sola vez a un lienzo propio, que luego se reutiliza
- * como textura en todos los sprites de ese tipo.
- *
- * En isometrica los objetos tienen altura: se dibujan hacia ARRIBA desde su
- * punto de apoyo, que es el centro del tile. De ahi viene la sensacion de
- * volumen sin necesidad de 3D real. La luz entra siempre por el noroeste, para
- * que todas las especies se lean como parte del mismo mundo.
- */
-export function makeFeatureArt(feature: Feature, detail = 1): FeatureArt | null {
-  if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES, detail);
-  const mineral = MINERAL_FACES[feature];
-  if (mineral) return makeRockArt(mineral, detail);
-  if (isSapling(feature)) return makeSaplingArt(feature, detail);
-
-  const look = LOOKS[feature];
-  if (!look) return null;
-
-  const width = 44;
-  const height = 58;
-  const made = newCanvas(width, height, detail);
-  if (!made) return null;
-  const [canvas, ctx] = made;
-
-  const footX = width / 2;
-  const footY = height - 6;
-  const grow = look.rare ? 1.15 : 1;
-
-  drawShadow(ctx, footX, footY, look.form === 'bush' ? 0.8 : 1);
-
-  if (look.form === 'bush') {
-    ctx.fillStyle = look.dark;
-    ctx.beginPath();
-    ctx.ellipse(footX, footY - 7 * grow, 11 * grow, 9 * grow, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.mid;
-    ctx.beginPath();
-    ctx.ellipse(footX - 2, footY - 10 * grow, 7.5 * grow, 6 * grow, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.light;
-    ctx.beginPath();
-    ctx.ellipse(footX - 3.5, footY - 12 * grow, 4 * grow, 3 * grow, 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (look.fruit) {
-      ctx.fillStyle = look.fruit;
-      for (const [dx, dy] of [[-5, -6], [4, -9], [1, -3], [7, -5]]) {
-        ctx.beginPath();
-        ctx.arc(footX + dx, footY + dy * grow, 2.1 * grow, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  } else if (look.form === 'conifer') {
-    ctx.fillStyle = look.trunk;
-    ctx.fillRect(footX - 2.5, footY - 14 * grow, 5, 14 * grow);
-    // Tres pisos que estrechan hacia arriba: silueta alta y puntiaguda.
-    const tiers: Array<[number, number, string]> = [
-      [14 * grow, 13 * grow, look.dark],
-      [21 * grow, 10 * grow, look.mid],
-      [28 * grow, 6.5 * grow, look.light],
-    ];
-    for (const [rise, halfWidth, color] of tiers) {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(footX, footY - rise - 11 * grow);
-      ctx.lineTo(footX + halfWidth, footY - rise + 2);
-      ctx.lineTo(footX - halfWidth, footY - rise + 2);
-      ctx.closePath();
-      ctx.fill();
-    }
-  } else {
-    ctx.fillStyle = look.trunk;
-    ctx.fillRect(footX - 3, footY - 17 * grow, 6, 17 * grow);
-    ctx.fillStyle = look.dark;
-    ctx.beginPath();
-    ctx.arc(footX, footY - 25 * grow, 15 * grow, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.mid;
-    ctx.beginPath();
-    ctx.arc(footX - 2, footY - 29 * grow, 11 * grow, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.light;
-    ctx.beginPath();
-    ctx.arc(footX - 5, footY - 32 * grow, 6.5 * grow, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  return { canvas, anchorX: footX / width, anchorY: footY / height, riseAbove: footY * detail };
-}
-
-/** Brote recien sembrado: pequeno, sin fruto y sin estorbar el paso. */
-function makeSaplingArt(feature: Feature, detail = 1): FeatureArt | null {
-  const adult = maturesInto(feature);
-  const look = LOOKS[adult];
-  const made = newCanvas(28, 26, detail);
-  if (!made) return null;
-  const [canvas, ctx] = made;
-
-  const footX = 14;
-  const footY = 21;
-  drawShadow(ctx, footX, footY, 0.5);
-
-  ctx.strokeStyle = look?.trunk ?? '#4a6b2c';
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(footX, footY);
-  ctx.lineTo(footX, footY - 7);
-  ctx.stroke();
-
-  ctx.fillStyle = look?.mid ?? '#3f7534';
-  ctx.beginPath();
-  ctx.ellipse(footX - 3.5, footY - 8, 3.6, 2.2, -0.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(footX + 3.5, footY - 9.5, 3.6, 2.2, 0.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  return { canvas, anchorX: footX / 28, anchorY: footY / 26, riseAbove: footY * detail };
-}
-
-/**
- * Roca y minerales comparten silueta y se distinguen por color: asi se leen como
- * vetas del mismo material y no como objetos ajenos entre si.
- */
-function makeRockArt(faces: readonly string[], detail = 1): FeatureArt | null {
-  const [base, face, highlight] = faces;
-  const made = newCanvas(40, 40, detail);
-  if (!made) return null;
-  const [canvas, ctx] = made;
-  const footX = 20;
-  const footY = 34;
-
-  drawShadow(ctx, footX, footY, 0.9);
-  ctx.fillStyle = base;
-  ctx.beginPath();
-  ctx.moveTo(footX - 11, footY);
-  ctx.lineTo(footX - 5, footY - 15);
-  ctx.lineTo(footX + 4, footY - 12);
-  ctx.lineTo(footX + 11, footY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = face;
-  ctx.beginPath();
-  ctx.moveTo(footX - 5, footY - 15);
-  ctx.lineTo(footX + 4, footY - 12);
-  ctx.lineTo(footX - 1, footY);
-  ctx.lineTo(footX - 11, footY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = highlight;
-  ctx.beginPath();
-  ctx.moveTo(footX - 5, footY - 15);
-  ctx.lineTo(footX - 1, footY - 6);
-  ctx.lineTo(footX - 8, footY - 4);
-  ctx.closePath();
-  ctx.fill();
-
-  return { canvas, anchorX: footX / 40, anchorY: footY / 40, riseAbove: footY * detail };
-}
-
-/** El personaje, con el mismo criterio de apoyo y luz que las features. */
-export function makePlayerArt(detail = 1): FeatureArt | null {
-  const width = 32;
-  const height = 44;
-  const made = newCanvas(width, height, detail);
-  if (!made) return null;
-  const [canvas, ctx] = made;
-
-  const footX = width / 2;
-  const footY = height - 5;
-
-  ctx.fillStyle = 'rgba(0,0,0,0.30)';
-  ctx.beginPath();
-  ctx.ellipse(footX, footY, TILE_W / 3, TILE_H / 3, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#2b3d5e';
-  ctx.fillRect(footX - 5, footY - 13, 10, 13);
-  ctx.fillStyle = '#3a5480';
-  ctx.fillRect(footX - 5, footY - 13, 5, 13);
-
-  ctx.fillStyle = '#f2d7b0';
-  ctx.beginPath();
-  ctx.arc(footX, footY - 18, 6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#8c5a3c';
-  ctx.beginPath();
-  ctx.arc(footX, footY - 20.5, 6, Math.PI, 0);
-  ctx.fill();
-
-  return { canvas, anchorX: footX / width, anchorY: footY / height, riseAbove: footY * detail };
-}

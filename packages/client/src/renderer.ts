@@ -43,15 +43,8 @@ import {
   tileOrigin,
   worldToScreen,
 } from './projection.js';
-import {
-  blockReliefMargin,
-  makeEdgeCueArt,
-  makeFaceArt,
-  makeFeatureArt,
-  makePlayerArt,
-  makeTopArt,
-  shadeStepAt,
-} from './tiles.js';
+import { blockReliefMargin, makeEdgeCueArt, makeFaceArt, makeTopArt } from './tiles.js';
+import { makeFeatureArt, makePlayerArt, shadeStepAt } from './spike3d/art.js';
 
 /**
  * Lado, en tiles, del bloque que se recorta contra la pantalla.
@@ -288,7 +281,7 @@ export class Renderer {
         texture,
         ax: art.anchorX,
         ay: art.anchorY,
-        rise: art.riseAbove,
+        rise: art.anchorY * art.canvas.height,
         halfWidth: art.canvas.width / 2,
       });
     }
@@ -299,7 +292,7 @@ export class Renderer {
     playerTexture.source.scaleMode = 'nearest';
     this.player = new Sprite(playerTexture);
     this.player.anchor.set(playerArt.anchorX, playerArt.anchorY);
-    this.playerRise = playerArt.riseAbove;
+    this.playerRise = playerArt.anchorY * playerArt.canvas.height;
 
     // La silueta: el mismo dibujo, tenido y translucido, por encima de todo.
     // Solo aparece cuando algo del terreno tapa al personaje.

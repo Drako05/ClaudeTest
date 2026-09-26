@@ -2,7 +2,7 @@
  * Los objetos del mundo: las features como **aspas de dos laminas**, el jugador
  * como sprite que mira a la camara.
  *
- * **El arte no se rehace.** `makeFeatureArt` y `makePlayerArt` (`tiles.ts`) ya
+ * **El arte no se rehace.** `makeFeatureArt` y `makePlayerArt` (`art.ts`) ya
  * dibujan cada especie a un canvas, asi que ese mismo canvas se sube como
  * textura. Lo que en un HD-2D suele ser el gasto grande —el pipeline de arte—
  * aqui ya estaba escrito, porque el arte de este proyecto es codigo y no
@@ -36,7 +36,7 @@ import {
 import { Feature } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
 import { LOOKS } from '../palette.js';
-import { makeFeatureArt, makePlayerArt, type FeatureArt } from '../tiles.js';
+import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
 
 /**
  * Dos quads cruzados a 90 grados, con el PIE EN `y = 0`.
@@ -144,9 +144,9 @@ interface Billboard {
 /**
  * Cuanto se eleva el dibujo sobre su punto de apoyo, en unidades de mundo.
  *
- * Se mide buscando el pixel con tinta mas alto, no por el lienzo ni por
- * `riseAbove`: un arbol ocupa 39 px de un lienzo de 58 y `riseAbove` da la cota
- * superior, no la altura. Es lo unico que permite afirmar «el jugador mide 1,8
+ * Se mide buscando el pixel con tinta mas alto, no por el lienzo ni por el
+ * ancla: un arbol ocupa 39 px de un lienzo de 58 y lo que queda por encima del
+ * ancla es la cota superior, no la altura. Es lo unico que permite afirmar «el jugador mide 1,8
  * bloques» con un numero en vez de con una captura.
  */
 function inkHeight(art: FeatureArt, unitsPerPixel: number): number {
