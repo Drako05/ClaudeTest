@@ -5,5 +5,3 @@ dist/
 coverage/
 .vite/
 screenshots/
-dist-single/
-dist-spike/

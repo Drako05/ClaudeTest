@@ -6,8 +6,8 @@
  * queda de vida, con que colores— sale entero de `client/effects.ts`, que es
  * puro, no sabe que existe un navegador y ya estaba escrito para el isometrico.
  * Es el mismo reparto que alli: la fisica se mide en Node y el renderizador solo
- * la pinta. Por eso esto no duplica nada del isometrico congelado: lo que se
- * reutiliza es la parte que nunca fue suya.
+ * la pinta. Por eso el paso a 3D no rehizo nada de esto: lo que se reutilizo es
+ * la parte que nunca fue de la camara.
  *
  * Dos adaptaciones al pasar de dos dimensiones a tres, y conviene saber por que:
  *
@@ -37,8 +37,8 @@ import {
   Vector3,
   type Scene,
 } from 'three';
-import type { Effects, Particle, Slash } from '../effects.js';
-import { MAX_PARTICLES, progressOf } from '../effects.js';
+import type { Effects, Particle, Slash } from './effects.js';
+import { MAX_PARTICLES, progressOf } from './effects.js';
 import type { World } from '@verdant/sim';
 
 /** Pixeles por casilla del arte isometrico, de donde vienen los tamanos. */
@@ -70,10 +70,10 @@ const SLASH_LIFT = 1.3;
 /**
  * Medio ancho de la cinta del barrido, en casillas.
  *
- * El isometrico traza 3 px con la casilla midiendo 32, y su capa cuelga de la
- * camara, asi que ese grosor escala con el zoom: es un ancho de MUNDO de 0.094
+ * El isometrico trazaba 3 px con la casilla midiendo 32, y su capa colgaba de la
+ * camara, asi que ese grosor escalaba con el zoom: un ancho de MUNDO de 0.094
  * casillas. Aqui se redondea a 0.12 —medio ancho 0.06— por una diferencia real
- * entre los dos renderizadores: PixiJS suaviza el trazo y este lienzo va sin
+ * entre los dos renderizadores: PixiJS suavizaba el trazo y este lienzo va sin
  * antialias, asi que un quad de dos pixeles y pico se deshilacha por cobertura
  * parcial justo donde el isometrico daba una linea limpia.
  */
@@ -106,7 +106,7 @@ export class EffectsView {
    * por una pared lo incrementaba igual, que es como los tres fallos que arreglo
    * esta tanda pasaron por delante de la prueba de humo sin despeinarla. Quien
    * quiera afirmar que se ve, que cuente pixeles blancos del lienzo:
-   * `tools/spike-slash.mjs`.
+   * `tools/slash.mjs`.
    */
   slashesDrawn = 0;
   debrisDrawn = 0;

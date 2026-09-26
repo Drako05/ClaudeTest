@@ -1,576 +1,447 @@
 /**
- * Prueba de humo del cliente en un navegador real.
+ * Prueba de humo del cliente 3D en un navegador real.
  *
  * Los tests unitarios cubren la simulacion, pero no pueden decir si el juego
  * ARRANCA: si WebGL inicializa, si el bundle carga, si el bucle avanza, si los
  * controles llegan a producir Intents. Esto abre el build en Chromium headless,
- * lo juega unos segundos leyendo el estado real por window.__verdant, y guarda
- * capturas.
+ * lo juega leyendo el estado real por `window.__verdant` y guarda capturas.
  *
- * Hace dos pasadas: escritorio con teclado y movil con eventos tactiles.
+ * Es la heredera del humo del isometrico y se lleva todas sus comprobaciones que
+ * son del JUEGO —andar, hambre, recolectar, semillas, area de tres casillas,
+ * barrido y escombros, joystick, pinza, carrera, salto, paredes, cima, mineral,
+ * panel de desarrollo— mas una por cada cosa que se traslado del isometrico:
+ * comer, sembrar, mirada de la camara, muerte y reinicio, HUD, reloj, panel del
+ * entorno, ayuda, noche, reticula, zoom por teclado y bordes de chunk y bioma.
+ * Se quedan fuera las que solo tenian sentido con aquella camara: caras
+ * dibujadas, cuatro vistas, pie en su rombo, atenuacion y silueta.
  *
- *   npm run build && node tools/smoke.mjs
- *   VERDANT_URL=https://... node tools/smoke.mjs   # verifica un despliegue
- *   VERDANT_DIST=../ruta/al/build node tools/smoke.mjs
+ * Reparto con los tests unitarios: aqui se verifica INTEGRACION —que un toque
+ * llega a una Intent y el mundo reacciona—; los numeros exactos se miden alli.
+ *
+ *   npm run smoke
+ *   VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke   # un despliegue
+ *
+ * Ojo con los FPS de aqui: se renderiza por software, sin GPU.
  */
 
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { extname, join, normalize } from 'node:path';
+import { readFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
-// VERDANT_DIST permite verificar tambien el build de un solo fichero.
-const DIST = process.env.VERDANT_DIST
-  ? fileURLToPath(new URL(process.env.VERDANT_DIST, import.meta.url))
-  : fileURLToPath(new URL('../packages/client/dist', import.meta.url));
+const PAGE = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
 const SHOTS = fileURLToPath(new URL('../screenshots', import.meta.url));
 const SEED = 12345;
-/** Medianoche: el dia dura 8 minutos, asi que hay que saltar hasta la noche. */
-const NIGHT_TICK = 0;
+const DAY_TICKS = 8 * 60 * 60;
+const HOUR_TICKS = DAY_TICKS / 24;
+/** Un sitio del lienzo libre de paneles, para clicar sobre el mundo. */
+const CLICK = { x: 900, y: 470 };
 
-const MIME = {
-  '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json',
-  '.png': 'image/png',
-};
-
-function serve(root) {
-  const server = createServer(async (req, res) => {
-    const urlPath = decodeURIComponent((req.url ?? '/').split('?')[0]);
-    const rel = normalize(urlPath === '/' ? '/index.html' : urlPath).replace(/^(\.\.[/\\])+/, '');
-    const file = join(root, rel);
-    if (!file.startsWith(root) || !existsSync(file)) {
-      res.writeHead(404).end('not found');
-      return;
-    }
-    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
-    res.end(await readFile(file));
-  });
-  return new Promise((resolve) => {
-    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port }));
-  });
-}
-
-/** Centro de la pantalla en la pasada de escritorio: ahi esta el personaje. */
-const CENTRE = { x: 640, y: 360 };
-
-/**
- * Recolecta mientras se anda en las cuatro direcciones.
- *
- * La accion es el **clic derecho** desde que Espacio se fue al salto, y con
- * raton la mirada la manda el cursor: por eso el cursor se mueve a cada paso al
- * lado hacia el que se camina. Manteniendolo quieto se golpearia siempre al
- * mismo sitio y la comprobacion pasaria a depender de que ahi hubiera algo.
- */
-async function harvestSweep(page, centre = CENTRE, ms = 450) {
-  const dirs = [
-    ['KeyW', 0, -110],
-    ['KeyD', 110, 0],
-    ['KeyS', 0, 110],
-    ['KeyA', -110, 0],
-  ];
-  await page.mouse.move(centre.x, centre.y + 110);
-  await page.mouse.down({ button: 'right' });
-  for (const [key, dx, dy] of dirs) {
-    await page.mouse.move(centre.x + dx, centre.y + dy);
-    await page.keyboard.down(key);
-    await page.waitForTimeout(ms);
-    await page.keyboard.up(key);
-  }
-  await page.mouse.up({ button: 'right' });
-}
-
-/**
- * Cuanto se anda en la mejor de las cuatro direcciones, volviendo al sitio.
- *
- * Desde que la altura estorba, que una direccion concreta no avance ya no es un
- * atasco: puede ser una pared, y una pared es lo correcto. Lo que si seria un
- * fallo es no poder ir a ningun lado.
- */
-async function bestWalk(page, from, ms = 700) {
-  let best = 0;
-  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
-    await page.keyboard.down(key);
-    await page.waitForTimeout(ms);
-    await page.keyboard.up(key);
-    const now = await waitForLoop(page);
-    best = Math.max(best, Math.hypot(now.x - from.x, now.y - from.y));
-    // Se vuelve andando en sentido contrario, para que las cuatro midan desde
-    // el mismo sitio. No se teletransporta: eso es justo lo que ya no existe.
-    const back = { KeyW: 'KeyS', KeyS: 'KeyW', KeyA: 'KeyD', KeyD: 'KeyA' }[key];
-    await page.keyboard.down(back);
-    await page.waitForTimeout(ms);
-    await page.keyboard.up(back);
-    await waitForLoop(page);
-  }
-  return best;
-}
+// ------------------------------------------------------------------ utilidades
 
 const failures = [];
-function fail(msg) {
-  console.error(`  FALLO: ${msg}`);
-  failures.push(msg);
-}
-
 function check(condition, msg) {
-  if (!condition) fail(msg);
+  if (!condition) {
+    console.error(`  FALLO: ${msg}`);
+    failures.push(msg);
+  }
 }
 
-/** Vigila errores de consola y excepciones no capturadas de una pagina. */
 function watchProblems(page, label) {
   page.on('console', (m) => {
-    if (m.type() === 'error') fail(`${label} console: ${m.text()}`);
+    if (m.type() === 'error') check(false, `${label} console: ${m.text()}`);
   });
-  page.on('pageerror', (e) => fail(`${label} pageerror: ${e.message}`));
+  page.on('pageerror', (e) => check(false, `${label} pageerror: ${e.message}`));
+}
+
+/** El estado, sin lo que no se puede serializar. */
+function state(page) {
+  return page.evaluate(() => {
+    const { spots, ...rest } = window.__verdant;
+    return rest;
+  });
+}
+
+/** Los sitios del mundo a los que ir a mirar algo. Caros: se piden aparte. */
+function spots(page) {
+  return page.evaluate(() => window.__verdant.spots());
 }
 
 /**
- * Espera a que el bucle de juego haya corrido de verdad, no solo a que cargue.
- *
- * Se mide el AVANCE del contador, no su valor absoluto. Comparar contra un
- * numero fijo dejo de funcionar en cuanto los mundos empezaron a nacer ya
- * entrados en la manana: el contador nacia por encima del umbral y la espera se
- * daba por cumplida en el primer frame, sin haber dibujado nada todavia.
+ * Espera a que el bucle haya corrido de verdad, no solo a que cargue: se mide el
+ * AVANCE del reloj, que un mundo puede nacer ya entrado en la manana.
  */
-async function waitForLoop(page) {
+async function waitForLoop(page, ticks = 90) {
+  await page.evaluate(() => delete window.__smokeBaseTick);
   await page.waitForFunction(
-    () => {
+    (n) => {
       if (!window.__verdant) return false;
       if (window.__smokeBaseTick === undefined) {
         window.__smokeBaseTick = window.__verdant.tick;
         return false;
       }
-      return window.__verdant.tick - window.__smokeBaseTick > 90;
+      return window.__verdant.tick - window.__smokeBaseTick > n;
     },
-    null,
-    { timeout: 20000 },
+    ticks,
+    { timeout: 30000 },
   );
-  return page.evaluate(() => window.__verdant);
+  return state(page);
 }
+
+async function open(page, baseUrl, query) {
+  await page.goto(`${baseUrl}/?seed=${SEED}${query ?? ''}`, { waitUntil: 'load' });
+  return waitForLoop(page);
+}
+
+async function hold(page, key, ms) {
+  await page.keyboard.down(key);
+  await page.waitForTimeout(ms);
+  await page.keyboard.up(key);
+}
+
+/** Gira la camara arrastrando con el raton, que es como se gira en PC. */
+async function orbit(page, dx) {
+  await page.mouse.move(CLICK.x, CLICK.y);
+  await page.mouse.down();
+  await page.mouse.move(CLICK.x + dx, CLICK.y, { steps: 8 });
+  await page.mouse.up();
+}
+
+const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 
 /**
- * Despacha un evento tactil sintetico con varios dedos.
- *
- * Playwright solo ofrece taps de un dedo, y aqui hace falta arrastrar el
- * joystick y pellizcar con dos, asi que se construyen Touch/TouchEvent a mano.
- *
- * `points` son todos los dedos apoyados; `changed` los que provocan este evento.
+ * Anda hasta moverse de verdad, probando direcciones: con agua, arboles y
+ * paredes, empenarse en una sola mide el mapa y no el juego.
  */
-async function touchEvent(page, type, points, changed = points) {
-  await page.evaluate(
-    ({ type, points, changed }) => {
-      const make = (p) => {
-        const target = p.selector ? document.querySelector(p.selector) : document.body;
-        if (!target) throw new Error(`sin destino para el toque: ${p.selector}`);
-        return new Touch({
-          identifier: p.id,
-          target,
-          clientX: p.x,
-          clientY: p.y,
-          pageX: p.x,
-          pageY: p.y,
-        });
-      };
-      const live = points.map(make);
-      const moved = changed.map(make);
-      const target = changed[0]?.selector
-        ? document.querySelector(changed[0].selector)
-        : document.body;
-      target.dispatchEvent(
-        new TouchEvent(type, {
-          touches: live,
-          targetTouches: live,
-          changedTouches: moved,
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
-    },
-    { type, points, changed },
-  );
-}
-
-/** Atajo de un solo dedo. */
-async function touch(page, type, { id = 1, x, y, selector }) {
-  const point = { id, x, y, selector };
-  const live = type === 'touchend' || type === 'touchcancel' ? [] : [point];
-  await touchEvent(page, type, live, [point]);
-}
-
-// ---------------------------------------------------------------- escritorio
-
-/**
- * Camina hasta moverse de verdad, probando direcciones.
- *
- * Insistir en una sola direccion no vale: el mundo tiene agua, arboles y ahora
- * relieve, y el bloque anterior deja al personaje donde le deja. Si se empena en
- * ir al norte y al norte hay mar, la prueba mide cero y falla por el mapa y no
- * por un fallo. Devuelve cuanto se ha movido en total.
- */
-async function walkToOpenGround(page, seconds = 1.4) {
-  const start = await page.evaluate(() => window.__verdant);
+async function walkToOpenGround(page, ms = 1400) {
+  const start = await state(page);
   let last = start;
   for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA', 'KeyD', 'KeyW']) {
-    await page.keyboard.down(key);
-    await page.waitForTimeout(seconds * 1000);
-    await page.keyboard.up(key);
-    last = await waitForLoop(page);
+    await hold(page, key, ms);
+    last = await waitForLoop(page, 30);
     if (Math.hypot(last.x - start.x, last.y - start.y) > 1.5) break;
   }
   return Math.hypot(last.x - start.x, last.y - start.y);
 }
 
+/** Cuanto se anda en la mejor de las cuatro direcciones, volviendo al sitio. */
+async function bestWalk(page, from, ms = 700) {
+  let best = 0;
+  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
+    await hold(page, key, ms);
+    const now = await waitForLoop(page, 30);
+    best = Math.max(best, Math.hypot(now.x - from.x, now.y - from.y));
+    const back = { KeyW: 'KeyS', KeyS: 'KeyW', KeyA: 'KeyD', KeyD: 'KeyA' }[key];
+    await hold(page, back, ms);
+    await waitForLoop(page, 30);
+  }
+  return best;
+}
+
+/**
+ * Golpea con clics sueltos mientras cambia de sitio y de rumbo, hasta que
+ * `done` diga basta. La mirada es la de la camara, asi que para golpear otro
+ * lado hay que GIRARLA; y un clic es una accion, porque mantener el raton es
+ * arrastrar la vista.
+ */
+async function harvestUntil(page, done, rounds = 8) {
+  let now = await state(page);
+  for (let round = 0; round < rounds && !done(now); round++) {
+    for (let i = 0; i < 3; i++) {
+      await page.mouse.click(CLICK.x, CLICK.y);
+      await page.waitForTimeout(260);
+    }
+    now = await waitForLoop(page, 20);
+    if (done(now)) break;
+    if (round % 2 === 1) await orbit(page, 160);
+    await hold(page, 'KeyW', 500);
+  }
+  return waitForLoop(page, 20);
+}
+
+/** Un evento de puntero tactil sobre el lienzo, que es lo que escucha el 3D. */
+async function pointers(page, points) {
+  await page.evaluate((pts) => {
+    const canvas = document.getElementById('view');
+    for (const p of pts) {
+      canvas.dispatchEvent(
+        new PointerEvent(p.type, {
+          pointerId: p.id,
+          pointerType: 'touch',
+          isPrimary: p.id === 1,
+          clientX: p.x,
+          clientY: p.y,
+          bubbles: true,
+        }),
+      );
+    }
+  }, points);
+}
+
+/** Un toque sobre un boton, con TouchEvent como un dedo de verdad. */
+async function tapButton(page, selector, type) {
+  await page.evaluate(
+    ({ selector, type }) => {
+      const el = document.querySelector(selector);
+      const rect = el.getBoundingClientRect();
+      const t = new Touch({
+        identifier: 9,
+        target: el,
+        clientX: rect.x + rect.width / 2,
+        clientY: rect.y + rect.height / 2,
+      });
+      const live = type === 'touchstart' ? [t] : [];
+      el.dispatchEvent(
+        new TouchEvent(type, { touches: live, targetTouches: live, changedTouches: [t], bubbles: true, cancelable: true }),
+      );
+    },
+    { selector, type },
+  );
+}
+
+async function tap(page, selector) {
+  await tapButton(page, selector, 'touchstart');
+  await page.waitForTimeout(60);
+  await tapButton(page, selector, 'touchend');
+}
+
+// ------------------------------------------------------------------ escritorio
+
 async function desktopPass(browser, baseUrl) {
-  console.log('\n== escritorio (teclado) ==');
+  console.log('\n== escritorio (teclado y raton) ==');
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   watchProblems(page, 'escritorio');
 
-  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
-  const spawn = await waitForLoop(page);
-  console.log('  estado inicial:', JSON.stringify(spawn));
-
+  const spawn = await open(page, baseUrl);
+  console.log(`  nace en ${spawn.x}, ${spawn.y}, nivel ${spawn.level}, ${spawn.biome}, ${spawn.clock}`);
   check(spawn.seed === SEED, `la semilla de la URL no se respeto (${spawn.seed})`);
   check(!spawn.clock.startsWith('00:'), `un mundo nuevo no deberia empezar a medianoche (${spawn.clock})`);
-  check(spawn.objects > 50, `apenas se dibujaron objetos en la escena (${spawn.objects})`);
   check(spawn.chunks > 0, 'no se cargo ningun chunk');
+  check(spawn.triangles > 1000, `apenas hay terreno mallado (${spawn.triangles} triangulos)`);
   check(spawn.health === 100, `salud inicial inesperada: ${spawn.health}`);
+  check(spawn.alive && !spawn.deadShown, 'se nace muerto');
+  const around = await spots(page);
+  check(around.relief.levels > 1, `el terreno sale a una sola altura: ${around.relief.levels}`);
 
-  // El relieve tiene que estar ahi desde el primer frame: varias alturas
-  // alrededor y sus caras dibujadas. Cero caras con varias alturas significaria
-  // un mundo escalonado que se ve plano.
-  check(spawn.relief.levels > 1, `el terreno sale a una sola altura: ${spawn.relief.levels}`);
-  check(spawn.faces.drawn > 0, 'no se dibujo ni una cara de relieve');
-  check(
-    spawn.faces.shapes < spawn.faces.drawn,
-    `el cache de caras no agrupa nada: ${spawn.faces.shapes} formas para ${spawn.faces.drawn} caras`,
-  );
-  console.log(
-    `  relieve: ${spawn.relief.levels} alturas, ${spawn.relief.ramps} taludes, ` +
-      `${spawn.faces.drawn} caras de ${spawn.faces.shapes} formas`,
-  );
+  // Los controles de PC: el racimo del pulgar oculto, el ojo y la ayuda a la vista.
+  check(!(await page.isVisible('#thumbPad')), 'los botones del pulgar se ven en PC');
+  check(await page.isVisible('#proj'), 'el ojo de la proyeccion no se ve');
+  check(await page.isVisible('#help'), 'la ayuda de teclado no se ve en PC');
+  check(!(await page.isVisible('.touch-only')), 'la pista tactil se ve en PC');
 
-  await page.screenshot({ path: join(SHOTS, '01-spawn.png') });
+  // HUD: barras, inventario, reloj y dia, leidos del DOM y no de la sonda.
+  const hud = await page.evaluate(() => ({
+    health: document.getElementById('healthText').textContent,
+    hunger: document.getElementById('hungerText').textContent,
+    wood: document.getElementById('wood').textContent,
+    clock: document.getElementById('clock').textContent,
+    day: document.getElementById('day').textContent,
+    seed: document.getElementById('seed').textContent,
+  }));
+  console.log(`  HUD: ${JSON.stringify(hud)}`);
+  // El hambre ya corre mientras carga la pagina, asi que se pide cerca de 100.
+  check(hud.health === '100' && Number(hud.hunger) >= 90, `barras de salida inesperadas: ${JSON.stringify(hud)}`);
+  check(/^\d\d:\d\d$/.test(hud.clock), `el reloj del HUD no marca la hora: ${hud.clock}`);
+  check(hud.day === '1', `el HUD no marca el dia 1: ${hud.day}`);
+  check(hud.seed === String(SEED), `el HUD no marca la semilla: ${hud.seed}`);
+  await mkdir(SHOTS, { recursive: true });
+  await page.screenshot({ path: join(SHOTS, '3d-01-spawn.png') });
 
-  await page.keyboard.down('KeyD');
-  await page.waitForTimeout(1600);
-  await page.keyboard.up('KeyD');
-
-  const moved = await waitForLoop(page);
-  check(moved.x > spawn.x + 1, `el jugador no avanzo (${spawn.x} -> ${moved.x})`);
+  // Andar.
+  const walked = await walkToOpenGround(page);
+  const moved = await state(page);
+  check(walked > 1, `el jugador apenas se movio: ${walked.toFixed(2)} casillas`);
   check(moved.tick > spawn.tick, 'la simulacion no avanzo');
   check(moved.hunger < spawn.hunger, 'el hambre no bajo con el tiempo');
+  const hudHunger = await page.evaluate(() => document.getElementById('hungerFill').style.width);
+  check(hudHunger !== '100%', `la barra de hambre del HUD no bajo (${hudHunger})`);
 
-  await page.screenshot({ path: join(SHOTS, '02-explorando.png') });
-
-  // Mantener el clic derecho debe encadenar recolecciones sin soltarlo.
-  await harvestSweep(page);
-
-  const gathered = await waitForLoop(page);
-  console.log('  inventario tras recolectar:', JSON.stringify(gathered.inventory));
-  const total = gathered.inventory.reduce((a, b) => a + b, 0);
-  check(total > 0, 'mantener el clic derecho no recolecto nada');
-
-  // El zoom por teclado tiene que cambiar el encuadre de verdad, no solo no fallar.
-  const beforeZoom = (await waitForLoop(page)).tilesOnScreen;
-  for (let i = 0; i < 7; i++) await page.keyboard.press('Minus');
-  await page.waitForTimeout(300);
-  const zoomedOut = (await waitForLoop(page)).tilesOnScreen;
-  check(zoomedOut > beforeZoom, `alejar no cambio el zoom (${beforeZoom} -> ${zoomedOut})`);
-
-  for (let i = 0; i < 4; i++) await page.keyboard.press('Equal');
-  await page.waitForTimeout(300);
-  const zoomedIn = (await waitForLoop(page)).tilesOnScreen;
-  check(zoomedIn < zoomedOut, `acercar no cambio el zoom (${zoomedOut} -> ${zoomedIn})`);
-
-  // El panel del entorno se despliega y se repliega con el mismo boton.
-  await page.click('#statsToggle');
-  check(await page.isVisible('#statsPanel'), 'el panel del entorno no se desplego');
-  const bars = await page.evaluate(() => ({
-    biome: document.querySelectorAll('#biomeBars .statRow').length,
-    chunk: document.querySelectorAll('#chunkBars .statRow').length,
-    reward: (document.getElementById('rewardState') || {}).textContent || '',
-  }));
-  console.log(`  panel: ${bars.biome} barras de bioma, ${bars.chunk} de chunk`);
-  check(bars.biome === 3 && bars.chunk === 3, `barras inesperadas: ${JSON.stringify(bars)}`);
-  check(bars.reward.length > 10, 'el panel no explica el estado de las recompensas');
-  await page.screenshot({ path: join(SHOTS, '08-panel.png') });
-  await page.click('#statsToggle');
-  check(!(await page.isVisible('#statsPanel')), 'el panel no se replego al volver a pulsar');
-
-  // Sembrar: recolectar deja semillas y F las planta.
-  //
-  // Se insiste cambiando de sitio hasta dar con vegetacion. Antes bastaba la
-  // primera tanda porque se nacia en la costa; ahora el nacimiento exige un
-  // rellano llano y puede caer tierra adentro, sobre roca, donde lo unico que
-  // se recolecta es piedra y la piedra no da semillas. Quedarse con la primera
-  // tanda seria depender de que el spawn caiga junto a un arbol.
-  let withSeeds = await waitForLoop(page);
-  let seeds = withSeeds.inventory[3] + withSeeds.inventory[4];
-  for (let round = 0; round < 4 && seeds === 0; round++) {
-    await walkToOpenGround(page, 1.4);
-    await harvestSweep(page);
-    withSeeds = await waitForLoop(page);
-    seeds = withSeeds.inventory[3] + withSeeds.inventory[4];
-  }
-  console.log(`  semillas tras recolectar: ${seeds}`);
-  check(seeds > 0, 'recolectar no dejo ninguna semilla');
-  // Sembrar apunta a donde mira el CURSOR, no a donde se anda, desde que la
-  // accion se fue al clic derecho. Y la casilla apuntada tiene que estar a la
-  // altura propia, estar vacia y admitir esa especie, asi que se prueban varias
-  // direcciones en vez de dar por hecho que la de delante sirve.
-  let afterPlanting = withSeeds;
-  for (const [dx, dy] of [
-    [0, -110],
-    [110, 0],
-    [0, 110],
-    [-110, 0],
-    [110, 110],
-    [-110, -110],
-  ]) {
-    await page.mouse.move(CENTRE.x + dx, CENTRE.y + dy);
-    await page.waitForTimeout(120);
-    await page.keyboard.press('KeyF');
-    await page.waitForTimeout(160);
-    afterPlanting = await waitForLoop(page);
-    if (afterPlanting.inventory[3] + afterPlanting.inventory[4] < seeds) break;
-    // Un paso corto para cambiar de casilla y volver a probar.
-    await page.keyboard.down('KeyW');
-    await page.waitForTimeout(140);
-    await page.keyboard.up('KeyW');
-  }
+  // La mirada es la de la camara: la mirada del nucleo tiene que ser la de la
+  // camara encajada en ocho direcciones, y girar la camara tiene que girarla.
+  const dot = (s) => s.facing[0] * s.aim[0] + s.facing[1] * s.aim[1];
+  const before = await state(page);
+  check(dot(before) > 0.9, `la mirada no sigue a la camara: ${JSON.stringify([before.facing, before.aim])}`);
+  await orbit(page, 260);
+  const turned = await waitForLoop(page, 20);
+  console.log(`  mirada: ${JSON.stringify(before.facing)} -> ${JSON.stringify(turned.facing)}`);
   check(
-    afterPlanting.inventory[3] + afterPlanting.inventory[4] < seeds,
-    'sembrar no consumio ninguna semilla',
+    turned.facing[0] !== before.facing[0] || turned.facing[1] !== before.facing[1],
+    'girar la camara no giro la mirada',
+  );
+  check(dot(turned) > 0.9, `tras girar, la mirada no sigue a la camara: ${JSON.stringify([turned.facing, turned.aim])}`);
+  // Y arrastrar es girar, no accionar: se decide al soltar.
+  check(turned.sent.harvest === before.sent.harvest, 'arrastrar para girar acciono');
+
+  // El area: tres casillas distintas que tocan al jugador, y lo que se alcanza
+  // es un subconjunto de ellas. La reticula marca exactamente lo alcanzable.
+  const tile = [Math.floor(turned.x), Math.floor(turned.y)];
+  check(turned.area.length === 3, `el area no son 3 casillas: ${JSON.stringify(turned.area)}`);
+  check(new Set(turned.area.map((t) => t.join(','))).size === 3, `el area repite casilla: ${JSON.stringify(turned.area)}`);
+  for (const [tx, ty] of turned.area) {
+    const d = Math.max(Math.abs(tx - tile[0]), Math.abs(ty - tile[1]));
+    check(d === 1, `casilla del area a distancia ${d}: ${tx},${ty}`);
+  }
+  const inArea = new Set(turned.area.map((t) => t.join(',')));
+  check(turned.reach.every((t) => inArea.has(t.join(','))), 'lo alcanzable sale del area');
+  check(
+    turned.reticleTiles === turned.reach.length,
+    `la reticula marca ${turned.reticleTiles} casillas y se alcanzan ${turned.reach.length}`,
   );
 
-  // Apuntar con el raton: la mirada tiene que seguir al cursor, y el clic
-  // izquierdo accionar sin tocar Espacio.
-  const centre = { x: 640, y: 360 };
-  await page.mouse.move(centre.x - 260, centre.y);
-  await page.waitForTimeout(200);
-  const aimLeft = await waitForLoop(page);
-  await page.mouse.move(centre.x + 260, centre.y);
-  await page.waitForTimeout(200);
-  const aimRight = await waitForLoop(page);
-  console.log(`  mirada: ${JSON.stringify(aimLeft.facing)} -> ${JSON.stringify(aimRight.facing)}`);
-  check(
-    aimLeft.facing[0] !== aimRight.facing[0] || aimLeft.facing[1] !== aimRight.facing[1],
-    `el cursor no giro la mirada (${JSON.stringify(aimLeft.facing)})`,
+  // Un clic sin arrastrar acciona, y el barrido llega a dibujarse. Desde el
+  // nacimiento, que es un rellano llano (regla 22): ahi las tres casillas estan
+  // al alcance, y el barrido no puede faltar por culpa del paisaje.
+  const beforeClick = await open(page, baseUrl);
+  check(beforeClick.reach.length === 3, `en el nacimiento no se alcanzan las tres casillas (${beforeClick.reach.length})`);
+  await page.mouse.click(CLICK.x, CLICK.y);
+  await page.waitForTimeout(400);
+  const afterClick = await state(page);
+  check(afterClick.sent.harvest > beforeClick.sent.harvest, 'un clic no acciono');
+  check(afterClick.slashesDrawn > beforeClick.slashesDrawn, 'accionar no dibujo ningun barrido');
+
+  // Recolectar de verdad, y los escombros contados como DIBUJADOS acumulados.
+  const gathered = await harvestUntil(page, (s) => sum(s.inventory) > 0);
+  console.log(`  inventario tras recolectar: ${JSON.stringify(gathered.inventory)}`);
+  check(sum(gathered.inventory) > 0, 'accionar no recolecto nada');
+  check(gathered.debrisDrawn > 0, 'derribar no dibujo ningun escombro');
+  const hudTotal = await page.evaluate(() =>
+    ['wood', 'stone', 'berries', 'coal', 'iron', 'copper', 'treeSeed', 'plantSeed']
+      .map((id) => Number(document.getElementById(id).textContent))
+      .reduce((a, b) => a + b, 0),
   );
-  // En isometrica el eje X de pantalla mezcla los dos ejes del mundo, asi que se
-  // comprueba la relacion entre las dos miradas y no un signo concreto.
-  check(
-    aimRight.facing[0] > aimLeft.facing[0] || aimRight.facing[1] < aimLeft.facing[1],
-    `la mirada no giro hacia el lado del cursor: ${JSON.stringify([aimLeft.facing, aimRight.facing])}`,
-  );
-  check(aimRight.area.length === 3, `el area no son 3 casillas: ${JSON.stringify(aimRight.area)}`);
-
-  // El area son la apuntada y sus dos vecinas del anillo: las tres tocan al
-  // jugador y son distintas.
-  const playerTile = [Math.floor(aimRight.x), Math.floor(aimRight.y)];
-  const distinct = new Set(aimRight.area.map((t) => t.join(',')));
-  check(distinct.size === 3, `el area repite casilla: ${JSON.stringify(aimRight.area)}`);
-  for (const [tx, ty] of aimRight.area) {
-    const reach = Math.max(Math.abs(tx - playerTile[0]), Math.abs(ty - playerTile[1]));
-    check(reach === 1, `casilla del area a distancia ${reach}: ${tx},${ty}`);
-  }
-
-  // Y lo que de verdad se acciona es un SUBCONJUNTO de esas tres: las que estan
-  // a la altura propia. Puede quedarse en una, o en ninguna al pie de un muro;
-  // lo que no puede es inventarse casillas que el apuntado no dio.
-  const enElArea = new Set(aimRight.area.map((t) => t.join(',')));
-  check(
-    aimRight.reach.length <= 3 && aimRight.reach.every((t) => enElArea.has(t.join(','))),
-    `lo alcanzable no sale del area: ${JSON.stringify(aimRight.reach)} vs ${JSON.stringify(aimRight.area)}`,
-  );
-
-  await page.screenshot({ path: join(SHOTS, '12-area-apuntada.png') });
-
-  // Ritmo en REPOSO, ya construida la escena: el `fps` del estado inicial mide
-  // la reventada de arranque —crear miles de sprites y sus lienzos— y no dice
-  // nada de como va el juego una vez cargado. Ojo: aqui se renderiza por
-  // software, sin GPU, asi que ni uno ni otro dicen nada de una maquina real.
-  await page.waitForTimeout(2500);
-  const idle = await page.evaluate(() => window.__verdant);
-  console.log(`  en reposo: ${idle.fps.toFixed(1)} fps, peor frame ${idle.worstFrameMs.toFixed(0)} ms`);
-
-  // Primero se anda a terreno sin talar, SIN tocar el raton, y luego se golpea
-  // con el clic izquierdo quieto. Andar y clicar a la vez no se puede medir
-  // aqui: el clic sintetico de Playwright roba el foco de la ventana y el
-  // manejador de `blur` —que existe para no dejar al personaje andando solo al
-  // cambiar de pestana— suelta las teclas pulsadas. Separandolo se comprueban
-  // las dos cosas que importan sin depender de esa carrera.
-  const walked = await walkToOpenGround(page);
-  check(walked > 1, `el personaje apenas se movio: ${walked.toFixed(2)} casillas`);
-  const beforeClick = await waitForLoop(page);
-
-  // La atenuacion, en coordenadas POSITIVAS. Aqui estuvo rota: la comprobacion
-  // miraba un `zIndex` que al pasar a contenedores por fila dejo de asignarse y
-  // valia cero, asi que con `x + y` positivo no se atenuaba NADA y con negativo
-  // se atenuaba todo. Media pantalla del mundo bien y la otra media mal, y ningun
-  // test unitario lo ve: hay que jugar. Se camina hasta el cuadrante positivo y
-  // se busca un momento en que algo estorbe.
-  {
-    let faded = 0;
-    let where = null;
-
-    // Si hay una pared de dos bloques en coordenadas positivas, se va a su pie:
-    // ahi hay algo que tapa por construccion. Pasearse a ver si aparece algo
-    // dejo de valer cuando el nacimiento se mudo a una meseta despejada —se
-    // recorrieron 25 casillas sin que nada estorbara nunca—, y una comprobacion
-    // que depende del paisaje no afirma nada.
-    const wall = beforeClick.cliffSpot;
-    if (wall && wall.stand.x > 1 && wall.stand.y > 1) {
-      await page.goto(`${baseUrl}/?seed=${SEED}&x=${wall.stand.x}&y=${wall.stand.y}`, {
-        waitUntil: 'load',
-      });
-      await page.evaluate(() => delete window.__smokeBaseTick);
-      const atWall = await waitForLoop(page);
-      if (atWall.faded > 0) {
-        faded = atWall.faded;
-        where = atWall;
-      }
-    }
-
-    // Y si aun asi no estorba nada, se pasea rotando el par de teclas: contra
-    // una pared, diez vueltas de S+D son diez muestras del mismo sitio.
-    const pares = [
-      ['KeyS', 'KeyD'],
-      ['KeyW', 'KeyD'],
-      ['KeyS', 'KeyA'],
-      ['KeyW', 'KeyA'],
-    ];
-    for (let i = 0; i < 12 && faded === 0; i++) {
-      const [a, b] = pares[i % pares.length];
-      await page.keyboard.down(a);
-      await page.keyboard.down(b);
-      await page.waitForTimeout(700);
-      await page.keyboard.up(a);
-      await page.keyboard.up(b);
-      const now = await waitForLoop(page);
-      if (now.x > 1 && now.y > 1) {
-        faded = now.faded;
-        where = now;
-      }
-    }
-    console.log(
-      `  atenuado en cuadrante positivo: ${faded} en ` +
-        `${where ? `${where.x.toFixed(1)},${where.y.toFixed(1)}` : 'ningun sitio'}`,
-    );
-    check(where !== null, 'no se llego al cuadrante positivo');
-    check(faded > 0, 'nada se atenuo estando en coordenadas positivas');
-  }
-
-  // Ir a la pared recarga la pagina, asi que el inventario de referencia de
-  // antes ya no vale: el mundo empieza de cero. Se vuelve a tomar aqui. Sin
-  // esto, lo recolectado despues se comparaba contra un inventario de otra
-  // partida y salia en negativo.
-  const beforeRing = await waitForLoop(page);
-
-  // Se barre el anillo entero de direcciones y, si la vuelta no da nada, se
-  // cambia de sitio y se repite. Golpear siempre hacia el mismo lado depende de
-  // que ahi hubiera algo, y eso es echarlo a suertes: lo que se comprueba es que
-  // **el clic izquierdo recolecta**, no que el este del jugador tenga un arbol.
-  const ring = [
-    [120, 60],
-    [0, 90],
-    [-120, 60],
-    [-120, -60],
-    [0, -90],
-    [120, -60],
-  ];
-  let afterClick = beforeRing;
-  const before = beforeRing.inventory.reduce((a, b) => a + b, 0);
-  for (let round = 0; round < 4; round++) {
-    for (const [dx, dy] of ring) {
-      await page.mouse.click(centre.x + dx, centre.y + dy, { button: 'right' });
-      await page.waitForTimeout(220);
-    }
-    afterClick = await waitForLoop(page);
-    if (afterClick.inventory.reduce((a, b) => a + b, 0) > before) break;
-    await walkToOpenGround(page, 1.1);
-    await waitForLoop(page);
-  }
-  const clicked = afterClick.inventory.reduce((a, b) => a + b, 0) - before;
-  console.log(`  clic derecho: +${clicked} recursos tras andar ${walked.toFixed(1)} casillas`);
-  check(clicked > 0, 'el clic derecho no recolecto nada');
-
-  // Los efectos. El bloque anterior dejo la zona talada, asi que se golpea
-  // MIENTRAS se camina: sobre una casilla vacia solo saldria el slash, y de que
-  // haya algo que derribar no se puede depender quedandose quieto.
-  // Primero, lejos de lo ya talado: el bloque del clic izquierdo deja la zona
-  // vacia, y sobre casillas vacias solo saldria el slash.
-  await walkToOpenGround(page, 1.1);
-
-  // El slash se cuenta por los que se han TRAZADO, no preguntando si hay uno
-  // vivo ahora. Preguntar por el vivo era echarlo a suertes —dura 0,22 s y aqui
-  // se sondea cada 420 ms—, y ademas miraba la lista de efectos, asi que no
-  // distinguia «no se lanza» de «se lanza y no se dibuja». Lo segundo era un
-  // fallo de verdad y esta comprobacion lo dejaba pasar: por debajo de 4,5 FPS
-  // el slash moria dentro del mismo fotograma en que nacia. El runner de CI
-  // corre a 4-4,9 FPS, justo encima del corte.
-  // Y los escombros van igual, que era la mitad sin arreglar de esa misma
-  // leccion: esto preguntaba por la LISTA de particulas vivas cada 420 ms, con
-  // un escombro viviendo entre 0,6 y 1,1 s y el runner a 4-6 FPS. O sea que
-  // acertaba a suertes, y ademas no distinguia «no se derribo nada» de «se
-  // derribo y no se dibujo». Aguanto varias tandas y un dia perdio la moneda:
-  // 221 slashes trazados y cero escombros vistos, con el mismo golpe soltando
-  // diez unas lineas mas abajo cuando el tiempo esta congelado.
-  const start = await page.evaluate(() => window.__verdant);
-  const slashesBefore = start.slashesDrawn;
-  const debrisBefore = start.debrisDrawn;
-
-  // Se repite cambiando de sitio hasta que caiga algo. Los escombros solo
-  // salen si se DERRIBA, y con la altura estorbando «hay algo talable justo
-  // aqui y a mi altura» dejo de ser una apuesta segura: una vuelta puede
-  // gastarse entera contra una pared o sobre casillas ya vacias.
-  let sawDebris = 0;
-  for (let round = 0; round < 4 && sawDebris === 0; round++) {
-    if (round > 0) await walkToOpenGround(page, 1.1);
-    await page.mouse.down({ button: 'right' });
-    for (const key of ['KeyS', 'KeyD', 'KeyS', 'KeyA', 'KeyW', 'KeyD', 'KeyS', 'KeyA', 'KeyD', 'KeyS']) {
-      await page.keyboard.down(key);
-      await page.waitForTimeout(420);
-      await page.keyboard.up(key);
-      sawDebris = (await page.evaluate(() => window.__verdant)).debrisDrawn - debrisBefore;
-    }
-    await page.mouse.up({ button: 'right' });
-  }
-  const slashes = (await page.evaluate(() => window.__verdant)).slashesDrawn - slashesBefore;
-  console.log(`  al golpear: ${slashes} slashes trazados, ${sawDebris} escombros dibujados`);
-  check(slashes > 0, 'accionar no dibujo ningun slash');
-  check(sawDebris > 0, 'derribar no solto ningun escombro');
-
-  // Y se apagan solos: no se quedan pegados en pantalla.
+  check(hudTotal === sum(gathered.inventory), `el inventario del HUD (${hudTotal}) no es el del juego`);
+  // Y los efectos se apagan solos.
   await page.waitForTimeout(1800);
-  const settled = await page.evaluate(() => window.__verdant);
+  const settled = await state(page);
   check(
     settled.effects.particles === 0 && settled.effects.slashes === 0,
     `los efectos no se apagaron (${JSON.stringify(settled.effects)})`,
   );
 
+  // Zoom con + y -.
+  const z0 = (await state(page)).distance;
+  for (let i = 0; i < 4; i++) await page.keyboard.press('Minus');
+  await page.waitForTimeout(300);
+  const z1 = (await state(page)).distance;
+  for (let i = 0; i < 6; i++) await page.keyboard.press('Equal');
+  await page.waitForTimeout(300);
+  const z2 = (await state(page)).distance;
+  console.log(`  zoom: ${z0.toFixed(1)} -> ${z1.toFixed(1)} -> ${z2.toFixed(1)}`);
+  check(z1 > z0, `- no alejo la camara (${z0} -> ${z1})`);
+  check(z2 < z1, `+ no acerco la camara (${z1} -> ${z2})`);
 
-  for (let i = 0; i < 5; i++) await page.keyboard.press('Minus');
-  await page.waitForTimeout(400);
-  await page.screenshot({ path: join(SHOTS, '03-mundo-amplio.png') });
+  // El panel del entorno.
+  await page.click('#statsToggle');
+  check(await page.isVisible('#statsPanel'), 'el panel del entorno no se desplego');
+  await page.waitForTimeout(300);
+  const bars = await page.evaluate(() => ({
+    biome: document.querySelectorAll('#biomeBars .statRow').length,
+    chunk: document.querySelectorAll('#chunkBars .statRow').length,
+    name: document.getElementById('biomeName').textContent,
+    reward: document.getElementById('rewardState').textContent,
+  }));
+  const here = await state(page);
+  console.log(`  panel: ${bars.name}, ${bars.biome} barras de bioma, ${bars.chunk} de chunk`);
+  check(bars.biome === 3 && bars.chunk === 3, `barras inesperadas: ${JSON.stringify(bars)}`);
+  check(bars.name === here.biome, `el panel anuncia ${bars.name} pisando ${here.biome}`);
+  check(bars.reward.length > 10, 'el panel no explica el estado de las recompensas');
+  await page.screenshot({ path: join(SHOTS, '3d-02-panel.png') });
+  await page.click('#statsToggle');
+  check(!(await page.isVisible('#statsPanel')), 'el panel no se replego al volver a pulsar');
 
-  // El mundo de noche. Se abre con ?t= porque un dia dura ocho minutos reales y
-  // esperarlo en una prueba de humo no tiene sentido.
-  await page.goto(`${baseUrl}/?seed=${SEED}&t=${NIGHT_TICK}`, { waitUntil: 'load' });
-  await page.evaluate(() => delete window.__smokeBaseTick);
-  const night = await waitForLoop(page);
-  console.log(`  hora nocturna: ${night.clock}`);
-  check(night.clock.startsWith('00:'), `no arranco a medianoche (${night.clock})`);
-  await page.screenshot({ path: join(SHOTS, '07-noche.png') });
+  // La carrera, con su estado en la ayuda.
+  await page.keyboard.press('ShiftLeft');
+  await page.waitForTimeout(150);
+  const runLabel = await page.evaluate(
+    () => getComputedStyle(document.getElementById('runState'), '::after').content,
+  );
+  check(runLabel.includes('ACTIVADO'), `la ayuda no dice que la carrera esta encendida (${runLabel})`);
+  await page.keyboard.press('ShiftLeft');
+
+  // El ojo: cambia de proyeccion y lo dice con su forma.
+  await page.click('#proj');
+  await page.waitForTimeout(200);
+  const orto = await state(page);
+  check(orto.projection === 'orto', `el ojo no cambio a ortografica (${orto.projection})`);
+  check(await page.isVisible('#proj.flat'), 'el ojo no se entrecerro en ortografica');
+  await page.keyboard.press('KeyP');
+  await page.waitForTimeout(200);
+  check((await state(page)).projection === 'perspectiva', 'P no volvio a la perspectiva');
 
   await page.close();
 }
 
-// --------------------------------------------------------------------- movil
+// ------------------------------------------------------ comer, sembrar, mineral
+
+/**
+ * Lo que depende de tener algo delante: comer bayas, sembrar sus semillas y
+ * minar. Se abre directamente en el sitio con `?x=&y=`, que buscarlo paseando
+ * seria una loteria.
+ */
+async function resourcesPass(browser, baseUrl) {
+  console.log('\n== recursos (comer, sembrar, minar) ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'recursos');
+
+  await open(page, baseUrl);
+  const where = await spots(page);
+
+  // Comer: una mata delante, un golpe, y E se come una baya.
+  const berry = where.berrySpot;
+  check(berry !== null, 'no se encontro ninguna mata con bayas');
+  if (berry) {
+    await open(page, baseUrl, `&x=${berry.stand.x}&y=${berry.stand.y}`);
+    const withBerries = await harvestUntil(page, (s) => s.inventory[2] > 0, 3);
+    console.log(`  mata en ${berry.node.x},${berry.node.y}: ${withBerries.inventory[2]} bayas`);
+    check(withBerries.inventory[2] > 0, 'golpear la mata no dio bayas');
+    check(withBerries.hunger < 100, 'el hambre no habia bajado, y con ella llena no se come');
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(300);
+    const fed = await state(page);
+    console.log(`  comer: bayas ${withBerries.inventory[2]} -> ${fed.inventory[2]}, hambre ${withBerries.hunger.toFixed(2)} -> ${fed.hunger.toFixed(2)}`);
+    check(fed.sent.eat > withBerries.sent.eat, 'E no llego a la Intent');
+    check(fed.inventory[2] < withBerries.inventory[2], 'comer no gasto ninguna baya');
+    check(fed.hunger > withBerries.hunger, 'comer no lleno el hambre');
+
+    // Sembrar: hace falta una semilla, y la semilla cae con una probabilidad.
+    const seeded = await harvestUntil(page, (s) => s.inventory[3] + s.inventory[4] > 0, 10);
+    const seeds = seeded.inventory[3] + seeded.inventory[4];
+    console.log(`  semillas tras recolectar: ${seeds}`);
+    check(seeds > 0, 'recolectar no dejo ninguna semilla');
+    let planted = seeded;
+    for (let i = 0; i < 8 && seeds > 0; i++) {
+      await page.keyboard.press('KeyF');
+      await page.waitForTimeout(250);
+      planted = await state(page);
+      if (planted.inventory[3] + planted.inventory[4] < seeds) break;
+      // A otra casilla: girar la camara cambia la apuntada.
+      await orbit(page, 120);
+      await hold(page, 'KeyW', 150);
+    }
+    check(planted.sent.plant > seeded.sent.plant, 'F no llego a la Intent');
+    check(planted.inventory[3] + planted.inventory[4] < seeds, 'sembrar no consumio ninguna semilla');
+  }
+
+  // Minar: la montana se pisa y sus minerales se sacan.
+  const mineral = where.mineralSpot;
+  check(mineral !== null, 'no se encontro ningun mineral en el mundo de prueba');
+  if (mineral) {
+    const arrived = await open(page, baseUrl, `&x=${mineral.stand.x}&y=${mineral.stand.y}`);
+    console.log(`  ${mineral.kind} en ${mineral.node.x},${mineral.node.y}; aparece en ${arrived.terrain} / ${arrived.biome}`);
+    check(arrived.biome === 'Tierras altas', `el bioma no es el esperado: ${arrived.biome}`);
+    const mined = await harvestUntil(page, (s) => s.inventory.slice(5).some((n) => n > 0), 2);
+    await page.screenshot({ path: join(SHOTS, '3d-03-montana.png') });
+    console.log(`  piedra ${mined.inventory[1]}, carbon/hierro/cobre ${mined.inventory.slice(5).join('/')}`);
+    check(mined.inventory.slice(5).some((n) => n > 0), `no se saco ningun mineral: ${JSON.stringify(mined.inventory)}`);
+    const walked = await bestWalk(page, mined);
+    check(walked > 1, 'el jugador no pudo caminar dentro de la montana');
+  }
+
+  await page.close();
+}
+
+// ------------------------------------------------------------------------ movil
 
 async function mobilePass(browser, baseUrl) {
   console.log('\n== movil (tactil, 390x844 @3x) ==');
@@ -583,746 +454,428 @@ async function mobilePass(browser, baseUrl) {
   const page = await context.newPage();
   watchProblems(page, 'movil');
 
-  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
-  const spawn = await waitForLoop(page);
-  console.log('  estado inicial:', JSON.stringify(spawn));
-
-  // Los controles deben revelarse solos en un dispositivo de puntero grueso.
-  const controlsVisible = await page.isVisible('#btnHarvest');
-  check(controlsVisible, 'los botones tactiles no aparecieron en un dispositivo tactil');
-  check(
-    await page.evaluate(() => document.body.classList.contains('touch-active')),
-    'el body no entro en modo tactil',
-  );
-
-  await page.screenshot({ path: join(SHOTS, '04-movil-spawn.png') });
-
-  // REGRESION del fallo reportado: el joystick nacia en cualquier punto de la
-  // pantalla. Un arrastre en la mitad DERECHA no debe crear joystick ni mover.
-  const beforeRight = await waitForLoop(page);
-  await touch(page, 'touchstart', { x: 300, y: 640 });
-  await touch(page, 'touchmove', { x: 360, y: 640 });
-  await page.waitForTimeout(500);
-  const afterRight = await waitForLoop(page);
-  await touch(page, 'touchend', { x: 360, y: 640 });
-  check(
-    !(await page.isVisible('#stick.active')),
-    'el joystick aparecio al tocar la mitad derecha',
-  );
-  check(
-    Math.abs(afterRight.x - beforeRight.x) < 1e-6 && Math.abs(afterRight.y - beforeRight.y) < 1e-6,
-    'tocar la mitad derecha movio al jugador',
-  );
-
-  // REGRESION del fallo reportado: el zoom no funcionaba en movil porque el
-  // primer dedo se quedaba con el joystick y el pellizco nunca se activaba.
-  const zoomStart = (await waitForLoop(page)).tilesOnScreen;
-  let a = { id: 11, x: 140, y: 500 };
-  let b = { id: 12, x: 250, y: 500 };
-  await touchEvent(page, 'touchstart', [a], [a]);
-  await touchEvent(page, 'touchstart', [a, b], [b]);
-  for (let step = 1; step <= 6; step++) {
-    a = { ...a, x: 140 - step * 12 };
-    b = { ...b, x: 250 + step * 12 };
-    await touchEvent(page, 'touchmove', [a, b], [a, b]);
+  const spawn = await open(page, baseUrl);
+  check(await page.evaluate(() => document.body.classList.contains('touch-active')), 'el body no entro en modo tactil');
+  for (const id of ['#action', '#jump', '#run', '#eat', '#plant', '#proj']) {
+    check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);
   }
-  await page.waitForTimeout(150);
-  const zoomedIn = (await waitForLoop(page)).tilesOnScreen;
-  await touchEvent(page, 'touchend', [b], [a]);
-  await touchEvent(page, 'touchend', [], [b]);
-  console.log(`  pellizco: ${zoomStart.toFixed(1)} -> ${zoomedIn.toFixed(1)} tiles`);
-  check(zoomedIn < zoomStart, `separar los dedos no acerco la camara (${zoomStart} -> ${zoomedIn})`);
+  check(!(await page.isVisible('#help')), 'la ayuda de teclado se ve en el movil');
+  check(await page.isVisible('.touch-only'), 'la pista de los gestos no se ve en el movil');
+  // El racimo cabe: ningun boton se sale de la pantalla ni se mete en la mitad
+  // izquierda, que es la del joystick.
+  const pad = await page.evaluate(() => document.getElementById('thumbPad').getBoundingClientRect().toJSON());
+  check(pad.left > 0 && pad.right <= 390, `el racimo se sale de la pantalla: ${JSON.stringify(pad)}`);
+  await page.screenshot({ path: join(SHOTS, '3d-04-movil.png') });
 
-  // Y el gesto contrario tiene que alejar.
-  a = { id: 21, x: 60, y: 500 };
-  b = { id: 22, x: 330, y: 500 };
-  await touchEvent(page, 'touchstart', [a], [a]);
-  await touchEvent(page, 'touchstart', [a, b], [b]);
-  for (let step = 1; step <= 6; step++) {
-    a = { ...a, x: 60 + step * 18 };
-    b = { ...b, x: 330 - step * 18 };
-    await touchEvent(page, 'touchmove', [a, b], [a, b]);
-  }
-  await page.waitForTimeout(150);
-  const zoomedOut = (await waitForLoop(page)).tilesOnScreen;
-  await touchEvent(page, 'touchend', [b], [a]);
-  await touchEvent(page, 'touchend', [], [b]);
-  check(zoomedOut > zoomedIn, `juntar los dedos no alejo la camara (${zoomedIn} -> ${zoomedOut})`);
+  // Un dedo a la derecha gira la camara: ni joystick ni movimiento.
+  const beforeLook = await state(page);
+  await pointers(page, [{ type: 'pointerdown', id: 1, x: 300, y: 400 }]);
+  for (let i = 1; i <= 10; i++) await pointers(page, [{ type: 'pointermove', id: 1, x: 300 - i * 8, y: 400 }]);
+  check(!(await page.isVisible('#stick.on')), 'el joystick aparecio con un dedo de camara');
+  await pointers(page, [{ type: 'pointerup', id: 1, x: 220, y: 400 }]);
+  const afterLook = await waitForLoop(page, 20);
+  check(Math.abs(afterLook.yaw - beforeLook.yaw) > 0.05, 'un dedo sobre el mundo no giro la camara');
+  check(Math.hypot(afterLook.x - beforeLook.x, afterLook.y - beforeLook.y) < 1e-6, 'girar la camara movio al jugador');
+  check(afterLook.sent.harvest === beforeLook.sent.harvest, 'en tactil, tocar el mundo acciono');
 
-  // Arrastrar el joystick tiene que llegar hasta la simulacion.
-  //
-  // Aqui NO se mide la escala analogica: el jugador choca con arboles y agua,
-  // asi que la distancia recorrida no es proporcional a la deflexion y una
-  // comprobacion de ese tipo mediria colisiones, no el joystick. La escala
-  // analogica se verifica sin colisiones en tests/simulation.test.ts, sobre una
-  // zona abierta. Lo que corresponde comprobar aqui es la integracion: que el
-  // toque produce una Intent y que el mundo reacciona.
-  const originX = 110;
-  const originY = 640;
-  await touch(page, 'touchstart', { x: originX, y: originY });
-  await touch(page, 'touchmove', { x: originX + 22, y: originY });
-  await page.waitForTimeout(700);
-  const partial = await waitForLoop(page);
-
-  // La captura se toma CON el dedo apoyado: es el unico momento en que el
-  // joystick esta en pantalla, y sin esto nunca se verificaria que se dibuja.
-  check(
-    await page.isVisible('#stick.active'),
-    'el joystick no aparecio al apoyar el dedo',
-  );
-  await page.screenshot({ path: join(SHOTS, '05-movil-joystick.png') });
-
-  await touch(page, 'touchend', { x: originX + 22, y: originY });
-  check(
-    !(await page.isVisible('#stick.active')),
-    'el joystick sigue visible tras levantar el dedo',
-  );
-
-  const partialDistance = Math.hypot(partial.x - spawn.x, partial.y - spawn.y);
-  // Deflexion PARCIAL, y a proposito: desde que el mando apunta en vez de
-  // dosificar, medio desplazamiento tiene que andar igual que el completo. La
-  // proporcion exacta se mide en `tests/simulation.test.ts`, sobre suelo llano
-  // verificado; aqui solo se comprueba que un desplazamiento corto mueve de
-  // verdad, que es lo que antes podia quedarse en un paso lentisimo.
-  console.log(`  joystick a media deflexion: ${partialDistance.toFixed(2)} tiles recorridos`);
-  check(partialDistance > 0.2, `el joystick no movio al jugador (${partialDistance})`);
-
-  // El interruptor de correr, que es lo que ahora manda sobre la velocidad.
-  const antesDeCorrer = await page.evaluate(() => window.__verdant.running);
-  await touch(page, 'touchstart', { id: 4, x: 300, y: 700, selector: '#btnRun' });
-  await touch(page, 'touchend', { id: 4, x: 300, y: 700, selector: '#btnRun' });
-  await page.waitForTimeout(150);
-  const corriendo = await page.evaluate(() => window.__verdant.running);
-  const encendido = await page.isVisible('#btnRun.on');
-  await touch(page, 'touchstart', { id: 4, x: 300, y: 700, selector: '#btnRun' });
-  await touch(page, 'touchend', { id: 4, x: 300, y: 700, selector: '#btnRun' });
-  await page.waitForTimeout(150);
-  const apagado = await page.evaluate(() => window.__verdant.running);
-  console.log(`  boton correr: ${antesDeCorrer} -> ${corriendo} -> ${apagado} (se ilumina: ${encendido})`);
-  check(antesDeCorrer === false, 'se empieza corriendo, y se deberia empezar andando');
-  check(corriendo === true, 'el boton de correr no encendio la carrera');
-  check(encendido, 'el boton de correr no muestra que esta encendido');
-  check(apagado === false, 'el boton de correr no la apago al segundo toque');
-
-  // Una deflexion por debajo de la zona muerta no debe mover nada: es lo que
-  // evita que el pulgar simplemente apoyado haga derivar al personaje.
-  const still = await waitForLoop(page);
-  await touch(page, 'touchstart', { x: originX, y: originY });
-  await touch(page, 'touchmove', { x: originX + 5, y: originY });
-  await page.waitForTimeout(500);
-  const drifted = await waitForLoop(page);
-  await touch(page, 'touchend', { x: originX + 5, y: originY });
-  check(
-    Math.abs(drifted.x - still.x) < 1e-6 && Math.abs(drifted.y - still.y) < 1e-6,
-    `la zona muerta no aguanta: derivo ${(drifted.x - still.x).toFixed(4)} tiles`,
-  );
-
-  // Mantener pulsado el boton de recolectar mientras se camina con el joystick:
-  // es el uso real, y ejercita a la vez la repeticion y los dos dedos.
-  //
-  // Se repite hasta que caiga algo. Una sola vuelta bastaba cuando se nacia en
-  // la costa; ahora el nacimiento exige un rellano llano y puede caer en roca,
-  // donde una vuelta de cuatro direcciones puede no topar con nada
-  // recolectable. Que el boton funcione no depende de que haya un arbol al lado.
-  async function sweepWithStick() {
-    await touch(page, 'touchstart', { id: 2, x: 330, y: 760, selector: '#btnHarvest' });
-    for (const [dx, dy] of [
-      [0, -80],
-      [80, 0],
-      [0, 80],
-      [-80, 0],
-    ]) {
-      await touch(page, 'touchstart', { x: originX, y: originY });
-      await touch(page, 'touchmove', { x: originX + dx, y: originY + dy });
-      await page.waitForTimeout(600);
-      await touch(page, 'touchend', { x: originX + dx, y: originY + dy });
+  // La pinza: separar acerca, juntar aleja.
+  const pinch = async (from, to) => {
+    await pointers(page, [
+      { type: 'pointerdown', id: 3, x: 195 - from, y: 300 },
+      { type: 'pointerdown', id: 4, x: 195 + from, y: 300 },
+    ]);
+    for (let i = 1; i <= 10; i++) {
+      const d = from + ((to - from) * i) / 10;
+      await pointers(page, [
+        { type: 'pointermove', id: 3, x: 195 - d, y: 300 },
+        { type: 'pointermove', id: 4, x: 195 + d, y: 300 },
+      ]);
     }
-    await touch(page, 'touchend', { id: 2, x: 330, y: 760, selector: '#btnHarvest' });
-    const now = await waitForLoop(page);
-    return now.inventory.reduce((a, b) => a + b, 0);
-  }
+    await pointers(page, [
+      { type: 'pointerup', id: 3, x: 195 - to, y: 300 },
+      { type: 'pointerup', id: 4, x: 195 + to, y: 300 },
+    ]);
+    await page.waitForTimeout(200);
+    return (await state(page)).distance;
+  };
+  const d0 = (await state(page)).distance;
+  const d1 = await pinch(30, 110);
+  const d2 = await pinch(110, 30);
+  console.log(`  pinza: ${d0.toFixed(1)} -> ${d1.toFixed(1)} -> ${d2.toFixed(1)}`);
+  check(d1 < d0, 'separar dos dedos no acerco la camara');
+  check(d2 > d1, 'juntar dos dedos no alejo la camara');
 
-  for (let round = 0; round < 4; round++) {
-    if ((await sweepWithStick()) > 0) break;
-    // A otro sitio: dos dedos largos de joystick en diagonal, que es lo que mas
-    // terreno cubre sin depender de que una direccion concreta este libre.
-    for (const [dx, dy] of [[70, 70], [-70, 70]]) {
-      await touch(page, 'touchstart', { x: originX, y: originY });
-      await touch(page, 'touchmove', { x: originX + dx, y: originY + dy });
-      await page.waitForTimeout(900);
-      await touch(page, 'touchend', { x: originX + dx, y: originY + dy });
-    }
-  }
+  // El joystick, abajo a la izquierda: aparece, mueve y desaparece.
+  const stick = { x: 90, y: 700 };
+  const beforeStick = await state(page);
+  await pointers(page, [{ type: 'pointerdown', id: 1, ...stick }]);
+  await pointers(page, [{ type: 'pointermove', id: 1, x: stick.x + 26, y: stick.y - 26 }]);
+  await page.waitForTimeout(800);
+  check(await page.isVisible('#stick.on'), 'el joystick no aparecio al apoyar el pulgar');
+  await pointers(page, [{ type: 'pointerup', id: 1, x: stick.x + 26, y: stick.y - 26 }]);
+  const afterStick = await waitForLoop(page, 20);
+  check(!(await page.isVisible('#stick.on')), 'el joystick sigue visible tras levantar el dedo');
+  const stickDistance = Math.hypot(afterStick.x - beforeStick.x, afterStick.y - beforeStick.y);
+  console.log(`  joystick: ${stickDistance.toFixed(2)} casillas`);
+  check(stickDistance > 0.2, `el joystick no movio al jugador (${stickDistance})`);
 
-  // El panel y el boton de sembrar tienen que funcionar tambien al tacto.
+  // La zona muerta: el pulgar apoyado sin querer no hace derivar.
+  const still = await state(page);
+  await pointers(page, [{ type: 'pointerdown', id: 1, ...stick }]);
+  await pointers(page, [{ type: 'pointermove', id: 1, x: stick.x + 5, y: stick.y }]);
+  await page.waitForTimeout(500);
+  await pointers(page, [{ type: 'pointerup', id: 1, x: stick.x + 5, y: stick.y }]);
+  const drifted = await waitForLoop(page, 10);
+  check(Math.hypot(drifted.x - still.x, drifted.y - still.y) < 1e-6, 'la zona muerta no aguanta');
+
+  // Correr: interruptor con luz.
+  await tap(page, '#run');
+  await page.waitForTimeout(150);
+  const on = await state(page);
+  const lit = await page.isVisible('#run.on');
+  await tap(page, '#run');
+  await page.waitForTimeout(150);
+  const off = await state(page);
+  console.log(`  correr: ${spawn.running} -> ${on.running} -> ${off.running} (luz: ${lit})`);
+  check(spawn.running === false, 'se empieza corriendo');
+  check(on.running === true && lit, 'el boton de correr no la encendio o no lo muestra');
+  check(off.running === false, 'el boton de correr no la apago al segundo toque');
+
+  // Saltar, comer y sembrar: el toque llega a la Intent.
+  const b = await state(page);
+  await tap(page, '#jump');
+  await page.waitForTimeout(250);
+  await tap(page, '#eat');
+  await page.waitForTimeout(250);
+  await tap(page, '#plant');
+  await page.waitForTimeout(250);
+  const a = await state(page);
+  console.log(`  intents: ${JSON.stringify(b.sent)} -> ${JSON.stringify(a.sent)}`);
+  check(a.sent.jump > b.sent.jump, 'el boton de saltar no llego a la Intent');
+  check(a.sent.eat > b.sent.eat, 'el boton de comer no llego a la Intent');
+  check(a.sent.plant > b.sent.plant, 'el boton de sembrar no llego a la Intent');
+
+  // La accion: mantener repite, cuatro por segundo. Desde el nacimiento, que es
+  // un rellano llano (regla 22): ahi las tres casillas estan al alcance y el
+  // barrido tiene que salir, sin depender de donde dejo el joystick al jugador.
+  const h0 = await open(page, baseUrl);
+  check(h0.reach.length === 3, `en el nacimiento no se alcanzan las tres casillas (${h0.reach.length})`);
+  await tapButton(page, '#action', 'touchstart');
+  await page.waitForTimeout(1600);
+  await tapButton(page, '#action', 'touchend');
+  const h1 = await waitForLoop(page, 10);
+  const repeats = h1.sent.harvest - h0.sent.harvest;
+  console.log(`  accion mantenida: ${repeats} acciones`);
+  check(repeats >= 2, `mantener la accion no repitio (${repeats})`);
+  check(h1.slashesDrawn > h0.slashesDrawn, 'la accion del movil no dibujo barrido');
+
+  // El panel del entorno, al tacto.
   await page.tap('#statsToggle');
   check(await page.isVisible('#statsPanel'), 'el panel no se abrio al tocarlo en movil');
-  await page.screenshot({ path: join(SHOTS, '09-movil-panel.png') });
+  await page.screenshot({ path: join(SHOTS, '3d-05-movil-panel.png') });
   await page.tap('#statsToggle');
-  await touch(page, 'touchstart', { id: 3, x: 250, y: 745, selector: '#btnPlant' });
-  await touch(page, 'touchend', { id: 3, x: 250, y: 745, selector: '#btnPlant' });
 
-  const gathered = await waitForLoop(page);
-  console.log('  inventario tras recolectar:', JSON.stringify(gathered.inventory));
-  const total = gathered.inventory.reduce((a, b) => a + b, 0);
-  check(total > 0, 'mantener el boton de recolectar no dio nada');
-
-  await page.screenshot({ path: join(SHOTS, '06-movil-recolectando.png') });
-
-  // Soltar el joystick debe detener al jugador por completo.
-  const before = await waitForLoop(page);
+  // Soltado todo, el jugador se queda quieto.
+  const rest0 = await waitForLoop(page, 10);
   await page.waitForTimeout(500);
-  const after = await waitForLoop(page);
-  check(
-    Math.abs(after.x - before.x) < 1e-6 && Math.abs(after.y - before.y) < 1e-6,
-    'el jugador sigue moviendose tras soltar el joystick',
-  );
+  const rest1 = await waitForLoop(page, 10);
+  check(Math.hypot(rest1.x - rest0.x, rest1.y - rest0.y) < 1e-6, 'el jugador sigue moviendose sin mando');
 
   await context.close();
 }
 
-// ------------------------------------------------- herramientas de desarrollo
+// -------------------------------------------------------- panel de desarrollo
 
-/**
- * Las herramientas de desarrollo, ejercitadas de punta a punta.
- *
- * Los tests unitarios ya miden que un salto de tiempo equivale a esperar y que
- * el bioma nombrado es el suelo pisado. Lo que solo se puede comprobar aqui es
- * que el panel existe, que sus botones llegan al motor y que los bordes se
- * dibujan sin reventar la escena.
- */
 async function devToolsPass(browser, baseUrl) {
   console.log('\n== herramientas de desarrollo (?dev=1) ==');
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   watchProblems(page, 'desarrollo');
 
-  await page.goto(`${baseUrl}/?seed=${SEED}&dev=1`, { waitUntil: 'load' });
-  const start = await waitForLoop(page);
+  const start = await open(page, baseUrl, '&dev=1');
   check(start.dev === true, 'el panel no se activo con ?dev=1');
   check(await page.isVisible('#devPanel'), 'el panel de desarrollo no es visible');
 
-  // Bordes: la escena tiene que seguir en pie y con MAS cosas dibujadas.
+  // Bordes de chunk y de bioma.
   await page.click('[data-toggle="chunks"]');
   await page.click('[data-toggle="biomes"]');
-  await page.waitForTimeout(400);
-  const withBorders = await waitForLoop(page);
-  check(withBorders.objects > 50, `la escena se vacio al dibujar los bordes (${withBorders.objects})`);
-  const bordersOn = await page.evaluate(() => ({
-    chunks: !!document.querySelector('[data-toggle="chunks"].on'),
-    biomes: !!document.querySelector('[data-toggle="biomes"].on'),
-  }));
-  check(bordersOn.chunks && bordersOn.biomes, `los conmutadores no quedaron activos: ${JSON.stringify(bordersOn)}`);
+  const withBorders = await waitForLoop(page, 20);
+  console.log(`  bordes: ${withBorders.gridChunks} chunks con rejilla, ${withBorders.borderSegments} segmentos de bioma`);
+  check(withBorders.gridChunks > 0, 'la rejilla de chunks no dibujo nada');
   check(withBorders.borderSegments > 0, 'el contorno de biomas no dibujo ni un segmento');
-  // Cada contorno tiene que caber en el rombo de su propio chunk. Es la medida
-  // del fallo que hubo: el origen del chunk sumado dos veces lo sacaba un chunk
-  // entero en diagonal, y eso a ojo no se distingue.
   check(withBorders.misplacedBorders === 0, `${withBorders.misplacedBorders} contornos fuera de su chunk`);
-  await page.screenshot({ path: join(SHOTS, '10-dev-bordes.png') });
+  await page.screenshot({ path: join(SHOTS, '3d-06-bordes.png') });
 
-  // El contorno tiene que sobrevivir a cambiar de chunk y a mover el zoom, que
-  // es justo donde se veia aparecer y desaparecer.
-  const startChunk = [Math.floor(withBorders.x) >> 5, Math.floor(withBorders.y) >> 5];
-  // Un chunk son 32 casillas y a 5.2 por segundo eso son mas de seis segundos
-  // seguidos, asi que se INSISTE en una direccion antes de probar otra. Rotar a
-  // cada tanda no vale y ademas se cancela: este, sur, norte y oeste dejan al
-  // jugador donde estaba, que es exactamente como fallaba esto. Probar varias
-  // direcciones hace falta porque con la altura estorbando una puede ser pared,
-  // pero cada una se agota antes de pasar a la siguiente.
+  // Y sobreviven a cambiar de chunk, saltando por el camino.
+  const chunkOf = (s) => [Math.floor(s.x) >> 5, Math.floor(s.y) >> 5].join(',');
   let walked = withBorders;
-  let walkedChunk = startChunk;
-  const cambio = () => walkedChunk[0] !== startChunk[0] || walkedChunk[1] !== startChunk[1];
-  for (const key of ['KeyD', 'KeyS', 'KeyA', 'KeyW']) {
-    for (let burst = 0; burst < 3 && !cambio(); burst++) {
+  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
+    for (let burst = 0; burst < 3 && chunkOf(walked) === chunkOf(withBorders); burst++) {
       await page.keyboard.down(key);
-      // Saltando por el camino, que es como se viaja desde que la altura
-      // estorba. Sin esto la prueba no cruzaba: el nacimiento solo garantiza
-      // unas 40 casillas ANDABLES, y salir de ahi es justo lo que el salto
-      // resuelve. Andar y nada mas mide un juego que ya no existe.
       for (let i = 0; i < 4; i++) {
         await page.waitForTimeout(650);
         await page.keyboard.press('Space');
       }
       await page.keyboard.up(key);
-      walked = await waitForLoop(page);
-      walkedChunk = [Math.floor(walked.x) >> 5, Math.floor(walked.y) >> 5];
+      walked = await waitForLoop(page, 20);
     }
-    if (cambio()) break;
+    if (chunkOf(walked) !== chunkOf(withBorders)) break;
   }
-  console.log(`  chunk ${startChunk} -> ${walkedChunk}, segmentos ${withBorders.borderSegments} -> ${walked.borderSegments}`);
-  check(
-    walkedChunk[0] !== startChunk[0] || walkedChunk[1] !== startChunk[1],
-    `el jugador no llego a cambiar de chunk (${startChunk} -> ${walkedChunk})`,
-  );
-  check(walked.borderSegments > 0, 'el contorno desaparecio al cambiar de chunk');
-  check(walked.misplacedBorders === 0, `${walked.misplacedBorders} contornos fuera de su chunk tras caminar`);
+  console.log(`  chunk ${chunkOf(withBorders)} -> ${chunkOf(walked)}, segmentos ${walked.borderSegments}`);
+  check(chunkOf(walked) !== chunkOf(withBorders), 'el jugador no llego a cambiar de chunk');
+  check(walked.borderSegments > 0 && walked.gridChunks > 0, 'los bordes desaparecieron al cambiar de chunk');
+  check(walked.misplacedBorders === 0, 'contornos fuera de su chunk tras caminar');
 
-  for (let i = 0; i < 6; i++) await page.keyboard.press('Minus');
-  await page.waitForTimeout(400);
-  const zoomedOutBorders = await waitForLoop(page);
-  check(zoomedOutBorders.tilesOnScreen > walked.tilesOnScreen, 'el zoom no cambio');
-  check(zoomedOutBorders.borderSegments > 0, 'el contorno desaparecio al alejar el zoom');
-  check(zoomedOutBorders.misplacedBorders === 0, `${zoomedOutBorders.misplacedBorders} contornos fuera de su chunk tras el zoom`);
-  for (let i = 0; i < 6; i++) await page.keyboard.press('Equal');
-  await page.waitForTimeout(300);
+  // Apagarlos los retira.
+  await page.click('[data-toggle="chunks"]');
+  await page.click('[data-toggle="biomes"]');
+  const off = await waitForLoop(page, 10);
+  check(off.gridChunks === 0 && off.borderSegments === 0, 'apagar los bordes no los retiro');
 
-  // Pausa: el reloj tiene que pararse de verdad, no solo cambiar de color.
+  // Pausa: el reloj se para de verdad.
   await page.click('[data-toggle="pause"]');
-  await page.waitForTimeout(150);
-  const paused = await page.evaluate(() => window.__verdant);
+  await page.waitForTimeout(200);
+  const paused = await state(page);
   check(paused.timeScale === 0, `pausar no dejo la escala a cero (${paused.timeScale})`);
   await page.waitForTimeout(700);
-  const stillPaused = await page.evaluate(() => window.__verdant);
+  const stillPaused = await state(page);
   check(stillPaused.tick === paused.tick, `el tiempo avanzo en pausa (${paused.tick} -> ${stillPaused.tick})`);
 
-  await page.click('[data-toggle="pause"]');
-  await page.waitForTimeout(400);
-  const resumed = await page.evaluate(() => window.__verdant);
-  check(resumed.tick > stillPaused.tick, 'reanudar no volvio a mover el reloj');
-
-  // Salto: +1 h son DAY_TICKS/24 ticks. Se compara contra el instante justo
-  // anterior al clic para que el margen sea el del propio bucle, no el del salto.
-  const HOUR_TICKS = (8 * 60 * 60) / 24;
-  await page.click('[data-toggle="pause"]');
-  await page.waitForTimeout(150);
-  const beforeJump = await page.evaluate(() => window.__verdant);
+  // +1 h exacta, y el registro la anota tal cual.
   await page.click('[data-jump="1200"]');
   await page.waitForTimeout(200);
-  const afterJump = await page.evaluate(() => window.__verdant);
-  const jumped = afterJump.tick - beforeJump.tick;
-  console.log(`  salto de +1 h: ${beforeJump.clock} -> ${afterJump.clock} (${jumped} ticks)`);
-  check(jumped === HOUR_TICKS, `el salto no adelanto una hora exacta (${jumped} ticks)`);
-  const jumpLine = await page.evaluate(() => (document.getElementById('devLog') || {}).textContent || '');
-  check(jumpLine.includes('+1 h'), `el registro no anoto el salto tal cual (${JSON.stringify(jumpLine)})`);
+  const afterJump = await state(page);
+  console.log(`  +1 h: ${stillPaused.clock} -> ${afterJump.clock}`);
+  check(afterJump.tick - stillPaused.tick === HOUR_TICKS, `el salto no adelanto una hora exacta (${afterJump.tick - stillPaused.tick})`);
+  const jumpLine = await page.evaluate(() => document.getElementById('devLog').textContent);
+  check(jumpLine.includes('+1 h'), `el registro no anoto el salto (${JSON.stringify(jumpLine)})`);
 
-  // La supervivencia viene congelada: saltar un dia entero gastaria 264 puntos
-  // de hambre y mataria al personaje, que es lo que hacia inservible el boton.
+  // Congelada por defecto: un dia entero no gasta hambre.
   check(afterJump.survivalFrozen === true, 'el panel no arranco con la supervivencia congelada');
-  const beforeDay = await page.evaluate(() => window.__verdant);
   await page.click('[data-jump="28800"]');
   await page.waitForTimeout(300);
-  const afterDay = await page.evaluate(() => window.__verdant);
-  console.log(`  +1 dia congelado: hambre ${beforeDay.hunger.toFixed(2)} -> ${afterDay.hunger.toFixed(2)}`);
-  check(afterDay.hunger === beforeDay.hunger, `saltar un dia gasto hambre estando congelada (${beforeDay.hunger} -> ${afterDay.hunger})`);
-  check(afterDay.health === beforeDay.health, 'saltar un dia gasto salud estando congelada');
+  const afterDay = await state(page);
+  check(afterDay.hunger === afterJump.hunger, `saltar un dia gasto hambre estando congelada (${afterJump.hunger} -> ${afterDay.hunger})`);
 
-  // Y al apagarlo, el hambre vuelve a bajar.
+  // Velocidad: a 16x el reloj corre mucho mas que a 1x.
+  await page.click('[data-speed="16"]');
+  const fast0 = await state(page);
+  await page.waitForTimeout(1000);
+  const fast1 = await state(page);
+  await page.click('[data-speed="1"]');
+  const slow0 = await state(page);
+  await page.waitForTimeout(1000);
+  const slow1 = await state(page);
+  console.log(`  ticks por segundo: 16x ${fast1.tick - fast0.tick}, 1x ${slow1.tick - slow0.tick}`);
+  check(fast1.tick - fast0.tick > 3 * (slow1.tick - slow0.tick), 'a 16x el reloj no corrio mas');
+
+  // Descongelada, el hambre vuelve a bajar.
   await page.click('[data-toggle="survival"]');
-  await page.click('[data-toggle="pause"]');
-  await page.waitForTimeout(700);
-  const thawed = await page.evaluate(() => window.__verdant);
+  await page.waitForTimeout(800);
+  const thawed = await state(page);
   check(thawed.survivalFrozen === false, 'el conmutador no se apago');
-  check(thawed.hunger < afterDay.hunger, `apagar la congelacion no devolvio el hambre (${afterDay.hunger} -> ${thawed.hunger})`);
+  check(thawed.hunger < afterDay.hunger, 'apagar la congelacion no devolvio el hambre');
   await page.click('[data-toggle="survival"]');
 
-  // Registro: recolectar tiene que dejar constancia.
-  await harvestSweep(page);
+  // Registro: recolectar deja constancia.
+  await harvestUntil(page, (s) => sum(s.inventory) > 0);
   await page.waitForTimeout(300);
-  const log = await page.evaluate(() => (document.getElementById('devLog') || {}).textContent || '');
+  const log = await page.evaluate(() => document.getElementById('devLog').textContent);
   console.log(`  registro: ${JSON.stringify(log.split('\n')[0] ?? '')}`);
-  check(log.trim().length > 0, 'recolectar no dejo ninguna linea en el registro');
-  await page.screenshot({ path: join(SHOTS, '11-dev-registro.png') });
+  check(log.split('\n').length > 1, 'recolectar no dejo ninguna linea en el registro');
 
-  // Captura del golpe. Los efectos avanzan con el tiempo escalado, asi que
-  // pausar los CONGELA: se golpea a velocidad normal y en cuanto salta un
-  // estallido se pausa y se fotografia con calma. A 1x el estallido entero cabe
-  // entre dos muestreos, y a 0.25x se camina cuatro veces mas lento y no se
-  // llega a nada que talar.
-  await page.click('[data-toggle="biomes"]');
-  await page.click('[data-toggle="chunks"]');
-  await page.mouse.move(760, 420);
-  await page.waitForTimeout(200);
-
-  // A terreno sin talar antes de nada: golpear donde ya se golpeo solo saca el
-  // slash, y entonces no hay estallido que fotografiar.
-  await walkToOpenGround(page, 1.2);
-
-  let shot = false;
-  await page.mouse.down({ button: 'right' });
-  for (const key of ['KeyS', 'KeyD', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyW', 'KeyA']) {
-    await page.keyboard.down(key);
-    for (let i = 0; i < 12 && !shot; i++) {
-      await page.waitForTimeout(90);
-      const now = await page.evaluate(() => window.__verdant);
-      if (now.effects.particles >= 8 && now.effects.slashes > 0) {
-        await page.click('[data-toggle="pause"]');
-        await page.screenshot({ path: join(SHOTS, '13-golpe.png') });
-        console.log(`  captura del golpe: ${now.effects.particles} escombros congelados`);
-        await page.click('[data-toggle="pause"]');
-        shot = true;
-      }
-    }
-    await page.keyboard.up(key);
-    if (shot) break;
-  }
-  await page.mouse.up({ button: 'right' });
-  check(shot, 'no se pudo fotografiar un golpe con escombros');
-
-  // F3 cierra el panel y devuelve el tiempo a su sitio.
+  // F3 cierra y devuelve todo a su sitio.
   await page.keyboard.press('F3');
   await page.waitForTimeout(150);
-  const closed = await page.evaluate(() => window.__verdant);
+  const closed = await state(page);
   check(closed.dev === false, 'F3 no cerro el panel');
-  check(closed.timeScale === 1, `al cerrar el panel el tiempo no volvio a 1x (${closed.timeScale})`);
-  check(closed.survivalFrozen === false, 'al cerrar el panel el personaje siguio siendo inmortal');
+  check(closed.timeScale === 1, `al cerrar el tiempo no volvio a 1x (${closed.timeScale})`);
+  check(closed.survivalFrozen === false, 'al cerrar el personaje siguio siendo inmortal');
   check(!(await page.isVisible('#devPanel')), 'el panel sigue visible tras cerrarlo');
 
   await page.close();
 }
 
-// ------------------------------------------------------------------ montana
+// ------------------------------------------------------------- muerte y noche
 
-/**
- * La montana: entrar, caminar y minar.
- *
- * La roca figuraba como terreno solido, asi que el bioma entero era un muro y el
- * autor chocaba contra su borde. Esto lo comprueba de punta a punta.
- *
- * Se abre directamente junto a un mineral con `?x=&y=`. Llegar andando obliga a
- * esquivar arboles, y buscar mineral paseando seria una loteria: el carbon sale
- * a 0.00225 por casilla, asi que la prueba fallaria por azar y no por un fallo.
- *
- * Aqui NO se toca el raton a proposito: sin puntero la mirada sigue al
- * movimiento, asi que andar hacia el mineral es lo que lo deja apuntado.
- */
-/**
- * El relieve visto de cerca.
- *
- * Se va a una pared de dos bloques, que es la que el autor pidio expresamente y
- * la que la calibracion de salientes hace escasa. Sin ir a buscarla, la prueba
- * dependeria de que el spawn cayera al lado de una.
- */
+async function lifePass(browser, baseUrl) {
+  console.log('\n== muerte, reinicio y noche ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'vida');
+
+  /** Mata al personaje saltando dias con la supervivencia descongelada. */
+  async function die() {
+    await page.evaluate(() => delete window.__smokeBaseTick);
+    if (!(await state(page)).dev) await page.keyboard.press('F3');
+    await page.click('[data-toggle="survival"]');
+    let now = await state(page);
+    for (let i = 0; i < 6 && now.alive; i++) {
+      await page.click('[data-jump="28800"]');
+      await page.waitForTimeout(300);
+      now = await state(page);
+    }
+    await page.keyboard.press('F3');
+    await page.waitForTimeout(300);
+    return state(page);
+  }
+
+  await open(page, baseUrl, '&dev=1');
+  const dead = await die();
+  console.log(`  tras saltar dias sin comer: salud ${dead.health}, hambre ${dead.hunger}`);
+  check(!dead.alive, 'saltar dias sin comer no mato al personaje');
+  check(dead.deadShown && (await page.isVisible('#dead')), 'al morir no aparecio el aviso');
+  await page.screenshot({ path: join(SHOTS, '3d-07-muerte.png') });
+
+  // R empieza un mundo nuevo, con semilla nueva y reflejada en la URL.
+  await page.keyboard.press('KeyR');
+  const reborn = await waitForLoop(page, 30);
+  const urlSeed = new URL(page.url()).searchParams.get('seed');
+  console.log(`  R: semilla ${dead.seed} -> ${reborn.seed} (URL ${urlSeed}), salud ${reborn.health}`);
+  check(reborn.alive && reborn.health === 100, 'R no devolvio la vida');
+  check(reborn.seed !== dead.seed, 'R no cambio de mundo');
+  check(urlSeed === String(reborn.seed), 'la URL no lleva la semilla nueva');
+  check(!(await page.isVisible('#dead')), 'el aviso de muerte sigue tras reiniciar');
+  check(reborn.triangles > 1000 && reborn.chunks > 0, 'el mundo nuevo no se mallo');
+
+  // Y el boton del aviso hace lo mismo.
+  const deadAgain = await die();
+  check(!deadAgain.alive, 'no se pudo volver a morir');
+  await page.click('#restart');
+  const reborn2 = await waitForLoop(page, 30);
+  check(reborn2.alive && reborn2.seed !== deadAgain.seed, 'el boton de reiniciar no empezo un mundo nuevo');
+
+  // La noche: la vela azul a medianoche y nada a mediodia.
+  const night = await open(page, baseUrl, '&t=0');
+  const tint = await page.evaluate(() => getComputedStyle(document.getElementById('sky')).backgroundColor);
+  console.log(`  medianoche: ${night.clock}, vela ${night.night.toFixed(2)} (${tint})`);
+  check(night.clock.startsWith('00:'), `no arranco a medianoche (${night.clock})`);
+  check(night.night > 0.4, `la noche no oscurece (${night.night})`);
+  check(tint !== 'rgba(0, 0, 0, 0)' && tint !== 'transparent', `la vela de la noche no se pinta (${tint})`);
+  await page.screenshot({ path: join(SHOTS, '3d-08-noche.png') });
+  const noon = await open(page, baseUrl, `&t=${DAY_TICKS / 2}`);
+  check(noon.night === 0, `a mediodia sigue habiendo vela (${noon.night})`);
+
+  await page.close();
+}
+
+// ---------------------------------------------------------------------- relieve
+
 async function reliefPass(browser, baseUrl) {
-  console.log('\n== relieve (paredes y taludes) ==');
+  console.log('\n== relieve (paredes, salto, carrera y cima) ==');
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   watchProblems(page, 'relieve');
 
-  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
-  const spawn = await waitForLoop(page);
-  const spot = spawn.cliffSpot;
-  check(spot !== null, 'no se encontro ninguna pared de dos bloques en el mundo de prueba');
-  if (!spot) {
-    await page.close();
-    return;
-  }
-  console.log(`  pared de ${spot.drop} bloques en ${spot.stand.x},${spot.stand.y}`);
-  check(spot.drop >= 2, `la pared mas alta es de ${spot.drop} bloque(s)`);
+  await open(page, baseUrl);
+  const { cliffSpot: spot, peakSpot: peak } = await spots(page);
+  check(spot !== null, 'no se encontro ninguna pared de dos bloques');
+  if (spot) {
+    console.log(`  pared de ${spot.drop} bloques en ${spot.stand.x},${spot.stand.y}`);
+    const at = `&x=${spot.stand.x}&y=${spot.stand.y}`;
+    const arrived = await open(page, baseUrl, at);
+    const relief = (await spots(page)).relief;
+    console.log(`  al pie: nivel ${arrived.level}, ${relief.levels} alturas, ${relief.tallWalls} al pie de un muro`);
+    check(relief.tallWalls > 0, 'no hay paredes de dos bloques donde deberia haberlas');
+    check(relief.ramps > 0, 'no hay ni un talud por el que subir');
+    await page.screenshot({ path: join(SHOTS, '3d-09-relieve.png') });
 
-  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
-    waitUntil: 'load',
-  });
-  await page.evaluate(() => delete window.__smokeBaseTick);
-  const arrived = await waitForLoop(page);
-  console.log(
-    `  al pie: nivel ${arrived.level}, ${arrived.relief.levels} alturas, ` +
-      `${arrived.relief.tallWalls} tiles al pie de un muro, ${arrived.faces.drawn} caras`,
-  );
-  check(arrived.relief.tallWalls > 0, 'no hay paredes de dos bloques donde deberia haberlas');
-  check(arrived.relief.ramps > 0, 'no hay ni un talud por el que subir en toda la zona');
-  check(arrived.faces.drawn > 0, 'la pared no dibujo ninguna cara');
+    const moved = await bestWalk(page, arrived);
+    console.log(`  camino ${moved.toFixed(2)} casillas junto a la pared`);
+    check(moved > 1, 'el jugador no pudo andar en ninguna direccion junto a la pared');
+    check(moved < 30, `no camino, se teletransporto: ${moved.toFixed(1)}`);
 
-  await page.screenshot({ path: join(SHOTS, '15-relieve.png') });
-
-  // Caminar junto al relieve no puede atascar: se anda a lo largo de la pared,
-  // no contra ella. Va ANTES de subir a la cima: puesto despues medía el
-  // teletransporte y pasaba por el motivo equivocado, que es peor que fallar.
-  // Se prueban las cuatro y se mira la MEJOR. Insistir en una sola dejo de
-  // valer cuando la altura empezo a estorbar: al pie de una pared hay
-  // direcciones que topan a media casilla, y eso ahora es lo correcto, no un
-  // atasco. Lo que seria un fallo es no poder ir a ningun lado.
-  const moved = await bestWalk(page, arrived);
-  console.log(`  camino ${moved.toFixed(2)} casillas junto a la pared, en la mejor direccion`);
-  check(moved > 1, 'el jugador no pudo andar en ninguna direccion junto a la pared');
-  check(moved < 30, `no camino, se teletransporto: ${moved.toFixed(1)} casillas`);
-
-  // --------------------------------------------------- la altura estorba
-  //
-  // Lo que pidio el autor en esta tanda: **ya no se cambia de nivel andando**.
-  // Se comprueba de las dos formas, porque son dos fallos distintos: que la
-  // pared detenga, y que el salto exista y devuelva al suelo.
-
-  // 1. Contra la pared. Lo que se afirma NO es «andando no se sube»: un talud
-  //    sube un nivel andando y para eso existe. Lo que ya no puede pasar es
-  //    **subir un muro**, o sea ganar dos niveles o mas sin saltar, que es
-  //    exactamente el teletransporte que habia antes. Se prueban las cuatro
-  //    direcciones y se guarda la que mas suba, porque hacia donde cae la pared
-  //    depende del sitio y dar por hecho una direccion seria echarlo a suertes.
-  let peor = null;
-  for (const key of ['KeyW', 'KeyA', 'KeyS', 'KeyD']) {
-    await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
-      waitUntil: 'load',
-    });
-    await page.evaluate(() => delete window.__smokeBaseTick);
-    const antes = await waitForLoop(page);
-    await page.keyboard.down(key);
-    await page.waitForTimeout(900);
-    await page.keyboard.up(key);
-    const despues = await waitForLoop(page);
-    const subida = despues.level - antes.level;
-    if (!peor || subida > peor.subida) peor = { key, subida, antes, despues };
-  }
-  console.log(
-    `  contra la pared: lo mas que se sube andando es ${peor.subida} nivel(es) ` +
-      `(${peor.key}, ${peor.antes.level} -> ${peor.despues.level})`,
-  );
-  check(peor.subida <= 1, `andar salvo un muro sin saltar: subio ${peor.subida} niveles`);
-
-  // 2. El salto. Se cuenta por los saltos EFECTUADOS y por la separacion
-  //    maxima que llegaron a tener los pies del suelo, no preguntando «esta en
-  //    el aire ahora»: un vuelo dura 0.4 s y aqui se sondea cada varios cientos
-  //    de milisegundos, asi que el instante se acierta a suertes. Es la misma
-  //    leccion que el slash.
-  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
-    waitUntil: 'load',
-  });
-  await page.evaluate(() => delete window.__smokeBaseTick);
-  const antesDelSalto = await waitForLoop(page);
-  await page.keyboard.press('Space');
-  await page.waitForTimeout(1500);
-  const trasCaer = await page.evaluate(() => window.__verdant);
-  console.log(
-    `  salto: ${trasCaer.jumps - antesDelSalto.jumps} despegue(s), ` +
-      `hasta ${trasCaer.airPeak.toFixed(2)} niveles sobre el suelo, ` +
-      `acaba ${trasCaer.grounded ? 'en suelo' : 'EN EL AIRE'}`,
-  );
-  check(trasCaer.jumps > antesDelSalto.jumps, 'Espacio no despego al personaje del suelo');
-  check(trasCaer.airPeak > 1, `el salto no levanto ni un bloque: ${trasCaer.airPeak}`);
-  check(trasCaer.grounded, 'el personaje se quedo flotando tras saltar');
-
-  // --------------------------------------------------- correr va mas rapido
-  //
-  // Se mide la VELOCIDAD que el nucleo le da al personaje, no la distancia que
-  // recorre. La distancia la contesta el paisaje: al pie de una pared, correr
-  // puede avanzar MENOS que andar simplemente porque topa antes, y asi fallo la
-  // primera version de esta comprobacion —2.84 andando contra 1.94 corriendo—
-  // midiendo el terreno en vez de la mecanica. `vx`/`vy` se fijan antes de
-  // resolver la colision, asi que valen lo mismo se choque o no.
-  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
-    waitUntil: 'load',
-  });
-  await page.evaluate(() => delete window.__smokeBaseTick);
-  const antesDeCorrer = await waitForLoop(page);
-  check(antesDeCorrer.running === false, 'se empieza corriendo, y se deberia empezar andando');
-
-  /** Velocidad mientras se empuja en una direccion, en casillas por segundo. */
-  async function pushSpeed(key = 'KeyD') {
-    await page.keyboard.down(key);
-    let best = 0;
-    for (let i = 0; i < 6; i++) {
-      await page.waitForTimeout(120);
-      const now = await page.evaluate(() => window.__verdant.speed);
-      if (now > best) best = now;
+    // Andando no se sube un muro: lo mas que se gana sin saltar es un nivel.
+    let peor = null;
+    for (const key of ['KeyW', 'KeyA', 'KeyS', 'KeyD']) {
+      const antes = await open(page, baseUrl, at);
+      await hold(page, key, 900);
+      const despues = await waitForLoop(page, 30);
+      const subida = despues.level - antes.level;
+      if (!peor || subida > peor.subida) peor = { key, subida };
     }
-    await page.keyboard.up(key);
-    return best;
+    console.log(`  contra la pared: lo mas que se sube andando es ${peor.subida} nivel(es)`);
+    check(peor.subida <= 1, `andar salvo un muro sin saltar: subio ${peor.subida} niveles`);
+
+    // El salto: despega, levanta mas de un bloque y vuelve al suelo.
+    const antesDelSalto = await open(page, baseUrl, at);
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(1500);
+    const trasCaer = await state(page);
+    console.log(`  salto: ${trasCaer.jumps - antesDelSalto.jumps} despegue(s), hasta ${trasCaer.airPeak.toFixed(2)} niveles`);
+    check(trasCaer.jumps > antesDelSalto.jumps, 'Espacio no despego al personaje');
+    check(trasCaer.airPeak > 1, `el salto no levanto ni un bloque: ${trasCaer.airPeak}`);
+    check(trasCaer.grounded, 'el personaje se quedo flotando tras saltar');
+
+    // Correr: la VELOCIDAD que da el nucleo, no la distancia, que la contesta
+    // el paisaje.
+    await open(page, baseUrl, at);
+    const pushSpeed = async () => {
+      await page.keyboard.down('KeyD');
+      let best = 0;
+      for (let i = 0; i < 6; i++) {
+        await page.waitForTimeout(120);
+        best = Math.max(best, (await state(page)).speed);
+      }
+      await page.keyboard.up('KeyD');
+      return best;
+    };
+    const vAndando = await pushSpeed();
+    await page.keyboard.press('ShiftLeft');
+    await page.waitForTimeout(150);
+    const trasShift = (await state(page)).running;
+    const vCorriendo = await pushSpeed();
+    await page.keyboard.press('ShiftLeft');
+    await page.waitForTimeout(150);
+    const trasSegundo = (await state(page)).running;
+    console.log(`  correr: ${vAndando.toFixed(2)} -> ${vCorriendo.toFixed(2)} casillas/s`);
+    check(trasShift === true && trasSegundo === false, 'Shift no se comporta como interruptor');
+    check(vAndando > 0, 'andando la velocidad salio cero');
+    check(vCorriendo > vAndando * 1.15, `correr no acelero: ${vAndando} vs ${vCorriendo}`);
   }
 
-  const vAndando = await pushSpeed();
-  await page.keyboard.press('ShiftLeft');
-  await page.waitForTimeout(150);
-  const trasShift = await page.evaluate(() => window.__verdant.running);
-  const vCorriendo = await pushSpeed();
-  await page.keyboard.press('ShiftLeft');
-  await page.waitForTimeout(150);
-  const trasSegundoShift = await page.evaluate(() => window.__verdant.running);
-
-  console.log(
-    `  correr: ${vAndando.toFixed(2)} -> ${vCorriendo.toFixed(2)} casillas/s ` +
-      `(x${(vCorriendo / vAndando).toFixed(2)}; shift: ${trasShift}, y otra vez: ${trasSegundoShift})`,
-  );
-  check(trasShift === true, 'Shift no encendio la carrera');
-  check(trasSegundoShift === false, 'Shift no la apago al segundo toque: no es un interruptor');
-  check(vAndando > 0, 'andando la velocidad salio cero: no se llego a empujar');
-  check(
-    vCorriendo > vAndando * 1.15,
-    `correr no acelero: ${vAndando.toFixed(2)} vs ${vCorriendo.toFixed(2)} casillas/s`,
-  );
-
-  // La cima. Es lo que el autor no encontraba explorando: subir a un punto alto
-  // y ver que el mundo tiene escala de verdad.
-  const peak = spawn.peakSpot;
+  // La cima.
   check(peak !== null, 'no se encontro ninguna cima');
   if (peak) {
-    console.log(`  cima mas alta cerca: nivel ${peak.level} en ${peak.stand.x},${peak.stand.y}`);
-    check(peak.level > 15, `la cima mas alta del entorno es el nivel ${peak.level}`);
-    await page.goto(`${baseUrl}/?seed=${SEED}&x=${peak.stand.x}&y=${peak.stand.y}`, {
-      waitUntil: 'load',
-    });
-    await page.evaluate(() => delete window.__smokeBaseTick);
-    const onTop = await waitForLoop(page);
-    console.log(`  en la cima: nivel ${onTop.level}, terreno ${onTop.terrain}`);
+    const onTop = await open(page, baseUrl, `&x=${peak.stand.x}&y=${peak.stand.y}`);
+    console.log(`  cima: nivel ${onTop.level}, ${onTop.terrain}`);
     check(onTop.level > 15, `la cima no era tan alta: nivel ${onTop.level}`);
-    // En lo mas alto no hay nada por delante que pueda taparle, asi que la
-    // silueta sobra. Si saliera aqui es que se dispara siempre y no significa
-    // nada, que es justo lo que pasaba comparando cajas enteras.
-    check(!onTop.playerHidden, 'la silueta sale hasta en la cima, donde nada tapa');
     for (let i = 0; i < 4; i++) await page.keyboard.press('Minus');
     await page.waitForTimeout(500);
-    await page.screenshot({ path: join(SHOTS, '16-cima.png') });
+    await page.screenshot({ path: join(SHOTS, '3d-10-cima.png') });
   }
 
   await page.close();
 }
 
-/**
- * Girar la camara.
- *
- * Con una sola vista, la cara oculta de una montana es inexplorable: lo que hay
- * al otro lado lo tapa la montana misma. Aqui se comprueba lo que hace falta para
- * que girar sirva de algo: que las cuatro vistas sean distintas, que en todas se
- * dibuje relieve, que el mando siga la vista, y que volver dejé el mundo como
- * estaba.
- */
-async function rotationPass(browser, baseUrl) {
-  console.log('\n== rotacion de camara ==');
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  watchProblems(page, 'rotacion');
+// ------------------------------------------------------------------------- main
 
-  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
-  const spawn = await waitForLoop(page);
-  const peak = spawn.peakSpot;
-  check(peak !== null, 'no se encontro ninguna cima');
-  if (!peak) {
-    await page.close();
-    return;
-  }
-
-  // Al pie de la cima, que es donde girar tiene sentido: media montana tapa.
-  await page.goto(`${baseUrl}/?seed=${SEED}&x=${peak.stand.x}&y=${peak.stand.y}`, {
-    waitUntil: 'load',
-  });
-  await page.evaluate(() => delete window.__smokeBaseTick);
-  const start = await waitForLoop(page);
-  check(start.view === 0, `no se empieza en la vista 0: ${start.view}`);
-
-  const seen = [];
-  for (let i = 0; i < 4; i++) {
-    const now = await waitForLoop(page);
-    check(now.view === i, `se esperaba la vista ${i} y hay la ${now.view}`);
-    check(now.faces.drawn > 0, `la vista ${i} no dibujo relieve`);
-
-    // Que se dibujen caras no dice DONDE se dibujan. El terreno estuvo medio
-    // tile fuera de sitio en las tres vistas giradas y esta pasada no se entero:
-    // el paisaje se corre entero y sigue siendo coherente consigo mismo. Lo que
-    // se descuelga es lo que se apoya en el, asi que se mide eso — el pie del
-    // personaje contra el rombo que pisa, sobre el sprite realmente dibujado.
-    const gap = now.footGap;
-    check(gap !== null, `la vista ${i} no dibujo el suelo bajo el personaje`);
-    if (gap) {
-      console.log(`  vista ${i}: pie a (${gap.dx.toFixed(1)}, ${gap.dy.toFixed(1)}) px de su rombo`);
-      // En x no influye el relieve: un desfase ahi es geometria mal puesta.
-      check(Math.abs(gap.dx) < 4, `vista ${i}: el suelo va ${gap.dx.toFixed(1)} px corrido en x`);
-      // En y se deja holgura para un talud, que inclina el rombo medio nivel.
-      check(Math.abs(gap.dy) < 10, `vista ${i}: el suelo va ${gap.dy.toFixed(1)} px corrido en y`);
+async function serve() {
+  const html = await readFile(PAGE);
+  const server = createServer((req, res) => {
+    if ((req.url ?? '/').split('?')[0] !== '/') {
+      res.writeHead(404).end();
+      return;
     }
-    seen.push(now.faces.drawn);
-    await page.screenshot({ path: join(SHOTS, `17-vista-${i}.png`) });
-    await page.keyboard.press('Period');
-    await page.waitForTimeout(500);
-  }
-  const back = await waitForLoop(page);
-  console.log(`  caras por vista: ${seen.join(' / ')}`);
-  check(back.view === 0, `cuatro giros no volvieron a la vista 0: ${back.view}`);
-  check(
-    Math.abs(back.x - start.x) < 0.001 && Math.abs(back.y - start.y) < 0.001,
-    'girar movio al personaje',
-  );
-
-  // El mando gira con la vista: «arriba» tiene que seguir siendo arriba en
-  // pantalla. Se mide en coordenadas de MUNDO, que es lo que cambia.
-  for (let v = 0; v < 4; v++) {
-    const before = await waitForLoop(page);
-    await page.keyboard.down('KeyW');
-    await page.waitForTimeout(700);
-    await page.keyboard.up('KeyW');
-    const after = await waitForLoop(page);
-    const moved = Math.hypot(after.x - before.x, after.y - before.y);
-    console.log(`  vista ${v}: andar arriba movio ${moved.toFixed(2)} casillas`);
-    await page.keyboard.press('Period');
-    await page.waitForTimeout(400);
-  }
-
-  await page.close();
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.end(html);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return server;
 }
 
-async function mountainPass(browser, baseUrl) {
-  console.log('\n== montana (roca y minerales) ==');
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-  watchProblems(page, 'montana');
-
-  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
-  const spawn = await waitForLoop(page);
-  const spot = spawn.mineralSpot;
-  check(spot !== null, 'no se encontro ningun mineral en el mundo de prueba');
-  if (!spot) {
-    await page.close();
-    return;
-  }
-  console.log(`  ${spot.kind} en ${spot.node.x},${spot.node.y}; se golpea desde ${spot.stand.x},${spot.stand.y}`);
-
-  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
-    waitUntil: 'load',
-  });
-  await page.evaluate(() => delete window.__smokeBaseTick);
-  const arrived = await waitForLoop(page);
-  console.log(`  aparecio en ${arrived.terrain} / ${arrived.biome}`);
-  check(arrived.biome === 'Tierras altas', `el bioma no es el esperado: ${arrived.biome}`);
-
-  // Se puede andar dentro, que es exactamente lo que no se podia.
-  await page.keyboard.down('KeyD');
-  await page.waitForTimeout(700);
-  await page.keyboard.up('KeyD');
-  const walked = await waitForLoop(page);
-  const moved = Math.hypot(walked.x - arrived.x, walked.y - arrived.y);
-  console.log(`  camino ${moved.toFixed(2)} casillas por la montana`);
-  check(moved > 1, 'el jugador no pudo caminar dentro de la montana');
-
-  // Se vuelve al sitio y se mina: andar al sur deja el mineral apuntado.
-  await page.goto(`${baseUrl}/?seed=${SEED}&x=${spot.stand.x}&y=${spot.stand.y}`, {
-    waitUntil: 'load',
-  });
-  await page.evaluate(() => delete window.__smokeBaseTick);
-  await waitForLoop(page);
-
-  await page.keyboard.down('KeyS');
-  await page.waitForTimeout(120);
-  await page.keyboard.up('KeyS');
-  // El cursor al sur, que es donde quedo el mineral apuntado: la accion es el
-  // clic derecho y con raton la mirada la manda el cursor.
-  await page.mouse.move(CENTRE.x, CENTRE.y + 110);
-  await page.mouse.down({ button: 'right' });
-  await page.waitForTimeout(500);
-  await page.mouse.up({ button: 'right' });
-  await page.screenshot({ path: join(SHOTS, '14-montana.png') });
-
-  const end = await page.evaluate(() => window.__verdant);
-  const minerals = end.inventory.slice(5);
-  console.log(`  piedra ${end.inventory[1]}, carbon/hierro/cobre ${minerals.join('/')}`);
-  check(
-    minerals.some((n) => n > 0),
-    `no se saco ningun mineral: inventario ${JSON.stringify(end.inventory)}`,
-  );
-
-  await page.close();
-}
-
-// ---------------------------------------------------------------------- main
-
-const remote = process.env.VERDANT_URL;
-const { server, port } = remote ? { server: null, port: 0 } : await serve(DIST);
-const baseUrl = remote ?? `http://127.0.0.1:${port}`;
+const remote = process.env.VERDANT_URL?.replace(/\/$/, '');
+const server = remote ? null : await serve();
+const baseUrl = remote ?? `http://127.0.0.1:${server.address().port}`;
 console.log(`probando ${baseUrl}`);
 
-// Al verificar un despliegue remoto puede haber un proxy de salida obligatorio.
 const proxyUrl = remote ? (process.env.HTTPS_PROXY ?? process.env.https_proxy) : undefined;
 const browser = await chromium.launch(proxyUrl ? { proxy: { server: proxyUrl } } : {});
 
+const only = process.argv[2];
+const passes = { desktopPass, resourcesPass, mobilePass, devToolsPass, lifePass, reliefPass };
 try {
-  await desktopPass(browser, baseUrl);
-  await mobilePass(browser, baseUrl);
-  await devToolsPass(browser, baseUrl);
-  await reliefPass(browser, baseUrl);
-  await rotationPass(browser, baseUrl);
-  await mountainPass(browser, baseUrl);
+  for (const [name, pass] of Object.entries(passes)) {
+    if (only && !name.startsWith(only)) continue;
+    await pass(browser, baseUrl);
+  }
 } finally {
   await browser.close();
   server?.close();

@@ -13,14 +13,10 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "smoke": "npm run build && node tools/smoke.mjs",
-    "build:pages": "npm run build && npm run spike && node tools/build-pages.mjs",
-    "build:single": "npm run build:single -w @verdant/client",
-    "artifact": "npm run build:single && node tools/make-artifact.mjs",
-    "spike": "npm run build:spike -w @verdant/client",
-    "spike:shots": "npm run spike && node tools/spike-shots.mjs",
-    "spike:gestures": "npm run spike && node tools/spike-gestures.mjs",
-    "spike:slash": "npm run spike && node tools/spike-slash.mjs",
-    "spike:smoke": "npm run spike && node tools/smoke3d.mjs"
+    "shots": "npm run build && node tools/shots.mjs",
+    "gestures": "npm run build && node tools/gestures.mjs",
+    "slash": "npm run build && node tools/slash.mjs",
+    "build:pages": "npm run build && node tools/build-pages.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

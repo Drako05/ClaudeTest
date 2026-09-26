@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BufferGeometry, Vector3 } from 'three';
-import { ribbon } from '../packages/client/src/spike3d/effects-view.js';
+import { ribbon } from '../packages/client/src/effects-view.js';
 
 /**
  * La cinta del barrido en 3D.
@@ -13,7 +13,7 @@ import { ribbon } from '../packages/client/src/spike3d/effects-view.js';
  *
  * Va en un test de Node y no en la medida del navegador porque es un NUMERO, que
  * es el reparto de siempre en este proyecto: el navegador verifica integracion
- * —`tools/spike-slash.mjs` cuenta pixeles de verdad en pantalla— y los tests
+ * —`tools/slash.mjs` cuenta pixeles de verdad en pantalla— y los tests
  * unitarios verifican cuentas.
  */
 

@@ -35,34 +35,22 @@ cosa del autor, desde la web.
 Y por eso existe `docs/pendiente.md`: **las notas del agente mueren con la
 sesion**, asi que lo que no este escrito en el repo se pierde. Leelo primero.
 
-## El isometrico esta CONGELADO
+## Un solo cliente: el 3D
 
-Decision del autor, 2026-09-12: **no se gasta mas trabajo en el juego
-isometrico.** No se le anaden mecanicas, no se le portan los cambios nuevos y no
-se pule. El desarrollo va al cliente 3D (`packages/client/src/spike3d/`,
-`npm run spike`), segun la decision que ya esta escrita en `docs/pendiente.md`.
+Decision del autor, 2026-09-26: **el juego isometrico se retiro del todo.** El
+cliente es el 3D (`packages/client/src/`), y cada caracteristica se hace una
+sola vez. Antes de borrarlo se traslado todo lo que era del juego y se comprobo
+con la prueba de humo; la lista, lo que no se traslado y por que, y las reglas
+de aquella camara estan en **`docs/isometrico.md`**. El codigo sigue en la
+historia: `b1d0d7a` es el ultimo commit con el isometrico completo.
 
-Lo congelado es **la capa de presentacion isometrica**: `projection.ts`,
-`terrain-draw.ts`, `relief-faces.ts`, `biome-edges.ts`, el arte de terreno de
-`tiles.ts`, `renderer.ts` y la parte de `main.ts` / `input.ts` que sea suya.
-`packages/sim` y `packages/shared` no estan congelados: son el nucleo del juego y
-entran intactos en el 3D, asi que ahi se sigue trabajando igual.
-
-Las reglas de abajo que describen la isometrica (6, 7, 16, 17, 18, 19, 20) se
-quedan escritas por dos motivos: varias son verdades del mundo, no de la camara
-—el orden por profundidad, las filas, lo que tapa a quien— y vuelven a aparecer
-en 3D; y las que no, cuentan **por que** se giro.
-
-**Interpretacion mia, corregible:** congelado no es roto. Si un cambio en `sim`
-deja el isometrico sin compilar o tumba `npm run smoke`, hago el arreglo minimo
-para devolverlo al verde, porque hoy el humo es la unica prueba de integracion
-que existe. Lo que no hago es llevarle nada nuevo. Si prefieres que el
-isometrico salga del `typecheck` y del humo en cuanto el 3D tenga su propia
-prueba de humo, dilo y se retira.
+Las reglas 6, 7 y 16 a 20 eran de la camara isometrica y se mudaron alli
+literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21» o
+«regla 22», y renumerar romperia esas referencias.
 
 ## Reglas duras
 
-1. **`packages/sim` jamas toca el navegador.** Sin DOM, canvas, WebGL, PixiJS ni
+1. **`packages/sim` jamas toca el navegador.** Sin DOM, canvas, WebGL, three.js ni
    `Math.random`. El mismo modulo debe correr en Node (servidor autoritativo,
    tests) y en el navegador. `tests/purity.test.ts` lo verifica.
 2. **Toda aleatoriedad viene de una semilla explicita.** Usa `mulberry32` o
@@ -79,49 +67,21 @@ prueba de humo, dilo y se retira.
 5. **El input produce `Intent`; nunca muta el estado.** Es lo que permitira
    enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
-   nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`): con raton la fija el
-   cursor, en tactil el joystick, y en reposo se conserva la que hubiera.
+   nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`), y es **la de la
+   camara**, decision del autor: cada tick sale de `camera.forward()` y el
+   nucleo la encaja en sus ocho direcciones. Se acciona hacia donde se mira; y
+   como el movimiento tambien se rota con la camara antes de entrar en la
+   Intent, la Intent sigue siendo de mundo y puede viajar por red.
 
    **`moveX`/`moveY` son DIRECCION, no velocidad.** Su magnitud no dice nada. Lo
    cambio el autor al pedir la carrera: el joystick hacia de acelerador —cuanto
    mas desplazado, mas rapido— y eso se sustituyo por dos velocidades discretas
    que elige `run`. Un mando analogico apunta; no dosifica. La zona muerta se
    queda, pero vive en el cliente: el nucleo solo ve direcciones.
-6. **La vista es isometrica, GIRABLE en cuatro, y vive solo en el cliente.** La
-   transformacion esta entera en `packages/client/src/projection.ts`, que lleva
-   una orientacion de modulo y la aplica dentro de `worldToScreen`,
-   `screenToWorld` y `depthOf`; todo lo demas se entera solo. El mundo es una
-   rejilla cuadrada y la simulacion no sabe que existe una camara: el vector de
-   movimiento se rota en `input.ts` **antes** de entrar en la Intent, para que la
-   Intent siga siendo de mundo y pueda viajar por red (regla 5).
-
-   **`worldToScreen(wx, wy)` NO es la esquina norte del rombo del tile**, aunque
-   lo sea en la vista 0. La rotacion gira alrededor del origen, no del centro de
-   la casilla, asi que ese punto pasa a ser la esquina oeste en la vista 1, la sur
-   en la 2 y la este en la 3: dibujar el rombo desde ahi lo deja **medio tile
-   fuera de sitio** en tres de las cuatro vistas. Para eso esta `tileOrigin`, que
-   sale del centro —lo unico que el giro respeta— y baja media altura de tile.
-
-   Lo que hace ese fallo dificil de ver es que **no se nota en el terreno**: todas
-   sus piezas se corren igual y el paisaje sigue siendo coherente consigo mismo.
-   Se nota en lo que se apoya en el, que se situa por el centro del tile y por
-   tanto cae bien: arboles a caballo entre dos casillas y personajes naciendo del
-   costado de un bloque. El test de orden tampoco lo ve, porque afirma quien tapa
-   a quien, que es RELATIVO. Lo que lo cierra es afirmar **donde cae el rombo**:
-   sus cuatro esquinas tienen que ser las de su cuadrado del mundo, proyectadas.
-   Cuando necesites una esquina concreta, pidela por sus coordenadas de mundo
-   —`worldCorner`, o proyectar el punto directamente— y no por su sitio en
-   pantalla.
-
-   Se gira porque con una sola vista la cara oculta de una montana es
-   inexplorable: lo que hay al otro lado lo tapa la montana misma. Girar de forma
-   continua no es posible —el arte lleva la proyeccion horneada dentro, asi que a
-   un angulo libre habria que rehacer la geometria del terreno en cada frame y el
-   orden dejaria de agruparse en antidiagonales—, y por eso el giro es de 90
-   grados y con corte seco.
-7. **Todo lo que tenga altura va en la capa ordenada por profundidad**
-   (`depthOf`), nunca horneado en la textura del chunk; si no, el personaje
-   aparecera por delante de cosas que tiene detras.
+6. *(Retirada con el isometrico: la vista isometrica girable. Ver
+   `docs/isometrico.md`.)*
+7. *(Retirada con el isometrico: la capa ordenada por profundidad. Ver
+   `docs/isometrico.md`.)*
 8. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
    interpolacion para el render es cosa del cliente.
 9. **Lo unico que detiene el paso es el agua.** La roca estuvo en
@@ -170,72 +130,9 @@ prueba de humo, dilo y se retira.
     especial. Las caras se calculan con las alturas de los **dos extremos** de
     cada borde: comparando niveles enteros, el costado de un talud se quedaria
     sin su cuna y se veria el fondo por el agujero.
-16. **Todo el mundo va en UN solo orden, por antidiagonales.** Suelo, paredes,
-    arboles y personaje comparten capa y se ordenan por `wx + wy`. Tener el suelo
-    horneado por un lado y las paredes en la capa de objetos por otro fue un
-    fallo de verdad, y de los caros: la capa de caras estaba entera por encima,
-    asi que una pared se pintaba sobre cualquier suelo, lo tuviera delante o
-    detras. **No lo vio ningun test ni la prueba de humo; lo vio el autor
-    jugando.** Por eso el orden vive ahora en `client/terrain-draw.ts`, que es
-    puro, y `tests/terrain-draw.test.ts` afirma la regla: si dos piezas se
-    solapan en pantalla, la de mayor profundidad se dibuja despues.
-
-    No se ordenan miles de sprites por frame: los tiles de una misma
-    antidiagonal **no se solapan nunca entre si**, asi que cada una es un
-    contenedor y solo se ordena la lista de contenedores. Si tocas eso, el test
-    «dentro de una antidiagonal nada se pisa» es el que defiende la suposicion.
-
-17. **El recorte de pantalla es por bloques de 8x8, no por chunk.** Con montanas
-    de cuarenta niveles un chunk ocupa mas que la pantalla, asi que darlo por
-    visible entero significa dibujar diez mil piezas para ver mil quinientas.
-    Medido: 10.236 contra 3.026.
-
-18. **Al personaje lo tapa el terreno, y por eso lleva silueta.** Atenuar el
-    suelo como se atenua un arbol NO vale: por detras de un arbol se ve el suelo,
-    pero por detras del suelo no hay nada y se abre un agujero al vacio. Se
-    probo. La silueta se decide mirando si algo cubre el **pecho o la cabeza**,
-    no la caja entera: la casilla de justo delante siempre roza los pies, y
-    comparando cajas la silueta salia siempre y dejaba de significar nada.
-
-    Lo que estorba se busca recorriendo las **filas de delante**, no una ventana
-    de casillas alrededor: con relieve, un arbol encaramado cinco filas mas alla
-    tapa tanto como el de al lado. Y ojo con las condiciones de esa busqueda: la
-    version anterior filtraba por un `zIndex` que al pasar a contenedores por fila
-    dejo de asignarse, asi que en coordenadas positivas no se atenuaba **nada** y
-    en negativas se atenuaba todo. Medio mundo bien y medio mal, y ningun test
-    unitario lo ve. Por eso la prueba de humo lo mide en el cuadrante positivo.
-
-19. **Una entidad va en la fila de su CASILLA, no de su posicion.** `depthRowOf`
-    redondea la casilla; redondear la posicion continua metia al personaje una
-    fila por delante de si mismo en media casilla de cada dos, dibujandolo sobre
-    el arbol y el bloque que tenia justo delante. Aparecia y desaparecia al
-    caminar, que es lo que lo hacia dificil de ver.
-
-20. **Un escalon mirado por detras no se ve, asi que se delata con el filo.** Los
-    dos costados traseros de un bloque los tapa el propio bloque, y sin nada mas
-    un escalon por detras es indistinguible de terreno llano: un nivel mide 16 px
-    y una fila 8, asi que subir un nivel equivale exactamente a retroceder dos
-    filas. En su sitio va el **filo iluminado** de la arista, que se refuerza con
-    el desnivel.
-
-    **No hay sombra, y no puede haberla.** Se intento dos veces y las dos
-    quedaron mal. Primero extruida en vertical, que en isometrica dibuja una
-    PARED y se veia como un panel oscuro de pie sobre la arista. Luego tumbada en
-    el plano del suelo, pero **al nivel del propio emisor**: sobre un escalon
-    hacia el mar era una losa plana flotando a la altura de la arena sobre agua
-    que esta un nivel mas abajo, y se leia como terreno que no existe.
-
-    Bajarla a su sitio tampoco vale, y esto es lo que cierra la cuestion: el
-    suelo que la recibiria **no se ve nunca**. Una casilla una fila mas atras y un
-    nivel mas abajo cae en pantalla justo donde cae la que la tapa por delante a
-    tu propia altura, y esa se dibuja despues. Es la misma aritmetica de la
-    ambiguedad, por el otro lado — y es tambien la razon de que el escalon
-    necesite una senal. `tests/projection.test.ts` fija las dos identidades.
-
-    De ahi sale la regla general que lo gobierna, y que vale para cualquier senal
-    que se anada: **nada se dibuja fuera del rombo de su propio tile**, porque
-    fuera de el no hay garantia de que haya suelo a esa altura.
-    `tests/terrain-draw.test.ts` lo afirma.
+16-20. *(Retiradas con el isometrico: el orden por antidiagonales, el recorte
+    por bloques, la silueta del jugador, la fila de su casilla y el filo de los
+    escalones. Ver `docs/isometrico.md`.)*
 
 21. **La altura estorba, y estorba con UNA regla: no se entra donde el suelo
     esta por encima de los pies.** De ahi salen las tres cosas a la vez y sin
@@ -354,7 +251,7 @@ que este proyecto ya se comio una vez:
 - **Edita con la herramienta de edicion, no con `sed` ni heredocs de `python`.**
   Cuando un fichero cambia por fuera, el sistema lo vuelca **entero** en el
   contexto para que no trabajes sobre una copia vieja. En una tanda,
-  `spike3d/main.ts` se volco completo siete veces: decenas de miles de tokens
+  `main.ts` del cliente se volco completo siete veces: decenas de miles de tokens
   en re-volcados que no aportaron nada.
 - **Una captura por ronda, no cuatro.** Cada PNG son 1.200-1.800 tokens y se
   queda en contexto reenviandose el resto del turno. Mira la que decide; las
@@ -372,9 +269,20 @@ npm run typecheck && npm test && npm run smoke
 
 `npm run smoke` construye el cliente y lo juega en Chromium headless leyendo el
 estado real por `window.__verdant`. Los tests unitarios no detectan que el juego
-no arranque; esto si. Hace dos pasadas, escritorio con teclado y movil con
-eventos tactiles sinteticos; si tocas los controles, ambas tienen que seguir
-pasando.
+no arranque; esto si. Hace seis pasadas —escritorio, recursos (comer, sembrar,
+minar), movil con toques sinteticos, panel de desarrollo, muerte y noche, y
+relieve—; si tocas los controles, todas tienen que seguir pasando. Una sola se
+corre con `node tools/smoke.mjs <nombre>` tras `npm run build`, por ejemplo
+`node tools/smoke.mjs mobile`.
+
+Dos habitos del humo que conviene conservar. Lo que depende del paisaje se
+comprueba **desde el nacimiento**, que es un rellano llano (regla 22) con las
+tres casillas al alcance, o yendo a un sitio buscado a proposito con `?x=&y=`
+(`probes.ts`); una comprobacion que depende de donde quedo el jugador pasa o
+falla por suerte, y eso ya paso. Y que un boton **llega a la Intent** se mide
+con los contadores `sent` de la sonda, no con su efecto: que sembrar plante
+depende de tener semillas y una casilla que lo admita, y eso lo miden los tests
+del nucleo.
 
 Reparto de responsabilidades entre las dos capas de test, que conviene respetar:
 la prueba de humo verifica **integracion** (que un toque llega a producir una
@@ -391,12 +299,12 @@ software a 3x, asi que ese numero no dice nada del rendimiento en un movil real.
 ## Efectos visuales
 
 `client/effects.ts` lleva el movimiento —donde esta cada cosa y cuanto le queda
-de vida— sin DOM ni PixiJS, y el renderizador solo lo dibuja: asi la fisica de
+de vida— sin DOM ni three.js, y `effects-view.ts` solo lo dibuja: asi la fisica de
 las particulas se mide en Node. Avanzan con el tiempo **escalado**, de modo que
 pausar los congela y 64x no inunda la pantalla.
 
 Los colores de los escombros salen de `client/palette.ts`, la misma tabla con la
-que `tiles.ts` pinta cada especie. Estan juntas a proposito: el encargo era que
+que `art.ts` pinta cada especie. Estan juntas a proposito: el encargo era que
 los escombros fueran los colores del objeto, y con una copia se separarian al
 primer retoque. Sobre hierba los verdes de un arbol desaparecen, asi que cada
 cuadrado lleva un contorno oscuro debajo; cambiarles el color habria sido
@@ -412,15 +320,15 @@ frame se ven los 35 slashes y a 221 ms cero de 35. Ahi vivio meses el fallo, y
 alargar el slash lo habria tapado tocando un numero de sensacion que es del
 autor.
 
-**El 3D reutiliza `effects.ts` tal cual y solo pone el dibujado**
-(`spike3d/effects-view.ts`). Es la prueba de que el reparto estaba bien hecho: lo
-que se reutiliza —donde esta cada escombro, cuanto le queda de vida, con que
-colores— nunca fue del isometrico, asi que no roza el congelado.
+**El 3D reutilizo `effects.ts` tal cual y solo puso el dibujado**
+(`effects-view.ts`). Es la prueba de que el reparto estaba bien hecho: lo que se
+reutilizo —donde esta cada escombro, cuanto le queda de vida, con que colores—
+nunca fue de la camara isometrica, que es donde nacio.
 
 Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
 
 - **En el 3D un nivel mide lo mismo que una casilla**, porque `terrain-mesh.ts`
-  usa la altura tal cual como coordenada Y; en el isometrico un nivel son 16 px
+  usa la altura tal cual como coordenada Y; en el isometrico un nivel eran 16 px
   y una casilla 32. Asi que la altura entra directa y el TAMANO, que `effects.ts`
   da en pixeles del arte isometrico, se divide por 32.
 - **Los escombros se apagan encogiendo, no desvaneciendose.** Cada uno tiene su
@@ -428,7 +336,7 @@ Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
   instancia; se aplica la misma curva de apagado a la escala. El barrido si se
   desvanece, porque son pocos y cada uno lleva su material.
 - **El barrido se dibuja POR ENCIMA del mundo y MIRANDO a la camara.** Las dos
-  cosas son la traduccion de una sola: en el isometrico el trazo vive en
+  cosas son la traduccion de una sola: en el isometrico el trazo vivia en
   `effectLayer`, una capa de pantalla sobre el mundo entero, y ahi nada puede
   taparlo ni escorzarlo. En 3D eso se compra con `depthTest: false` y con una
   cinta que se ensancha perpendicular a la linea de vision. Sin lo primero se lo
@@ -464,7 +372,7 @@ una vez para comprobar que salia donde debia; salia.
 cuenta dentro del dibujado, y aun asi los tres fallos de arriba lo incrementaban
 igual: recortado por el frustum o tapado por el terreno, el contador subia. Es el
 mismo fallo de razonamiento que el de abajo, un escalon mas adentro. Para afirmar
-que algo llega a pantalla hay que contar **pixeles**: `npm run spike:slash` para
+que algo llega a pantalla hay que contar **pixeles**: `npm run slash` para
 una captura en reposo como referencia y cuenta los que el efecto aclara, porque
 con el jugador y la camara quietos dos fotogramas son identicos. Y compara
 **contra el peor de cuatro rumbos**, no contra uno: los dos defectos de
@@ -479,9 +387,9 @@ Lo que ese fallo enseña sobre las comprobaciones, y vale para cualquiera que se
 anada: **la prueba de humo preguntaba si habia un slash vivo en ese instante**,
 con una vida de 0,22 s y un sondeo cada 420 ms. Dos defectos en uno — se
 acertaba a suertes, y miraba la LISTA de efectos, asi que no distinguia «no se
-lanza» de «se lanza y no se dibuja», que era justo el caso. Ahora el renderizador
-lleva un acumulador de slashes **trazados** (`Renderer.slashesDrawn`) y el humo
-afirma que crece. Una comprobacion que puede pasar por suerte es peor que una que
+lanza» de «se lanza y no se dibuja», que era justo el caso. Ahora el dibujado
+lleva un acumulador de slashes **trazados** (`EffectsView.slashesDrawn`) y el
+humo afirma que crece. Una comprobacion que puede pasar por suerte es peor que una que
 falla.
 
 **Y la moraleja de la moraleja: cuando se arreglo el slash, la comprobacion de
@@ -491,7 +399,7 @@ Aguanto varias tandas y un dia el runner de CI perdio la moneda: 221 slashes
 trazados y cero escombros, con el mismo golpe soltando diez unas lineas mas
 abajo, donde el tiempo esta congelado. Un escombro vive entre 0,6 y 1,1 s, el
 runner va a 4-6 FPS y el sondeo cae cada 420 ms: no habia por que acertar. Ahora
-hay `Renderer.debrisDrawn`, gemelo del otro. **Al arreglar una comprobacion de
+hay `EffectsView.debrisDrawn`, gemelo del otro. **Al arreglar una comprobacion de
 estas, mira si su hermana tiene el mismo fallo.**
 
 ## Herramientas de desarrollo
@@ -513,12 +421,19 @@ que saltar una hora deje el mundo exactamente igual que vivirla quieto; y
 equivalencia siga valiendo con el interruptor en cualquier posicion. Hay tests de
 las tres.
 
-Las superposiciones de depuracion (rejilla de chunks y contorno de biomas) se
-trazan en coordenadas de pantalla **absolutas** y su `Graphics` se queda en (0,0)
-dentro de `markerLayer`. Asignarle ademas la posicion del chunk suma el origen
-dos veces y saca todo el dibujo un chunk en diagonal; como en el chunk (0,0) el
-error vale cero, a ojo parece que funciona. La geometria del contorno vive aparte
-en `client/biome-edges.ts`, sin PixiJS, para poder verificarla en Node.
+Las superposiciones de depuracion (rejilla de chunks y contorno de biomas) van
+en `overlays.ts`, en coordenadas **del mundo** y pegadas al suelo de cada
+esquina. En el isometrico se calculaban en pantalla y ahi tuvieron sus dos
+fallos —el origen del chunk sumado dos veces, que sacaba el dibujo un chunk en
+diagonal y en el chunk (0,0) valia cero, y las costuras sin dibujar—; en 3D el
+primero desaparece por construccion y el humo sigue midiendo que ningun
+segmento caiga fuera de su chunk. La geometria del contorno vive aparte en
+`biome-edges.ts`, sin three.js, para poder verificarla en Node, y mira el vecino
+de la costura con `world.gen` para no registrar chunks por mirar.
+
+**La mirada es la de la camara, asi que la reticula tambien.** Marca las
+casillas que la accion ALCANZA (`actionReach`), cada una a su altura: marcar las
+de encima de una pared prometeria algo que la accion no cumple (regla 21).
 
 La congelacion empieza puesta al abrir el panel y solo se aplica con el panel
 abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
@@ -549,7 +464,7 @@ descarta, escribe profundidad y el orden deja de importar. De ahi salen:
 - **El umbral es 0.4 y no puede ser menor**, porque el arte pinta su sombra **al
   26 %** y con el material opaco cualquier umbral que la conserve la pintaria
   **negra maciza**. O sea que la sombra del arte se descarta por fuerza.
-- **Por eso la sombra va aparte y tumbada** (`spike3d/shadows.ts`), que ademas es
+- **Por eso la sombra va aparte y tumbada** (`shadows.ts`), que ademas es
   donde debia estar: la pintada era una elipse VERTICAL pegada al pie, herencia
   de que el arte nacio para una camara isometrica fija. Sin ella unos arboles de
   tres bloques parecen pegatinas flotando. Medido quitandolas: 60.429 pixeles
@@ -585,7 +500,7 @@ entero: la relacion entre jugador y arbol ya era la buena y lo que sobraba era e
 bloque.
 
 Asi que **todo lo que se apoya en el suelo sube con el mismo `BASE = 2.3`**
-(`spike3d/billboards.ts`), y solo los arboles llevan su pizca de mas
+(`billboards.ts`), y solo los arboles llevan su pizca de mas
 (`ARBOL = 2.6`). Eso conserva intactas las proporciones que el autor ya habia
 dado por buenas entre unos y otros, y cambia unicamente su tamano frente al
 terreno. Medido del dibujo:
@@ -608,14 +523,13 @@ subes 0,6 andando y saltas 1,25; aqui 1,93, `STEP_UP` 0,5 y apice 1,16. La regla
 pixelado. `makeFeatureArt(feature, detail)` y `makePlayerArt(detail)` crean el
 lienzo `detail` veces mas grande y le aplican `ctx.scale(detail, detail)`: **ni
 una coordenada de dibujo cambia**, y `anchorX`/`anchorY` salen bien solas porque
-ya eran fracciones. `riseAbove` va en pixeles y se multiplica. El isometrico pide
-`detail = 1` y obtiene byte por byte lo de siempre —lo afirma el humo con su «pie
-a (0,0) px de su rombo» en las cuatro vistas—.
+ya eran fracciones. Con `detail = 1` sale byte por byte el dibujo original del
+isometrico, que lo verifico su humo mientras existio.
 
 **Las proporciones se MIDEN, no se miran.** `BillboardSet.sizes` busca el pixel
-con tinta mas alto de cada lienzo y lo pasa a bloques; `npm run spike:shots` los
-imprime. No vale el alto del lienzo ni `riseAbove`: un arbol ocupa 39 px de un
-lienzo de 58 y `riseAbove` da la cota superior. Estimando por el lienzo me sali
+con tinta mas alto de cada lienzo y lo pasa a bloques; `npm run shots` los
+imprime. No vale el alto del lienzo ni el ancla: un arbol ocupa 39 px de un
+lienzo de 58 y lo que queda por encima del ancla es la cota superior. Estimando por el lienzo me sali
 con que un brote mediria 1,52 bloques y una roca 2,88; medidos son 0,88 y 1,09.
 
 Dos cosas arrastro el cambio y no eran opcionales: **`EYE` de la camara** paso de
@@ -628,7 +542,8 @@ a polvo. El **alto** del barrido sube tambien —es el pecho del personaje— pe
 Y una consecuencia que es de juicio del autor, no medible: **el relieve se lee
 menos de la mitad de alto**. Una pared de un bloque pasa de llegar al pecho a
 llegar a la rodilla, y una cima de 27 niveles de medir 34 personajes a medir 14.
-La fisica no cambia ni un decimal, pero los 16 px por nivel se calibraron a ojo.
+La fisica no cambia ni un decimal, pero los 16 px por nivel se calibraron a ojo
+en el isometrico, que era donde un nivel se media en pixeles.
 
 ## El relieve
 
@@ -637,9 +552,11 @@ escalon de 0.06 de elevacion, y `groundHeightAt` devuelve la altura real de un
 punto con decimales. **El relieve estorba** desde la fase 2: hay gravedad, salto
 y caida, y ya no se cambia de nivel andando (regla 21).
 
-Un nivel mide **16 px**, que es `TILE_W / 2`: en una isometrica 2:1 esa es la
-arista vertical de un cubo. Estuvo en 8 y el autor lo noto a la primera —los
-bloques se veian como baldosas—, asi que no es una eleccion estetica.
+**En el 3D un nivel mide lo mismo que una casilla**: `terrain-mesh.ts` usa la
+altura tal cual como coordenada Y, asi que los bloques son cubos. En el
+isometrico un nivel eran **16 px**, `TILE_W / 2`, la arista vertical de un cubo
+en una 2:1; estuvo en 8 y el autor lo noto a la primera —los bloques se veian
+como baldosas—. Es el mismo cubo por los dos caminos.
 
 Las cordilleras amplifican el desnivel **anclando en el nivel del mar**: bajo el
 agua `reliefAt` es identica a `elevationAt`, y por eso meter montanas no obligo a
@@ -647,13 +564,11 @@ recalibrar la costa, que son los tres umbrales mas delicados que hay. Los de
 altitud si se recalibraron, pero **sumando** reglas a las viejas en vez de
 sustituirlas, para no mover el mundo llano ni un tile.
 
-La camara gira con **coma y punto**, no con Q y E: la E ya era comer, y cambiar
-una tecla que funciona para meter otra no es decision del agente.
-
-Los controles cambiaron con la fase 2, y fue decision del autor: **Espacio pasa
-a ser el salto** y la accion se va **al clic derecho, en exclusiva**. En tactil
-hay boton de saltar, en el isometrico y en el 3D. Dejar tambien el clic
-izquierdo accionando habria vaciado la distincion de sentido.
+Las teclas: WASD o flechas andan, **Espacio salta** (decision del autor en la
+fase 2), Shift enciende la carrera, **E come** y **F siembra**, R empieza un
+mundo nuevo, + y - acercan y alejan, y P cambia de proyeccion. La camara se gira
+arrastrando. Las letras de comer y sembrar vienen del isometrico, y cambiar una
+tecla que funciona para meter otra no es decision del agente.
 
 **Correr es un INTERRUPTOR**, tambien decision suya: se enciende con Shift o con
 el boton del movil y se queda encendido hasta que se vuelva a pulsar. No es una
@@ -670,7 +585,7 @@ elige el interruptor, no lo desplazado que este el pulgar.
 ese mismo boton gira la camara arrastrando. Se decide **al soltar** —lo que no se
 ha movido mas de `TAP_SLOP` era un clic; lo que si, era un arrastre y ya giro la
 vista—, y se mide contra el ORIGEN quedandose con el maximo, para que ir y volver
-siga contando como arrastre. La regla vive en `spike3d/gestures.ts`, que es puro,
+siga contando como arrastre. La regla vive en `gestures.ts`, que es puro,
 y `tests/gestures.test.ts` la afirma. En tactil no hay tal conflicto: acciona el
 boton, y un dedo sobre el mundo gira la camara y nada mas.
 
@@ -679,19 +594,24 @@ la mas pegada al borde derecho**, que es donde cae el pulgar en reposo, y salto 
 carrera se apartan a su izquierda y van mas pequenos. En fila y no en columna,
 para que sea el borde —y no la altura— lo que ordene la importancia.
 
+Comer y sembrar llegaron despues, al retirar el isometrico, y se colocaron
+**siguiendo esa misma regla**: a la izquierda de todo y los mas pequenos, porque
+se usan menos que moverse y accionar. En un telefono estrecho los cinco se
+aprietan y la accion conserva su primacia. **La colocacion es deduccion mia**
+desde la regla del autor, no una decision suya: puede corregirla.
+
 **Y ese racimo no se ve en PC**, tambien decision suya: son controles de pulgar y
 con teclado sobran, porque Shift, Espacio y el clic izquierdo ya hacen lo mismo.
-El mecanismo es el del isometrico y se copio tal cual —`.touch-active` en el
-`body`, que pone `controls.ts` si el puntero es grueso y, si no, al primer toque
+El mecanismo —`.touch-active` en el `body`, que pone `controls.ts` si el puntero es grueso y, si no, al primer toque
 de verdad—. **Esa segunda via no es adorno**: un portatil tactil declara puntero
 fino, asi que sin ella sus botones no apareceran nunca, y como `hasTouch` de
 Playwright ya hace que Chromium declare puntero grueso, medirla obliga a fingir
-uno fino (`tools/spike-slash.mjs` lo hace, y afirma «oculto al cargar, visible
+uno fino (`tools/slash.mjs` lo hace, y afirma «oculto al cargar, visible
 tras tocar»).
 
 La excepcion es **el ojo de la esquina superior derecha**, que cambia de
-proyeccion y se ve siempre: es el unico control que no tiene tecla anunciada en
-ningun sitio. Va en SVG y no en emoji —`👁` se pinta a color y distinto en cada
+proyeccion y se ve siempre: nacio siendo el unico control sin tecla anunciada, y
+en el movil sigue sin tenerla (en PC la ayuda ya anuncia la P). Va en SVG y no en emoji —`👁` se pinta a color y distinto en cada
 sistema— y **dice cual esta activa con su propia forma**: abierto en perspectiva,
 que tiene fuga, y entrecerrado en ortografica, que lo aplana todo. Lo eligio asi
 el autor entre tres opciones; el simbolo cuenta la diferencia en vez de limitarse

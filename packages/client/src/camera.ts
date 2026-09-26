@@ -1,10 +1,10 @@
 /**
- * La camara del spike: orbita libre alrededor del jugador.
+ * La camara: orbita libre alrededor del jugador.
  *
- * Es todo el motivo de esto. La camara isometrica no puede describir lo que hay
- * detras de una montana —la informacion no esta en la imagen, y esta medido en
- * `tests/projection.test.ts`—, y girarla en cuatro pasos fijos fue un parche que
- * no se siente natural explorando. Aqui el angulo es continuo.
+ * Fue el motivo de pasar a 3D. La camara isometrica no podia describir lo que
+ * hay detras de una montana —la informacion no estaba en la imagen—, y girarla
+ * en cuatro pasos fijos fue un parche que no se sentia natural explorando
+ * (`docs/isometrico.md`). Aqui el angulo es continuo.
  *
  * Lleva **las dos proyecciones con un interruptor**, y no es indecision: es la
  * bifurcacion estetica que tiene que juzgar el autor. La ortografica conserva el

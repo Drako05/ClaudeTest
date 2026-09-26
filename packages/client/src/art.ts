@@ -15,7 +15,7 @@
 
 import { Feature, isSapling, maturesInto, Terrain } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
-import { LOOKS, MINERAL_FACES, ROCK_FACES } from '../palette.js';
+import { LOOKS, MINERAL_FACES, ROCK_FACES } from './palette.js';
 
 /** Ancho y alto, en pixeles del arte, del tile para el que se dibujo todo. */
 export const TILE_W = 32;

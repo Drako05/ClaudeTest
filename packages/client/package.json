@@ -6,15 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 4173",
-    "build:single": "vite build --config vite.single.config.ts",
-    "build:spike": "vite build --config vite.spike.config.ts",
-    "dev:spike": "vite --open /spike3d.html"
+    "preview": "vite preview --port 4173"
   },
   "dependencies": {
     "@verdant/shared": "*",
     "@verdant/sim": "*",
-    "pixi.js": "^8.5.0",
     "three": "^0.170.0"
   },
   "devDependencies": {

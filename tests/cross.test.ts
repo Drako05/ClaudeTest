@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crossGeometry } from '../packages/client/src/spike3d/billboards.js';
+import { crossGeometry } from '../packages/client/src/billboards.js';
 
 /**
  * El aspa de dos laminas.

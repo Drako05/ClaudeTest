@@ -24,9 +24,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      # Publica los dos juegos: el isometrico en la raiz y el 3D en /3d/. La
-      # migracion a 3D esta decidida pero no hecha, asi que sustituir uno por
-      # otro dejaria sin URL al unico juego completo que hay.
+      # El juego en la raiz, y /3d/ redirigiendo a ella: ahi vivio el 3D
+      # mientras convivio con el isometrico. Ver tools/build-pages.mjs.
       - run: npm run build:pages
       - uses: actions/configure-pages@v5
         with:

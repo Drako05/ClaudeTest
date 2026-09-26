@@ -2,21 +2,146 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-    <title>Verdant — prototipo</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+    <title>Verdant — 3D</title>
     <style>
       * { box-sizing: border-box; }
       html, body {
         margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1020;
-        /* Sin esto, arrastrar el joystick desplaza o hace rebotar la pagina. */
-        touch-action: none;
-        overscroll-behavior: none;
-        -webkit-user-select: none;
-        user-select: none;
+        touch-action: none; overscroll-behavior: none;
+        -webkit-user-select: none; user-select: none;
         -webkit-tap-highlight-color: transparent;
       }
+      canvas { display: block; width: 100%; height: 100%; }
+      /*
+        El cambio de vista: un ojo pequeno arriba a la derecha.
+
+        Es el unico control que se ve SIEMPRE, tambien con teclado, y por eso no
+        vive con los demas: correr, saltar y accionar tienen tecla y el racimo de
+        abajo es solo para el pulgar, pero cambiar de proyeccion no se anuncia en
+        ningun otro sitio.
+
+        El ojo lo dice todo por si solo: **abierto** en perspectiva, que es la que
+        tiene fuga y profundidad, y **entrecerrado** —una rendija, sin pupila— en
+        ortografica, que lo aplana todo. El simbolo cuenta la diferencia en vez de
+        limitarse a senalar que hay un interruptor.
+      */
+      #proj {
+        position: fixed; z-index: 12;
+        top: calc(12px + env(safe-area-inset-top));
+        right: calc(12px + env(safe-area-inset-right));
+        -webkit-appearance: none; appearance: none;
+        display: flex; align-items: center; justify-content: center;
+        width: 44px; height: 44px; padding: 0; border-radius: 50%;
+        color: #e8eef7; background: rgba(8, 14, 28, 0.82);
+        border: 1px solid rgba(140, 190, 255, 0.34);
+        backdrop-filter: blur(6px); cursor: pointer;
+        touch-action: manipulation;
+      }
+      #proj svg {
+        width: 24px; height: 24px; display: block;
+        fill: none; stroke: currentColor; stroke-width: 1.8;
+        stroke-linecap: round; stroke-linejoin: round;
+      }
+      /* La pupila es lo unico macizo, para que el ojo abierto se lea de un
+         vistazo a 24 px. */
+      #proj .eye-pupil { fill: currentColor; stroke: none; }
+      /* `.flat` es la ortografica: se cierra el parpado y desaparece la pupila. */
+      #proj.flat .eye-open, #proj.flat .eye-pupil { display: none; }
+      #proj:not(.flat) .eye-flat { display: none; }
+      #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
+      /* El salto, justo encima del de proyeccion y bajo el mismo pulgar. Es
+         redondo y grande porque se usa constantemente, al reves que aquel. */
+      /*
+        El racimo del pulgar derecho: accion, salto y correr.
+
+        La ACCION es la mas grande y la mas pegada al borde derecho, que es donde
+        cae el pulgar en reposo, porque es lo que mas se pulsa. Salto y carrera
+        se apartan hacia la izquierda y van mas pequenos. Van en fila y no en
+        columna para que sea el borde derecho —y no la altura— lo que ordene la
+        importancia.
+
+        **Ocultos mientras no haya un dedo de por medio**: `.touch-active` en el
+        `body`, que
+        pone `controls.ts` al arrancar si el puntero es grueso y, si no, al
+        primer toque de verdad. En PC estorban y no hacen falta —Shift, Espacio y
+        el clic izquierdo ya hacen lo mismo—, y la segunda via no es adorno: un
+        portatil tactil declara puntero fino, asi que sin ella sus botones no
+        apareceran nunca.
+
+        El del ojo no entra aqui: ese se ve siempre. Ver su bloque arriba.
+      */
+      #thumbPad {
+        position: fixed; z-index: 11;
+        bottom: calc(18px + env(safe-area-inset-bottom));
+        right: calc(14px + env(safe-area-inset-right));
+        display: none; align-items: flex-end; gap: 10px;
+      }
+      body.touch-active #thumbPad { display: flex; }
+      #thumbPad button {
+        -webkit-appearance: none; appearance: none;
+        border-radius: 50%;
+        font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        letter-spacing: .08em; text-transform: uppercase;
+        color: #e8eef7; background: rgba(8, 14, 28, 0.82);
+        border: 1px solid rgba(140, 190, 255, 0.34);
+        backdrop-filter: blur(6px); cursor: pointer;
+        touch-action: manipulation;
+      }
+      #thumbPad button b { display: block; line-height: 1; margin-bottom: 3px; }
+      #thumbPad button:active { transform: scale(.95); }
+      #thumbPad button:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
+      /* Encendido o pulsado: tiene que verse, porque cambia lo que hace el juego. */
+      #thumbPad button.on {
+        background: rgba(60, 104, 168, .86);
+        border-color: rgba(170, 214, 255, .75);
+        color: #f4f9ff;
+      }
+
+      #action { width: 98px; height: 98px; font-size: 11px; }
+      #action b { font-size: 26px; }
+      #run, #jump { width: 66px; height: 66px; }
+      #run b, #jump b { font-size: 18px; }
+      /* Comer y sembrar, los mas apartados del borde y los mas pequenos: se usan
+         menos que moverse y accionar. Siguen la regla del racimo —el borde
+         ordena la importancia— y no la rompen. */
+      #eat, #plant { width: 54px; height: 54px; }
+      #eat b, #plant b { font-size: 16px; }
+      /* En un telefono de 390 px los cinco en fila se comian el sitio del
+         joystick; se aprietan, y la accion conserva su primacia. */
+      @media (max-width: 560px) {
+        #thumbPad { gap: 6px; }
+        #eat, #plant { width: 44px; height: 44px; font-size: 8px; }
+        #run, #jump { width: 54px; height: 54px; font-size: 9px; }
+        #action { width: 80px; height: 80px; }
+      }
+      #proj:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
+
+      /* El joystick flotante: nace donde apoyas el pulgar dentro del cuadrante
+         inferior izquierdo. Verlo es lo que hace evidente que esa zona es del
+         personaje y el resto de la camara. */
+      #stick {
+        position: fixed; z-index: 11; width: 116px; height: 116px;
+        margin: -58px 0 0 -58px; border-radius: 50%;
+        border: 2px solid rgba(180, 215, 255, 0.30);
+        background: radial-gradient(circle, rgba(20,34,60,.42), rgba(20,34,60,.14));
+        opacity: 0; visibility: hidden; transition: opacity .12s ease;
+        pointer-events: none;
+      }
+      #stick.on { opacity: 1; visibility: visible; }
+      #stickKnob {
+        position: absolute; left: 50%; top: 50%;
+        width: 46px; height: 46px; border-radius: 50%;
+        background: rgba(143, 196, 255, .58);
+        border: 2px solid rgba(226, 240, 255, .72);
+        transform: translate(-50%, -50%);
+      }
+
+      /* La vela de la noche: un tinte sobre todo el mundo, bajo el HUD. Ver
+         `sky.ts` para por que es una vela y no bajar las luces. */
+      #sky { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+
       body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #e8eef7; }
-      canvas { display: block; }
 
       #hud {
         position: fixed; top: 12px; left: 12px; z-index: 10;
@@ -57,78 +182,17 @@
         padding: 9px 20px; border-radius: 8px; cursor: pointer; font-weight: 700;
       }
 
-      /* ---- Controles tactiles ---------------------------------------------
-         Ocultos por defecto: se revelan al detectar un puntero grueso o al
-         primer toque, anadiendo .touch-active al body. */
-      #stick {
-        position: fixed; z-index: 12; width: 116px; height: 116px;
-        margin: -58px 0 0 -58px; border-radius: 50%;
-        border: 2px solid rgba(180, 215, 255, 0.30);
-        background: radial-gradient(circle, rgba(20,34,60,.42), rgba(20,34,60,.16));
-        opacity: 0; visibility: hidden; transition: opacity .12s ease;
-        pointer-events: none;
-      }
-      #stick.active { opacity: 1; visibility: visible; }
-      #stickKnob {
-        position: absolute; left: 50%; top: 50%;
-        width: 46px; height: 46px; border-radius: 50%;
-        background: rgba(143, 196, 255, .58);
-        border: 2px solid rgba(226, 240, 255, .72);
-        transform: translate(-50%, -50%);
-      }
-
-      #touchButtons {
-        position: fixed; z-index: 12;
-        right: calc(14px + env(safe-area-inset-right));
-        bottom: calc(20px + env(safe-area-inset-bottom));
-        display: none; align-items: flex-end; gap: 12px;
-      }
-      body.touch-active #touchButtons { display: flex; }
-
-      .touch-btn {
-        -webkit-appearance: none; appearance: none;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-        gap: 2px; font: inherit; color: #e8eef7; cursor: pointer;
-        border-radius: 50%; touch-action: none;
-        border: 2px solid rgba(180, 215, 255, .34);
-        background: rgba(20, 34, 60, .46);
-        backdrop-filter: blur(4px);
-        transition: transform .08s ease, background .08s ease;
-      }
-      .touch-btn .glyph { font-size: 21px; line-height: 1; }
-      .touch-btn .label { font-size: 9px; letter-spacing: .1em; opacity: .8; }
-      .touch-btn.pressed, .touch-btn:active {
-        transform: scale(.93); background: rgba(60, 104, 168, .62);
-      }
-      .touch-btn:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
-
-      #btnHarvest { width: 92px; height: 92px; }
-      #rotButtons {
-        position: fixed; right: 14px; top: 14px; z-index: 9;
-        display: none; gap: 8px;
-      }
-      .touch-btn.rot { width: 46px; height: 46px; }
-      body.touch-active #rotButtons { display: flex; }
-      #btnEat { width: 58px; height: 58px; margin-bottom: 6px; }
-      #btnPlant { width: 70px; height: 70px; margin-bottom: 2px; }
-      /* El salto, entre sembrar y recoger: se usa a menudo y va a la altura del
-         pulgar, pero mas pequeno que recoger, que sigue siendo el principal. */
-      #btnJump { width: 70px; height: 70px; margin-bottom: 2px; }
-      #btnRun { width: 70px; height: 70px; margin-bottom: 2px; }
-      /* Encendido: el interruptor tiene que verse desde el otro lado de la
-         pantalla, porque cambia como responde TODO el movimiento. */
-      #btnRun.on {
-        background: rgba(60, 104, 168, 0.86);
-        border-color: rgba(170, 214, 255, 0.75);
-        color: #f4f9ff;
-      }
+      /* La pista de los gestos, solo con dedos: con teclado la dice la ayuda. */
+      .touch-only { display: none; }
+      body.touch-active .touch-only { display: flex; }
+      /* Se le descuenta el ojo de la esquina de enfrente en un telefono estrecho. */
+      #hud { max-width: calc(100vw - 24px - 68px); }
 
       /* En tactil los atajos de teclado no sirven de nada. */
       body.touch-active #help { display: none; }
 
       /* La carrera es un INTERRUPTOR y con teclado no hay boton que mirar, asi
-         que el estado se dice en la ayuda: sin indicador, un interruptor deja al
-         jugador adivinando por que el personaje va como va. */
+         que el estado se dice en la ayuda. */
       body.running #kbdRun {
         background: rgba(60, 104, 168, 0.9);
         border-color: rgba(170, 214, 255, 0.75);
@@ -137,29 +201,19 @@
       body.running #runState { color: #cfe4ff; font-weight: 600; }
       body.running #runState::after { content: ' ACTIVADO'; }
 
-      /* Pantallas estrechas: el HUD se compacta pero conserva los FPS, que es
-         justo el numero que interesa medir en el movil real. */
       @media (max-width: 560px) {
         #hud { top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left));
                padding: 8px 10px; font-size: 11px; min-width: 148px; }
         #hud h1 { font-size: 10px; margin-bottom: 5px; }
         #help { font-size: 10px; padding: 7px 10px; }
-        /* Con cuatro botones en fila, a 390 px la hilera medía 340 de 390 y se
-           comia el sitio del joystick. Se aprietan: el de recoger conserva su
-           tamano porque es el que mas se usa. */
-        #touchButtons { gap: 6px; }
-        #btnEat { width: 46px; height: 46px; }
-        #btnPlant, #btnJump, #btnRun { width: 54px; height: 54px; }
-        #btnHarvest { width: 78px; height: 78px; }
       }
-
 
       /* ---- Panel del entorno (esquina superior derecha) ------------------- */
       #statsToggle {
         position: fixed; z-index: 13;
-        top: calc(12px + env(safe-area-inset-top));
+        top: calc(64px + env(safe-area-inset-top));
         right: calc(12px + env(safe-area-inset-right));
-        width: 46px; height: 46px; border-radius: 12px;
+        width: 44px; height: 44px; border-radius: 12px;
         display: flex; align-items: center; justify-content: center;
         font-size: 22px; line-height: 1; cursor: pointer;
         color: #e8eef7; background: rgba(8, 14, 28, 0.78);
@@ -172,10 +226,10 @@
 
       #statsPanel {
         position: fixed; z-index: 13;
-        top: calc(66px + env(safe-area-inset-top));
+        top: calc(116px + env(safe-area-inset-top));
         right: calc(12px + env(safe-area-inset-right));
         width: 260px; max-width: calc(100vw - 24px);
-        max-height: calc(100vh - 90px); overflow-y: auto;
+        max-height: calc(100vh - 140px); overflow-y: auto;
         padding: 12px 14px; border-radius: 12px; font-size: 12px;
         background: rgba(8, 14, 28, 0.86);
         border: 1px solid rgba(140, 190, 255, 0.22);
@@ -290,12 +344,46 @@
         #devPanel { width: 228px; font-size: 11px; max-height: 58vh; }
       }
 
-      @media (prefers-reduced-motion: reduce) {
-        #stick, .touch-btn, .bar > i { transition: none; }
-      }
     </style>
   </head>
   <body>
+    <canvas id="view"></canvas>
+    <div id="sky" aria-hidden="true"></div>
+    <div id="stick" aria-hidden="true"><i id="stickKnob"></i></div>
+    <!-- El orden del DOM es el de la pantalla: correr y saltar a la izquierda,
+         y la accion pegada al borde derecho, que es donde cae el pulgar. -->
+    <div id="thumbPad">
+      <button id="eat" type="button" aria-label="Comer bayas">
+        <b aria-hidden="true">&#127827;</b>
+        Comer
+      </button>
+      <button id="plant" type="button" aria-label="Sembrar">
+        <b aria-hidden="true">&#127793;</b>
+        Sembrar
+      </button>
+      <button id="run" type="button" aria-label="Correr" aria-pressed="false">
+        <b aria-hidden="true">&#187;</b>
+        Correr
+      </button>
+      <button id="jump" type="button" aria-label="Saltar">
+        <b aria-hidden="true">&#8593;</b>
+        Saltar
+      </button>
+      <button id="action" type="button" aria-label="Accionar">
+        <b aria-hidden="true">&#9874;</b>
+        Accion
+      </button>
+    </div>
+    <!-- El ojo: en SVG y no un emoji, porque 👁 se pinta a color y distinto en
+         cada sistema, y aqui tiene que ir monocromo como el resto de glifos.
+         Las dos formas viven en el mismo SVG y las alterna la clase `.flat`. -->
+    <button id="proj" type="button" aria-label="Vista en perspectiva; tocar para ortográfica">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path class="eye-open" d="M1.8 12S5.8 5.6 12 5.6 22.2 12 22.2 12s-4 6.4-10.2 6.4S1.8 12 1.8 12z" />
+        <circle class="eye-pupil" cx="12" cy="12" r="3" />
+        <path class="eye-flat" d="M1.8 12S5.8 9.4 12 9.4 22.2 12 22.2 12s-4 2.6-10.2 2.6S1.8 12 1.8 12z" />
+      </svg>
+    </button>
     <div id="hud">
       <h1>Verdant</h1>
       <div class="row"><span>Salud</span><span id="healthText" class="dim">100</span></div>
@@ -318,13 +406,15 @@
       <div class="row dim"><span>Pos</span><span id="pos">0, 0</span></div>
       <div class="row dim"><span>Chunks</span><span id="chunks">0</span></div>
       <div class="row dim"><span>FPS</span><span id="fps">0</span></div>
+      <div class="row dim"><span>Dibujo</span><span id="draw">—</span></div>
+      <div class="row dim touch-only"><span>abajo-izq anda · resto gira · 2 dedos zoom</span></div>
     </div>
 
     <div id="help">
       <kbd id="kbdRun">Shift</kbd> <span id="runState">correr</span> &nbsp;
-      <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic dcho</kbd> recolectar &nbsp; <kbd>E</kbd> comer bayas<br />
-      <kbd>F</kbd> sembrar &nbsp; <kbd>,</kbd>/<kbd>.</kbd> girar la vista &nbsp;
-      <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom
+      <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic</kbd> accionar &nbsp; <kbd>arrastrar</kbd> girar<br />
+      <kbd>E</kbd> comer bayas &nbsp; <kbd>F</kbd> sembrar &nbsp;
+      <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom &nbsp; <kbd>P</kbd> vista
     </div>
 
     <button id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"
@@ -344,55 +434,10 @@
       </div>
     </div>
 
-    <div id="stick" aria-hidden="true"><i id="stickKnob"></i></div>
-
-    <!-- Girar la camara: en tactil no hay teclas, y sin poder girar la cara
-         oculta de una montana es inexplorable. Van arriba a la izquierda de los
-         botones de accion para no competir con el pulgar que recolecta. -->
-    <div id="rotButtons">
-      <button id="btnRotL" class="touch-btn rot" type="button" aria-label="Girar a la izquierda">
-        <span class="glyph" aria-hidden="true">&#8630;</span>
-      </button>
-      <button id="btnRotR" class="touch-btn rot" type="button" aria-label="Girar a la derecha">
-        <span class="glyph" aria-hidden="true">&#8631;</span>
-      </button>
-    </div>
-
-    <div id="touchButtons">
-      <button id="btnEat" class="touch-btn" type="button" aria-label="Comer bayas">
-        <span class="glyph" aria-hidden="true">&#127827;</span>
-        <span class="label">COMER</span>
-      </button>
-      <button id="btnPlant" class="touch-btn" type="button" aria-label="Sembrar">
-        <span class="glyph" aria-hidden="true">&#127793;</span>
-        <span class="label">SEMBRAR</span>
-      </button>
-      <!-- En tactil no hay Espacio, y sin salto la altura deja de ser
-           atravesable: media montana quedaria fuera de alcance en el movil. -->
-      <button id="btnJump" class="touch-btn" type="button" aria-label="Saltar">
-        <span class="glyph" aria-hidden="true">&#8593;</span>
-        <span class="label">SALTAR</span>
-      </button>
-      <!-- Correr es un INTERRUPTOR, no un boton que se mantiene: en un telefono
-           mantener pulsado con un pulgar mientras el otro lleva el joystick no
-           deja dedos para nada mas. Por eso se queda encendido, y por eso lleva
-           un estado visible: un interruptor sin indicador no se sabe como esta. -->
-      <button id="btnRun" class="touch-btn" type="button" aria-label="Correr"
-              aria-pressed="false">
-        <span class="glyph" aria-hidden="true">&#187;</span>
-        <span class="label">CORRER</span>
-      </button>
-      <button id="btnHarvest" class="touch-btn" type="button" aria-label="Recolectar">
-        <span class="glyph" aria-hidden="true">&#9874;</span>
-        <span class="label">RECOGER</span>
-      </button>
-    </div>
-
     <div id="dead">
       <p>HAS MUERTO</p>
       <button id="restart">Reiniciar</button>
     </div>
-
-    <script type="module" src="./src/main.ts"></script>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

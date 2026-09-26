@@ -1,5 +1,5 @@
 /**
- * Los gestos del spike, medidos en un navegador de verdad.
+ * Los gestos, medidos en un navegador de verdad.
  *
  * `tests/gestures.test.ts` afirma la regla; esto comprueba que la regla llega
  * viva hasta el lienzo. Son dos capas distintas: la logica pura no sabe nada de
@@ -10,7 +10,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const file = fileURLToPath(new URL('../packages/client/dist-spike/spike3d.html', import.meta.url));
+const file = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
 const html = await readFile(file);
 const server = createServer((_, res) => { res.setHeader('content-type', 'text/html'); res.end(html); });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -39,7 +39,7 @@ async function touches(points) {
   }, points);
 }
 
-const before = await page.evaluate(() => window.__spike);
+const before = await page.evaluate(() => window.__verdant);
 
 // Los dos pulgares del autor: uno andando abajo a la izquierda, otro girando.
 await touches([{ type: 'pointerdown', id: 1, x: 80, y: 700 }, { type: 'pointerdown', id: 2, x: 300, y: 400 }]);
@@ -50,7 +50,7 @@ for (let i = 1; i <= 24; i++) {
   ]);
 }
 await page.waitForTimeout(500);
-const after = await page.evaluate(() => window.__spike);
+const after = await page.evaluate(() => window.__verdant);
 
 console.log(`  distancia ${before.distance.toFixed(2)} -> ${after.distance.toFixed(2)}`);
 console.log(`  giro ${before.yaw.toFixed(2)} -> ${after.yaw.toFixed(2)}`);
@@ -63,7 +63,7 @@ await touches([{ type: 'pointerup', id: 1, x: 128, y: 652 }, { type: 'pointerup'
 await page.waitForTimeout(300);
 
 // Y ahora una pinza de verdad: dos dedos, los dos en zona de camara.
-const preZoom = await page.evaluate(() => window.__spike);
+const preZoom = await page.evaluate(() => window.__verdant);
 await touches([{ type: 'pointerdown', id: 3, x: 200, y: 300 }, { type: 'pointerdown', id: 4, x: 260, y: 300 }]);
 for (let i = 1; i <= 14; i++) {
   await touches([
@@ -72,14 +72,14 @@ for (let i = 1; i <= 14; i++) {
   ]);
 }
 await page.waitForTimeout(400);
-const postZoom = await page.evaluate(() => window.__spike);
+const postZoom = await page.evaluate(() => window.__verdant);
 await touches([{ type: 'pointerup', id: 3, x: 88, y: 300 }, { type: 'pointerup', id: 4, x: 372, y: 300 }]);
 
 console.log(`  pinza: distancia ${preZoom.distance.toFixed(2)} -> ${postZoom.distance.toFixed(2)}`);
 check(postZoom.distance < preZoom.distance, 'separar dos dedos de camara no acerco la vista');
 check(Math.abs(postZoom.yaw - preZoom.yaw) < 0.01, 'la pinza giro la camara ademas de hacer zoom');
 
-await page.screenshot({ path: 'screenshots/spike-movil-gestos.png' });
+await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();
 server.close();
 console.log(failures ? `GESTOS: FALLIDO (${failures})` : 'GESTOS: OK');

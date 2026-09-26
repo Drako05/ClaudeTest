@@ -38,6 +38,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El cuarto de vuelta propio de cada aspa | Las features ya son aspas | un numero |
 | El tamano y la intensidad de la sombra tumbada | Las features ya son aspas | dos numeros |
 | El material de las aspas **no se ilumina**, para que el aspecto no cambiara | Las features ya son aspas | cambiar a Lambert, con pegas |
+| Comer y sembrar en el racimo del pulgar: a la izquierda de todo y los mas pequenos | El isometrico se retira | CSS |
+| La noche como **vela sobre la pantalla**, no bajando las luces | El isometrico se retira | trabajo de verdad si se quiere luz |
+| Sin `?seed` se juega un mundo al azar (el 3D usaba siempre el 12345) | El isometrico se retira | una linea |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
@@ -125,7 +128,7 @@ Tres cosas que decidí yo y puedes corregir:
   parecido a Minecraft; es un número.
 - **La sombra tumbada** mide el 62 % del ancho del elemento y va al 26-42 % de
   negro. Es lo que las asienta; si la quieres más marcada o más sutil, son dos
-  números en `spike3d/shadows.ts`.
+  números en `shadows.ts`.
 - **El material no se ilumina** (`MeshBasicMaterial`), para que el aspecto sea
   exactamente el de antes. Si prefieres que el sol afecte a los árboles, se
   cambia a Lambert — pero entonces las dos láminas de una misma aspa se iluminan
@@ -177,7 +180,7 @@ El barrido «no salia completo y se desvanecia casi de inmediato». **No era la
 duracion ni la curva**: `SLASH_SECONDS = 0.22`, el barrido `t * 1.6` y el apagado
 `(1 - t) * 0.85` son los tuyos y los del isometrico, y estan intactos. Eran tres
 fallos de dibujado, cada uno confirmado reintroduciendolo y viendo caer la medida
-(`npm run spike:slash`, que cuenta pixeles de pantalla y no barridos lanzados):
+(`npm run slash`, que cuenta pixeles de pantalla y no barridos lanzados):
 
 | Fallo | Con el fallo | Arreglado |
 |---|---|---|
@@ -200,18 +203,15 @@ es un numero, y es de sensacion, o sea tuyo.
 
 ## Decision tomada: el juego pasa a 3D con estetica de sprites
 
-**Y desde el 2026-09-12, el isometrico esta congelado por decision suya:**
-no se gasta trabajo en el, no se le portan los cambios nuevos y no se le
-anaden mecanicas. Lo que venga de ahora en adelante se hace en `sim` (que es
-comun) y en el cliente 3D. `CLAUDE.md` lo lleva como nota de cabecera, con el
-detalle de que ficheros abarca y de que hacer si un cambio en `sim` tumba el
-humo del isometrico.
+**El 2026-09-12 el isometrico se congelo, y el 2026-09-26 se retiro del
+todo** (ver «El isometrico se retira», abajo). Esta seccion es la historia de
+por que se giro.
 
-El autor probo un spike de 3D (`packages/client/src/spike3d/`, `npm run spike`) y
-**decidio girar**. Motivo, medido y no opinado: en una isometrica de angulo fijo
+El autor probo un prototipo de 3D y **decidio girar**. Motivo, medido y no opinado: en una isometrica de angulo fijo
 la informacion para entender el relieve **no esta en la imagen** —subir un nivel
 equivale exactamente a retroceder dos filas, y el pie de un escalon queda siempre
-tapado; las dos identidades estan fijadas en `tests/projection.test.ts`—. Wakfu lo
+tapado; las dos identidades las fijaba `tests/projection.test.ts`, hoy en la
+historia (`b1d0d7a`)—. Wakfu lo
 resuelve en diseno de nivel poniendo la altura en los bordes del mapa; en un
 sandbox procedural eso no esta disponible.
 
@@ -228,7 +228,7 @@ recoleccion y reloj entran intactos—, porque `sim` nunca supo que existia una
 camara. Y `groundHeight(level, rampDir, fx, fy)` ya devuelve la altura continua de
 cualquier punto de una casilla: eso ya es la descripcion de una malla.
 
-### Lo que la migracion tiene que resolver y el spike no resolvio
+### Lo que la migracion tenia que resolver
 
 1. **El terreno tapa al jugador** cuando la camara queda detras de una loma. En 3D
    se resuelve con colision de camara o atenuando lo que se interpone; son
@@ -237,10 +237,59 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    arbol y regular en un humanoide.
 3. **Agrupar los sprites.** Entre 100 y 300 draw calls segun el angulo, casi todos
    arboles sueltos. A 80 FPS no bloquea, pero es la primera optimizacion.
-4. **Que se retira del isometrico**: `projection.ts`, `terrain-draw.ts`,
-   `relief-faces.ts`, `biome-edges.ts`, el arte de terreno de `tiles.ts` y la
-   mayor parte de `renderer.ts`. Sobreviven `effects.ts`, `palette.ts`,
-   `devtools.ts`, `main.ts` y `input.ts` casi enteros.
+4. ~~Que se retira del isometrico.~~ **Hecho el 2026-09-26**: se retiro entero
+   (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
+
+---
+
+## El isometrico se retira — HECHO (2026-09-26)
+
+Decision del autor: centrarse al 100 % en el 3D, que el 3D no dependa de nada
+del isometrico y no tener que adaptar cada caracteristica a dos modelos. Con
+una condicion: **no perder trabajo que solo estuviera en el isometrico.**
+
+Como se hizo, por fases y con `main` en verde entre una y otra:
+
+1. **Cortar la dependencia.** El 3D arrastraba codigo isometrico por una sola
+   puerta: `tiles.ts`, que mezclaba el arte de especies con el de terreno e
+   importaba `projection.ts`. El arte del 3D paso a `art.ts`, y un test recorre
+   el grafo de imports (hoy `tests/client-boundary.test.ts`, que ademas afirma
+   que no queda ningun fichero huerfano).
+2. **Trasladar lo que solo tenia el isometrico.** Se comparo campo a campo la
+   `Intent`, los HTML, los renderizadores y las sondas de depuracion. Salieron
+   catorce cosas, y dos eran graves: **en el 3D no se podia comer** —con el
+   hambre corriendo— y **al morir la partida se quedaba congelada sin aviso**.
+   La tabla entera, con donde vive cada una y que comprobacion la cubre, esta en
+   `docs/isometrico.md`.
+3. **Humo del 3D antes de borrar nada.** Hasta entonces la unica prueba de
+   integracion jugaba el isometrico. La nueva lleva todas sus comprobaciones de
+   juego y una por cada traslado, en seis pasadas; convivio con la vieja en CI
+   hasta que las dos estuvieron en verde.
+4. **Borrar**: ocho modulos, cuatro tests, su humo, el build de un solo fichero
+   y `pixi.js`.
+5. **El 3D pasa a ser el cliente**: `src/spike3d/` subio a `src/`, los scripts
+   perdieron el `spike` y Pages lo publica en la raiz, con `/3d/` redirigiendo
+   para no romper enlaces ni el acceso del telefono.
+
+Lo que aparecio por el camino y conviene saber:
+
+- **La mirada es la de la camara**, decision del autor: se acciona hacia donde
+  se mira. Por eso las sondas del humo (`probes.ts`) buscan el sitio de apoyo
+  al sureste de lo que se quiere golpear: la camara arranca mirando al noroeste.
+- **La noche es una vela sobre la pantalla**, como en el isometrico, y no bajar
+  las luces: las aspas usan un material sin iluminar y se quedarian a pleno dia
+  con el terreno a oscuras. Si algun dia se quiere luz de verdad, primero hay
+  que decidir lo del material (ver «Esperando tu juicio»).
+- **Dos comprobaciones del humo nuevo pasaban o fallaban segun donde quedara el
+  jugador** —el barrido del clic y el de la accion movil—: al pie de un muro las
+  tres casillas pueden estar a otra altura y no hay nada que barrer. Se movieron
+  al nacimiento, que es un rellano llano por la regla 22.
+- **Que un boton llega a la Intent** se mide con contadores (`sent` en la
+  sonda), no con su efecto: sembrar depende de tener semillas y sitio.
+- **La etiqueta `isometrico-final`** no la dejo crear el proxy de la sesion (se
+  corta la conexion al empujar etiquetas). No hace falta para recuperar nada
+  —`b1d0d7a` esta en la historia de `main`—, pero si el autor la quiere, se
+  crea desde la web.
 
 ---
 
@@ -408,7 +457,7 @@ escrito para que la proxima tanda no tenga que volver a encontrarlo.
 
 ### La causa, que son dos lineas
 
-El salto se encola en un **booleano** (`client/src/input.ts`, `jumpQueued`) y se
+El salto se encola en un **booleano** (`client/src/input.ts` del isometrico, `jumpQueued`; hoy `controls.ts`) y se
 consume **incondicionalmente** en el primer tick del fotograma:
 
 ```ts
@@ -426,7 +475,8 @@ que no es correcto es **tirar la peticion** en vez de retenerla unas decimas.
 
 ### Lo medido
 
-Modelo del bucle real (`main.ts` + el pestillo de `input.ts`) a 60 fps, con un
+Modelo del bucle real de entonces (`main.ts` + el pestillo de `input.ts`, en el
+isometrico; en el 3D el pestillo es el mismo, en `controls.ts`) a 60 fps, con un
 12 % de temblor humano en el ritmo de pulsacion. El vuelo dura **0.400 s**:
 
 | Periodo de pulsacion | Saltos efectuados | Con un buffer de 0.15 s |
@@ -464,7 +514,8 @@ importa con fotogramas largos.
 
 1. **Buffer de salto**: que la peticion viva unas decimas en vez de tirarse, de
    modo que pulsar justo antes de tocar suelo salte al aterrizar. En
-   `input.ts` es cambiar el booleano por un contador de ticks que decrece, y
+   `controls.ts` es cambiar el booleano `jumpQueued` por un contador de ticks
+   que decrece, y
    limpiarlo cuando el despegue ocurre de verdad.
 2. **Cuanto margen es decision del autor**, no del agente: 0.15 s es lo habitual
    en plataformas, pero un buffer largo hace que el personaje salte «solo» un

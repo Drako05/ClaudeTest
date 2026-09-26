@@ -1,18 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, type Terrain } from '@verdant/shared';
 import { groundHeight, World } from '@verdant/sim';
-import { chunkMesh, meshHeightAt } from '../packages/client/src/spike3d/terrain-mesh.js';
+import { chunkMesh, meshHeightAt } from '../packages/client/src/terrain-mesh.js';
 
 /**
- * La malla del spike de 3D.
+ * La malla del terreno.
  *
- * Es lo unico del spike que merece un test, y no es por rigor: el spike existe
- * para que el autor compare la vista nueva con la de hoy en su telefono, y esa
- * comparacion **no vale nada si la geometria no es el mismo mundo**. Aqui se
- * afirma que lo es.
- *
- * Lo demas del spike —camara, billboards, controles— se juzga mirando, que es
- * justo para lo que se construye.
+ * El mundo que se ve **tiene que ser el mismo** que simula el nucleo: si la
+ * malla se separara de `groundHeight`, el personaje andaria por encima o por
+ * debajo de lo que pisa. Aqui se afirma que la geometria es la del mundo.
  */
 
 const SEEDS = [12345, 7, 999];

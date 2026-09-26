@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DAY_TICKS } from '@verdant/shared';
-import { AMBER, mixColor, NIGHT, NIGHT_ALPHA, skyTint } from '../packages/client/src/spike3d/sky.js';
+import { AMBER, mixColor, NIGHT, NIGHT_ALPHA, skyTint } from '../packages/client/src/sky.js';
 
 /**
  * El dia y la noche del 3D: la misma vela que tenia el isometrico, con sus

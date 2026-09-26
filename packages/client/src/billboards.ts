@@ -35,7 +35,7 @@ import {
 } from 'three';
 import { Feature } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
-import { LOOKS } from '../palette.js';
+import { LOOKS } from './palette.js';
 import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
 
 /**

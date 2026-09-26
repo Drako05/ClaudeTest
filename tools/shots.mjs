@@ -3,7 +3,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-const file = fileURLToPath(new URL('../packages/client/dist-spike/spike3d.html', import.meta.url));
+const file = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
 const html = await readFile(file);
 const server = createServer((_, res) => { res.setHeader('content-type', 'text/html'); res.end(html); });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -21,13 +21,13 @@ console.log('HUD:', await page.textContent('#hud'));
 
 // Las proporciones, medidas del dibujo y no de una captura: es la unica forma de
 // afirmar «el jugador mide 1,8 bloques» en vez de que lo parezca.
-const sizes = await page.evaluate(() => window.__spike.sizes);
+const sizes = await page.evaluate(() => window.__verdant.sizes);
 console.log(
   'PROPORCIONES (bloques):',
   Object.entries(sizes).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(' · '),
 );
 
-await page.screenshot({ path: 'screenshots/spike-01-perspectiva.png' });
+await page.screenshot({ path: 'screenshots/01-perspectiva.png' });
 
 // Girar la camara: arrastre en la mitad derecha.
 for (const [i, dx] of [[1, 260], [2, 260], [3, 260]]) {
@@ -36,7 +36,7 @@ for (const [i, dx] of [[1, 260], [2, 260], [3, 260]]) {
   await page.mouse.move(900 - dx, 380, { steps: 12 });
   await page.mouse.up();
   await page.waitForTimeout(900);
-  await page.screenshot({ path: `screenshots/spike-0${i + 1}-giro.png` });
+  await page.screenshot({ path: `screenshots/0${i + 1}-giro.png` });
 }
 
 // El ojo, que es lo que hay en un telefono: la tecla P no existe alli. Su estado
@@ -48,7 +48,7 @@ await page.click('#proj');
 await page.waitForTimeout(900);
 console.log('HUD:', await page.textContent('#hud'));
 console.log('OJO:', await eye());
-await page.screenshot({ path: 'screenshots/spike-05-orto.png' });
+await page.screenshot({ path: 'screenshots/05-orto.png' });
 await page.click('#proj');
 await page.waitForTimeout(700);
 console.log('OJO de vuelta:', await eye());

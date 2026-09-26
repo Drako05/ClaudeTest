@@ -1,11 +1,11 @@
 /**
  * Mide si el barrido del 3D se VE, contando pixeles blancos del lienzo.
  *
- * Por que pixeles y no `__spike.slashesDrawn`: ese contador cuenta lo que se
+ * Por que pixeles y no `__verdant.slashesDrawn`: ese contador cuenta lo que se
  * MANDA a la escena, y mandar no es llegar a pantalla. Un barrido recortado por
  * el frustum o tapado por una pared lo incrementa igual, asi que no distingue
  * «no se lanza» de «se lanza y no se ve» —que era justo el fallo—. Es la misma
- * leccion que ya costo meses en el isometrico, un escalon mas abajo.
+ * leccion que ya costo meses con el slash, un escalon mas abajo.
  *
  * El numero que vale es la DIFERENCIA entre accionando y quieto: asi da igual
  * que el terreno tenga nieve o que la interfaz lleve texto claro.
@@ -15,7 +15,7 @@
  * cuatro veces por segundo —hay uno vivo el ~88 % del tiempo—. Perseguirlo seria
  * echarlo a suertes.
  *
- *   npm run spike && node tools/spike-slash.mjs
+ *   npm run slash
  */
 
 import { chromium } from 'playwright';
@@ -39,7 +39,7 @@ const BOX = { x0: 320, y0: 120, x1: 960, y1: 520 };
 /** Cuanto tiene que subir un canal para contar como aclarado por el efecto. */
 const LIFT = 12;
 
-const file = fileURLToPath(new URL('../packages/client/dist-spike/spike3d.html', import.meta.url));
+const file = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
 const html = await readFile(file);
 const server = createServer((_, res) => {
   res.setHeader('content-type', 'text/html');
@@ -71,7 +71,7 @@ page.on('pageerror', (e) => problems.push(String(e)));
 await page.goto(`http://127.0.0.1:${port}/?seed=12345`, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 
-const spawn = await page.evaluate(() => window.__spike);
+const spawn = await page.evaluate(() => window.__verdant);
 console.log(`nace en ${spawn.x.toFixed(1)}, ${spawn.y.toFixed(1)}`);
 
 // El boton de accion esta oculto hasta que haya un dedo de por medio, asi que se
@@ -108,7 +108,7 @@ if (!planted) {
   server.close();
   process.exit(1);
 }
-const origin = await page.evaluate(() => window.__spike);
+const origin = await page.evaluate(() => window.__verdant);
 console.log(`primer golpe dibujado en ${origin.x.toFixed(1)}, ${origin.y.toFixed(1)}`);
 await page.waitForTimeout(400);
 
@@ -122,9 +122,9 @@ await page.waitForTimeout(400);
 await page.keyboard.down('Shift');
 let best = { key: 'KeyD', gain: -1 };
 for (const key of ['KeyW', 'KeyS', 'KeyA', 'KeyD']) {
-  const from = await page.evaluate(() => window.__spike);
+  const from = await page.evaluate(() => window.__verdant);
   await push(key, 1200);
-  const to = await page.evaluate(() => window.__spike);
+  const to = await page.evaluate(() => window.__verdant);
   const gain = Math.hypot(to.x - from.x, to.y - from.y);
   if (gain > best.gain) best = { key, gain };
 }
@@ -135,13 +135,13 @@ for (const key of ['KeyW', 'KeyS', 'KeyA', 'KeyD']) {
 let walked = 0;
 for (let tries = 0; tries < 6 && walked < 18; tries++) {
   await push(best.key, 5000);
-  const now = await page.evaluate(() => window.__spike);
+  const now = await page.evaluate(() => window.__verdant);
   walked = Math.hypot(now.x - origin.x, now.y - origin.y);
 }
 await page.keyboard.up('Shift');
 await page.waitForTimeout(500);
 
-const there = await page.evaluate(() => window.__spike);
+const there = await page.evaluate(() => window.__verdant);
 console.log(`camina hacia ${best.key} y acaba a ${walked.toFixed(1)} casillas del primer golpe, en ${there.x.toFixed(1)}, ${there.y.toFixed(1)}`);
 if (walked < 18) console.log('AVISO: no se ha alejado lo bastante; el recorte por frustum no queda probado');
 
@@ -162,7 +162,7 @@ if (!reaches) {
   server.close();
   process.exit(1);
 }
-const spot = await page.evaluate(() => window.__spike);
+const spot = await page.evaluate(() => window.__verdant);
 console.log(`acciona con alcance completo en ${spot.x.toFixed(1)}, ${spot.y.toFixed(1)}, altura ${spot.z.toFixed(1)}`);
 
 const results = [];
@@ -194,7 +194,7 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando']) {
   let pitch = 0;
   for (let turn = 0; turn < turns; turn++) {
     if (turn > 0) await drag(-262, 0);
-    pitch = (await page.evaluate(() => window.__spike)).pitch;
+    pitch = (await page.evaluate(() => window.__verdant)).pitch;
 
     // Quieto el jugador y quieta la camara, dos fotogramas seguidos son
     // IDENTICOS. Asi que la referencia es una captura en reposo y lo que se mide
@@ -203,18 +203,18 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando']) {
     const reference = decodePng(await page.screenshot());
     noise = Math.max(noise, (await sample(reference, 2)).max);
 
-    const before = await page.evaluate(() => window.__spike);
+    const before = await page.evaluate(() => window.__verdant);
     await page.hover('#action');
     await page.mouse.down();
     await page.waitForTimeout(300);
     const hitting = await sample(reference, 8);
     await page.mouse.up();
-    const after = await page.evaluate(() => window.__spike);
+    const after = await page.evaluate(() => window.__verdant);
     await page.waitForTimeout(500);
 
     // Una captura por tanda y no cuatro: la del fotograma con mas barrido a la
     // vista, que es la que decide si esto se ve o no.
-    if (view === 'normal') await writeFile(new URL('../screenshots/spike-slash.png', import.meta.url), hitting.best);
+    if (view === 'normal') await writeFile(new URL('../screenshots/slash.png', import.meta.url), hitting.best);
 
     if (worst === null || hitting.max < worst) worst = hitting.max;
     sent += after.slashesDrawn - before.slashesDrawn;
@@ -270,13 +270,13 @@ async function push(key, ms) {
  * cuando el area da al menos dos casillas, o sea cuando hay arco que trazar.
  */
 async function probe() {
-  const before = await page.evaluate(() => window.__spike.slashesDrawn);
+  const before = await page.evaluate(() => window.__verdant.slashesDrawn);
   await page.hover('#action');
   await page.mouse.down();
   await page.waitForTimeout(700);
   await page.mouse.up();
   await page.waitForTimeout(400);
-  const after = await page.evaluate(() => window.__spike.slashesDrawn);
+  const after = await page.evaluate(() => window.__verdant.slashesDrawn);
   return after > before;
 }
 

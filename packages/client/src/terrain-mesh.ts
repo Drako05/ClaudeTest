@@ -1,10 +1,10 @@
 /**
  * El relieve del mundo convertido en una malla de triangulos.
  *
- * **Puro**: no importa three.js ni toca el DOM, igual que `terrain-draw.ts` y
- * `projection.ts`. Devuelve arrays planos y quien dibuje los envuelve. Asi la
- * geometria se puede comprobar en Node, y eso aqui no es un lujo: si la malla
- * mintiera sobre el mundo, comparar la vista nueva con la de hoy no valdria nada.
+ * **Puro**: no importa three.js ni toca el DOM. Devuelve arrays planos y quien
+ * dibuje los envuelve. Asi la geometria se puede comprobar en Node, y eso aqui no
+ * es un lujo: si la malla mintiera sobre el mundo, el personaje andaria por
+ * encima o por debajo de lo que pisa.
  *
  * Sale de `groundHeight(level, rampDir, fx, fy)`, que ya existia en
  * `sim/relief.ts` y devuelve la altura continua en cualquier punto de una
@@ -55,8 +55,8 @@ const SIDES: readonly Side[] = [
  *
  * Fuera del chunk se pregunta al GENERADOR y no al mundo: `world.levelAt`
  * llamaria a `getChunk` y registraria el chunk vecino, con lo que dibujar
- * alteraria las cuentas de bioma. Es el mismo cuidado que ya tienen
- * `relief-faces.ts` y `biome-edges.ts`.
+ * alteraria las cuentas de bioma. Es el mismo cuidado que tiene
+ * `biome-edges.ts`.
  */
 function cornerHeight(
   world: World,
@@ -84,7 +84,7 @@ export type TerrainColor = (terrain: Terrain, wx: number, wy: number) => readonl
  *
  * La tapa usa las **cuatro** alturas de sus esquinas, asi que un talud sale como
  * un cuadrilatero alabeado —una rampa de verdad— sin necesitar codigo aparte. Es
- * la misma razon por la que el isometrico dibuja un talud como un rombo torcido.
+ * la misma razon por la que el isometrico dibujaba un talud como un rombo torcido.
  */
 export function chunkMesh(world: World, chunk: Chunk, colorOf: TerrainColor): MeshData {
   const positions: number[] = [];

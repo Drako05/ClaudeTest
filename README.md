@@ -5,26 +5,9 @@ para crecer hacia multijugador online y, mas adelante, una version nativa.
 
 **Jugar: https://drako05.github.io/ClaudeTest/**
 
-**El 3D: https://drako05.github.io/ClaudeTest/3d/** — el mismo mundo, la misma
-semilla y la misma simulacion, con camara libre en vez de isometrica. Es hacia
-donde va el proyecto (`docs/pendiente.md`); el isometrico de la raiz sigue siendo
-el juego completo mientras dure la migracion. Arranca **en perspectiva**, que es
-la vista que eligio el autor para el juego final.
-
-En el movil, el pulgar en el cuadrante inferior izquierdo anda, el resto de la
-pantalla gira la camara, y dos dedos de camara hacen zoom. Abajo a la derecha
-estan correr, saltar y **accion** —la mas grande y la mas pegada al borde, que es
-donde cae el pulgar—.
-
-**Esos tres botones no se ven en PC**, donde solo estorban: Espacio salta, Shift
-enciende y apaga la carrera, y el **clic izquierdo acciona** siempre que no
-arrastre, porque arrastrar es girar la camara. Aparecen al detectar un puntero
-grueso o al primer toque, igual que en el isometrico.
-
-El que si se ve siempre es el **ojo de la esquina superior derecha**, que cambia
-entre perspectiva y ortografica: es el unico control sin tecla anunciada en
-ninguna parte. Abierto es perspectiva y entrecerrado ortografica, que es la que
-lo aplana todo.
+Un mundo con relieve y camara libre en 3D. Arranca **en perspectiva**, que es la
+vista que eligio el autor; el ojo de la esquina superior derecha cambia a
+ortografica, que lo aplana todo. La antigua direccion `/3d/` redirige aqui.
 
 El nombre es provisional.
 
@@ -38,28 +21,22 @@ npm run dev      # servidor de desarrollo
 Otros comandos:
 
 ```bash
-npm test         # tests del nucleo (Node, sin navegador)
+npm test          # tests del nucleo y del cliente (Node, sin navegador)
 npm run typecheck
-npm run build    # build estatico del cliente isometrico
-npm run smoke    # construye y juega el build en Chromium headless
-npm run artifact # build de un solo fichero autocontenido
+npm run build     # build estatico: un unico index.html autocontenido
+npm run smoke     # construye y juega el build en Chromium headless
+npm run shots     # capturas y proporciones medidas en bloques
+npm run slash     # cuenta los pixeles que el barrido llega a pintar
+npm run gestures  # los gestos tactiles, medidos en un navegador de verdad
+npm run build:pages               # el sitio tal como se publica
 npx vite-node tools/analyze-world.ts   # estadisticas del mundo generado
 ```
 
-Y el cliente 3D, que es por donde va el desarrollo:
+La URL admite `?seed=12345` para fijar el mundo (sin ella se elige uno al
+azar), `?t=` para abrirlo a una hora concreta en ticks, `?x=&y=` para aparecer
+en un sitio, y `?dev=1` para abrir el panel de desarrollo.
 
-```bash
-npm run spike           # build del 3D
-npm run spike:shots     # capturas y proporciones medidas en bloques
-npm run spike:slash     # cuenta los pixeles que el barrido llega a pintar
-npm run spike:gestures  # los gestos tactiles, medidos en un navegador de verdad
-npm run build:pages     # los dos clientes juntos, como se publican
-```
-
-La semilla se puede fijar por URL: `?seed=12345`. Sin ella se elige una al azar.
-
-`npm run smoke` tambien puede verificar un despliegue ya publicado en vez del
-build local:
+`npm run smoke` tambien puede verificar un despliegue ya publicado:
 
 ```bash
 VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
@@ -67,55 +44,56 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 
 ## Controles
 
-**Teclado**
+**Teclado y raton**
 
 | Tecla | Accion |
 |---|---|
-| `WASD` / flechas | Moverse (a marcha) |
-| `Shift` | Correr: interruptor, se queda encendido |
+| `WASD` / flechas | Moverse, relativo a la camara |
+| Arrastrar | Girar la camara |
+| Rueda, `+` / `-` | Zoom |
+| Clic izquierdo | Accionar hacia donde mira la camara (si no se arrastro) |
 | `Espacio` | Saltar |
-| Clic derecho | Recolectar las casillas marcadas (mantener repite) |
+| `Shift` | Correr: interruptor, se queda encendido |
 | `E` | Comer bayas |
+| `F` | Sembrar |
 | `R` | Mundo nuevo |
-| `+` / `-` | Zoom |
+| `P` | Perspectiva / ortografica |
+| `F3` | Panel de desarrollo |
 
 **Tactil** (aparece solo en dispositivos de puntero grueso, o al primer toque)
 
 | Gesto | Accion |
 |---|---|
-| Apoyar y arrastrar en la mitad izquierda | Joystick flotante: apunta, no dosifica |
-| Boton RECOGER | Recolectar; mantener repite 4 veces por segundo |
-| Boton SALTAR | Saltar; no encadena si se mantiene |
-| Boton CORRER | Correr: interruptor, se queda encendido |
-| Boton COMER | Comer bayas |
-| Pellizcar con dos dedos | Zoom |
+| Pulgar en el cuadrante inferior izquierdo | Joystick flotante: apunta, no dosifica |
+| Un dedo en el resto de la pantalla | Girar la camara |
+| Dos dedos de camara | Zoom |
+| Boton ACCION | Accionar; mantener repite 4 veces por segundo |
+| Botones SALTAR y CORRER | Saltar; correr es un interruptor |
+| Botones COMER y SEMBRAR | Comer bayas y sembrar |
 
-El joystick solo nace en la **mitad izquierda**: la derecha queda libre para los
-botones y para el pellizco. Si apoyas un segundo dedo sobre el mundo, el
-pellizco tiene prioridad y le quita el control al joystick; sin esa cesion el
-zoom seria inalcanzable, porque el primer dedo se queda siempre con el joystick.
+La accion es el boton mas grande y el mas pegado al borde derecho, donde cae el
+pulgar; los demas se apartan a su izquierda, mas pequenos cuanto menos se usan.
+En PC esos botones no se ven: el teclado ya hace lo mismo.
 
 El joystick **apunta, no dosifica**: cruzada la zona muerta se anda a velocidad
 de marcha entera, se haya desplazado el pulgar poco o mucho. La velocidad la
-elige el interruptor de correr. Lo fue hasta la tanda de la carrera —la
-velocidad era proporcional al desplazamiento— y lo cambio el autor. La zona
-muerta se queda, para que el dedo simplemente apoyado no haga derivar al
-personaje.
+elige el interruptor de correr. La zona muerta se queda, para que el dedo
+simplemente apoyado no haga derivar al personaje.
 
 ## Estructura
 
 ```
 packages/shared   Vocabulario comun: tiles, features, recursos, Intent
 packages/sim      Nucleo de simulacion. Puro, determinista, sin navegador
-packages/client    Renderizado, input y HUD. Lo unico que toca el DOM
+packages/client   Cliente 3D (three.js): escena, controles y HUD. Lo unico que toca el DOM
 tools             Utilidades de analisis y verificacion
-tests             Tests del nucleo
+tests             Tests del nucleo y de las partes puras del cliente
 ```
 
 ## La regla que sostiene el proyecto
 
 **`packages/sim` no puede depender del navegador.** Ni DOM, ni canvas, ni WebGL,
-ni PixiJS, ni `Math.random`.
+ni three.js, ni `Math.random`.
 
 No es purismo. Es lo que hace posible, sin reescribir el juego:
 
@@ -135,13 +113,12 @@ del futuro multijugador, la reproducibilidad de los bugs y los tests.
 
 ## Decisiones tomadas y por que
 
-**El isometrico esta congelado desde el 2026-09-12, y el desarrollo va al 3D.**
-Es la decision viva mas grande del proyecto: al isometrico no se le anaden
-mecanicas ni se le portan los cambios nuevos, y solo se le hace el arreglo minimo
-si algo lo deja sin compilar. Lo congelado es su **capa de presentacion**;
-`packages/sim` y `packages/shared` son el nucleo y siguen creciendo igual, que es
-justo lo que permitio que el 3D naciera leyendo el mismo mundo sin tocar una
-regla. El porque y el alcance exacto estan en `CLAUDE.md`.
+**Un solo cliente, en 3D.** El juego nacio isometrico; el 2026-09-12 el
+desarrollo paso al 3D y el 2026-09-26 el isometrico se retiro, despues de
+trasladar al 3D todo lo que era del juego y comprobarlo en la prueba de humo.
+Que se pudiera hacer sin tocar una linea de `packages/sim` es justo lo que
+justifica la arquitectura. El porque, lo que se traslado y las reglas de aquella
+camara estan en `docs/isometrico.md`.
 
 **TypeScript en vez de Rust/WASM, por ahora.** Un nucleo en WASM seria mas rapido,
 pero multiplicaria el coste de iterar justo en la fase donde lo unico que importa
@@ -150,21 +127,13 @@ antemano: si el tick supera ~8 ms con la carga objetivo, se porta el modulo
 caliente detras de la misma interfaz. `tests/performance.test.ts` vigila ese
 numero (linea base actual: unas 3 milesimas de milisegundo).
 
-**La vista es isometrica, y eso no toco la simulacion.** El mundo sigue siendo
-una rejilla cuadrada; solo cambia como se proyecta a pantalla
-(`packages/client/src/projection.ts`). Ni una regla, colision o test del nucleo
-cambio al pasar de cenital a isometrica: esa es exactamente la separacion que
-justifica toda la arquitectura.
+**La camara no toco la simulacion.** El mundo es una rejilla cuadrada con
+alturas; el cliente la malla y la mira. Ni una regla, colision o test del nucleo
+cambio al pasar de cenital a isometrica, ni de isometrica a 3D.
 
-Dos consecuencias que si son del render y no se pueden esquivar:
-
-- **Las features no se hornean en la textura del chunk.** Arboles, rocas y
-  personaje van en una capa ordenada por profundidad (`depthOf = wx + wy`), para
-  que el jugador pueda pasar por detras de un arbol. Horneadas en el suelo no
-  podrian ordenarse contra el personaje.
-- **Lo que tapa al jugador se vuelve translucido.** En isometrica un arbol una
-  casilla por delante oculta al personaje por completo. Se atenuan solo las
-  casillas que geometricamente pueden taparlo, no todas.
+**Los elementos del mundo son aspas de dos laminas**, no sprites que giran con
+la camara: asi el bosque tiene lados. El jugador si es un sprite que mira a la
+camara, por decision del autor. El detalle esta en `CLAUDE.md`.
 
 **El input tactil no rompe la frontera del nucleo.** El joystick y los botones
 son una segunda fuente que produce la misma `Intent` que el teclado; el nucleo
@@ -172,9 +141,9 @@ no se entera de que existe una pantalla tactil. El vector de la `Intent` es
 **direccion pura** y la velocidad la elige su campo `run`, asi que teclado y
 joystick producen exactamente lo mismo: uno con teclas, el otro con un pulgar.
 
-**Un sprite por chunk, no por tile.** Cada chunk se pinta una vez en un canvas 2D
-y se sube como una textura, y solo se repinta si cambia. Dibujar el terreno
-cuesta unas decenas de sprites por frame en vez de decenas de miles.
+**Una malla por chunk, no por tile.** El terreno de cada chunk es una sola
+geometria con color por vertice, y las sombras de sus elementos van en un
+`InstancedMesh`: el coste va por chunk, no por casilla.
 
 **Las mutaciones viven fuera del chunk.** Un chunk puede descartarse y
 regenerarse en cualquier momento, asi que lo que el jugador cambia se guarda en
@@ -199,15 +168,14 @@ Encima de eso, lo que vino despues:
 - **El mundo tiene altura, y estorba.** Hasta 41 niveles, laderas escalonadas,
   mesetas y acantilados; y desde la fase 2 hay gravedad, salto y caida, asi que
   ya no se cambia de nivel andando.
-- **El cliente 3D con camara libre**, que es donde va el desarrollo: el mismo
-  mundo y la misma simulacion, con los elementos como aspas de dos laminas,
-  proporciones al estilo Minecraft —el jugador dos bloques, un arbol tres— y los
-  efectos reutilizando la fisica que ya existia.
+- **Camara libre en 3D**, con los elementos como aspas de dos laminas,
+  proporciones al estilo Minecraft —el jugador dos bloques, un arbol tres—, dia
+  y noche, y los efectos reutilizando la fisica que ya existia.
 
-**Lo siguiente es cerrar esa migracion, no empezar el multijugador.** Queda por
-resolver la oclusion del jugador por el terreno, los sprites de varias
-direcciones para el personaje y agrupar las aspas para bajar las draw calls; los
-cabos sueltos y las decisiones que esperan al autor estan en `docs/pendiente.md`.
+**Antes del multijugador quedan cabos de la camara nueva:** que el terreno tape
+al jugador sin perderlo de vista, los sprites de varias direcciones para el
+personaje y agrupar las aspas para bajar las draw calls. Los cabos sueltos y las
+decisiones que esperan al autor estan en `docs/pendiente.md`.
 
 Despues, y en este orden:
 

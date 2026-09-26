@@ -1,31 +1,23 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * El 3D no alcanza nada del isometrico.
+ * El cliente, entero, cuelga de su entrada.
  *
- * Se recorre el grafo de imports desde la entrada del 3D, siguiendo solo los
- * relativos —los paquetes del nucleo se cruzan por su nombre y no son del
- * cliente—, y se afirma que ningun fichero alcanzado es de la lista isometrica
- * ni importa `pixi.js`. Es lo que prueba que el isometrico se puede borrar sin
- * que el 3D se entere.
+ * Se recorre el grafo de imports desde `main.ts`, siguiendo solo los relativos
+ * —los paquetes del nucleo se cruzan por su nombre y no son del cliente—, y se
+ * afirman dos cosas:
+ *
+ * - **Nada huerfano.** Todo fichero de `src` se alcanza desde la entrada. Un
+ *   modulo que nadie importa es un resto: asi se comprobo que al retirar el
+ *   isometrico no quedo nada suyo colgando.
+ * - **Nada de PixiJS**, que era el motor del isometrico.
  */
 
 const ROOT = resolve(__dirname, '..');
 const CLIENT = join(ROOT, 'packages/client/src');
-const ENTRY = join(CLIENT, 'spike3d/main.ts');
-
-const ISOMETRIC = [
-  'main.ts',
-  'input.ts',
-  'renderer.ts',
-  'projection.ts',
-  'terrain-draw.ts',
-  'relief-faces.ts',
-  'biome-edges.ts',
-  'tiles.ts',
-].map((f) => join(CLIENT, f));
+const ENTRY = join(CLIENT, 'main.ts');
 
 const IMPORT = /(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 
@@ -48,30 +40,29 @@ function reach(entry: string): Map<string, string[]> {
   return seen;
 }
 
-describe('frontera del cliente 3D', () => {
+function sources(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? sources(join(dir, e.name)) : e.name.endsWith('.ts') ? [join(dir, e.name)] : [],
+  );
+}
+
+describe('el cliente cuelga de su entrada', () => {
   const graph = reach(ENTRY);
 
   it('recorre algo de verdad', () => {
     // Sin esto, un fallo del patron dejaria el grafo en la entrada sola y el
-    // test pasaria sin comprobar nada.
-    expect(graph.size).toBeGreaterThan(8);
+    // test de huerfanos fallaria por el motivo equivocado.
+    expect(graph.size).toBeGreaterThan(10);
     expect([...graph.keys()].some((f) => f.endsWith('art.ts'))).toBe(true);
   });
 
-  it('no alcanza ningun fichero del isometrico', () => {
-    const hits = ISOMETRIC.filter((f) => graph.has(f)).map((f) => relative(ROOT, f));
-    expect(hits).toEqual([]);
+  it('no queda ningun fichero huerfano', () => {
+    const orphans = sources(CLIENT).filter((f) => !graph.has(f)).map((f) => relative(ROOT, f));
+    expect(orphans).toEqual([]);
   });
 
   it('no importa pixi.js', () => {
     const users = [...graph].filter(([, specs]) => specs.some((s) => s.startsWith('pixi')));
     expect(users.map(([f]) => relative(ROOT, f))).toEqual([]);
-  });
-
-  it('el propio test ve un import isometrico si lo hay', () => {
-    // Contraste: desde la entrada del isometrico el mismo recorrido tiene que
-    // encontrarlos. Si no, la comprobacion de arriba no podria fallar.
-    const iso = reach(join(CLIENT, 'main.ts'));
-    expect(iso.has(join(CLIENT, 'projection.ts'))).toBe(true);
   });
 });

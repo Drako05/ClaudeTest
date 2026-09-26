@@ -5,7 +5,7 @@ import {
   STICK_DEAD,
   STICK_RADIUS,
   TAP_SLOP,
-} from '../packages/client/src/spike3d/gestures.js';
+} from '../packages/client/src/gestures.js';
 
 /**
  * De quien es cada dedo.

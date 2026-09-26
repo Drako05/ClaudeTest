@@ -1,9 +1,9 @@
 /**
  * Efectos visuales: el slash de la accion y los escombros de lo derribado.
  *
- * Puro y sin DOM ni PixiJS, como `projection.ts` y `biome-edges.ts`: aqui vive
- * el movimiento —donde esta cada cosa y cuanto le queda de vida— y el
- * renderizador solo lo dibuja. Asi la fisica de las particulas se comprueba en
+ * Puro y sin DOM ni three.js, como `terrain-mesh.ts` y `biome-edges.ts`: aqui
+ * vive el movimiento —donde esta cada cosa y cuanto le queda de vida— y
+ * `effects-view.ts` solo lo dibuja. Asi la fisica de las particulas se comprueba en
  * Node, que es donde se pueden medir numeros.
  *
  * Nada de esto existe para la simulacion. Es adorno del cliente y el nucleo no
