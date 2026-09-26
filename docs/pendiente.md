@@ -45,6 +45,8 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La mochila del inventario y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y el muslo | La franja de salud y hambre | SVG |
 | Con el inventario abierto en el movil, el panel **tapa** comer, sembrar y correr hasta que se cierra | La franja de salud y hambre | CSS |
 | El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `CLAUDE.md`, racimo del pulgar | un numero |
+| Primera persona: ojos a **1,75** sobre los pies, campo de vision **70°**, se entra mirando **-0,2 rad** hacia el suelo, catalejo hasta **15°** | `CLAUDE.md`, las tres vistas | numeros en `camera.ts` |
+| Con raton el catalejo vuelve **0,8 s** despues del ultimo giro de rueda (no hay «soltar») | `CLAUDE.md`, las tres vistas | un numero |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
@@ -274,9 +276,12 @@ abierto, cae con tres fallos.
 **0 pixeles** en el peor rumbo de «de cerca, girando» y, repetida, 17, 93 y 84.
 La herramienta anda hasta un sitio con alcance completo y no siempre para en el
 mismo (5.0,42.2 / 5.2,42.3 / 5.5,42.6), asi que su peor rumbo depende de donde
-cae. El cambio de la franja no toca nada dentro del recuadro que mide. Pero una
-medida que puede dar cero por el sitio es la misma trampa que ya costo el slash:
-habria que fijarle el sitio con `?x=&y=` en vez de dejarle caminar.
+cae. El cambio de la franja no toca nada dentro del recuadro que mide.
+
+**Resuelto despues, con la primera persona:** los ceros salian en rumbos donde,
+al girar, las casillas de delante quedaban a otra altura y la accion solo
+alcanzaba la propia —que no se barre—: no habia arco que ver. La herramienta
+ahora cuenta esos rumbos aparte («sin arco») y no los mete en el peor.
 
 ---
 

@@ -6,8 +6,9 @@ para crecer hacia multijugador online y, mas adelante, una version nativa.
 **Jugar: https://drako05.github.io/ClaudeTest/**
 
 Un mundo con relieve y camara libre en 3D. Arranca **en perspectiva**, que es la
-vista que eligio el autor; el ojo de la esquina superior derecha cambia a
-ortografica, que lo aplana todo. La antigua direccion `/3d/` redirige aqui.
+vista que eligio el autor; el ojo de la esquina superior derecha recorre
+perspectiva, isometrica —que lo aplana todo— y primera persona. La antigua
+direccion `/3d/` redirige aqui.
 
 El nombre es provisional.
 
@@ -50,7 +51,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 |---|---|
 | `WASD` / flechas | Moverse, relativo a la camara |
 | Arrastrar | Girar la camara |
-| Rueda, `+` / `-` | Zoom |
+| Rueda, `+` / `-` | Zoom; en primera persona, catalejo que vuelve al dejar de girar |
 | Clic izquierdo | Accionar hacia donde mira la camara (si no se arrastro) |
 | `Espacio` | Saltar |
 | `Shift` | Correr: interruptor, se queda encendido |
@@ -58,7 +59,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | `F` | Sembrar |
 | `I` | Inventario |
 | `R` | Mundo nuevo |
-| `P` | Perspectiva / ortografica |
+| `P` | Vista: perspectiva → isometrica → primera persona |
 | `F3` | Panel de desarrollo |
 
 **Tactil** (aparece solo en dispositivos de puntero grueso, o al primer toque)
@@ -67,7 +68,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 |---|---|
 | Pulgar en el cuadrante inferior izquierdo | Joystick flotante: apunta, no dosifica |
 | Un dedo en el resto de la pantalla | Girar la camara |
-| Dos dedos de camara | Zoom |
+| Dos dedos de camara | Zoom; en primera persona, catalejo que vuelve al soltar |
 | Boton ACCION | Accionar; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar la accion |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
 | Botones COMER y SEMBRAR | Comer bayas y sembrar |

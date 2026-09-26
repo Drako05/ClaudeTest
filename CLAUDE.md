@@ -643,6 +643,27 @@ a senalar que hay un interruptor.
 juego final tras probar las dos en su telefono. El interruptor se queda porque la
 ortografica conserva el aspecto plano del isometrico y sirve para comparar.
 
+**El ojo recorre tres vistas: perspectiva → isometrica → primera persona**, con
+el boton o con P. La primera persona la pidio el autor despues, con estas
+decisiones suyas: el ojo lleva un **punto de mira** en esa vista; arrastrar
+**hacia arriba es mirar arriba** —el dedo lleva la mirada, al reves que en las
+orbitales, que «agarran el mundo»—; y la pinza es un **catalejo temporal**, que
+estrecha el campo de vision y al soltar vuelve. En la interfaz la ortografica
+se llama «isometrica», que es como la llama el autor.
+
+Las tres comparten el **rumbo** (`yaw`): cambiar de vista sigue mirando al mismo
+sitio y `forward()` —movimiento y mirada de la accion— vale igual. La
+inclinacion es de cada una (`fpPitch` aparte), asi que volver a tercera persona
+recupera su angulo. El cuerpo del jugador no se dibuja desde dentro. Los numeros
+de la primera persona —ojos a 1,75, 70°, catalejo hasta 15°, la vuelta del
+catalejo con raton a los 0,8 s— son deduccion mia; estan en `docs/pendiente.md`.
+
+**Una medida de «se ve» tiene que saber cuando no hay nada que ver.** `npm run
+slash` daba cero en rumbos donde la accion solo alcanzaba la casilla propia,
+que no se barre: no era el barrido esfumandose, era que no habia arco. Ahora
+esos rumbos se cuentan aparte. Desde los ojos, cuando hay arco, se ve de sobra
+(miles de pixeles: la cinta pasa a un palmo de la camara).
+
 Ojo con una diferencia entre los dos mandos, que es deliberada: **el boton repite
 al mantenerlo** (cuatro veces por segundo, la cadencia de siempre) y **el raton
 no** —un clic es una accion—, porque mantener pulsado el raton significa

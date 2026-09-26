@@ -234,6 +234,14 @@ export class Gestures {
     return null;
   }
 
+  /**
+   * True mientras haya dos dedos de camara apoyados, se muevan o no: es lo que
+   * sostiene el catalejo de la primera persona, que vuelve al soltarlos.
+   */
+  get pinchHeld(): boolean {
+    return this.lookTouches().length >= 2;
+  }
+
   /** El giro acumulado desde la ultima vez que se pidio, en pixeles. */
   takeOrbit(): { dx: number; dy: number } {
     const out = { dx: this.orbitX, dy: this.orbitY };

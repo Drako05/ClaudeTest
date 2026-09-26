@@ -166,7 +166,15 @@ const spot = await page.evaluate(() => window.__verdant);
 console.log(`acciona con alcance completo en ${spot.x.toFixed(1)}, ${spot.y.toFixed(1)}, altura ${spot.z.toFixed(1)}`);
 
 const results = [];
-for (const view of ['normal', 'camara baja', 'de cerca, girando']) {
+for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera persona']) {
+  if (view === 'primera persona') {
+    // Desde los ojos, que es donde el arco mas facil podria salirse de
+    // pantalla: queda a la altura del pecho, por debajo de la mirada. P dos
+    // veces: perspectiva → isometrica → primera persona.
+    await page.keyboard.press('KeyP');
+    await page.keyboard.press('KeyP');
+    await page.waitForTimeout(600);
+  }
   if (view === 'camara baja') {
     // Arrastrar hacia arriba baja la elevacion, que es lo que aplastaba la
     // cinta cuando se ensanchaba en el plano del suelo.
@@ -186,15 +194,29 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando']) {
   // En la vista giratoria se mide en cuatro rumbos y se guarda el PEOR: la
   // pregunta no es «se ve desde algun sitio» sino «hay algun sitio desde el que
   // desaparezca». Un minimo en cero es el barrido esfumandose.
-  const turns = view === 'de cerca, girando' ? 4 : 1;
+  //
+  // PERO solo cuentan los rumbos con ARCO que trazar. Al girar, las casillas de
+  // delante pueden quedar a otra altura y la accion alcanza solo la que se pisa,
+  // que no se barre (regla 12): ahi no hay nada que ver, y contarlo como «el
+  // barrido no se ve» daba ceros por el paisaje. Se cuentan aparte, como «sin
+  // arco». Asi salieron los ceros de «de cerca» durante tandas.
+  const turns = view === 'de cerca, girando' || view === 'primera persona' ? 4 : 1;
   let worst = null;
   let noise = 0;
   let sent = 0;
   let gathered = 0;
   let pitch = 0;
+  let noArc = 0;
   for (let turn = 0; turn < turns; turn++) {
     if (turn > 0) await drag(-262, 0);
-    pitch = (await page.evaluate(() => window.__verdant)).pitch;
+    const here = await page.evaluate(() => window.__verdant);
+    pitch = here.projection === 'primera' ? here.fpPitch : here.pitch;
+    // La casilla propia siempre se alcanza y va la ultima: el arco necesita
+    // al menos dos del anillo.
+    if (here.reach.length - 1 < 2) {
+      noArc++;
+      continue;
+    }
 
     // Quieto el jugador y quieta la camara, dos fotogramas seguidos son
     // IDENTICOS. Asi que la referencia es una captura en reposo y lo que se mide
@@ -221,22 +243,23 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando']) {
     gathered += after.gathered - before.gathered;
   }
 
-  results.push({ view, pitch, noise, lit: worst, sent, gathered });
+  results.push({ view, pitch, noise, lit: worst, sent, gathered, noArc });
 }
 
 console.log('');
-console.log('vista               elevacion  ruido  pixeles aclarados  barridos mandados  recogido');
+console.log('vista               elevacion  ruido  pixeles aclarados  barridos mandados  recogido  sin arco');
 for (const r of results) {
   console.log(
     `${r.view.padEnd(19)} ${r.pitch.toFixed(2).padStart(9)} ` +
-    `${String(r.noise).padStart(6)} ${String(r.lit).padStart(18)} ` +
-    `${String(r.sent).padStart(18)} ${String(r.gathered).padStart(9)}`,
+    `${String(r.noise).padStart(6)} ${String(r.lit ?? '—').padStart(18)} ` +
+    `${String(r.sent).padStart(18)} ${String(r.gathered).padStart(9)} ${String(r.noArc).padStart(9)}`,
   );
 }
 console.log('');
 console.log('«pixeles aclarados» es el barrido llegando a pantalla; en la vista giratoria,');
 console.log('el PEOR de los cuatro rumbos. Con «recogido» a cero no hay escombros de por');
-console.log('medio y todo lo aclarado es del barrido.');
+console.log('medio y todo lo aclarado es del barrido. «Sin arco» son los rumbos donde');
+console.log('solo se alcanzaba la casilla propia: no hay barrido que ver y no cuentan.');
 console.log('');
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 

@@ -52,7 +52,7 @@ import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
-import { OrbitCamera } from './camera.js';
+import { OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
 import { chunkMesh } from './terrain-mesh.js';
 import { Hud } from './hud.js';
@@ -113,19 +113,25 @@ const controls = new Controls(
  * sincronizado**: la vista de salida es la perspectiva, y llamar al interruptor
  * para poner el icono en su sitio la voltearia al primer frame.
  */
+/** Como se anuncia cada vista, y a cual lleva tocar el ojo. */
+const VIEW_LABELS: Record<Projection, string> = {
+  perspectiva: 'Vista en perspectiva; tocar para isométrica',
+  orto: 'Vista isométrica; tocar para primera persona',
+  primera: 'Vista en primera persona; tocar para perspectiva',
+};
+
 function renderProjButton(): void {
-  const orto = camera.projection === 'orto';
-  // El ojo se entrecierra en ortografica, que es la vista que lo aplana todo.
-  projButton.classList.toggle('flat', orto);
-  const label = orto
-    ? 'Vista ortográfica; tocar para perspectiva'
-    : 'Vista en perspectiva; tocar para ortográfica';
+  // El ojo dice la vista con su forma: abierto en perspectiva, entrecerrado en
+  // la isometrica —que lo aplana todo— y con punto de mira en primera persona.
+  projButton.classList.toggle('flat', camera.projection === 'orto');
+  projButton.classList.toggle('fp', camera.projection === 'primera');
+  const label = VIEW_LABELS[camera.projection];
   projButton.setAttribute('aria-label', label);
   projButton.title = label;
 }
 
 function toggleProjection(): void {
-  camera.toggleProjection();
+  camera.cycleProjection();
   renderProjButton();
 }
 renderProjButton();
@@ -455,6 +461,8 @@ function frame(now: number): void {
   const look = controls.takeLook();
   camera.orbit(look.dx, look.dy);
   camera.zoom(controls.takeZoom());
+  // El catalejo de la primera persona vuelve solo al soltar la pinza.
+  camera.relaxSpyglass(dt, controls.zoomHeld);
 
   syncChunks();
   overlays.updateReticle(state);
@@ -471,13 +479,18 @@ function frame(now: number): void {
   // La altura que LLEVA, no la del suelo: con gravedad dejan de ser lo mismo, y
   // leyendo el suelo el personaje seguiria pegado al terreno saltando.
   const ph = state.entities.z[state.playerId];
-  if (player) billboards.moveTo(player, px, ph, py);
+  if (player) {
+    billboards.moveTo(player, px, ph, py);
+    // En primera persona se mira desde dentro: el cuerpo no se dibuja.
+    player.visible = camera.projection !== 'primera';
+  }
   water.position.set(px, WATER_Y, py);
 
   const w = window.innerWidth;
   const h = window.innerHeight;
   renderer.setSize(w, h, false);
-  scene.fog = camera.projection === 'perspectiva' ? haze : null;
+  // La niebla solo con fuga: en la isometrica lavaba la escena entera.
+  scene.fog = camera.projection === 'orto' ? null : haze;
   camera.follow(px, ph, py, w, h);
   renderer.render(scene, camera.active);
 
@@ -525,6 +538,10 @@ Object.defineProperty(window, '__verdant', {
       yaw: camera.yaw,
       pitch: camera.pitch,
       projection: camera.projection,
+      /** Campo de vision en uso: el catalejo de la primera persona lo estrecha. */
+      fov: camera.fov,
+      fpPitch: camera.fpPitch,
+      playerVisible: player?.visible ?? false,
       running: controls.running,
       dev: dev.active,
       timeScale: dev.timeScale,

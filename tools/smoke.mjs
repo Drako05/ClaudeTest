@@ -386,15 +386,36 @@ async function desktopPass(browser, baseUrl) {
   check(runLabel.includes('ACTIVADO'), `la ayuda no dice que la carrera esta encendida (${runLabel})`);
   await page.keyboard.press('ShiftLeft');
 
-  // El ojo: cambia de proyeccion y lo dice con su forma.
+  // El ojo recorre las tres vistas y lo dice con su forma: perspectiva →
+  // isometrica (entrecerrado) → primera persona (con mira) → perspectiva.
   await page.click('#proj');
   await page.waitForTimeout(200);
   const orto = await state(page);
-  check(orto.projection === 'orto', `el ojo no cambio a ortografica (${orto.projection})`);
-  check(await page.isVisible('#proj.flat'), 'el ojo no se entrecerro en ortografica');
+  check(orto.projection === 'orto', `el ojo no cambio a isometrica (${orto.projection})`);
+  check(await page.isVisible('#proj.flat'), 'el ojo no se entrecerro en isometrica');
+  await page.click('#proj');
+  await page.waitForTimeout(300);
+  const fp = await state(page);
+  check(fp.projection === 'primera', `el ojo no cambio a primera persona (${fp.projection})`);
+  check(await page.isVisible('#proj.fp'), 'el ojo no lleva la mira en primera persona');
+  check(fp.playerVisible === false, 'en primera persona se ve el cuerpo del personaje');
+  // El barrido tiene que llegar a dibujarse tambien desde los ojos. Desde el
+  // nacimiento, con las casillas al alcance (regla 22).
+  const fpStart = await open(page, baseUrl);
+  await page.keyboard.press('KeyP');
+  await page.keyboard.press('KeyP');
+  await page.waitForTimeout(300);
+  check((await state(page)).projection === 'primera', 'P no llevo a la primera persona');
+  await page.mouse.click(CLICK.x, CLICK.y);
+  await page.waitForTimeout(400);
+  const fpHit = await state(page);
+  check(fpHit.slashesDrawn > fpStart.slashesDrawn, 'en primera persona el barrido no se dibujo');
+  await page.screenshot({ path: join(SHOTS, '3d-02b-primera-persona.png') });
   await page.keyboard.press('KeyP');
   await page.waitForTimeout(200);
-  check((await state(page)).projection === 'perspectiva', 'P no volvio a la perspectiva');
+  const back = await state(page);
+  check(back.projection === 'perspectiva', 'P no volvio a la perspectiva');
+  check(back.playerVisible === true, 'al salir de la primera persona el cuerpo no volvio');
 
   await page.close();
 }
@@ -553,6 +574,37 @@ async function mobilePass(browser, baseUrl) {
   console.log(`  pinza: ${d0.toFixed(1)} -> ${d1.toFixed(1)} -> ${d2.toFixed(1)}`);
   check(d1 < d0, 'separar dos dedos no acerco la camara');
   check(d2 > d1, 'juntar dos dedos no alejo la camara');
+
+  // En primera persona la pinza es un catalejo: estrecha mientras dura y, al
+  // soltar, vuelve (decision del autor). Se mide el campo de vision durante y
+  // despues, con los dedos todavia apoyados en el primer caso.
+  await page.tap('#proj');
+  await page.tap('#proj');
+  await page.waitForTimeout(300);
+  check((await state(page)).projection === 'primera', 'tocar el ojo dos veces no llevo a la primera persona');
+  const fov0 = (await state(page)).fov;
+  await pointers(page, [
+    { type: 'pointerdown', id: 5, x: 165, y: 300 },
+    { type: 'pointerdown', id: 6, x: 225, y: 300 },
+  ]);
+  for (let i = 1; i <= 10; i++) {
+    await pointers(page, [
+      { type: 'pointermove', id: 5, x: 165 - i * 8, y: 300 },
+      { type: 'pointermove', id: 6, x: 225 + i * 8, y: 300 },
+    ]);
+  }
+  await page.waitForTimeout(400);
+  const fovHeld = (await state(page)).fov;
+  await pointers(page, [
+    { type: 'pointerup', id: 5, x: 85, y: 300 },
+    { type: 'pointerup', id: 6, x: 305, y: 300 },
+  ]);
+  await page.waitForTimeout(1200);
+  const fovAfter = (await state(page)).fov;
+  console.log(`  catalejo: ${fov0} -> ${fovHeld.toFixed(1)} (apoyado) -> ${fovAfter.toFixed(1)} (soltado)`);
+  check(fovHeld < fov0, 'en primera persona la pinza no estrecho el campo de vision');
+  check(fovAfter === fov0, `al soltar la pinza el catalejo no volvio (${fovAfter})`);
+  await page.tap('#proj');
 
   // El joystick, abajo a la izquierda: aparece, mueve y desaparece.
   const stick = { x: 90, y: 700 };

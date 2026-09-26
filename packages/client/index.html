@@ -54,6 +54,12 @@
       /* `.flat` es la ortografica: se cierra el parpado y desaparece la pupila. */
       #proj.flat .eye-open, #proj.flat .eye-pupil { display: none; }
       #proj:not(.flat) .eye-flat { display: none; }
+      /* `.fp` es la primera persona: el ojo abierto con un punto de mira encima
+         —un anillo alrededor de la pupila y dos marcas arriba y abajo—, «ves a
+         traves de sus ojos». Eleccion del autor. */
+      #proj .eye-aim { display: none; stroke-width: 1.4; }
+      #proj.fp .eye-aim { display: inline; }
+      #proj.fp .eye-pupil { transform: scale(.55); transform-origin: 12px 12px; }
       #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
       /* El salto, justo encima del de proyeccion y bajo el mismo pulgar. Es
          redondo y grande porque se usa constantemente, al reves que aquel. */
@@ -465,6 +471,8 @@
         <path class="eye-open" d="M1.8 12S5.8 5.6 12 5.6 22.2 12 22.2 12s-4 6.4-10.2 6.4S1.8 12 1.8 12z" />
         <circle class="eye-pupil" cx="12" cy="12" r="3" />
         <path class="eye-flat" d="M1.8 12S5.8 9.4 12 9.4 22.2 12 22.2 12s-4 2.6-10.2 2.6S1.8 12 1.8 12z" />
+        <circle class="eye-aim" cx="12" cy="12" r="4.4" />
+        <path class="eye-aim" d="M12 .8v3.4M12 19.8v3.4" />
       </svg>
     </button>
     <!-- El HUD, arriba a la izquierda y cerrado al arrancar. El icono es una

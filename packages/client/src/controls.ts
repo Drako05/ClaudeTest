@@ -14,6 +14,9 @@
 
 import { Gestures, STICK_RADIUS } from './gestures.js';
 
+/** Cuanto aguanta el catalejo tras el ultimo giro de rueda, en ms. */
+const WHEEL_HOLD_MS = 800;
+
 export interface Move {
   /** Vector en el plano de la PANTALLA, sin rotar. Lo rota la camara. */
   readonly x: number;
@@ -86,10 +89,12 @@ export class Controls {
         case 'Equal':
         case 'NumpadAdd':
           this.wheelZoom /= 1.25;
+          this.lastWheelAt = performance.now();
           break;
         case 'Minus':
         case 'NumpadSubtract':
           this.wheelZoom *= 1.25;
+          this.lastWheelAt = performance.now();
           break;
         default:
           break;
@@ -154,6 +159,7 @@ export class Controls {
       (e) => {
         e.preventDefault();
         this.wheelZoom *= e.deltaY > 0 ? 1.1 : 1 / 1.1;
+        this.lastWheelAt = performance.now();
       },
       { passive: false },
     );
@@ -163,6 +169,8 @@ export class Controls {
   }
 
   private wheelZoom = 1;
+  /** Ultima vez que se giro la rueda o se pulso + / -, en ms. */
+  private lastWheelAt = -Infinity;
   private jumpQueued = false;
   private eatQueued = false;
   private plantQueued = false;
@@ -373,6 +381,16 @@ export class Controls {
   /** Consume el giro acumulado desde el frame anterior. */
   takeLook(): { dx: number; dy: number } {
     return this.gestures.takeOrbit();
+  }
+
+  /**
+   * Si el zoom se esta sosteniendo: pinza apoyada, o rueda girada hace menos de
+   * `WHEEL_HOLD_MS`. Con raton no hay «soltar», asi que el catalejo de la
+   * primera persona vuelve cuando se deja de girar un momento (deduccion del
+   * agente, no del autor).
+   */
+  get zoomHeld(): boolean {
+    return this.gestures.pinchHeld || performance.now() - this.lastWheelAt < WHEEL_HOLD_MS;
   }
 
   takeZoom(): number {
