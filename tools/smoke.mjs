@@ -228,25 +228,39 @@ async function desktopPass(browser, baseUrl) {
   check(!(await page.isVisible('#thumbPad')), 'los botones del pulgar se ven en PC');
   check(await page.isVisible('#proj'), 'el ojo de la proyeccion no se ve');
   check(await page.isVisible('#help'), 'la ayuda de teclado no se ve en PC');
-  check(!(await page.isVisible('.touch-only')), 'la pista tactil se ve en PC');
 
-  // HUD: barras, inventario, reloj y dia, leidos del DOM y no de la sonda.
+  // La franja de salud y hambre se ve siempre; HUD e inventario arrancan
+  // cerrados (decision del autor) y se abren con su boton.
+  check(await page.isVisible('#vitals'), 'la franja de salud y hambre no se ve');
+  check(await page.isVisible('#invToggle') && await page.isVisible('#hudToggle'), 'faltan los botones del inventario o del HUD');
+  check(!spawn.hudOpen && !(await page.isVisible('#hud')), 'el HUD no arranca cerrado');
+  check(!spawn.inventoryOpen && !(await page.isVisible('#invPanel')), 'el inventario no arranca cerrado');
+  const vit = await page.evaluate(() => ({
+    health: Number(document.getElementById('healthBar').getAttribute('aria-valuenow')),
+    hunger: Number(document.getElementById('hungerBar').getAttribute('aria-valuenow')),
+    right: document.getElementById('vitals').getBoundingClientRect().right,
+  }));
+  // El hambre ya corre mientras carga la pagina, asi que se pide cerca de 100.
+  check(vit.health === 100 && vit.hunger >= 90, `barras de salida inesperadas: ${JSON.stringify(vit)}`);
+  check(vit.right > 1280 - 30, `las barras no llegan al borde derecho (${vit.right})`);
+
+  await page.click('#hudToggle');
+  await page.waitForTimeout(250);
   const hud = await page.evaluate(() => ({
-    health: document.getElementById('healthText').textContent,
-    hunger: document.getElementById('hungerText').textContent,
-    wood: document.getElementById('wood').textContent,
     clock: document.getElementById('clock').textContent,
     day: document.getElementById('day').textContent,
     seed: document.getElementById('seed').textContent,
   }));
   console.log(`  HUD: ${JSON.stringify(hud)}`);
-  // El hambre ya corre mientras carga la pagina, asi que se pide cerca de 100.
-  check(hud.health === '100' && Number(hud.hunger) >= 90, `barras de salida inesperadas: ${JSON.stringify(hud)}`);
+  check((await state(page)).hudOpen && await page.isVisible('#hud'), 'el boton no abrio el HUD');
+  check(!(await page.isVisible('.touch-only')), 'la pista tactil se ve en PC');
   check(/^\d\d:\d\d$/.test(hud.clock), `el reloj del HUD no marca la hora: ${hud.clock}`);
   check(hud.day === '1', `el HUD no marca el dia 1: ${hud.day}`);
   check(hud.seed === String(SEED), `el HUD no marca la semilla: ${hud.seed}`);
   await mkdir(SHOTS, { recursive: true });
   await page.screenshot({ path: join(SHOTS, '3d-01-spawn.png') });
+  await page.click('#hudToggle');
+  check(!(await page.isVisible('#hud')), 'el boton no volvio a cerrar el HUD');
 
   // Andar.
   const walked = await walkToOpenGround(page);
@@ -305,12 +319,21 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  inventario tras recolectar: ${JSON.stringify(gathered.inventory)}`);
   check(sum(gathered.inventory) > 0, 'accionar no recolecto nada');
   check(gathered.debrisDrawn > 0, 'derribar no dibujo ningun escombro');
+  // El inventario, con su tecla: I lo abre, muestra lo del juego, e I lo cierra.
+  await page.keyboard.press('KeyI');
+  await page.waitForTimeout(250);
+  check(await page.isVisible('#invPanel'), 'I no abrio el inventario');
   const hudTotal = await page.evaluate(() =>
     ['wood', 'stone', 'berries', 'coal', 'iron', 'copper', 'treeSeed', 'plantSeed']
       .map((id) => Number(document.getElementById(id).textContent))
       .reduce((a, b) => a + b, 0),
   );
-  check(hudTotal === sum(gathered.inventory), `el inventario del HUD (${hudTotal}) no es el del juego`);
+  const nowTotal = sum((await state(page)).inventory);
+  check(hudTotal === nowTotal, `el inventario en pantalla (${hudTotal}) no es el del juego (${nowTotal})`);
+  await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
+  await page.keyboard.press('KeyI');
+  await page.waitForTimeout(150);
+  check(!(await page.isVisible('#invPanel')), 'I no volvio a cerrar el inventario');
   // Y los efectos se apagan solos.
   await page.waitForTimeout(1800);
   const settled = await state(page);
@@ -460,12 +483,34 @@ async function mobilePass(browser, baseUrl) {
     check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);
   }
   check(!(await page.isVisible('#help')), 'la ayuda de teclado se ve en el movil');
-  check(await page.isVisible('.touch-only'), 'la pista de los gestos no se ve en el movil');
-  // El racimo cabe: ningun boton se sale de la pantalla ni se mete en la mitad
-  // izquierda, que es la del joystick.
-  const pad = await page.evaluate(() => document.getElementById('thumbPad').getBoundingClientRect().toJSON());
+  for (const id of ['#vitals', '#invToggle', '#hudToggle']) {
+    check(await page.isVisible(id), `${id} no se ve en el movil`);
+  }
+  // El racimo cabe en la pantalla y queda ENTERO por encima de la franja de
+  // salud y hambre, que llega hasta el borde derecho.
+  const layout = await page.evaluate(() => ({
+    pad: document.getElementById('thumbPad').getBoundingClientRect().toJSON(),
+    vitals: document.getElementById('vitals').getBoundingClientRect().toJSON(),
+    inv: document.getElementById('invToggle').getBoundingClientRect().toJSON(),
+  }));
+  const { pad, vitals, inv } = layout;
   check(pad.left > 0 && pad.right <= 390, `el racimo se sale de la pantalla: ${JSON.stringify(pad)}`);
+  check(pad.bottom <= vitals.top, `el racimo pisa la franja: ${pad.bottom} > ${vitals.top}`);
+  check(vitals.right > 390 - 30 && vitals.bottom <= 844, `la franja no llega al borde derecho: ${JSON.stringify(vitals)}`);
+  check(inv.left < 40 && inv.top >= vitals.top - 1, `el boton del inventario no esta en la esquina: ${JSON.stringify(inv)}`);
+
+  // Los dos paneles, al tacto. La pista de los gestos vive en el HUD.
+  await page.tap('#hudToggle');
+  await page.waitForTimeout(200);
+  check(await page.isVisible('#hud'), 'tocar el boton no abrio el HUD en el movil');
+  check(await page.isVisible('.touch-only'), 'la pista de los gestos no se ve en el movil');
+  await page.tap('#hudToggle');
+  await page.tap('#invToggle');
+  await page.waitForTimeout(200);
+  check(await page.isVisible('#invPanel'), 'tocar el boton no abrio el inventario en el movil');
   await page.screenshot({ path: join(SHOTS, '3d-04-movil.png') });
+  await page.tap('#invToggle');
+  check(!(await page.isVisible('#invPanel')), 'tocar otra vez no cerro el inventario');
 
   // Un dedo a la derecha gira la camara: ni joystick ni movimiento.
   const beforeLook = await state(page);

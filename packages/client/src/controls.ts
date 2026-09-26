@@ -8,8 +8,8 @@
  * regla no se comprueba jugando con dos pulgares en un headless.
  *
  * Las teclas son las de siempre: WASD o flechas para andar, Espacio salta,
- * Shift enciende y apaga la carrera, E come, F siembra, R empieza un mundo
- * nuevo, + y - acercan y alejan, y P cambia de proyeccion.
+ * Shift enciende y apaga la carrera, E come, F siembra, I abre el inventario,
+ * R empieza un mundo nuevo, + y - acercan y alejan, y P cambia de proyeccion.
  */
 
 import { Gestures, STICK_RADIUS } from './gestures.js';
@@ -25,6 +25,7 @@ export class Controls {
   private readonly gestures: Gestures;
   onToggleProjection: (() => void) | null = null;
   onRestart: (() => void) | null = null;
+  onToggleInventory: (() => void) | null = null;
 
   /**
    * Enciende los controles de pulgar.
@@ -72,6 +73,11 @@ export class Controls {
           break;
         case 'KeyF':
           this.plantQueued = true;
+          break;
+        // El inventario tiene tecla; el HUD no, solo su boton (decision del
+        // autor).
+        case 'KeyI':
+          this.onToggleInventory?.();
           break;
         case 'KeyR':
           this.onRestart?.();

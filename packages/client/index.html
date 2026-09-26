@@ -6,6 +6,11 @@
     <title>Verdant</title>
     <style>
       * { box-sizing: border-box; }
+      /* Alto de la franja inferior de salud y hambre. Todo lo que vive abajo
+         —el racimo del pulgar, la ayuda, el panel de desarrollo, el inventario—
+         se apoya encima de ella con esta misma cifra, para que no se pisen si la
+         franja cambia de alto. */
+      :root { --vitals-h: 50px; --above-vitals: calc(var(--vitals-h) + 20px + env(safe-area-inset-bottom)); }
       html, body {
         margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1020;
         touch-action: none; overscroll-behavior: none;
@@ -73,7 +78,8 @@
       */
       #thumbPad {
         position: fixed; z-index: 11;
-        bottom: calc(18px + env(safe-area-inset-bottom));
+        /* Por encima de la franja de salud y hambre, que es lo mas bajo. */
+        bottom: var(--above-vitals);
         right: calc(14px + env(safe-area-inset-right));
         display: none; align-items: flex-end; gap: 10px;
       }
@@ -143,24 +149,106 @@
 
       body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #e8eef7; }
 
+      /*
+        Los tres botones de panel —HUD, bioma e inventario— comparten aspecto:
+        cuadrados redondeados, distintos de los redondos del pulgar, porque no
+        hacen nada en el mundo, solo abren y cierran informacion.
+      */
+      #hudToggle, #statsToggle, #invToggle {
+        position: fixed; z-index: 13;
+        -webkit-appearance: none; appearance: none; padding: 0;
+        width: 44px; height: 44px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 22px; line-height: 1; cursor: pointer;
+        color: #e8eef7; background: rgba(8, 14, 28, 0.78);
+        border: 1px solid rgba(140, 190, 255, 0.22);
+        backdrop-filter: blur(6px); touch-action: manipulation;
+      }
+      #hudToggle svg, #invToggle svg {
+        width: 22px; height: 22px; display: block;
+        fill: none; stroke: currentColor; stroke-width: 1.8;
+        stroke-linecap: round; stroke-linejoin: round;
+      }
+      #hudToggle:active, #statsToggle:active, #invToggle:active { transform: scale(.94); }
+      #hudToggle:focus-visible, #statsToggle:focus-visible, #invToggle:focus-visible {
+        outline: 2px solid #8fc4ff; outline-offset: 3px;
+      }
+      #hudToggle.open, #statsToggle.open, #invToggle.open { background: rgba(60, 104, 168, .72); }
+
+      /* El HUD: se despliega bajo su boton, arriba a la izquierda, espejo del
+         panel del bioma en la esquina de enfrente. Arranca cerrado. */
+      #hudToggle {
+        top: calc(12px + env(safe-area-inset-top));
+        left: calc(12px + env(safe-area-inset-left));
+      }
       #hud {
-        position: fixed; top: 12px; left: 12px; z-index: 10;
+        position: fixed; z-index: 10;
+        top: calc(64px + env(safe-area-inset-top));
+        left: calc(12px + env(safe-area-inset-left));
         background: rgba(8, 14, 28, 0.78);
         border: 1px solid rgba(140, 190, 255, 0.22);
         border-radius: 10px; padding: 12px 14px;
         font-size: 13px; line-height: 1.55; min-width: 210px;
         backdrop-filter: blur(6px);
       }
-      #hud h1 { margin: 0 0 8px; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #8fc4ff; font-weight: 600; }
-      .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; margin: 3px 0 8px; }
-      .bar > i { display: block; height: 100%; width: 100%; transition: width .12s linear; }
-      #healthFill { background: linear-gradient(90deg, #ff6b6b, #ff9f7a); }
-      #hungerFill { background: linear-gradient(90deg, #ffc46b, #ffe89a); }
+      #hud[hidden] { display: none; }
       .row { display: flex; justify-content: space-between; gap: 16px; }
       .dim { color: #8b9bb4; }
 
+      /*
+        La franja inferior: salud y hambre, siempre a la vista, con el boton del
+        inventario en la esquina. Es lo mas bajo de la pantalla; el racimo del
+        pulgar va encima. Las barras no llevan nombre: las identifica su icono,
+        del mismo color que su relleno.
+      */
+      #vitals {
+        position: fixed; z-index: 11;
+        left: calc(12px + env(safe-area-inset-left));
+        right: calc(12px + env(safe-area-inset-right));
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        height: var(--vitals-h);
+        display: flex; align-items: center; gap: 10px;
+        pointer-events: none;
+      }
+      #invToggle { position: static; flex: none; pointer-events: auto; }
+      #vitalBars {
+        flex: 1; min-width: 0;
+        display: flex; flex-direction: column; justify-content: center; gap: 7px;
+        height: 100%; padding: 0 12px 0 10px; border-radius: 12px;
+        background: rgba(8, 14, 28, 0.62);
+        border: 1px solid rgba(140, 190, 255, 0.18);
+        backdrop-filter: blur(6px);
+      }
+      .vital { display: flex; align-items: center; gap: 8px; }
+      .vital svg { width: 16px; height: 16px; flex: none; display: block; }
+      .bar {
+        flex: 1; height: 9px; border-radius: 5px; overflow: hidden;
+        background: rgba(255,255,255,.14);
+      }
+      .bar > i { display: block; height: 100%; width: 100%; transition: width .12s linear; }
+      #healthFill { background: linear-gradient(90deg, #ff6b6b, #ff9f7a); }
+      #hungerFill { background: linear-gradient(90deg, #ffc46b, #ffe89a); }
+
+      /* El inventario se abre por encima de su boton. */
+      #invPanel {
+        position: fixed; z-index: 15;
+        left: calc(12px + env(safe-area-inset-left));
+        bottom: var(--above-vitals);
+        min-width: 190px; max-width: calc(100vw - 24px);
+        padding: 12px 14px; border-radius: 12px;
+        font-size: 13px; line-height: 1.55;
+        background: rgba(8, 14, 28, 0.86);
+        border: 1px solid rgba(140, 190, 255, 0.22);
+        backdrop-filter: blur(6px);
+      }
+      #invPanel[hidden] { display: none; }
+      #invPanel h2 {
+        margin: 0 0 6px; font-size: 11px; letter-spacing: .14em;
+        text-transform: uppercase; color: #8fc4ff; font-weight: 600;
+      }
+
       #help {
-        position: fixed; bottom: 12px; left: 12px; z-index: 10;
+        position: fixed; bottom: var(--above-vitals); left: 12px; z-index: 10;
         background: rgba(8, 14, 28, 0.78);
         border: 1px solid rgba(140, 190, 255, 0.22);
         border-radius: 10px; padding: 10px 14px; font-size: 12px; line-height: 1.7;
@@ -201,28 +289,20 @@
       body.running #runState { color: #cfe4ff; font-weight: 600; }
       body.running #runState::after { content: ' ACTIVADO'; }
 
+      /* Con el inventario abierto, la ayuda se aparta: comparten esquina. */
+      body:has(#invPanel:not([hidden])) #help { display: none; }
+
       @media (max-width: 560px) {
-        #hud { top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left));
-               padding: 8px 10px; font-size: 11px; min-width: 148px; }
-        #hud h1 { font-size: 10px; margin-bottom: 5px; }
+        #hud { padding: 8px 10px; font-size: 11px; min-width: 148px; }
+        #invPanel { font-size: 12px; }
         #help { font-size: 10px; padding: 7px 10px; }
       }
 
       /* ---- Panel del entorno (esquina superior derecha) ------------------- */
       #statsToggle {
-        position: fixed; z-index: 13;
         top: calc(64px + env(safe-area-inset-top));
         right: calc(12px + env(safe-area-inset-right));
-        width: 44px; height: 44px; border-radius: 12px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 22px; line-height: 1; cursor: pointer;
-        color: #e8eef7; background: rgba(8, 14, 28, 0.78);
-        border: 1px solid rgba(140, 190, 255, 0.22);
-        backdrop-filter: blur(6px); touch-action: manipulation;
       }
-      #statsToggle:active { transform: scale(.94); }
-      #statsToggle:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
-      #statsToggle.open { background: rgba(60, 104, 168, .72); }
 
       #statsPanel {
         position: fixed; z-index: 13;
@@ -286,9 +366,9 @@
       #devPanel {
         position: fixed; z-index: 14;
         left: calc(12px + env(safe-area-inset-left));
-        bottom: calc(12px + env(safe-area-inset-bottom));
+        bottom: var(--above-vitals);
         width: 268px; max-width: calc(100vw - 24px);
-        max-height: calc(100vh - 24px); overflow-y: auto;
+        max-height: calc(100vh - var(--vitals-h) - 90px); overflow-y: auto;
         padding: 9px 11px; border-radius: 12px;
         font-size: 12px; line-height: 1.45;
         background: rgba(14, 12, 24, 0.90);
@@ -384,21 +464,17 @@
         <path class="eye-flat" d="M1.8 12S5.8 9.4 12 9.4 22.2 12 22.2 12s-4 2.6-10.2 2.6S1.8 12 1.8 12z" />
       </svg>
     </button>
-    <div id="hud">
-      <h1>Verdant</h1>
-      <div class="row"><span>Salud</span><span id="healthText" class="dim">100</span></div>
-      <div class="bar"><i id="healthFill"></i></div>
-      <div class="row"><span>Hambre</span><span id="hungerText" class="dim">100</span></div>
-      <div class="bar"><i id="hungerFill"></i></div>
-      <div class="row"><span>Madera</span><span id="wood" class="dim">0</span></div>
-      <div class="row"><span>Piedra</span><span id="stone" class="dim">0</span></div>
-      <div class="row"><span>Bayas</span><span id="berries" class="dim">0</span></div>
-      <div class="row"><span>Carbon</span><span id="coal" class="dim">0</span></div>
-      <div class="row"><span>Hierro</span><span id="iron" class="dim">0</span></div>
-      <div class="row"><span>Cobre</span><span id="copper" class="dim">0</span></div>
-      <div class="row"><span>Sem. arbol</span><span id="treeSeed" class="dim">0</span></div>
-      <div class="row"><span>Sem. planta</span><span id="plantSeed" class="dim">0</span></div>
-      <hr style="border:0;border-top:1px solid rgba(255,255,255,.1);margin:9px 0" />
+    <!-- El HUD, arriba a la izquierda y cerrado al arrancar. El icono es una
+         «i» de informacion, monocroma como el ojo. -->
+    <button id="hudToggle" type="button" aria-expanded="false" aria-controls="hud"
+            aria-label="Mostrar informacion">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9.2" />
+        <path d="M12 11v6" />
+        <circle cx="12" cy="7.4" r=".6" />
+      </svg>
+    </button>
+    <div id="hud" hidden>
       <div class="row"><span>Hora</span><span id="clock">00:00</span></div>
       <div class="row dim"><span>Dia</span><span id="day">1</span></div>
       <hr style="border:0;border-top:1px solid rgba(255,255,255,.1);margin:9px 0" />
@@ -413,8 +489,52 @@
     <div id="help">
       <kbd id="kbdRun">Shift</kbd> <span id="runState">correr</span> &nbsp;
       <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic</kbd> accionar &nbsp; <kbd>arrastrar</kbd> girar<br />
-      <kbd>E</kbd> comer bayas &nbsp; <kbd>F</kbd> sembrar &nbsp;
+      <kbd>E</kbd> comer bayas &nbsp; <kbd>F</kbd> sembrar &nbsp; <kbd>I</kbd> inventario &nbsp;
       <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom &nbsp; <kbd>P</kbd> vista
+    </div>
+
+    <!-- La franja inferior: el inventario en la esquina y, a su derecha, salud y
+         hambre hasta el borde. Sin rotulos: un corazon y un muslo, en SVG y del
+         color de su barra, para que se vean iguales en todos los sistemas. -->
+    <div id="vitals">
+      <button id="invToggle" type="button" aria-expanded="false" aria-controls="invPanel"
+              aria-label="Inventario (I)">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 6.5V5a3 3 0 0 1 6 0v1.5" />
+          <rect x="4.5" y="6.5" width="15" height="14" rx="3.5" />
+          <path d="M4.5 12.5h15" />
+          <path d="M10 12.5v2.2h4v-2.2" />
+        </svg>
+      </button>
+      <div id="vitalBars">
+        <div class="vital">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#ff6b6b" d="M12 21s-7.4-4.5-9.5-9.1C1 8.5 3.1 4.4 6.8 4.4c2.1 0 3.6 1.2 5.2 3.2 1.6-2 3.1-3.2 5.2-3.2 3.7 0 5.8 4.1 4.3 7.5C19.4 16.5 12 21 12 21z" />
+          </svg>
+          <div class="bar" id="healthBar" role="meter" aria-label="Salud"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="healthFill"></i></div>
+        </div>
+        <div class="vital">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#ffc46b" d="M15.2 2.6a6.2 6.2 0 0 1 4.4 10.6c-1.7 1.7-4 2.2-6.1 1.6l-2.3 2.3-2.4-2.4 2.3-2.3c-.6-2.1-.1-4.4 1.6-6.1a6.2 6.2 0 0 1 2.5-1.7z" />
+            <path fill="#f3e6cf" d="M8.8 14.7l2.4 2.4-1.9 1.9a2 2 0 1 1-2.5 2.5 2 2 0 1 1-2.5-2.5 2 2 0 1 1 2.5-2.5z" />
+          </svg>
+          <div class="bar" id="hungerBar" role="meter" aria-label="Hambre"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="hungerFill"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="invPanel" hidden>
+      <h2>Inventario</h2>
+      <div class="row"><span>Madera</span><span id="wood" class="dim">0</span></div>
+      <div class="row"><span>Piedra</span><span id="stone" class="dim">0</span></div>
+      <div class="row"><span>Bayas</span><span id="berries" class="dim">0</span></div>
+      <div class="row"><span>Carbon</span><span id="coal" class="dim">0</span></div>
+      <div class="row"><span>Hierro</span><span id="iron" class="dim">0</span></div>
+      <div class="row"><span>Cobre</span><span id="copper" class="dim">0</span></div>
+      <div class="row"><span>Sem. arbol</span><span id="treeSeed" class="dim">0</span></div>
+      <div class="row"><span>Sem. planta</span><span id="plantSeed" class="dim">0</span></div>
     </div>
 
     <button id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"

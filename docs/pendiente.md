@@ -41,6 +41,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Comer y sembrar en el racimo del pulgar: a la izquierda de todo y los mas pequenos | El isometrico se retira | CSS |
 | La noche como **vela sobre la pantalla**, no bajando las luces | El isometrico se retira | trabajo de verdad si se quiere luz |
 | Sin `?seed` se juega un mundo al azar (el 3D usaba siempre el 12345) | El isometrico se retira | una linea |
+| Salud y hambre **apiladas** (salud arriba), la franja de 50 px y **sin numero** en las barras | La franja de salud y hambre | CSS |
+| La mochila del inventario y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y el muslo | La franja de salud y hambre | SVG |
+| Con el inventario abierto en el movil, el panel **tapa** comer, sembrar y correr hasta que se cierra | La franja de salud y hambre | CSS |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
@@ -239,6 +242,30 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    arboles sueltos. A 80 FPS no bloquea, pero es la primera optimizacion.
 4. ~~Que se retira del isometrico.~~ **Hecho el 2026-09-26**: se retiro entero
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
+
+---
+
+## La franja de salud y hambre — HECHA (2026-09-26)
+
+Pedido del autor, con sus decisiones: salud y hambre siempre a la vista, abajo
+del todo y bajo el racimo del pulgar, sin rotulo y con un corazon y un muslo de
+pollo en SVG a color; un boton de inventario en la esquina inferior izquierda
+(tecla I); el HUD ocultable con su boton arriba a la izquierda y sin tecla; HUD e
+inventario cerrados al arrancar. Lo que decidi yo esta en «Esperando tu juicio».
+
+El humo afirma lo que no se ve en un test: que los paneles arrancan cerrados y se
+abren con su boton o su tecla, que el inventario en pantalla es el del juego, y
+que en un telefono de 390 px el racimo queda entero por encima de la franja y la
+franja llega al borde derecho. Comprobado que muerde: con el HUD arrancando
+abierto, cae con tres fallos.
+
+**Cabo suelto de medida, no de juego:** `npm run slash` dio dos veces seguidas
+**0 pixeles** en el peor rumbo de «de cerca, girando» y, repetida, 17, 93 y 84.
+La herramienta anda hasta un sitio con alcance completo y no siempre para en el
+mismo (5.0,42.2 / 5.2,42.3 / 5.5,42.6), asi que su peor rumbo depende de donde
+cae. El cambio de la franja no toca nada dentro del recuadro que mide. Pero una
+medida que puede dar cero por el sitio es la misma trampa que ya costo el slash:
+habria que fijarle el sitio con `?x=&y=` en vez de dejarle caminar.
 
 ---
 

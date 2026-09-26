@@ -1,6 +1,11 @@
 /**
- * El HUD: salud y hambre, inventario, reloj, el panel del entorno y el aviso de
- * muerte.
+ * La interfaz sobre el mundo: la franja de salud y hambre, el HUD, el
+ * inventario, el panel del entorno y el aviso de muerte.
+ *
+ * Las barras se ven siempre. El HUD, el inventario y el panel del entorno se
+ * abren y cierran con su boton, arrancan cerrados, y mientras estan cerrados no
+ * se escribe en ellos: el DOM se toca diez veces por segundo y no hay por que
+ * pagarlo por lo que no se ve.
  *
  * Es DOM puro sobre el estado del nucleo, y vino tal cual del cliente
  * isometrico: nada de esto sabe que hay una camara.
@@ -79,10 +84,14 @@ const KINDS: readonly LifeKind[] = [LifeKind.Tree, LifeKind.Plant, LifeKind.Anim
 
 export class Hud {
   private readonly el = {
-    healthText: byId('healthText'),
+    healthBar: byId('healthBar'),
     healthFill: byId('healthFill'),
-    hungerText: byId('hungerText'),
+    hungerBar: byId('hungerBar'),
     hungerFill: byId('hungerFill'),
+    hudToggle: byId('hudToggle'),
+    hud: byId('hud'),
+    invToggle: byId('invToggle'),
+    invPanel: byId('invPanel'),
     wood: byId('wood'),
     stone: byId('stone'),
     berries: byId('berries'),
@@ -111,16 +120,49 @@ export class Hud {
   private readonly biomeRows: StatRow[] = [];
   private readonly chunkRows: StatRow[] = [];
 
+  /** Los dos ultimos datos de rendimiento, para pintar el HUD nada mas abrirlo. */
+  private lastFps = 0;
+  private lastDraw = '—';
+
   /** `current` da el estado vigente: al reiniciar la partida se sustituye. */
   constructor(private readonly current: () => GameState) {
-    // El panel del entorno se despliega y repliega con el mismo boton.
-    this.el.statsToggle.addEventListener('click', () => {
-      const open = this.el.statsPanel.hidden;
-      this.el.statsPanel.hidden = !open;
-      this.el.statsToggle.classList.toggle('open', open);
-      this.el.statsToggle.setAttribute('aria-expanded', String(open));
-      if (open) this.updateStats(this.current());
-    });
+    // Cada panel se despliega y repliega con su boton.
+    this.el.statsToggle.addEventListener('click', () => this.toggleStats());
+    this.el.hudToggle.addEventListener('click', () => this.toggleHud());
+    this.el.invToggle.addEventListener('click', () => this.toggleInventory());
+  }
+
+  /** Abre o cierra un panel y deja su boton diciendo como esta. */
+  private static flip(button: HTMLElement, panel: HTMLElement): boolean {
+    const open = panel.hidden;
+    panel.hidden = !open;
+    button.classList.toggle('open', open);
+    button.setAttribute('aria-expanded', String(open));
+    return open;
+  }
+
+  toggleStats(): void {
+    if (Hud.flip(this.el.statsToggle, this.el.statsPanel)) this.updateStats(this.current());
+  }
+
+  /** El HUD: solo con su boton, sin tecla (decision del autor). */
+  toggleHud(): void {
+    const open = Hud.flip(this.el.hudToggle, this.el.hud);
+    this.el.hudToggle.setAttribute('aria-label', open ? 'Ocultar informacion' : 'Mostrar informacion');
+    if (open) this.updateInfo(this.current());
+  }
+
+  /** El inventario: su boton o la tecla I. */
+  toggleInventory(): void {
+    if (Hud.flip(this.el.invToggle, this.el.invPanel)) this.updateInventory(this.current());
+  }
+
+  get hudOpen(): boolean {
+    return !this.el.hud.hidden;
+  }
+
+  get inventoryOpen(): boolean {
+    return !this.el.invPanel.hidden;
   }
 
   /** Si el aviso de muerte esta a la vista. */
@@ -129,16 +171,28 @@ export class Hud {
   }
 
   update(state: GameState, fps: number, draw: string): void {
-    const { entities, playerId, inventory } = state;
-    const health = entities.health[playerId];
-    const hunger = entities.hunger[playerId];
+    const { entities, playerId } = state;
     const el = this.el;
+    this.lastFps = fps;
+    this.lastDraw = draw;
 
-    el.healthText.textContent = String(Math.ceil(health));
-    el.healthFill.style.width = `${Math.max(0, health)}%`;
-    el.hungerText.textContent = String(Math.ceil(hunger));
-    el.hungerFill.style.width = `${Math.max(0, hunger)}%`;
+    // Las barras, siempre: son lo unico que no se puede ocultar.
+    const health = Math.max(0, entities.health[playerId]);
+    const hunger = Math.max(0, entities.hunger[playerId]);
+    el.healthFill.style.width = `${health}%`;
+    el.healthBar.setAttribute('aria-valuenow', String(Math.ceil(health)));
+    el.hungerFill.style.width = `${hunger}%`;
+    el.hungerBar.setAttribute('aria-valuenow', String(Math.ceil(hunger)));
 
+    el.dead.classList.toggle('show', entities.alive[playerId] === 0);
+    if (this.inventoryOpen) this.updateInventory(state);
+    if (this.hudOpen) this.updateInfo(state);
+    this.updateStats(state);
+  }
+
+  private updateInventory(state: GameState): void {
+    const { inventory } = state;
+    const el = this.el;
     el.wood.textContent = String(inventory[Resource.Wood]);
     el.stone.textContent = String(inventory[Resource.Stone]);
     el.berries.textContent = String(inventory[Resource.Berries]);
@@ -147,18 +201,19 @@ export class Hud {
     el.coal.textContent = String(inventory[Resource.Coal]);
     el.iron.textContent = String(inventory[Resource.Iron]);
     el.copper.textContent = String(inventory[Resource.Copper]);
+  }
 
+  private updateInfo(state: GameState): void {
+    const { entities, playerId } = state;
+    const el = this.el;
     el.clock.textContent = clockLabel(state.tick);
     el.day.textContent = String(dayNumber(state.tick));
     el.seed.textContent = String(state.world.seed);
     el.pos.textContent = `${Math.floor(entities.x[playerId])}, ${Math.floor(entities.y[playerId])}`;
     el.chunks.textContent = String(state.world.loadedChunkCount);
     // Hasta que cierre la primera ventana de medicion no hay dato que mostrar.
-    el.fps.textContent = fps > 0 ? String(Math.round(fps)) : '—';
-    el.draw.textContent = draw;
-
-    el.dead.classList.toggle('show', entities.alive[playerId] === 0);
-    this.updateStats(state);
+    el.fps.textContent = this.lastFps > 0 ? String(Math.round(this.lastFps)) : '—';
+    el.draw.textContent = this.lastDraw;
   }
 
   /**

@@ -600,6 +600,20 @@ se usan menos que moverse y accionar. En un telefono estrecho los cinco se
 aprietan y la accion conserva su primacia. **La colocacion es deduccion mia**
 desde la regla del autor, no una decision suya: puede corregirla.
 
+**Debajo del racimo, lo mas bajo de la pantalla, va la franja de salud y hambre**,
+decision del autor: siempre a la vista, en PC y en movil, sin rotulos —un corazon
+y un muslo de pollo en SVG, del color de su barra—, con el **boton del inventario
+en la esquina inferior izquierda** y las barras desde poco despues de el hasta el
+borde derecho. Todo lo que vive abajo (racimo, ayuda, panel de desarrollo,
+inventario) se apoya encima con la variable CSS `--above-vitals`, y el humo
+afirma que el racimo no pisa la franja.
+
+**El HUD y el inventario arrancan cerrados**, tambien decision suya. El HUD
+(hora, dia, semilla, posicion, FPS) se abre con su boton de arriba a la izquierda
+—espejo del del bioma— y **no tiene tecla**; el inventario, con su boton o con
+**I**. Cerrados no se escriben: el DOM se refresca diez veces por segundo y no
+hay por que pagarlo por lo que no se ve.
+
 **Y ese racimo no se ve en PC**, tambien decision suya: son controles de pulgar y
 con teclado sobran, porque Shift, Espacio y el clic izquierdo ya hacen lo mismo.
 El mecanismo —`.touch-active` en el `body`, que pone `controls.ts` si el puntero es grueso y, si no, al primer toque

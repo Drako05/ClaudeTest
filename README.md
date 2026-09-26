@@ -56,6 +56,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | `Shift` | Correr: interruptor, se queda encendido |
 | `E` | Comer bayas |
 | `F` | Sembrar |
+| `I` | Inventario |
 | `R` | Mundo nuevo |
 | `P` | Perspectiva / ortografica |
 | `F3` | Panel de desarrollo |
@@ -70,6 +71,12 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Boton ACCION | Accionar; mantener repite 4 veces por segundo |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
 | Botones COMER y SEMBRAR | Comer bayas y sembrar |
+
+**En los dos:** la salud (corazon) y el hambre (muslo) van siempre abajo, de
+borde a borde, con el boton del **inventario** en la esquina inferior izquierda.
+El boton de arriba a la izquierda abre el **HUD** (hora, dia, semilla, posicion,
+FPS) y el de la hoja, bajo el ojo, el **panel del entorno**. Los tres paneles
+arrancan cerrados.
 
 La accion es el boton mas grande y el mas pegado al borde derecho, donde cae el
 pulgar; los demas se apartan a su izquierda, mas pequenos cuanto menos se usan.

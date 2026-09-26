@@ -137,6 +137,7 @@ controls.bindActionButton(document.getElementById('action'));
 controls.bindEatButton(document.getElementById('eat'));
 controls.bindPlantButton(document.getElementById('plant'));
 controls.onRestart = restart;
+controls.onToggleInventory = () => hud.toggleInventory();
 document.getElementById('restart')?.addEventListener('click', restart);
 
 // El barrido y los escombros. El movimiento sale de `effects.ts`, que es puro y
@@ -561,6 +562,8 @@ Object.defineProperty(window, '__verdant', {
       hunger: e.hunger[id],
       alive: e.alive[id] === 1,
       deadShown: hud.deadShown,
+      hudOpen: hud.hudOpen,
+      inventoryOpen: hud.inventoryOpen,
       inventory: Array.from(state.inventory),
       chunks: state.world.loadedChunkCount,
       tracked: state.world.trackedChunkCount,
