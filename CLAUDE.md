@@ -99,10 +99,18 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     arrasado reviviera dependia del orden en que se generaron los chunks —es
     decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
     que ningun test evidente lo delate.
-12. **Una accion afecta a tres casillas: la apuntada y sus dos vecinas en el
-    anillo de 8 direcciones** (`sim/aim.ts`). De esa unica regla salen los dos
-    casos que describio el autor —en recto las flanqueantes quedan en diagonal,
-    en diagonal quedan ortogonales— y `tests/aim.test.ts` las tiene todas. El
+12. **Una accion afecta a cuatro casillas: la apuntada, sus dos vecinas en el
+    anillo de 8 direcciones y la que se pisa** (`sim/aim.ts`). De esa unica regla
+    salen los dos casos que describio el autor —en recto las flanqueantes quedan
+    en diagonal, en diagonal quedan ortogonales— y `tests/aim.test.ts` las tiene
+    todas. La casilla propia la sumo despues, con su enunciado sobre una rejilla
+    1-9 con el jugador en el 5: mirando a 2 se afectan 1, 2, 3 y 5; mirando a 3,
+    2, 3, 6 y 5 (hay un test con esos dos casos literales). El orden es fijo
+    —`[apuntada, flanco, flanco, propia]`—: sembrar sigue usando solo la
+    apuntada, y **el arco del barrido recorre solo las tres del anillo**, por
+    decision suya; la propia se recolecta pero no se barre. El cliente la quita
+    del arco por coordenadas, no por posicion, porque `actionReach` filtra por
+    altura y la lista se desplaza. El
     area parte de la casilla que se PISA: antes se apuntaba con
     `floor(pos + mirada * 1.1)`, que pegado al borde de la casilla podia saltar a
     dos de distancia, y con tres casillas eso deja de pasar inadvertido.

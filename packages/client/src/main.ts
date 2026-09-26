@@ -415,7 +415,16 @@ function frame(now: number): void {
       state.world.groundHeightAt(state.entities.x[state.playerId], state.entities.y[state.playerId]);
     if (gap > airPeak) airPeak = gap;
     if (accionando) {
-      effects.spawnSlash(actionReach(state.world, state.entities, state.playerId));
+      // El arco recorre solo las casillas del anillo: la que se pisa se
+      // recolecta pero no se barre, por decision del autor. Se quita por
+      // COORDENADAS y no por posicion en la lista: `actionReach` filtra por
+      // altura, y si la apuntada cayera la propia se correria dentro del arco
+      // y el trazo cruzaria al personaje.
+      const tx = Math.floor(state.entities.x[state.playerId]);
+      const ty = Math.floor(state.entities.y[state.playerId]);
+      effects.spawnSlash(
+        actionReach(state.world, state.entities, state.playerId).filter((t) => t.x !== tx || t.y !== ty),
+      );
     }
     for (const hit of state.lastHarvest) {
       gathered += hit.amount + hit.seeds;
@@ -537,7 +546,7 @@ Object.defineProperty(window, '__verdant', {
       /** Hacia donde mira la camara, que es de donde sale la mirada. */
       aim: [camera.forward().x, camera.forward().y],
       // Las dos cosas y por separado: `area` es la GEOMETRIA del apuntado
-      // —siempre tres casillas del anillo— y `reach` las que estan a la altura
+      // —tres casillas del anillo y la que se pisa— y `reach` las que estan a la altura
       // propia y se pueden accionar. En terreno escalonado difieren.
       area: actionArea(e, id).map((t) => [t.x, t.y]),
       reach: actionReach(state.world, e, id).map((t) => [t.x, t.y]),

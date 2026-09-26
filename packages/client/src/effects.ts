@@ -62,7 +62,10 @@ export interface Particle {
 }
 
 export interface Slash {
-  /** Las tres casillas del area, en el orden que las da `actionArea`. */
+  /**
+   * Las casillas del ANILLO que barre el arco, en el orden que las da
+   * `actionArea`. La que se pisa no entra: se recolecta, pero no se barre.
+   */
   tiles: ReadonlyArray<{ x: number; y: number }>;
   age: number;
   ttl: number;
@@ -97,7 +100,7 @@ export class Effects {
     return { particles: this.live.length, slashes: this.slashList.length };
   }
 
-  /** Un barrido sobre las tres casillas del area. */
+  /** Un barrido sobre las casillas del anillo que se alcanzan. */
   spawnSlash(tiles: ReadonlyArray<{ x: number; y: number }>): void {
     this.slashList.push({
       tiles: tiles.map((t) => ({ x: t.x, y: t.y })),

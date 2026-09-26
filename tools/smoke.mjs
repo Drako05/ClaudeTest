@@ -7,7 +7,7 @@
  * lo juega leyendo el estado real por `window.__verdant` y guarda capturas.
  *
  * Es la heredera del humo del isometrico y se lleva todas sus comprobaciones que
- * son del JUEGO —andar, hambre, recolectar, semillas, area de tres casillas,
+ * son del JUEGO —andar, hambre, recolectar, semillas, area de cuatro casillas,
  * barrido y escombros, joystick, pinza, carrera, salto, paredes, cima, mineral,
  * panel de desarrollo— mas una por cada cosa que se traslado del isometrico:
  * comer, sembrar, mirada de la camara, muerte y reinicio, HUD, reloj, panel del
@@ -287,15 +287,16 @@ async function desktopPass(browser, baseUrl) {
   // Y arrastrar es girar, no accionar: se decide al soltar.
   check(turned.sent.harvest === before.sent.harvest, 'arrastrar para girar acciono');
 
-  // El area: tres casillas distintas que tocan al jugador, y lo que se alcanza
-  // es un subconjunto de ellas. La reticula marca exactamente lo alcanzable.
+  // El area: cuatro casillas distintas —tres del anillo que tocan al jugador y
+  // la que pisa, la ultima—, y lo que se alcanza es un subconjunto de ellas. La
+  // reticula marca exactamente lo alcanzable.
   const tile = [Math.floor(turned.x), Math.floor(turned.y)];
-  check(turned.area.length === 3, `el area no son 3 casillas: ${JSON.stringify(turned.area)}`);
-  check(new Set(turned.area.map((t) => t.join(','))).size === 3, `el area repite casilla: ${JSON.stringify(turned.area)}`);
-  for (const [tx, ty] of turned.area) {
+  check(turned.area.length === 4, `el area no son 4 casillas: ${JSON.stringify(turned.area)}`);
+  check(new Set(turned.area.map((t) => t.join(','))).size === 4, `el area repite casilla: ${JSON.stringify(turned.area)}`);
+  turned.area.forEach(([tx, ty], i) => {
     const d = Math.max(Math.abs(tx - tile[0]), Math.abs(ty - tile[1]));
-    check(d === 1, `casilla del area a distancia ${d}: ${tx},${ty}`);
-  }
+    check(d === (i < 3 ? 1 : 0), `casilla ${i} del area a distancia ${d}: ${tx},${ty}`);
+  });
   const inArea = new Set(turned.area.map((t) => t.join(',')));
   check(turned.reach.every((t) => inArea.has(t.join(','))), 'lo alcanzable sale del area');
   check(
@@ -304,10 +305,10 @@ async function desktopPass(browser, baseUrl) {
   );
 
   // Un clic sin arrastrar acciona, y el barrido llega a dibujarse. Desde el
-  // nacimiento, que es un rellano llano (regla 22): ahi las tres casillas estan
-  // al alcance, y el barrido no puede faltar por culpa del paisaje.
+  // nacimiento, que es un rellano llano (regla 22): ahi las cuatro casillas
+  // estan al alcance, y el barrido no puede faltar por culpa del paisaje.
   const beforeClick = await open(page, baseUrl);
-  check(beforeClick.reach.length === 3, `en el nacimiento no se alcanzan las tres casillas (${beforeClick.reach.length})`);
+  check(beforeClick.reach.length === 4, `en el nacimiento no se alcanzan las cuatro casillas (${beforeClick.reach.length})`);
   await page.mouse.click(CLICK.x, CLICK.y);
   await page.waitForTimeout(400);
   const afterClick = await state(page);
@@ -601,10 +602,10 @@ async function mobilePass(browser, baseUrl) {
   check(a.sent.plant > b.sent.plant, 'el boton de sembrar no llego a la Intent');
 
   // La accion: mantener repite, cuatro por segundo. Desde el nacimiento, que es
-  // un rellano llano (regla 22): ahi las tres casillas estan al alcance y el
+  // un rellano llano (regla 22): ahi las cuatro casillas estan al alcance y el
   // barrido tiene que salir, sin depender de donde dejo el joystick al jugador.
   const h0 = await open(page, baseUrl);
-  check(h0.reach.length === 3, `en el nacimiento no se alcanzan las tres casillas (${h0.reach.length})`);
+  check(h0.reach.length === 4, `en el nacimiento no se alcanzan las cuatro casillas (${h0.reach.length})`);
   await tapButton(page, '#action', 'touchstart');
   await page.waitForTimeout(1600);
   await tapButton(page, '#action', 'touchend');

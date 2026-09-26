@@ -264,7 +264,8 @@ async function push(key, ms) {
 }
 
 /**
- * ¿Alcanza la accion las tres casillas desde aqui?
+ * ¿Alcanza la accion las casillas del anillo desde aqui? (Las que barre el arco;
+ * la que se pisa se alcanza siempre, pero no se barre.)
  *
  * `slashesDrawn` no sirve para afirmar que se VE, pero si para esto: solo sube
  * cuando el area da al menos dos casillas, o sea cuando hay arco que trazar.

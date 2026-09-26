@@ -16,8 +16,9 @@ import { actionArea } from '@verdant/sim';
  *
  * El autor lo describio en dos casos —mirando en recto y mirando en diagonal—
  * pero es una sola regla: la casilla apuntada mas sus dos vecinas en el anillo
- * de 8 direcciones. Aqui esta esa regla escrita como tabla, para que sea
- * comprobable y no una interpretacion mia.
+ * de 8 direcciones, **y la casilla que se pisa**, que sumo despues. Aqui esta
+ * esa regla escrita como tabla, para que sea comprobable y no una
+ * interpretacion mia.
  */
 
 const N = 0;
@@ -29,7 +30,7 @@ const SW = 5;
 const W = 6;
 const NW = 7;
 
-/** Las tripletas como texto, para poder compararlas sin depender del orden. */
+/** Las casillas como texto, para poder compararlas sin depender del orden. */
 function tilesOf(dir: number): Set<string> {
   return new Set(actionTiles(0, 0, dir).map((t) => `${t.x},${t.y}`));
 }
@@ -37,14 +38,14 @@ function tilesOf(dir: number): Set<string> {
 describe('El area de efecto, direccion por direccion', () => {
   // La especificacion del autor, entera. Desde (0,0), en cada direccion.
   const expected: ReadonlyArray<readonly [number, string, string[]]> = [
-    [N, 'norte', ['0,-1', '-1,-1', '1,-1']],
-    [NE, 'noreste', ['1,-1', '0,-1', '1,0']],
-    [E, 'este', ['1,0', '1,-1', '1,1']],
-    [SE, 'sureste', ['1,1', '1,0', '0,1']],
-    [S, 'sur', ['0,1', '1,1', '-1,1']],
-    [SW, 'suroeste', ['-1,1', '0,1', '-1,0']],
-    [W, 'oeste', ['-1,0', '-1,1', '-1,-1']],
-    [NW, 'noroeste', ['-1,-1', '-1,0', '0,-1']],
+    [N, 'norte', ['0,-1', '-1,-1', '1,-1', '0,0']],
+    [NE, 'noreste', ['1,-1', '0,-1', '1,0', '0,0']],
+    [E, 'este', ['1,0', '1,-1', '1,1', '0,0']],
+    [SE, 'sureste', ['1,1', '1,0', '0,1', '0,0']],
+    [S, 'sur', ['0,1', '1,1', '-1,1', '0,0']],
+    [SW, 'suroeste', ['-1,1', '0,1', '-1,0', '0,0']],
+    [W, 'oeste', ['-1,0', '-1,1', '-1,-1', '0,0']],
+    [NW, 'noroeste', ['-1,-1', '-1,0', '0,-1', '0,0']],
   ];
 
   for (const [dir, name, tiles] of expected) {
@@ -53,7 +54,7 @@ describe('El area de efecto, direccion por direccion', () => {
     });
   }
 
-  it('siempre son tres casillas distintas', () => {
+  it('siempre son cuatro casillas distintas', () => {
     for (let dir = 0; dir < DIRECTIONS.length; dir++) {
       expect(actionTiles(0, 0, dir)).toHaveLength(ACTION_TILES);
       expect(tilesOf(dir).size, `${dir} repite casilla`).toBe(ACTION_TILES);
@@ -68,12 +69,43 @@ describe('El area de efecto, direccion por direccion', () => {
     }
   });
 
-  it('las tres tocan al personaje, ninguna queda a dos casillas', () => {
+  it('las tres del anillo tocan al personaje, ninguna queda a dos casillas', () => {
     for (let dir = 0; dir < DIRECTIONS.length; dir++) {
-      for (const tile of actionTiles(0, 0, dir)) {
+      for (const tile of actionTiles(0, 0, dir).slice(0, 3)) {
         expect(Math.max(Math.abs(tile.x), Math.abs(tile.y))).toBe(1);
       }
     }
+  });
+
+  it('la casilla que se pisa va siempre la ultima', () => {
+    // Lo que lee las tres primeras —sembrar, el arco del barrido— no cambia.
+    for (let dir = 0; dir < DIRECTIONS.length; dir++) {
+      expect(actionTiles(7, -3, dir)[3]).toEqual({ x: 7, y: -3 });
+    }
+  });
+});
+
+/**
+ * Los dos casos del autor, con SU numeracion: una rejilla 3x3 del 1 al 9, leida
+ * como un teclado de telefono, con el jugador en el 5.
+ *
+ *   1 2 3
+ *   4 5 6
+ *   7 8 9
+ */
+describe('El area en la rejilla del autor', () => {
+  /** Numero de la casilla (dx, dy) respecto al jugador, del 1 al 9. */
+  const cell = (t: { x: number; y: number }): number => (t.y + 1) * 3 + (t.x + 1) + 1;
+  /** Direccion hacia una casilla de la rejilla. */
+  const toward = (n: number): number => directionOf(((n - 1) % 3) - 1, Math.floor((n - 1) / 3) - 1);
+  const cells = (n: number): number[] => actionTiles(0, 0, toward(n)).map(cell).sort();
+
+  it('mirando a 2, afecta a 1, 2, 3 y 5', () => {
+    expect(cells(2)).toEqual([1, 2, 3, 5]);
+  });
+
+  it('mirando a 3, afecta a 2, 3, 5 y 6', () => {
+    expect(cells(3)).toEqual([2, 3, 5, 6]);
   });
 });
 
@@ -84,7 +116,7 @@ describe('El area de efecto, direccion por direccion', () => {
 describe('La forma del area segun el enunciado del autor', () => {
   it('mirando en recto, las dos flanqueantes quedan en diagonal del personaje', () => {
     for (const dir of [N, E, S, W]) {
-      const [aimed, ...flanks] = actionTiles(0, 0, dir);
+      const [aimed, ...flanks] = actionTiles(0, 0, dir).slice(0, 3);
       // La apuntada es la de justo enfrente: ortogonal.
       expect(aimed.x === 0 || aimed.y === 0).toBe(true);
       for (const flank of flanks) {
@@ -97,7 +129,7 @@ describe('La forma del area segun el enunciado del autor', () => {
 
   it('mirando en diagonal, las flanqueantes son adyacentes al personaje y a la apuntada', () => {
     for (const dir of [NE, SE, SW, NW]) {
-      const [aimed, ...flanks] = actionTiles(0, 0, dir);
+      const [aimed, ...flanks] = actionTiles(0, 0, dir).slice(0, 3);
       expect(aimed.x !== 0 && aimed.y !== 0).toBe(true);
       for (const flank of flanks) {
         // Adyacente al personaje en ortogonal.
@@ -164,6 +196,7 @@ describe('El area de una entidad', () => {
         { x: 5, y: 9 },
         { x: 5, y: 8 },
         { x: 5, y: 10 },
+        { x: 4, y: 9 },
       ]);
     }
   });
@@ -179,6 +212,7 @@ describe('El area de una entidad', () => {
       { x: -4, y: -9 },
       { x: -5, y: -9 },
       { x: -3, y: -9 },
+      { x: -4, y: -8 },
     ]);
   });
 });

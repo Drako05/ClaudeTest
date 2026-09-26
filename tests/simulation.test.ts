@@ -388,12 +388,13 @@ describe('Mirada y area de efecto', () => {
     expect(state.entities.facingY[state.playerId]).toBeCloseTo(0, 6);
   });
 
-  it('recolectar vacia las tres casillas y suma el botin de las tres', () => {
+  it('recolectar vacia las cuatro casillas —la propia incluida— y suma el botin de todas', () => {
     const world = new World(2024);
     world.setNow(0);
     const store = new EntityStore(4);
 
-    // Un sitio donde las tres casillas del area tengan algo que recolectar.
+    // Un sitio donde las cuatro casillas del area tengan algo que recolectar,
+    // tambien la que se pisa: es la que el autor sumo a la regla.
     let placed: { id: number; tiles: ReturnType<typeof actionArea> } | null = null;
     for (let y = -40; y < 40 && !placed; y++) {
       for (let x = -40; x < 40; x++) {
@@ -401,7 +402,7 @@ describe('Mirada y area de efecto', () => {
         store.facingX[id] = 1;
         store.facingY[id] = 0;
         const tiles = actionArea(store, id);
-        // Las tres, ademas, a la altura del jugador: desde que la altura
+        // Todas, ademas, a la altura del jugador: desde que la altura
         // estorba, la accion no alcanza lo que esta subido a un bloque.
         const level = world.levelAt(x, y);
         if (
@@ -415,12 +416,12 @@ describe('Mirada y area de efecto', () => {
         store.count--; // se descarta la entidad de prueba
       }
     }
-    expect(placed, 'no se encontro un area con vida en las tres casillas').not.toBeNull();
+    expect(placed, 'no se encontro un area con vida en las cuatro casillas').not.toBeNull();
 
     const inventory = new Int32Array(RESOURCE_COUNT);
     const results = tryHarvestArea(world, store, placed!.id, inventory, 0);
 
-    expect(results).toHaveLength(3);
+    expect(results).toHaveLength(4);
     for (const tile of placed!.tiles) {
       expect(world.featureAt(tile.x, tile.y)).toBe(Feature.None);
     }
@@ -466,6 +467,8 @@ describe('Mirada y area de efecto', () => {
       // Las dos flanqueantes siguen vacias.
       expect(world.featureAt(spot!.tiles[1].x, spot!.tiles[1].y)).toBe(Feature.None);
       expect(world.featureAt(spot!.tiles[2].x, spot!.tiles[2].y)).toBe(Feature.None);
+      // Ni la que se pisa: sembrar no alcanza la casilla propia.
+      expect(world.featureAt(spot!.tiles[3].x, spot!.tiles[3].y)).toBe(Feature.None);
       // Y solo se gasto una semilla.
       const left = inventory[Resource.TreeSeed] + inventory[Resource.PlantSeed];
       expect(left).toBe(5);

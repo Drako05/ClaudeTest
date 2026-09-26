@@ -245,6 +245,16 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
 
 ---
 
+## La accion alcanza tambien la casilla que se pisa — HECHO
+
+Pedido del autor: cuatro casillas en vez de tres, con su enunciado sobre una
+rejilla 1-9 (jugador en el 5; mirando a 2 → 1, 2, 3 y 5; mirando a 3 → 2, 3, 6
+y 5). El arco del barrido no cambia, tambien decision suya. Esta en la regla 12
+de `CLAUDE.md`. Recolectar la propia solo hace algo si hay algo pisable encima
+—una mata, por ejemplo—; sembrar sigue siendo solo la apuntada.
+
+---
+
 ## La franja de salud y hambre — HECHA (2026-09-26)
 
 Pedido del autor, con sus decisiones: salud y hambre siempre a la vista, abajo

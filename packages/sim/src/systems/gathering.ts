@@ -108,8 +108,9 @@ export function tryHarvest(
 }
 
 /**
- * Recolecta las tres casillas del area, en orden fijo y empezando por la
- * apuntada. Cada una rinde lo suyo: tres arboles dan la madera de tres arboles,
+ * Recolecta las casillas del area que estan al alcance —las tres del anillo y
+ * la que se pisa—, en orden fijo y empezando por la apuntada. Cada una rinde lo
+ * suyo: tres arboles dan la madera de tres arboles,
  * como decidio el autor. El coste lo pone el ecosistema, que tardara mas en
  * reponerse de una tala tan rapida.
  */

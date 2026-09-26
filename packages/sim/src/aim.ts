@@ -10,6 +10,12 @@
  * personaje; mirando al sureste salen SE, E y S, con las dos flanqueantes
  * ortogonales al personaje y pegadas a la apuntada. Es exactamente lo que pidio,
  * y de una sola regla.
+ *
+ * **Y la casilla que se pisa**, que el autor sumo despues: cuatro en total. Su
+ * enunciado, sobre una rejilla 3x3 numerada del 1 al 9 con el jugador en el 5:
+ * mirando a 2 se afectan 1, 2, 3 y 5; mirando a 3, 2, 3, 6 y 5. La propia va la
+ * ULTIMA, asi que lo que lee las tres primeras —sembrar, el arco del barrido—
+ * sigue igual; y el arco no pasa por ella, tambien por decision suya.
  */
 
 /** Desplazamiento en tiles de cada direccion. */
@@ -36,8 +42,8 @@ export const DIRECTIONS: readonly Offset[] = [
   { x: -1, y: -1 }, // NW
 ];
 
-/** Cuantas casillas afecta una accion. */
-export const ACTION_TILES = 3;
+/** Cuantas casillas afecta una accion: tres del anillo y la que se pisa. */
+export const ACTION_TILES = 4;
 
 /** True si la direccion es diagonal. */
 export function isDiagonal(dir: number): boolean {
@@ -78,8 +84,9 @@ export function facingOf(dir: number): Offset {
 /**
  * Las casillas que afecta una accion desde la casilla del personaje.
  *
- * La apuntada va SIEMPRE la primera: es la que el reticulo marca con mas fuerza
- * y la que usan las acciones de una sola casilla, como sembrar.
+ * El orden es fijo: `[apuntada, flanco, flanco, propia]`. La apuntada va SIEMPRE
+ * la primera: es la que el reticulo marca con mas fuerza y la que usan las
+ * acciones de una sola casilla, como sembrar. La propia, la ultima.
  *
  * Se parte de la casilla del personaje y no de su posicion continua a proposito.
  * Antes se apuntaba con `floor(pos + mirada * 1.1)`, y con el personaje pegado
@@ -88,8 +95,9 @@ export function facingOf(dir: number): Offset {
  */
 export function actionTiles(tileX: number, tileY: number, dir: number): Offset[] {
   const index = wrap(dir);
-  return [index, index - 1, index + 1].map((i) => {
+  const ring = [index, index - 1, index + 1].map((i) => {
     const d = DIRECTIONS[wrap(i)];
     return { x: tileX + d.x, y: tileY + d.y };
   });
+  return [...ring, { x: tileX, y: tileY }];
 }
