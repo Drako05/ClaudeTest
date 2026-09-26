@@ -25,6 +25,12 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           node tools/smoke.mjs
+      # Los dos humos mientras conviven los dos clientes: el del 3D es el que
+      # tiene que estar en verde antes de poder retirar el isometrico.
+      - name: Build del cliente 3D
+        run: npm run spike
+      - name: Prueba de humo del 3D
+        run: node tools/smoke3d.mjs
       - name: Guardar capturas
         if: always()
         uses: actions/upload-artifact@v4

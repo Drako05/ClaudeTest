@@ -1,5 +1,5 @@
 /**
- * Mando del spike: la capa de DOM sobre `gestures.ts`.
+ * El mando: la capa de DOM sobre `gestures.ts`.
  *
  * Aqui no hay ninguna regla, solo traduccion: los eventos del navegador se
  * reducen a numeros y se le pasan a `Gestures`, que es puro y donde vive de
@@ -7,9 +7,9 @@
  * autor —andar y girar a la vez cambiaba el zoom— era una regla de esas, y una
  * regla no se comprueba jugando con dos pulgares en un headless.
  *
- * No reutiliza `input.ts`: aquel rota el vector de movimiento con la camara
- * isometrica de cuatro pasos, y aqui el angulo es continuo. Es codigo de spike y
- * se tira con el.
+ * Las teclas son las de siempre: WASD o flechas para andar, Espacio salta,
+ * Shift enciende y apaga la carrera, E come, F siembra, R empieza un mundo
+ * nuevo, + y - acercan y alejan, y P cambia de proyeccion.
  */
 
 import { Gestures, STICK_RADIUS } from './gestures.js';
@@ -24,12 +24,12 @@ export class Controls {
   private readonly keys = new Set<string>();
   private readonly gestures: Gestures;
   onToggleProjection: (() => void) | null = null;
+  onRestart: (() => void) | null = null;
 
   /**
    * Enciende los controles de pulgar.
    *
-   * Mismo mecanismo que el isometrico (`input.ts:97`): una clase en el `body` y
-   * el CSS decide. Correr, saltar y accionar no se ven en PC —Shift, Espacio y
+   * Una clase en el `body` y el CSS decide. Correr, saltar y accionar no se ven en PC —Shift, Espacio y
    * el clic izquierdo ya hacen lo mismo, y ahi solo estorban—, pero el boton de
    * vista no depende de esto: ese se ve siempre, porque es el unico sin tecla
    * anunciada.
@@ -62,7 +62,32 @@ export class Controls {
         this.toggleRun();
       }
       this.keys.add(e.code);
-      if (e.code === 'KeyP') this.onToggleProjection?.();
+      if (e.repeat) return;
+      switch (e.code) {
+        case 'KeyP':
+          this.onToggleProjection?.();
+          break;
+        case 'KeyE':
+          this.eatQueued = true;
+          break;
+        case 'KeyF':
+          this.plantQueued = true;
+          break;
+        case 'KeyR':
+          this.onRestart?.();
+          break;
+        // El mismo paso que la rueda del isometrico: 1.25 por pulsacion.
+        case 'Equal':
+        case 'NumpadAdd':
+          this.wheelZoom /= 1.25;
+          break;
+        case 'Minus':
+        case 'NumpadSubtract':
+          this.wheelZoom *= 1.25;
+          break;
+        default:
+          break;
+      }
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => {
@@ -133,6 +158,8 @@ export class Controls {
 
   private wheelZoom = 1;
   private jumpQueued = false;
+  private eatQueued = false;
+  private plantQueued = false;
   private runEl: HTMLElement | null = null;
 
   /** Accion pedida de un clic o de un toque. Se consume una vez. */
@@ -184,6 +211,10 @@ export class Controls {
 
   private toggleRun(): void {
     this.running = !this.running;
+    // Con teclado no hay boton que mirar, asi que el estado lo dice la ayuda:
+    // sin indicador, un interruptor deja adivinando por que el personaje va
+    // como va.
+    document.body.classList.toggle('running', this.running);
     this.runEl?.classList.toggle('on', this.running);
     this.runEl?.setAttribute('aria-pressed', String(this.running));
   }
@@ -222,6 +253,44 @@ export class Controls {
     const press = (e: Event) => {
       e.preventDefault();
       this.jumpQueued = true;
+    };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('pointerdown', (e) => {
+      if ((e as PointerEvent).pointerType !== 'touch') press(e);
+    });
+  }
+
+  /** Consume la comida pedida, si la hubo. Un toque es un bocado. */
+  takeEat(): boolean {
+    const out = this.eatQueued;
+    this.eatQueued = false;
+    return out;
+  }
+
+  /** Consume la siembra pedida, si la hubo. */
+  takePlant(): boolean {
+    const out = this.plantQueued;
+    this.plantQueued = false;
+    return out;
+  }
+
+  /**
+   * Comer y sembrar del movil: de un solo toque, no repiten al mantener. Van
+   * aparte del lienzo por lo mismo que el salto.
+   */
+  bindEatButton(el: HTMLElement | null): void {
+    this.bindTap(el, () => (this.eatQueued = true));
+  }
+
+  bindPlantButton(el: HTMLElement | null): void {
+    this.bindTap(el, () => (this.plantQueued = true));
+  }
+
+  private bindTap(el: HTMLElement | null, run: () => void): void {
+    if (!el) return;
+    const press = (e: Event) => {
+      e.preventDefault();
+      run();
     };
     el.addEventListener('touchstart', press, { passive: false });
     el.addEventListener('pointerdown', (e) => {

@@ -37,14 +37,24 @@ import {
   MeshBasicMaterial,
 } from 'three';
 import {
+  BIOME_NAMES,
   CHUNK_SIZE,
   Feature,
-  RESOURCE_NAMES,
+  TERRAIN_NAMES,
   TICK_DT,
   emptyIntent,
   type Terrain,
 } from '@verdant/shared';
-import { actionReach, createGame, step, type GameState } from '@verdant/sim';
+import {
+  actionArea,
+  actionReach,
+  clockLabel,
+  skipTime,
+  step,
+  toChunkCoord,
+  type GameState,
+} from '@verdant/sim';
+import { DevTools } from '../devtools.js';
 import { Effects } from '../effects.js';
 import { debrisPalette } from '../palette.js';
 import { EffectsView } from './effects-view.js';
@@ -54,15 +64,24 @@ import { buildShadows, type ShadowSpot } from './shadows.js';
 import { OrbitCamera } from './camera.js';
 import { Controls } from './controls.js';
 import { chunkMesh } from './terrain-mesh.js';
+import { Hud } from './hud.js';
+import { Overlays } from './overlays.js';
+import { berrySpot, cliffSpot, mineralSpot, peakSpot, reliefAround } from './probes.js';
+import { skyTint, tintCss } from './sky.js';
+import { randomSeed, seedFromLocation, startGame, writeSeedToLocation } from './start.js';
 
 /** Radio de chunks que se mallan alrededor del jugador. */
 const RADIUS = 3;
 /** Altura del plano de agua, justo bajo el nivel donde empieza la tierra. */
 const WATER_Y = -0.18;
 
+/** Techo de tiempo por frame. Sin esto, una pausa larga de la pestana dispara
+ *  cientos de ticks de golpe y el juego se congela intentando ponerse al dia. */
+const MAX_FRAME_SECONDS = 0.25;
+
 const canvas = document.getElementById('view') as HTMLCanvasElement;
-const hud = document.getElementById('hud') as HTMLElement;
 const projButton = document.getElementById('proj') as HTMLButtonElement;
+const skyEl = document.getElementById('sky') as HTMLElement;
 
 const renderer = new WebGLRenderer({ canvas, antialias: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -79,12 +98,9 @@ const sun = new DirectionalLight(0xfff2dd, 1.05);
 sun.position.set(-0.6, 1, -0.45);
 scene.add(sun);
 
-const seed = seedFromLocation();
-let state: GameState = createGame(seed);
-const spawn = state.world.findSpawn(0, 0);
-state.entities.x[state.playerId] = spawn.x;
-state.entities.y[state.playerId] = spawn.y;
-state.world.ensureAround(spawn.x, spawn.y, RADIUS);
+let seed = seedFromLocation();
+let state: GameState = startGame(seed, true, RADIUS);
+const hud = new Hud(() => state);
 
 const camera = new OrbitCamera();
 const controls = new Controls(
@@ -127,11 +143,30 @@ controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));
 controls.bindRunButton(document.getElementById('run'));
 controls.bindActionButton(document.getElementById('action'));
+controls.bindEatButton(document.getElementById('eat'));
+controls.bindPlantButton(document.getElementById('plant'));
+controls.onRestart = restart;
+document.getElementById('restart')?.addEventListener('click', restart);
 
 // El barrido y los escombros. El movimiento sale de `effects.ts`, que es puro y
 // ya existia; aqui solo se dibuja (`effects-view.ts`).
 const effects = new Effects();
 const effectsView = new EffectsView(scene);
+const overlays = new Overlays(scene);
+
+/**
+ * El panel de desarrollo (F3 o `?dev=1`): pausa, velocidades, saltos de tiempo,
+ * congelar la supervivencia, bordes y registro. Solo importa `shared`, y por eso
+ * vino del isometrico sin tocar una linea.
+ */
+const dev = new DevTools({
+  onSkip: (ticks) => {
+    skipTime(state, ticks);
+    // Tras un salto el estado observado cambia de golpe; no tiene sentido
+    // registrarlo como si el jugador hubiera recolectado o comido.
+    dev.observe(Array.from(state.inventory), state.entities.hunger[state.playerId], 0);
+  },
+});
 
 const billboards = new BillboardSet();
 const player = billboards.spawnPlayer();
@@ -249,6 +284,24 @@ function dispose(key: string, view: ChunkView): void {
   views.delete(key);
 }
 
+/**
+ * Mundo nuevo, con semilla al azar: R o el boton del aviso de muerte.
+ *
+ * Se tira todo lo que era del mundo anterior —mallas, efectos, superposiciones—
+ * y se conserva lo que no: el arte de cada especie, que es el mismo en todos.
+ */
+function restart(): void {
+  seed = randomSeed();
+  writeSeedToLocation(seed);
+  for (const [key, view] of views) dispose(key, view);
+  effects.clear();
+  overlays.reset();
+  state = startGame(seed, false, RADIUS);
+  gathered = 0;
+  jumps = 0;
+  airPeak = 0;
+}
+
 // --------------------------------------------------------------- bucle
 
 let last = performance.now();
@@ -257,6 +310,25 @@ let fpsFrames = 0;
 let fpsWindow = 0;
 let fps = 0;
 let worstFrame = 0;
+let worstFrameMs = 0;
+let hudTimer = 0;
+/**
+ * Saltos EFECTUADOS y separacion maxima de los pies respecto al suelo.
+ *
+ * Contadores y no «esta en el aire ahora», por lo mismo que los del barrido: un
+ * vuelo dura 0.4 s y en una maquina lenta cabe entero entre dos sondeos.
+ */
+let jumps = 0;
+let airPeak = 0;
+/**
+ * Intents ENVIADAS al nucleo con cada accion puesta, acumuladas.
+ *
+ * Es lo que permite a la prueba de humo afirmar que un boton llega a la Intent
+ * sin depender del paisaje: que sembrar plante algo depende de tener semillas y
+ * una casilla que lo admita, y eso ya lo miden los tests del nucleo. Aqui se
+ * mide la otra mitad, que el toque llega.
+ */
+const sent = { harvest: 0, jump: 0, eat: 0, plant: 0 };
 
 /** Ticks desde la ultima accion, para repetir al mantener pulsado. */
 let actionTicks = 0;
@@ -270,16 +342,18 @@ const ACTION_REPEAT_TICKS = 15;
  * talar un arbol se veria como que el arbol desaparece y ya.
  */
 let gathered = 0;
-let lastResource = -1;
 
 function frame(now: number): void {
-  const dt = Math.min(0.25, (now - last) / 1000);
+  const raw = (now - last) / 1000;
   last = now;
+  // El peor frame se mide SIN recortar: recortarlo ocultaria justo el tiron.
+  if (raw > worstFrame) worstFrame = raw;
+  const dt = Math.min(MAX_FRAME_SECONDS, raw);
   fpsFrames++;
   fpsWindow += dt;
-  if (dt > worstFrame) worstFrame = dt;
   if (fpsWindow >= 1) {
     fps = fpsFrames / fpsWindow;
+    worstFrameMs = worstFrame * 1000;
     fpsWindow = 0;
     fpsFrames = 0;
     worstFrame = 0;
@@ -299,12 +373,27 @@ function frame(now: number): void {
   let jump = controls.takeJump();
   intent.run = controls.running;
   let action = controls.takeAction();
+  let eat = controls.takeEat();
+  let plant = controls.takePlant();
+  // La mirada es la de la camara, decision del autor: se acciona hacia donde se
+  // mira. El nucleo la encaja en sus ocho direcciones (regla 12).
+  intent.aimX = fwd.x;
+  intent.aimY = fwd.y;
 
-  accumulator += dt;
-  let guard = 8;
-  while (accumulator >= TICK_DT && guard-- > 0) {
+  // Con escala cero el acumulador no avanza y la simulacion queda congelada; a
+  // 64x corren los ticks que toquen, que con el techo de frame son a lo sumo
+  // 0.25 s de mundo por frame y escala.
+  const scaled = dt * dev.timeScale;
+  accumulator += scaled;
+  // Se copia cada frame: asi reiniciar o abrir el panel se resuelve solo.
+  state.survivalFrozen = dev.survivalFrozen;
+  while (accumulator >= TICK_DT) {
     intent.jump = jump;
     jump = false;
+    intent.eat = eat;
+    eat = false;
+    intent.plant = plant;
+    plant = false;
 
     // Mantener el boton repite cuatro veces por segundo, que es la cadencia de
     // siempre (`HARVEST_REPEAT_TICKS`, 15 ticks a 60 Hz). Se cuenta en TICKS y
@@ -320,13 +409,24 @@ function frame(now: number): void {
     // La Intent se guarda en vez de pasarse en linea: hace falta saber si se
     // acciono para lanzar el barrido, aunque no se derribara nada.
     const accionando = intent.harvest;
+    if (intent.harvest) sent.harvest++;
+    if (intent.jump) sent.jump++;
+    if (intent.eat) sent.eat++;
+    if (intent.plant) sent.plant++;
+    const pisabaAntes = state.entities.grounded[state.playerId];
     step(state, intent);
+    // Cuenta el despegue de verdad, no la tecla: saltar contra el techo de un
+    // salto imposible no suma.
+    if (pisabaAntes && !state.entities.grounded[state.playerId] && intent.jump) jumps++;
+    const gap =
+      state.entities.z[state.playerId] -
+      state.world.groundHeightAt(state.entities.x[state.playerId], state.entities.y[state.playerId]);
+    if (gap > airPeak) airPeak = gap;
     if (accionando) {
       effects.spawnSlash(actionReach(state.world, state.entities, state.playerId));
     }
     for (const hit of state.lastHarvest) {
       gathered += hit.amount + hit.seeds;
-      lastResource = hit.resource;
       // Los escombros se posan en la cima del tile del que salieron, no en el
       // plano cero: talar en una meseta no puede tirar la madera al mar.
       effects.spawnDebris(
@@ -338,12 +438,12 @@ function frame(now: number): void {
     }
     accumulator -= TICK_DT;
   }
-  accumulator = Math.min(accumulator, TICK_DT);
 
-  // Los efectos avanzan con el tiempo REAL del frame, una sola vez, y su propia
-  // regla les garantiza un fotograma de vida por corto que sea: un barrido dura
-  // 0.22 s y en una maquina lenta cabria entero entre dos fotogramas.
-  effects.advance(dt);
+  // Los efectos avanzan una sola vez por frame, y su propia regla les garantiza
+  // un fotograma de vida por corto que sea: un barrido dura 0.22 s y en una
+  // maquina lenta cabria entero entre dos fotogramas. Con el tiempo ESCALADO:
+  // pausar los congela y a 64x no inundan la pantalla.
+  effects.advance(scaled);
   // La camara va con ellos porque la cinta del barrido se orienta hacia el ojo:
   // tumbada en el suelo se veia de canto al bajar la elevacion. Se pasa la del
   // frame ANTERIOR —`camera.follow` es unas lineas mas abajo—, y eso no se nota:
@@ -356,6 +456,14 @@ function frame(now: number): void {
   camera.zoom(controls.takeZoom());
 
   syncChunks();
+  overlays.updateReticle(state);
+  overlays.syncDebug(
+    state.world,
+    [...views.keys()].map((k) => k.split(',').map(Number) as [number, number]),
+    dev.showChunkBorders,
+    dev.showBiomeBorders,
+  );
+  skyEl.style.background = tintCss(skyTint(state.tick));
 
   const px = state.entities.x[state.playerId];
   const py = state.entities.y[state.playerId];
@@ -372,16 +480,19 @@ function frame(now: number): void {
   camera.follow(px, ph, py, w, h);
   renderer.render(scene, camera.active);
 
-  const info = renderer.info.render;
-  hud.textContent =
-    `${fps.toFixed(0)} FPS · ${camera.projection}\n` +
-    `${(triangles / 1000).toFixed(1)}k triangulos · ${info.calls} draw calls\n` +
-    `pos ${px.toFixed(0)}, ${py.toFixed(0)} · altura ${ph.toFixed(1)} · semilla ${seed}\n` +
-    `recogido ${gathered}` +
-    (lastResource >= 0 ? ` · ultimo: ${RESOURCE_NAMES[lastResource]}` : '') +
-    '\n' +
-    `abajo-izq anda · resto gira · 2 dedos zoom\n` +
-    `espacio salta · clic izq acciona · shift ${controls.running ? 'CORRE' : 'anda'}`;
+  // El HUD a 10 Hz: basta para que las barras respondan y no reescribe el DOM
+  // en cada frame.
+  hudTimer += dt;
+  if (hudTimer >= 0.1) {
+    hudTimer = 0;
+    const info = renderer.info.render;
+    hud.update(state, fps, `${info.calls} · ${(triangles / 1000).toFixed(0)}k tri`);
+    dev.observe(
+      Array.from(state.inventory),
+      state.entities.hunger[state.playerId],
+      state.world.biomeAt(Math.floor(px), Math.floor(py)),
+    );
+  }
 
   requestAnimationFrame(frame);
 }
@@ -389,39 +500,90 @@ function frame(now: number): void {
 requestAnimationFrame(frame);
 
 /**
- * Estado legible desde fuera, para poder MEDIR los gestos en un navegador de
- * verdad. El fallo que trajo el autor solo se manifiesta con dos dedos a la vez,
- * que es lo que ninguna prueba ve si no se le da con que compararlo.
+ * Estado legible desde fuera, para la prueba de humo y las medidas: permite a
+ * Playwright leer el estado real del juego en vez de adivinarlo por pixeles.
+ *
+ * Los sitios del mundo a los que ir a mirar algo (`spots()`) son una funcion y
+ * no un campo porque recorren cientos de miles de casillas del generador: como
+ * campo se pagarian en cada lectura.
  */
 Object.defineProperty(window, '__spike', {
-  get: () => ({
-    distance: camera.distance,
-    yaw: camera.yaw,
-    pitch: camera.pitch,
-    projection: camera.projection,
-    running: controls.running,
-    /** Lo recolectado, para poder comprobar la accion desde fuera. */
-    gathered,
-    /** Barridos y escombros DIBUJADOS, acumulados. Ver `EffectsView`. */
-    slashesDrawn: effectsView.slashesDrawn,
-    /** Lo que mide cada cosa en BLOQUES, medido del dibujo. Ver `BillboardSet`. */
-    sizes: billboards.sizes,
-    debrisDrawn: effectsView.debrisDrawn,
-    x: state.entities.x[state.playerId],
-    y: state.entities.y[state.playerId],
-    z: state.entities.z[state.playerId],
-    grounded: !!state.entities.grounded[state.playerId],
-    fps,
-    triangles,
-  }),
+  get: () => {
+    const id = state.playerId;
+    const e = state.entities;
+    const tx = Math.floor(e.x[id]);
+    const ty = Math.floor(e.y[id]);
+    const biome = state.world.biomeAt(tx, ty);
+    return {
+      tick: state.tick,
+      seed: state.world.seed,
+      clock: clockLabel(state.tick),
+      /** Opacidad de la vela de la noche. Cero a pleno dia. */
+      night: skyTint(state.tick).alpha,
+      distance: camera.distance,
+      yaw: camera.yaw,
+      pitch: camera.pitch,
+      projection: camera.projection,
+      running: controls.running,
+      dev: dev.active,
+      timeScale: dev.timeScale,
+      survivalFrozen: dev.survivalFrozen,
+      gridChunks: overlays.gridCount,
+      borderSegments: overlays.borderSegmentCount,
+      misplacedBorders: overlays.misplacedBorderCount,
+      /** Casillas que marca la reticula: las que la accion alcanza. */
+      reticleTiles: overlays.reticleTiles,
+      /** Lo recolectado, para poder comprobar la accion desde fuera. */
+      gathered,
+      /** Barridos y escombros DIBUJADOS, acumulados. Ver `EffectsView`. */
+      slashesDrawn: effectsView.slashesDrawn,
+      debrisDrawn: effectsView.debrisDrawn,
+      effects: effects.tally,
+      /** Lo que mide cada cosa en BLOQUES, medido del dibujo. Ver `BillboardSet`. */
+      sizes: billboards.sizes,
+      facing: [e.facingX[id], e.facingY[id]],
+      /** Hacia donde mira la camara, que es de donde sale la mirada. */
+      aim: [camera.forward().x, camera.forward().y],
+      // Las dos cosas y por separado: `area` es la GEOMETRIA del apuntado
+      // —siempre tres casillas del anillo— y `reach` las que estan a la altura
+      // propia y se pueden accionar. En terreno escalonado difieren.
+      area: actionArea(e, id).map((t) => [t.x, t.y]),
+      reach: actionReach(state.world, e, id).map((t) => [t.x, t.y]),
+      terrain: TERRAIN_NAMES[state.world.terrainAt(tx, ty)],
+      level: state.world.levelAt(tx, ty),
+      biome: BIOME_NAMES[biome],
+      balanced: state.world.isBiomeBalanced(toChunkCoord(tx), toChunkCoord(ty), biome),
+      x: e.x[id],
+      y: e.y[id],
+      z: e.z[id],
+      grounded: !!e.grounded[id],
+      jumps,
+      airPeak,
+      sent: { ...sent },
+      /**
+       * Velocidad que el nucleo le da al personaje, en casillas/s. `vx`/`vy` se
+       * fijan antes de resolver la colision, asi que valen marcha o carrera
+       * exactas aunque se este empujando contra un muro.
+       */
+      speed: Math.hypot(e.vx[id], e.vy[id]),
+      health: e.health[id],
+      hunger: e.hunger[id],
+      alive: e.alive[id] === 1,
+      deadShown: hud.deadShown,
+      inventory: Array.from(state.inventory),
+      chunks: state.world.loadedChunkCount,
+      tracked: state.world.trackedChunkCount,
+      fps,
+      /** Frame mas lento del ultimo segundo: es lo que delata un tiron. */
+      worstFrameMs,
+      triangles,
+      spots: () => ({
+        relief: reliefAround(state),
+        cliffSpot: cliffSpot(state),
+        peakSpot: peakSpot(state),
+        mineralSpot: mineralSpot(state),
+        berrySpot: berrySpot(state),
+      }),
+    };
+  },
 });
-
-function seedFromLocation(): number {
-  try {
-    const raw = new URLSearchParams(window.location.search).get('seed');
-    if (raw !== null && raw !== '') return Number(raw) >>> 0;
-  } catch {
-    // Ignorado a proposito: sin URL legible se juega la semilla de siempre.
-  }
-  return 12345;
-}
