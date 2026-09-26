@@ -179,24 +179,27 @@ async function pointers(page, points) {
   }, points);
 }
 
-/** Un toque sobre un boton, con TouchEvent como un dedo de verdad. */
-async function tapButton(page, selector, type) {
+/**
+ * Un toque sobre un boton, con TouchEvent como un dedo de verdad. `dx`/`dy`
+ * desplazan el dedo desde el centro del boton, para arrastrarlo con `touchmove`.
+ */
+async function tapButton(page, selector, type, dx = 0, dy = 0) {
   await page.evaluate(
-    ({ selector, type }) => {
+    ({ selector, type, dx, dy }) => {
       const el = document.querySelector(selector);
       const rect = el.getBoundingClientRect();
       const t = new Touch({
         identifier: 9,
         target: el,
-        clientX: rect.x + rect.width / 2,
-        clientY: rect.y + rect.height / 2,
+        clientX: rect.x + rect.width / 2 + dx,
+        clientY: rect.y + rect.height / 2 + dy,
       });
-      const live = type === 'touchstart' ? [t] : [];
+      const live = type === 'touchend' || type === 'touchcancel' ? [] : [t];
       el.dispatchEvent(
         new TouchEvent(type, { touches: live, targetTouches: live, changedTouches: [t], bubbles: true, cancelable: true }),
       );
     },
-    { selector, type },
+    { selector, type, dx, dy },
   );
 }
 
@@ -608,12 +611,23 @@ async function mobilePass(browser, baseUrl) {
   check(h0.reach.length === 4, `en el nacimiento no se alcanzan las cuatro casillas (${h0.reach.length})`);
   await tapButton(page, '#action', 'touchstart');
   await page.waitForTimeout(1600);
-  await tapButton(page, '#action', 'touchend');
+  // Y sin soltar, ese mismo dedo se arrastra: gira la camara y la accion sigue
+  // repitiendo (pedido del autor).
+  const holding = await state(page);
+  for (let i = 1; i <= 16; i++) await tapButton(page, '#action', 'touchmove', -i * 10, -i * 2);
+  await page.waitForTimeout(800);
+  const draggedHold = await state(page);
+  await tapButton(page, '#action', 'touchend', -160, -32);
   const h1 = await waitForLoop(page, 10);
   const repeats = h1.sent.harvest - h0.sent.harvest;
-  console.log(`  accion mantenida: ${repeats} acciones`);
+  const whileTurning = draggedHold.sent.harvest - holding.sent.harvest;
+  const turnedBy = draggedHold.yaw - holding.yaw;
+  console.log(`  accion mantenida: ${repeats} acciones; arrastrando el dedo, giro ${turnedBy.toFixed(2)} rad y ${whileTurning} acciones`);
   check(repeats >= 2, `mantener la accion no repitio (${repeats})`);
   check(h1.slashesDrawn > h0.slashesDrawn, 'la accion del movil no dibujo barrido');
+  check(Math.abs(turnedBy) > 0.1, 'arrastrar el dedo de la accion no giro la camara');
+  check(whileTurning > 0, 'la accion dejo de repetir mientras se arrastraba el dedo');
+  check(draggedHold.distance === holding.distance, 'arrastrar el dedo de la accion cambio el zoom');
 
   // El panel del entorno, al tacto.
   await page.tap('#statsToggle');

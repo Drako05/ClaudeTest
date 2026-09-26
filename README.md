@@ -68,7 +68,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Pulgar en el cuadrante inferior izquierdo | Joystick flotante: apunta, no dosifica |
 | Un dedo en el resto de la pantalla | Girar la camara |
 | Dos dedos de camara | Zoom |
-| Boton ACCION | Accionar; mantener repite 4 veces por segundo |
+| Boton ACCION | Accionar; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar la accion |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
 | Botones COMER y SEMBRAR | Comer bayas y sembrar |
 

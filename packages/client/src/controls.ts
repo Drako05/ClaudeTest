@@ -202,14 +202,48 @@ export class Controls {
       this.actionHeld = false;
       el.classList.remove('on');
     };
-    el.addEventListener('touchstart', press, { passive: false });
-    el.addEventListener('touchend', release);
-    el.addEventListener('touchcancel', release);
+
+    /**
+     * El dedo que aprieta tambien gira la camara si se arrastra, sin soltar la
+     * accion: pedido del autor. Los `touchmove` siguen llegando al elemento
+     * donde nacio el dedo aunque salga de el, asi que basta con escucharlos
+     * aqui. La regla —umbral, que no haga pinza— vive en `gestures.ts`.
+     */
+    const keyOf = (t: Touch) => `accion:${t.identifier}`;
+    el.addEventListener(
+      'touchstart',
+      (e) => {
+        press(e);
+        for (const t of Array.from(e.changedTouches)) this.gestures.downAction(keyOf(t), t.clientX, t.clientY);
+      },
+      { passive: false },
+    );
+    el.addEventListener(
+      'touchmove',
+      (e) => {
+        e.preventDefault();
+        for (const t of Array.from(e.changedTouches)) this.gestures.move(keyOf(t), t.clientX, t.clientY);
+      },
+      { passive: false },
+    );
+    const lift = (e: TouchEvent) => {
+      for (const t of Array.from(e.changedTouches)) this.gestures.up(keyOf(t));
+      // Se suelta la accion cuando no queda ningun dedo sobre el boton.
+      if (e.targetTouches.length === 0) release();
+    };
+    el.addEventListener('touchend', lift);
+    el.addEventListener('touchcancel', lift);
+
     el.addEventListener('pointerdown', (e) => {
       if ((e as PointerEvent).pointerType !== 'touch') press(e);
     });
-    el.addEventListener('pointerup', release);
-    el.addEventListener('pointerleave', release);
+    // Con raton, soltar o salirse del boton suelta la accion. Con un dedo no:
+    // arrastrarlo fuera es girar la camara, y la accion tiene que seguir.
+    for (const type of ['pointerup', 'pointerleave']) {
+      el.addEventListener(type, (e) => {
+        if ((e as PointerEvent).pointerType !== 'touch') release();
+      });
+    }
   }
 
   /** Carrera encendida. Interruptor, no tecla mantenida. */

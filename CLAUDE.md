@@ -648,6 +648,21 @@ al mantenerlo** (cuatro veces por segundo, la cadencia de siempre) y **el raton
 no** —un clic es una accion—, porque mantener pulsado el raton significa
 arrastrar la camara y no se puede saber si es accion hasta que se suelta.
 
+**Y el dedo que mantiene ACCION gira la camara si se arrastra**, sin soltar la
+accion: pedido del autor, y con la mirada de la camara eso es barrer alrededor.
+En `gestures.ts` es un tercer dueno, `'actionLook'`, que gira como un dedo de
+camara pero **no cuenta para la pinza** —si contara, el dedo de la accion mas
+uno de camara harian zoom solos— y no empieza a girar hasta pasar `TAP_SLOP`,
+para que el pulgar que solo mantiene no de tirones (el umbral es deduccion mia).
+Los `touchmove` se escuchan en el propio boton, que los sigue recibiendo aunque
+el dedo salga de el, y con un dedo `pointerleave` ya no suelta la accion.
+
+**La prueba de ese gesto va con toques de verdad** (CDP
+`Input.dispatchTouchEvent` en `tools/gestures.mjs`), no con `PointerEvent`
+sinteticos: los sinteticos entran directos al lienzo y se saltan lo que el
+navegador decide sobre un dedo que nace en un boton. Muerde: sin el `touchmove`
+del boton, cae.
+
 Numeros del autor, que no se tocan sin preguntarle: el escalon (0.06), los 16 px
 por nivel, el 15 % de fronteras que son rampa y el tope de 40 niveles. El umbral
 de salientes y la ganancia de cordillera, en cambio, son calibraciones: se eligen

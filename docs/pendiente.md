@@ -44,6 +44,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Salud y hambre **apiladas** (salud arriba), la franja de 50 px y **sin numero** en las barras | La franja de salud y hambre | CSS |
 | La mochila del inventario y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y el muslo | La franja de salud y hambre | SVG |
 | Con el inventario abierto en el movil, el panel **tapa** comer, sembrar y correr hasta que se cierra | La franja de salud y hambre | CSS |
+| El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `CLAUDE.md`, racimo del pulgar | un numero |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden

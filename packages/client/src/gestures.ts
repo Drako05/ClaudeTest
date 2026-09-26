@@ -15,9 +15,19 @@
  * movil: **cada dedo elige dueno al nacer y no lo cambia nunca**. El cuadrante
  * inferior izquierdo es del joystick; el resto de la pantalla, de la camara. Y
  * una pinza solo existe si sus DOS dedos son de la camara.
+ *
+ * Y un tercer dueno, que no nace en el lienzo: **el dedo del boton de accion**
+ * (`'actionLook'`). El autor pidio apretar la accion y, sin soltar, arrastrar
+ * ese mismo dedo para girar la camara —como la mirada es la de la camara, es
+ * barrer alrededor—. Gira igual que un dedo de camara, pero **no cuenta para la
+ * pinza**: si contara, el dedo de la accion mas uno de camara serian dos dedos
+ * de camara y el zoom saltaria solo.
  */
 
-export type Role = 'stick' | 'look';
+export type Role = 'stick' | 'look' | 'actionLook';
+
+/** Clave de un puntero: los del lienzo son `pointerId`; los del boton, texto. */
+export type PointerKey = number | string;
 
 interface Touch {
   role: Role;
@@ -65,7 +75,7 @@ export const STICK_DEAD = 0.14;
 export const PINCH_THRESHOLD = 10;
 
 export class Gestures {
-  private readonly touches = new Map<number, Touch>();
+  private readonly touches = new Map<PointerKey, Touch>();
   private orbitX = 0;
   private orbitY = 0;
   private zoomFactor = 1;
@@ -106,7 +116,15 @@ export class Gestures {
     this.resetPinch();
   }
 
-  move(id: number, x: number, y: number): void {
+  /**
+   * El dedo que aprieta el boton de accion. Nace fuera del lienzo, asi que no
+   * pasa por `roleFor`: su dueno es siempre el mismo.
+   */
+  downAction(key: string, x: number, y: number): void {
+    this.touches.set(key, { role: 'actionLook', x, y, originX: x, originY: y, isTouch: true, travel: 0 });
+  }
+
+  move(id: PointerKey, x: number, y: number): void {
     const touch = this.touches.get(id);
     if (!touch) return;
 
@@ -115,7 +133,16 @@ export class Gestures {
     const travel = Math.hypot(x - touch.originX, y - touch.originY);
     if (travel > touch.travel) touch.travel = travel;
 
-    if (touch.role === 'look') {
+    if (touch.role === 'actionLook') {
+      // No gira hasta pasar `TAP_SLOP`: un pulgar que solo mantiene el boton
+      // tiembla, y sin umbral la camara daria tirones. Lo de antes del umbral
+      // se pierde a proposito, para no dar un salto al cruzarlo. (Umbral
+      // deducido por el agente, no pedido por el autor.)
+      if (touch.travel > TAP_SLOP) {
+        this.orbitX += x - touch.x;
+        this.orbitY += y - touch.y;
+      }
+    } else if (touch.role === 'look') {
       const looks = this.lookTouches();
       // Con DOS dedos de camara manda la pinza y el giro se suspende: si no,
       // pellizcar hace girar la vista al mismo tiempo.
@@ -140,10 +167,11 @@ export class Gestures {
    * de un dedo y si apenas se movio. Quien decide que hacer con eso es
    * `controls.ts` — aqui no se sabe que existe una accion.
    */
-  up(id: number): Release | null {
+  up(id: PointerKey): Release | null {
     const touch = this.touches.get(id);
     this.touches.delete(id);
-    this.resetPinch();
+    // El dedo de la accion no forma parte de ninguna pinza: soltarlo no la toca.
+    if (touch?.role !== 'actionLook') this.resetPinch();
     if (!touch) return null;
     return { role: touch.role, isTouch: touch.isTouch, tap: touch.travel <= TAP_SLOP };
   }

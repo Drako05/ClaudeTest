@@ -79,6 +79,42 @@ console.log(`  pinza: distancia ${preZoom.distance.toFixed(2)} -> ${postZoom.dis
 check(postZoom.distance < preZoom.distance, 'separar dos dedos de camara no acerco la vista');
 check(Math.abs(postZoom.yaw - preZoom.yaw) < 0.01, 'la pinza giro la camara ademas de hacer zoom');
 
+// El dedo de la accion: se aprieta ACCION y, sin soltar, se arrastra ese mismo
+// dedo. Tiene que girar la camara y la accion tiene que seguir repitiendo.
+//
+// Esta va con toques de VERDAD (CDP `Input.dispatchTouchEvent`), no con
+// `PointerEvent` sinteticos: entran por la tuberia de gestos del navegador, que
+// es la que decide si un dedo nacido en un boton puede seguir moviendo algo o
+// se lo queda el navegador. Los sinteticos se saltan justo eso.
+const cdp = await page.context().newCDPSession(page);
+const btn = await page.evaluate(() => {
+  const r = document.getElementById('action').getBoundingClientRect();
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+});
+const real = (type, points) =>
+  cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map((p) => ({ x: p.x, y: p.y, id: 7 })) });
+const preHold = await page.evaluate(() => window.__verdant);
+await real('touchStart', [btn]);
+await page.waitForTimeout(400);
+const heldStill = await page.evaluate(() => window.__verdant);
+for (let i = 1; i <= 16; i++) await real('touchMove', [{ x: btn.x - i * 10, y: btn.y - i * 2 }]);
+await page.waitForTimeout(700);
+const dragged = await page.evaluate(() => window.__verdant);
+await real('touchEnd', []);
+await page.waitForTimeout(300);
+const released = await page.evaluate(() => window.__verdant);
+const turned = dragged.yaw - heldStill.yaw;
+const kept = dragged.sent.harvest - heldStill.sent.harvest;
+console.log(`  accion arrastrada: giro ${turned.toFixed(2)} rad, ${kept} acciones mientras giraba`);
+check(Math.abs(heldStill.yaw - preHold.yaw) < 1e-9, 'apretar la accion sin arrastrar giro la camara');
+check(Math.abs(turned) > 0.1, 'arrastrar el dedo de la accion no giro la camara');
+check(kept > 0, 'la accion dejo de repetir mientras se arrastraba el dedo');
+check(dragged.distance === heldStill.distance, 'arrastrar el dedo de la accion cambio el zoom');
+// Y al soltar, la accion se detiene de verdad.
+await page.waitForTimeout(800);
+const stopped = await page.evaluate(() => window.__verdant);
+check(stopped.sent.harvest === released.sent.harvest, 'la accion siguio repitiendo tras soltar el dedo');
+
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();
 server.close();

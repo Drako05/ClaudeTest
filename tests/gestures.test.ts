@@ -245,3 +245,75 @@ describe('Un clic no es un arrastre', () => {
     expect(fresh().up(99)).toBeNull();
   });
 });
+
+/**
+ * El dedo del boton de accion: apretar y, sin soltar, arrastrar ese mismo dedo
+ * gira la camara (pedido del autor). Nace fuera del lienzo, con su propio dueno.
+ */
+describe('El dedo de la accion gira la camara', () => {
+  const BUTTON = { x: 330, y: 760 };
+
+  it('arrastrado, gira lo mismo que un dedo de camara', () => {
+    const accion = fresh();
+    accion.downAction('accion:0', BUTTON.x, BUTTON.y);
+    accion.move('accion:0', BUTTON.x - 10, BUTTON.y);
+    accion.takeOrbit(); // lo de antes del umbral no cuenta
+    accion.move('accion:0', BUTTON.x - 70, BUTTON.y - 20);
+
+    const camara = fresh();
+    camara.down(1, LOOK_SPOT.x, LOOK_SPOT.y, true);
+    camara.move(1, LOOK_SPOT.x - 60, LOOK_SPOT.y - 20);
+
+    expect(accion.takeOrbit()).toEqual(camara.takeOrbit());
+  });
+
+  it('por debajo del umbral no gira: el pulgar que solo mantiene tiembla', () => {
+    const g = fresh();
+    g.downAction('accion:0', BUTTON.x, BUTTON.y);
+    g.move('accion:0', BUTTON.x + TAP_SLOP - 1, BUTTON.y);
+    expect(g.takeOrbit()).toEqual({ dx: 0, dy: 0 });
+  });
+
+  it('pasado el umbral gira desde donde esta, sin dar un salto', () => {
+    const g = fresh();
+    g.downAction('accion:0', BUTTON.x, BUTTON.y);
+    g.move('accion:0', BUTTON.x + TAP_SLOP + 2, BUTTON.y);
+    // Solo el trozo de este paso, no los TAP_SLOP + 2 desde el origen.
+    expect(g.takeOrbit().dx).toBe(TAP_SLOP + 2);
+    g.move('accion:0', BUTTON.x + TAP_SLOP + 12, BUTTON.y);
+    expect(g.takeOrbit().dx).toBe(10);
+  });
+
+  it('con un dedo de camara a la vez NO hace pinza: el zoom no cambia', () => {
+    // Si contara como dedo de camara, los dos se leerian como una pinza.
+    const g = fresh();
+    g.downAction('accion:0', BUTTON.x, BUTTON.y);
+    g.down(1, LOOK_UPPER_LEFT.x, LOOK_UPPER_LEFT.y, true);
+    // Uno en horizontal y otro en vertical: la distancia entre ellos cambia de
+    // sobra para ser una pinza, y cada uno deja su giro en un eje.
+    for (let i = 1; i <= 10; i++) {
+      g.move('accion:0', BUTTON.x - i * 12, BUTTON.y);
+      g.move(1, LOOK_UPPER_LEFT.x, LOOK_UPPER_LEFT.y + i * 12);
+    }
+    expect(g.takeZoom()).toBe(1);
+    // Y los dos giran: el de la accion en x, el de camara en y.
+    const orbit = g.takeOrbit();
+    expect(orbit.dx).toBeLessThan(0);
+    expect(orbit.dy).toBe(120);
+  });
+
+  it('no mueve al personaje ni se lleva el joystick', () => {
+    const g = fresh();
+    g.downAction('accion:0', BUTTON.x, BUTTON.y);
+    g.down(2, STICK_SPOT.x, STICK_SPOT.y, true);
+    g.move('accion:0', BUTTON.x - 80, BUTTON.y);
+    expect(g.stickCenter()).toEqual(STICK_SPOT);
+    expect(g.stick()).toEqual({ x: 0, y: 0 });
+  });
+
+  it('soltarlo dice que era el dedo de la accion, para que nadie accione otra vez', () => {
+    const g = fresh();
+    g.downAction('accion:0', BUTTON.x, BUTTON.y);
+    expect(g.up('accion:0')?.role).toBe('actionLook');
+  });
+});
