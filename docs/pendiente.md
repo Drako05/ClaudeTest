@@ -48,6 +48,10 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Primera persona: ojos a **1,75** sobre los pies, campo de vision **70°**, se entra mirando **-0,2 rad** hacia el suelo, catalejo hasta **15°** | `CLAUDE.md`, las tres vistas | numeros en `camera.ts` |
 | Con raton el catalejo vuelve **0,8 s** despues del ultimo giro de rueda (no hay «soltar») | `CLAUDE.md`, las tres vistas | un numero |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
+| Tronco = el tramo **desnudo** hasta la copa, y la copa **conserva su tamano** | Arboles altos | redibujar el arte |
+| La normal del tronco: media **3,5**, desviacion **0,75**, **truncada** en 2-5 (no recortada) | Arboles altos | numeros en `trunk.ts` |
+| El tronco va en escalones de **un cuarto de bloque** (13 alturas) | Arboles altos | un numero |
+| Coniferas, frondosos y los **raros** sacan el tronco de la misma normal | Arboles altos | un `if` |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
 al encadenarlos. La causa esta localizada y el plan escrito, esperando a que
@@ -247,6 +251,36 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Arboles altos: el tronco mide de 2 a 5 bloques — HECHO (2026-09-26)
+
+Tu encargo: **solo el tronco de un arbol adulto mide de 2 a 5 bloques, segun
+una normal**, para que el jugador vea por debajo del follaje. Antes, medido del
+dibujo, el tronco que asomaba bajo la copa iba de **0,78 a 1,13** bloques: la
+copa le tapaba la cabeza a un personaje de 1,93.
+
+Lo que interprete yo, y esta en «Esperando tu juicio»:
+
+- **«Tronco» es el tramo desnudo**, del suelo al borde bajo de la copa, porque
+  es el que decide si se ve por debajo. La copa no cambia de tamano: sube. El
+  arbol entero pasa de 3,17 a unos 4,4-7,4 bloques (5,70 con el tronco medio).
+- **Media 3,5 y desviacion 0,75**, que ponen 2 y 5 a ±2σ. **Truncada**: una
+  muestra que se sale se vuelve a sortear. Recortarla habria dejado un 2,3 % de
+  los arboles clavados en 2 y otro tanto en 5, una fila de arboles iguales.
+- **Las seis especies de arbol** por igual, raras incluidas (conservan su copa
+  un 15 % mayor). Brotes, arbustos y rocas no cambian.
+
+Lo que no es interpretacion: la altura es **de la casilla** (`hash2DFloat`),
+como el giro del aspa, asi que un arbol no cambia de altura al regenerarse su
+chunk; y es **arte**, `packages/sim` no se entera. Se dibuja por (especie,
+cuarto de bloque), cada combinacion una vez y solo si aparece: sigue siendo un
+Mesh por arbol, sin draw calls de mas.
+
+Medido del dibujo en la semilla 12345: **2.924 arboles, de 1,97 a 5,00, media
+3,48**. `tests/trunk.test.ts` afirma la forma de la normal y que no hay montones
+en los topes (comprobado que muerde: recortando en vez de truncar caen dos
+tests), y el humo afirma el rango, la variacion y que el tronco medio deja pasar
+al jugador (con el arte viejo cae con tres fallos).
 
 ## La accion alcanza tambien la casilla que se pisa — HECHO
 

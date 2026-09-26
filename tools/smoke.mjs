@@ -228,6 +228,14 @@ async function desktopPass(browser, baseUrl) {
   check(around.relief.levels > 1, `el terreno sale a una sola altura: ${around.relief.levels}`);
 
   // Los controles de PC: el racimo del pulgar oculto, el ojo y la ayuda a la vista.
+  // El tronco desnudo de los arboles, MEDIDO del dibujo: de 2 a 5 bloques segun
+  // una normal (encargo del autor), para que el jugador vea por debajo de la
+  // copa. Con el arte de antes, el tronco que asomaba medio 0,8.
+  const tr = spawn.trunks;
+  check(tr.n > 50, `apenas se colocaron arboles (${tr.n})`);
+  check(tr.min >= 1.9 && tr.max <= 5.1, `tronco fuera de 2-5 bloques: ${tr.min.toFixed(2)}-${tr.max.toFixed(2)}`);
+  check(tr.mean > spawn.sizes.jugador + 0.5, `el tronco medio (${tr.mean.toFixed(2)}) no deja pasar por debajo al jugador`);
+  check(tr.max - tr.min > 2, `los troncos no varian: ${tr.min.toFixed(2)}-${tr.max.toFixed(2)}`);
   check(!(await page.isVisible('#thumbPad')), 'los botones del pulgar se ven en PC');
   check(await page.isVisible('#proj'), 'el ojo de la proyeccion no se ve');
   check(await page.isVisible('#help'), 'la ayuda de teclado no se ve en PC');

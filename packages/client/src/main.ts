@@ -559,6 +559,8 @@ Object.defineProperty(window, '__verdant', {
       effects: effects.tally,
       /** Lo que mide cada cosa en BLOQUES, medido del dibujo. Ver `BillboardSet`. */
       sizes: billboards.sizes,
+      /** Tronco desnudo de los arboles colocados, medido del dibujo. */
+      trunks: billboards.trunks,
       facing: [e.facingX[id], e.facingY[id]],
       /** Hacia donde mira la camara, que es de donde sale la mirada. */
       aim: [camera.forward().x, camera.forward().y],

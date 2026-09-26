@@ -26,6 +26,13 @@ console.log(
   'PROPORCIONES (bloques):',
   Object.entries(sizes).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(' · '),
 );
+// El tronco desnudo de los arboles que se han colocado de verdad: 2 a 5 bloques
+// segun una normal (ver `trunk.ts`).
+const trunks = await page.evaluate(() => window.__verdant.trunks);
+console.log(
+  `TRONCOS (bloques): ${trunks.n} arboles · min ${trunks.min.toFixed(2)} · ` +
+    `media ${trunks.mean.toFixed(2)} · max ${trunks.max.toFixed(2)}`,
+);
 
 await page.screenshot({ path: 'screenshots/01-perspectiva.png' });
 

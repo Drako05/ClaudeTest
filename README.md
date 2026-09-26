@@ -177,7 +177,8 @@ Encima de eso, lo que vino despues:
   mesetas y acantilados; y desde la fase 2 hay gravedad, salto y caida, asi que
   ya no se cambia de nivel andando.
 - **Camara libre en 3D**, con los elementos como aspas de dos laminas,
-  proporciones al estilo Minecraft —el jugador dos bloques, un arbol tres—, dia
+  proporciones al estilo Minecraft —el jugador dos bloques, y los
+  arboles con un tronco de 2 a 5 para ver por debajo de la copa—, dia
   y noche, y los efectos reutilizando la fisica que ya existia.
 
 **Antes del multijugador quedan cabos de la camara nueva:** que el terreno tape

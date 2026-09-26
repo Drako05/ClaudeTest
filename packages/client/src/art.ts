@@ -104,8 +104,13 @@ function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: 
  * Los objetos se dibujan hacia ARRIBA desde su punto de apoyo, que es el centro
  * del tile. La luz entra siempre por el noroeste, para que todas las especies se
  * lean como parte del mismo mundo.
+ *
+ * `bare`, solo para arboles, es cuanto tronco DESNUDO se quiere bajo la copa,
+ * en pixeles de arte (ver `trunk.ts`). El lienzo crece hacia arriba y la copa
+ * se dibuja con sus coordenadas de siempre, solo desplazada: el follaje no
+ * cambia de tamano, cambia de altura. Sin `bare` sale el dibujo de siempre.
  */
-export function makeFeatureArt(feature: Feature, detail = 1): FeatureArt | null {
+export function makeFeatureArt(feature: Feature, detail = 1, bare?: number): FeatureArt | null {
   if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES, detail);
   const mineral = MINERAL_FACES[feature];
   if (mineral) return makeRockArt(mineral, detail);
@@ -114,15 +119,22 @@ export function makeFeatureArt(feature: Feature, detail = 1): FeatureArt | null 
   const look = LOOKS[feature];
   if (!look) return null;
 
+  const grow = look.rare ? 1.15 : 1;
+  // Cuanto sube la copa: lo que falta desde su borde bajo de hoy hasta `bare`.
+  const up = bare === undefined || look.form === 'bush'
+    ? 0
+    : Math.max(0, bare - canopyBottom(look.form, grow));
+
   const width = 44;
-  const height = 58;
+  const height = 58 + Math.ceil(up);
   const made = newCanvas(width, height, detail);
   if (!made) return null;
   const [canvas, ctx] = made;
 
   const footX = width / 2;
   const footY = height - 6;
-  const grow = look.rare ? 1.15 : 1;
+  // La copa se dibuja desde este pie ficticio; el tronco, desde el de verdad.
+  const crownY = footY - up;
 
   drawShadow(ctx, footX, footY, look.form === 'bush' ? 0.8 : 1);
 
@@ -149,7 +161,7 @@ export function makeFeatureArt(feature: Feature, detail = 1): FeatureArt | null 
     }
   } else if (look.form === 'conifer') {
     ctx.fillStyle = look.trunk;
-    ctx.fillRect(footX - 2.5, footY - 14 * grow, 5, 14 * grow);
+    ctx.fillRect(footX - 2.5, footY - 14 * grow - up, 5, 14 * grow + up);
     // Tres pisos que estrechan hacia arriba: silueta alta y puntiaguda.
     const tiers: Array<[number, number, string]> = [
       [14 * grow, 13 * grow, look.dark],
@@ -159,30 +171,40 @@ export function makeFeatureArt(feature: Feature, detail = 1): FeatureArt | null 
     for (const [rise, halfWidth, color] of tiers) {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.moveTo(footX, footY - rise - 11 * grow);
-      ctx.lineTo(footX + halfWidth, footY - rise + 2);
-      ctx.lineTo(footX - halfWidth, footY - rise + 2);
+      ctx.moveTo(footX, crownY - rise - 11 * grow);
+      ctx.lineTo(footX + halfWidth, crownY - rise + 2);
+      ctx.lineTo(footX - halfWidth, crownY - rise + 2);
       ctx.closePath();
       ctx.fill();
     }
   } else {
     ctx.fillStyle = look.trunk;
-    ctx.fillRect(footX - 3, footY - 17 * grow, 6, 17 * grow);
+    ctx.fillRect(footX - 3, footY - 17 * grow - up, 6, 17 * grow + up);
     ctx.fillStyle = look.dark;
     ctx.beginPath();
-    ctx.arc(footX, footY - 25 * grow, 15 * grow, 0, Math.PI * 2);
+    ctx.arc(footX, crownY - 25 * grow, 15 * grow, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = look.mid;
     ctx.beginPath();
-    ctx.arc(footX - 2, footY - 29 * grow, 11 * grow, 0, Math.PI * 2);
+    ctx.arc(footX - 2, crownY - 29 * grow, 11 * grow, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = look.light;
     ctx.beginPath();
-    ctx.arc(footX - 5, footY - 32 * grow, 6.5 * grow, 0, Math.PI * 2);
+    ctx.arc(footX - 5, crownY - 32 * grow, 6.5 * grow, 0, Math.PI * 2);
     ctx.fill();
   }
 
   return { canvas, anchorX: footX / width, anchorY: footY / height };
+}
+
+/**
+ * A cuantos pixeles del pie queda hoy el borde bajo de la copa: el tronco que
+ * se ve desnudo con el dibujo original. En el frondoso es el circulo oscuro
+ * (centro a 25, radio 15); en la conifera, la base del primer piso (a 14, que
+ * baja 2 de mas).
+ */
+function canopyBottom(form: 'conifer' | 'broadleaf', grow: number): number {
+  return form === 'conifer' ? 14 * grow - 2 : 10 * grow;
 }
 
 /** Brote recien sembrado: pequeno, sin fruto y sin estorbar el paso. */

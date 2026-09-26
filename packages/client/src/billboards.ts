@@ -37,6 +37,7 @@ import { Feature } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
 import { LOOKS } from './palette.js';
 import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
+import { TRUNK_BUCKETS, bucketBlocks, trunkBlocks, trunkBucket } from './trunk.js';
 
 /**
  * Dos quads cruzados a 90 grados, con el PIE EN `y = 0`.
@@ -98,6 +99,9 @@ const PX_PER_TILE = 32;
  *   jugador 0,78 -> 1,79   arbusto 0,47 -> 1,08
  *   arbol   1,22 -> 3,17   roca    1,25 -> 2,88   brote 0,66 -> 1,52
  *
+ * Despues el tronco de los arboles se alargo aparte, de 2 a 5 bloques: eso no
+ * es escala, es dibujo (ver `trunk.ts`).
+ *
  * **Nada de esto llega a `packages/sim`.** El salto, `STEP_UP` y la colision van
  * en unidades de mundo y no saben lo que mide un sprite. Es arte, no fisica.
  */
@@ -122,6 +126,15 @@ function scaleOf(feature: Feature): number {
   return look && look.form !== 'bush' ? ARBOL : BASE;
 }
 
+/** Arbol adulto: tiene look y no es arbusto. Los brotes no tienen look. */
+function isTree(feature: Feature): boolean {
+  const look = LOOKS[feature];
+  return !!look && look.form !== 'bush';
+}
+
+/** Pixeles de arte (a `detail = 1`) que mide un bloque de un arbol. */
+const TREE_PX_PER_BLOCK = PX_PER_TILE / ARBOL;
+
 interface Billboard {
   readonly texture: Texture;
   /** Tamano en unidades de mundo. */
@@ -131,6 +144,8 @@ interface Billboard {
   readonly lift: number;
   /** Lo que el DIBUJO levanta del suelo, en bloques. Ver `inkHeight`. */
   readonly visible: number;
+  /** Tronco DESNUDO que deja ver el dibujo, en bloques. 0 si no es arbol. */
+  readonly bare: number;
   /**
    * Geometria y material del aspa, UNO por especie y compartidos por todas sus
    * instancias. Antes cada sprite se creaba su propio material.
@@ -169,7 +184,43 @@ function inkHeight(art: FeatureArt, unitsPerPixel: number): number {
   return 0;
 }
 
-function fromArt(art: FeatureArt | null, scale: number, cross: boolean): Billboard | null {
+/**
+ * Cuanto tronco se ve desnudo, en unidades de mundo: la tirada de pixeles del
+ * color del tronco en la columna del pie, desde el suelo hacia arriba.
+ *
+ * La copa se pinta encima del tronco, asi que la tirada termina justo donde
+ * empieza el follaje. Es la medida que dice si el jugador ve por debajo, sacada
+ * del dibujo y no de la cuenta que lo produjo.
+ */
+function bareHeight(art: FeatureArt, trunk: string, unitsPerPixel: number): number {
+  const ctx = art.canvas.getContext('2d');
+  if (!ctx) return 0;
+  const { width, height } = art.canvas;
+  const want = [1, 3, 5].map((i) => parseInt(trunk.slice(i, i + 2), 16));
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, width, height).data;
+  } catch {
+    return 0;
+  }
+  const x = Math.floor(art.anchorX * width);
+  const foot = Math.round(art.anchorY * height);
+  let run = 0;
+  for (let y = foot - 1; y >= 0; y--) {
+    const i = (y * width + x) * 4;
+    const same = data[i + 3] > 200 && want.every((c, k) => Math.abs(data[i + k] - c) <= 3);
+    if (!same) break;
+    run++;
+  }
+  return run * unitsPerPixel;
+}
+
+function fromArt(
+  art: FeatureArt | null,
+  scale: number,
+  cross: boolean,
+  trunk?: string,
+): Billboard | null {
   if (!art) return null;
   const texture = new CanvasTexture(art.canvas);
   // Sin filtrado: el arte es de pixeles y suavizarlo lo emborrona, que es
@@ -194,6 +245,7 @@ function fromArt(art: FeatureArt | null, scale: number, cross: boolean): Billboa
     h,
     lift: below,
     visible: inkHeight(art, scale / (PX_PER_TILE * DETAIL)),
+    bare: trunk ? bareHeight(art, trunk, scale / (PX_PER_TILE * DETAIL)) : 0,
     geometry: cross ? crossGeometry(w, above, below) : null,
     // Basic y no Lambert: el arte ya lleva su luz horneada desde el noroeste y
     // el sprite tampoco se iluminaba, asi que asi el ASPECTO no cambia y solo
@@ -220,7 +272,15 @@ function fromArt(art: FeatureArt | null, scale: number, cross: boolean): Billboa
 /** Todas las especies dibujadas una vez, listas para instanciarse. */
 export class BillboardSet {
   private readonly byFeature = new Map<Feature, Billboard>();
+  /**
+   * Los arboles, UNO por (especie, altura de tronco) y compartido por todas sus
+   * instancias: sigue siendo un Mesh por arbol, sin una draw call de mas. Se
+   * dibujan la primera vez que hacen falta; como mucho 6 especies x 13 alturas.
+   */
+  private readonly trees = new Map<number, Billboard | null>();
   private readonly player: Billboard | null;
+  /** Tronco desnudo de los arboles colocados, MEDIDO del dibujo. */
+  private readonly placed = { n: 0, min: Infinity, max: 0, sum: 0 };
 
   constructor() {
     for (const feature of Object.values(Feature)) {
@@ -229,6 +289,28 @@ export class BillboardSet {
       if (art) this.byFeature.set(feature, art);
     }
     this.player = fromArt(makePlayerArt(DETAIL), BASE, false);
+  }
+
+  /** El arte de ese arbol con ese escalon de tronco (ver `trunk.ts`). */
+  private tree(feature: Feature, bucket: number): Billboard | null {
+    const key = feature * TRUNK_BUCKETS + bucket;
+    let art = this.trees.get(key);
+    if (art === undefined) {
+      const bare = bucketBlocks(bucket) * TREE_PX_PER_BLOCK;
+      art = fromArt(makeFeatureArt(feature, DETAIL, bare), ARBOL, true, LOOKS[feature]?.trunk);
+      this.trees.set(key, art);
+    }
+    return art;
+  }
+
+  /**
+   * Cuanto tronco desnudo llevan los arboles que se han colocado, en bloques y
+   * medido del dibujo: minimo, maximo, media y cuantos. Acumulado, asi que un
+   * chunk que se redibuja cuenta otra vez; para la forma de la cuenta da igual.
+   */
+  get trunks(): { n: number; min: number; max: number; mean: number } {
+    const { n, min, max, sum } = this.placed;
+    return { n, min: n ? min : 0, max, mean: n ? sum / n : 0 };
   }
 
   /**
@@ -250,6 +332,21 @@ export class BillboardSet {
       const art = this.byFeature.get(feature);
       if (art) out[name] = art.visible;
     }
+    // El arbol, con el tronco del centro de la normal; y los dos extremos del
+    // tronco desnudo, medidos en coniferas y frondosos.
+    const middle = this.tree(Feature.ForestTree, trunkBucket(3.5));
+    if (middle) out.arbol = middle.visible;
+    const bares: number[] = [];
+    for (const feature of [Feature.ForestTree, Feature.MeadowTree]) {
+      for (const bucket of [0, TRUNK_BUCKETS - 1]) {
+        const art = this.tree(feature, bucket);
+        if (art) bares.push(art.bare);
+      }
+    }
+    if (bares.length) {
+      out.troncoMin = Math.min(...bares);
+      out.troncoMax = Math.max(...bares);
+    }
     return out;
   }
 
@@ -263,11 +360,24 @@ export class BillboardSet {
    * vuelta basta, porque el aspa se repite cada 90 grados.
    */
   spawn(feature: Feature, wx: number, height: number, wy: number, seed: number): Mesh | null {
-    const art = this.byFeature.get(feature);
+    const tx = Math.floor(wx);
+    const ty = Math.floor(wy);
+    // Los arboles, ademas, llevan su propia altura de tronco, que tambien es de
+    // la casilla por la misma razon que el giro.
+    const art = isTree(feature)
+      ? this.tree(feature, trunkBucket(trunkBlocks(seed, tx, ty)))
+      : this.byFeature.get(feature);
     if (!art || !art.geometry || !art.material) return null;
+    if (art.bare > 0) {
+      const p = this.placed;
+      p.n++;
+      p.sum += art.bare;
+      p.min = Math.min(p.min, art.bare);
+      p.max = Math.max(p.max, art.bare);
+    }
     const mesh = new Mesh(art.geometry, art.material);
     mesh.position.set(wx, height, wy);
-    mesh.rotation.y = hash2DFloat(seed, Math.floor(wx), Math.floor(wy)) * (Math.PI / 2);
+    mesh.rotation.y = hash2DFloat(seed, tx, ty) * (Math.PI / 2);
     return mesh;
   }
 

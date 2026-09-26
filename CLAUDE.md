@@ -516,10 +516,31 @@ terreno. Medido del dibujo:
 | | Antes | Ahora |
 |---|---|---|
 | Jugador | 0,78 | **1,93** |
-| Arbol | 1,22 | **3,17** |
+| Arbol | 1,22 | 3,17, y con tronco alto **4,4-7,4** (5,70 el medio) |
+| Tronco desnudo del arbol | 0,3-0,4 | 0,78-1,13, y ahora **2-5** segun una normal |
 | Arbusto | 0,47 | 1,17 |
 | Brote | 0,29 | 0,88 |
 | Roca y minerales | 0,47 | 1,09 |
+
+**El tronco de cada arbol adulto mide de 2 a 5 bloques**, encargo del autor
+para que el jugador vea por debajo del follaje (antes asomaban 0,78-1,13 y la
+copa le tapaba la cabeza). Se lee como el tramo **desnudo** hasta la copa, que
+conserva su tamano y sube encima; sale de una **normal truncada** de media 3,5 y
+desviacion 0,75 (`trunk.ts`) —los numeros y el truncado son deduccion mia—. Dos
+cosas que no son de gusto:
+
+- **Es de la casilla**, de `hash2DFloat` como el giro del aspa: con azar vivo un
+  arbol cambiaria de altura cada vez que su chunk se regenera (regla 3).
+- **Truncada, no recortada**: recortar a [2, 5] clavaria un 2,3 % de los arboles
+  exactamente en cada tope. `tests/trunk.test.ts` lo afirma y muerde.
+
+El arte se redibuja por **(especie, cuarto de bloque)**, cada combinacion una
+vez y solo cuando aparece (`BillboardSet.tree`): sigue siendo un Mesh por arbol
+con geometria y material compartidos. `makeFeatureArt(feature, detail, bare)`
+alarga el tronco y sube la copa sin tocar sus coordenadas. Y el tronco se
+**mide del dibujo**, no de la cuenta: la tirada del color del tronco en la
+columna del pie, que termina donde la copa se pinta encima
+(`window.__verdant.trunks`, que el humo afirma).
 
 **Esto es ARTE, no fisica.** El salto (apice 1,16), `STEP_UP` y la colision van en
 unidades de mundo y no saben lo que mide un sprite, asi que `packages/sim` no se
