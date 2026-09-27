@@ -516,8 +516,9 @@ terreno. Medido del dibujo:
 | | Antes | Ahora |
 |---|---|---|
 | Jugador | 0,78 | **1,93** |
-| Arbol | 1,22 | 3,17, y con tronco alto **4,4-7,4** (5,70 el medio) |
+| Arbol | 1,22 | 3,17, y con tronco alto y copa grande **~5,3-8,7** (6,82 el medio) |
 | Tronco desnudo del arbol | 0,3-0,4 | 0,78-1,13, y ahora **2-5** segun una normal |
+| Copa del frondoso (alto) | ~0,9 | 2,47, y con `CROWN = 1.5` **3,69** |
 | Arbusto | 0,47 | 1,17 |
 | Brote | 0,29 | 0,88 |
 | Roca y minerales | 0,47 | 1,09 |
@@ -541,6 +542,18 @@ alarga el tronco y sube la copa sin tocar sus coordenadas. Y el tronco se
 **mide del dibujo**, no de la cuenta: la tirada del color del tronco en la
 columna del pie, que termina donde la copa se pinta encima
 (`window.__verdant.trunks`, que el humo afirma).
+
+**La copa crecio despues, a juego con el tronco**: a peticion del autor, que la
+vio pequena para el arbol nuevo, se multiplica por `CROWN = 1.5` (`art.ts`; el
+numero es deduccion mia). Se escala **desde su borde bajo**, asi que el tronco
+desnudo no se entera y sus comprobaciones siguen valiendo; y como el lienzo se
+ensancha con ella, **la sombra tumbada crece sola** (`widthOf` sale del ancho).
+
+La medida del tronco busca el tronco **unas filas por encima del pie**: el
+lienzo redondea su alto al alza, el ancla es una fraccion del alto logico, y la
+fila del pie mezcla tronco y sombra. Con la copa mas alta esa fila cayo mal y el
+frondoso midio **cero** de tronco; mirando solo la fila del pie, que un arbol
+mida bien o no dependia del redondeo.
 
 **Esto es ARTE, no fisica.** El salto (apice 1,16), `STEP_UP` y la colision van en
 unidades de mundo y no saben lo que mide un sprite, asi que `packages/sim` no se

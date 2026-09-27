@@ -204,15 +204,20 @@ function bareHeight(art: FeatureArt, trunk: string, unitsPerPixel: number): numb
     return 0;
   }
   const x = Math.floor(art.anchorX * width);
-  const foot = Math.round(art.anchorY * height);
-  let run = 0;
-  for (let y = foot - 1; y >= 0; y--) {
+  const foot = art.anchorY * height;
+  const isTrunk = (y: number): boolean => {
     const i = (y * width + x) * 4;
-    const same = data[i + 3] > 200 && want.every((c, k) => Math.abs(data[i + k] - c) <= 3);
-    if (!same) break;
-    run++;
-  }
-  return run * unitsPerPixel;
+    return data[i + 3] > 200 && want.every((c, k) => Math.abs(data[i + k] - c) <= 3);
+  };
+  // El pie cae a mitad de pixel —el lienzo redondea su alto al alza y el ancla
+  // es una fraccion del alto logico—, y esa fila mezcla tronco y sombra. Asi que
+  // se busca el tronco unas filas por encima y se mide desde el pie de verdad
+  // hasta donde acaba. Sin esto, un lienzo mas alto medio el tronco en cero.
+  let y = Math.floor(foot);
+  while (y > foot - 4 && y >= 0 && !isTrunk(y)) y--;
+  if (y < 0 || !isTrunk(y)) return 0;
+  while (y > 0 && isTrunk(y - 1)) y--;
+  return (foot - y) * unitsPerPixel;
 }
 
 function fromArt(
@@ -336,7 +341,9 @@ export class BillboardSet {
     // tronco desnudo, medidos en coniferas y frondosos.
     const middle = this.tree(Feature.ForestTree, trunkBucket(3.5));
     if (middle) out.arbol = middle.visible;
-    const bares: number[] = [];
+    // Lo que mide de alto la copa del frondoso: tinta total menos tronco desnudo.
+    const leafy = this.tree(Feature.MeadowTree, trunkBucket(3.5));
+    if (leafy) out.copa = leafy.visible - leafy.bare;    const bares: number[] = [];
     for (const feature of [Feature.ForestTree, Feature.MeadowTree]) {
       for (const bucket of [0, TRUNK_BUCKETS - 1]) {
         const art = this.tree(feature, bucket);

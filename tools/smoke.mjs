@@ -236,6 +236,9 @@ async function desktopPass(browser, baseUrl) {
   check(tr.min >= 1.9 && tr.max <= 5.1, `tronco fuera de 2-5 bloques: ${tr.min.toFixed(2)}-${tr.max.toFixed(2)}`);
   check(tr.mean > spawn.sizes.jugador + 0.5, `el tronco medio (${tr.mean.toFixed(2)}) no deja pasar por debajo al jugador`);
   check(tr.max - tr.min > 2, `los troncos no varian: ${tr.min.toFixed(2)}-${tr.max.toFixed(2)}`);
+  // Y la copa, agrandada para ir a juego con ese tronco: la del frondoso medía
+  // 2,4 bloques de alto y con `CROWN = 1.5` pasa de 3,5.
+  check(spawn.sizes.copa > 3.1, `la copa no crecio: ${spawn.sizes.copa?.toFixed(2)} bloques`);
   check(!(await page.isVisible('#thumbPad')), 'los botones del pulgar se ven en PC');
   check(await page.isVisible('#proj'), 'el ojo de la proyeccion no se ve');
   check(await page.isVisible('#help'), 'la ayuda de teclado no se ve en PC');

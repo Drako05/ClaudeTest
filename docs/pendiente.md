@@ -52,6 +52,8 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La normal del tronco: media **3,5**, desviacion **0,75**, **truncada** en 2-5 (no recortada) | Arboles altos | numeros en `trunk.ts` |
 | El tronco va en escalones de **un cuarto de bloque** (13 alturas) | Arboles altos | un numero |
 | Coniferas, frondosos y los **raros** sacan el tronco de la misma normal | Arboles altos | un `if` |
+| La copa **x1,5** (`CROWN`), fija y no ligada a la altura del tronco | Arboles altos | un numero |
+| Desde arriba, un bosque denso con copas grandes **tapa mas al jugador** | Arboles altos | es el cabo de la camara que ya estaba pendiente |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
 al encadenarlos. La causa esta localizada y el plan escrito, esperando a que
@@ -281,6 +283,19 @@ Medido del dibujo en la semilla 12345: **2.924 arboles, de 1,97 a 5,00, media
 en los topes (comprobado que muerde: recortando en vez de truncar caen dos
 tests), y el humo afirma el rango, la variacion y que el tronco medio deja pasar
 al jugador (con el arte viejo cae con tres fallos).
+
+**Y la copa, despues** (2026-09-27): la viste pequena para el arbol nuevo y
+pediste agrandarla. Propuse y puse **x1,5** (`CROWN` en `art.ts`): el frondoso
+pasa de 2,47 a **3,69** bloques de copa, del orden del tronco medio, como un
+roble de Minecraft; el arbol medio mide ahora 6,82. Se escala desde su borde
+bajo, asi que el tronco sigue en 1,98-5,01. El humo afirma que la copa pasa de
+3,1 (con `CROWN = 1` cae). Por el camino aparecio que la medida del tronco
+miraba solo la fila del pie, que cae a medio pixel: con la copa nueva el
+frondoso medio cero. Ahora busca el tronco unas filas por encima.
+
+Una consecuencia a mirar: vista desde arriba, un bosque denso ahora **tapa mas
+al jugador**. Es el cabo de la camara que ya estaba en la lista («que el
+terreno tape al jugador sin perderlo de vista»), que ahora aprieta un poco mas.
 
 ## La accion alcanza tambien la casilla que se pisa — HECHO
 

@@ -107,8 +107,7 @@ function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: 
  *
  * `bare`, solo para arboles, es cuanto tronco DESNUDO se quiere bajo la copa,
  * en pixeles de arte (ver `trunk.ts`). El lienzo crece hacia arriba y la copa
- * se dibuja con sus coordenadas de siempre, solo desplazada: el follaje no
- * cambia de tamano, cambia de altura. Sin `bare` sale el dibujo de siempre.
+ * sube hasta ahi. Sin `bare`, el tronco es el de siempre.
  */
 export function makeFeatureArt(feature: Feature, detail = 1, bare?: number): FeatureArt | null {
   if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES, detail);
@@ -120,21 +119,28 @@ export function makeFeatureArt(feature: Feature, detail = 1, bare?: number): Fea
   if (!look) return null;
 
   const grow = look.rare ? 1.15 : 1;
+  const tree = look.form !== 'bush';
+  // Borde bajo de la copa en el dibujo original, desde el pie.
+  const bottom = look.form === 'bush' ? 0 : canopyBottom(look.form, grow);
   // Cuanto sube la copa: lo que falta desde su borde bajo de hoy hasta `bare`.
-  const up = bare === undefined || look.form === 'bush'
-    ? 0
-    : Math.max(0, bare - canopyBottom(look.form, grow));
+  const up = bare === undefined || !tree ? 0 : Math.max(0, bare - bottom);
+  // Lo que la copa escalada sobresale por arriba de la de siempre, cuya cima
+  // estaba a 40 px del pie.
+  const taller = tree ? Math.ceil((40 * grow - bottom) * (CROWN - 1)) : 0;
 
-  const width = 44;
-  const height = 58 + Math.ceil(up);
+  const width = tree ? Math.ceil(44 * CROWN) : 44;
+  const height = 58 + Math.ceil(up) + taller;
   const made = newCanvas(width, height, detail);
   if (!made) return null;
   const [canvas, ctx] = made;
 
   const footX = width / 2;
   const footY = height - 6;
-  // La copa se dibuja desde este pie ficticio; el tronco, desde el de verdad.
-  const crownY = footY - up;
+  // La copa se escala por `CROWN` DESDE SU BORDE BAJO, que asi no se mueve y el
+  // tronco desnudo sigue midiendo lo que pidio `bare`. `crown(y)` lleva una
+  // altura del dibujo original (pixeles sobre el pie) a su sitio en el lienzo.
+  const base = footY - up - bottom;
+  const crown = (y: number): number => base - (y - bottom) * CROWN;
 
   drawShadow(ctx, footX, footY, look.form === 'bush' ? 0.8 : 1);
 
@@ -171,9 +177,9 @@ export function makeFeatureArt(feature: Feature, detail = 1, bare?: number): Fea
     for (const [rise, halfWidth, color] of tiers) {
       ctx.fillStyle = color;
       ctx.beginPath();
-      ctx.moveTo(footX, crownY - rise - 11 * grow);
-      ctx.lineTo(footX + halfWidth, crownY - rise + 2);
-      ctx.lineTo(footX - halfWidth, crownY - rise + 2);
+      ctx.moveTo(footX, crown(rise + 11 * grow));
+      ctx.lineTo(footX + halfWidth * CROWN, crown(rise - 2));
+      ctx.lineTo(footX - halfWidth * CROWN, crown(rise - 2));
       ctx.closePath();
       ctx.fill();
     }
@@ -182,20 +188,31 @@ export function makeFeatureArt(feature: Feature, detail = 1, bare?: number): Fea
     ctx.fillRect(footX - 3, footY - 17 * grow - up, 6, 17 * grow + up);
     ctx.fillStyle = look.dark;
     ctx.beginPath();
-    ctx.arc(footX, crownY - 25 * grow, 15 * grow, 0, Math.PI * 2);
+    ctx.arc(footX, crown(25 * grow), 15 * grow * CROWN, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = look.mid;
     ctx.beginPath();
-    ctx.arc(footX - 2, crownY - 29 * grow, 11 * grow, 0, Math.PI * 2);
+    ctx.arc(footX - 2 * CROWN, crown(29 * grow), 11 * grow * CROWN, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = look.light;
     ctx.beginPath();
-    ctx.arc(footX - 5, crownY - 32 * grow, 6.5 * grow, 0, Math.PI * 2);
+    ctx.arc(footX - 5 * CROWN, crown(32 * grow), 6.5 * grow * CROWN, 0, Math.PI * 2);
     ctx.fill();
   }
 
   return { canvas, anchorX: footX / width, anchorY: footY / height };
 }
+
+/**
+ * Cuanto mas grande es la copa de un arbol adulto que en el arte original.
+ *
+ * Al alargar el tronco a 2-5 bloques la copa se quedo en unos 2,4 de ancho y de
+ * alto, mas pequena que el propio tronco: el arbol se leia como una piruleta, y
+ * el autor pidio agrandarla. Con 1,5 la copa del frondoso mide unos 3,7 y queda
+ * del orden del tronco medio (3,5), como un roble de Minecraft. **El numero es
+ * deduccion mia**, a juzgar a ojo; esta en `docs/pendiente.md`.
+ */
+export const CROWN = 1.5;
 
 /**
  * A cuantos pixeles del pie queda hoy el borde bajo de la copa: el tronco que
