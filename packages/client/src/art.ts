@@ -219,8 +219,13 @@ function makeTreeArt(
  * Con `n` pisos de alto `tierH` separados `step`, la copa mide
  * `tierH + (n-1)·step`; el alto de piso sale de lo abierta que sea la especie
  * (densa: cada piso tapa la mitad del siguiente; el alerce deja hueco).
- * El cono estrecha hasta la punta; la aguja de la picea negra solo a la mitad, y
- * remata con su penacho.
+ * Los pisos van de base plana y no caida: con las puntas por debajo, la copa
+ * bajaria de su borde bajo y ni el tronco desnudo ni el ancho medirian lo que
+ * dice la especie.
+ *
+ * La aguja de la picea negra estrecha mas despacio y remata con su **punta
+ * engrosada**: tres pisos cortos y apretados que acaban en punta. Fue una elipse
+ * lisa un dia, y en el movil del autor se leia como una bola clavada en un palo.
  */
 function drawTiers(
   ctx: CanvasRenderingContext2D,
@@ -231,50 +236,42 @@ function drawTiers(
   w: number,
   h: number,
 ): void {
-  const n = shape.tiers;
-  const step = h / (n + 1 - 2 * shape.open);
-  const tierH = step * (2 - 2 * shape.open);
-  const spire = shape.silhouette === 'spire';
-  // Base plana y no caida: con las puntas por debajo, la copa bajaria de su
-  // borde bajo y ni el tronco desnudo ni el ancho medirian lo que dice la especie.
-  const droop = 0;
-  for (let i = 0; i < n; i++) {
-    const rise = i * step;
-    const taper = spire ? 1 - 0.5 * (rise / h) : 1 - rise / h;
-    const hw = (w / 2) * taper;
-    const base = yB - rise;
-    const apex = base - tierH;
-    // Todo el piso en sombra y la cara del noroeste iluminada, mas cuanto mas
-    // arriba: los pisos altos reciben mas cielo.
+  /** Un piso: todo en sombra y la cara del noroeste iluminada. */
+  const tier = (base: number, tall: number, hw: number, lit: string): void => {
     ctx.fillStyle = look.dark;
     ctx.beginPath();
-    ctx.moveTo(footX, apex);
-    ctx.lineTo(footX + hw, base + droop);
-    ctx.lineTo(footX, base);
-    ctx.lineTo(footX - hw, base + droop);
+    ctx.moveTo(footX, base - tall);
+    ctx.lineTo(footX + hw, base);
+    ctx.lineTo(footX - hw, base);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = i >= (n * 2) / 3 ? look.light : look.mid;
+    ctx.fillStyle = lit;
     ctx.beginPath();
-    ctx.moveTo(footX, apex);
-    ctx.lineTo(footX - hw, base + droop);
+    ctx.moveTo(footX, base - tall);
+    ctx.lineTo(footX - hw, base);
     ctx.lineTo(footX - hw * 0.15, base);
     ctx.closePath();
     ctx.fill();
+  };
+
+  const spire = shape.silhouette === 'spire';
+  // La aguja deja arriba sitio para la punta engrosada, que la solapa.
+  const bodyH = spire ? h * 0.72 : h;
+  const n = shape.tiers;
+  const step = bodyH / (n + 1 - 2 * shape.open);
+  const tierH = step * (2 - 2 * shape.open);
+  for (let i = 0; i < n; i++) {
+    const rise = i * step;
+    const taper = spire ? 1 - 0.6 * (rise / bodyH) : 1 - rise / bodyH;
+    // Los pisos altos reciben mas cielo.
+    tier(yB - rise, tierH, (w / 2) * taper, i >= (n * 2) / 3 ? look.light : look.mid);
   }
   if (spire) {
-    // El penacho de la picea negra: un racimo denso en la punta.
-    const rx = w * 0.42;
-    const ry = step * 1.1;
-    const cy = yB - h + ry;
-    ctx.fillStyle = look.dark;
-    ctx.beginPath();
-    ctx.ellipse(footX, cy, rx, ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.light;
-    ctx.beginPath();
-    ctx.ellipse(footX - rx * 0.3, cy - ry * 0.25, rx * 0.5, ry * 0.5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // Del 62 % de la copa a la punta, tres pisos que estrechan hasta cerrar.
+    const clubStep = (h * 0.38) / 4;
+    for (let k = 0; k < 3; k++) {
+      tier(yB - h * 0.62 - k * clubStep, clubStep * 2, w * [0.26, 0.21, 0.14][k], look.light);
+    }
   }
 }
 

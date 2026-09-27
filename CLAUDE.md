@@ -565,7 +565,7 @@ bloques de alto**; el alto exacto y el numero de pisos son deduccion mia.
 | Bosque raro | Alerce en otono | 4,5 × 2 | cono de 4 pisos, con huecos |
 | Pradera | Roble aislado | 3,5 × 4,4 | cupula lobulada |
 | Pradera raro | Cerezo japones | 3 × 4,5 | sombrilla |
-| Tundra | Picea negra | 5 × 1,25 | aguja con penacho |
+| Tundra | Picea negra | 5 × 1,25 | aguja con la punta engrosada, apuntada |
 | Tundra raro | Picea azul | 4,5 × 2 | cono denso de 6 pisos |
 
 Sustituyo a un `CROWN = 1.5` comun que duro un dia. La copa se dibuja **desde
@@ -581,6 +581,11 @@ sigue a cada especie** (`widthOf`): ancha bajo el roble, estrecha bajo la picea.
 tinta por encima del tronco desnudo) y el humo afirma su ancho:alto a un 15 % del
 de la especie. Muerde: dibujando los frondosos tan anchos como altos, caen roble
 y cerezo.
+
+**Una medida de proporcion no ve la silueta.** La picea negra pasaba la suya
+con una elipse lisa por penacho, y en el movil del autor se leia como una bola
+clavada en un palo. Ahora la punta engrosada son tres pisos cortos que cierran
+en punta; eso solo lo dice una captura.
 
 La medida del tronco busca el tronco **unas filas por encima del pie**: el
 lienzo redondea su alto al alza, el ancla es una fraccion del alto logico, y la

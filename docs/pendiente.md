@@ -54,6 +54,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Coniferas, frondosos y los **raros** sacan el tronco de la misma normal | Arboles altos | un `if` |
 | El **alto de copa** de cada especie (5; 4,5; 3,5; 3; 5; 4,5) y el numero de pisos de las coniferas | Arboles con forma de su especie | numeros en `tree-shapes.ts` |
 | Los pisos de las coniferas con **base plana**, sin puntas caidas | Arboles con forma de su especie | una linea |
+| La punta engrosada de la picea negra: **tres pisos cortos que cierran en punta** desde el 62 % de la copa | Arboles con forma de su especie | numeros en `art.ts` |
 | Los arboles raros **pierden su +15 %**: ahora son especie propia | Arboles con forma de su especie | un numero |
 | Desde arriba, un bosque denso con copas grandes **tapa mas al jugador** | Arboles altos | es el cabo de la camara que ya estaba pendiente |
 
@@ -265,6 +266,12 @@ tundra raro = picea azul; y **solo la forma**, con la copa en 3-5 bloques de
 alto. Medido del dibujo, cada ancho:alto cae en el de su especie (0,40; 0,44;
 1,26; 1,49; 0,25; 0,44). La tabla, en `CLAUDE.md` (Proporciones) y en
 `tree-shapes.ts`. Lo que decidi yo esta arriba, en «Esperando tu juicio».
+
+Despues viste en el movil una conifera con **un circulo de hojas en la punta**:
+era la picea negra, con su penacho dibujado como una elipse lisa. La especie
+real si tiene la punta tupida, pero la elipse se leia como una piruleta. Ahora
+son tres pisos cortos y apretados que acaban en punta, y la aguja estrecha
+hasta arriba; el ancho:alto medido sigue en 0,25.
 
 Nota: la picea comun sale **igual de ancha que antes y mas alta**: tu viste la
 copa estrecha, pero una picea de verdad es estrecha. Los que se ensanchan son
