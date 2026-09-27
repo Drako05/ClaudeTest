@@ -49,7 +49,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Con raton el catalejo vuelve **0,8 s** despues del ultimo giro de rueda (no hay «soltar») | `CLAUDE.md`, las tres vistas | un numero |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
 | Tronco = el tramo **desnudo** hasta la copa, y la copa **conserva su tamano** | Arboles altos | redibujar el arte |
-| La normal del tronco: media **3,5**, desviacion **0,75**, **truncada** en 2-5 (no recortada) | Arboles altos | numeros en `trunk.ts` |
+| El tronco desnudo **por especie** (μ ± σ): picea comun 2,5 ± 0,35, alerce 4 ± 0,5, roble 2,4 ± 0,3, cerezo 2,2 ± 0,2, picea negra 2,1 ± 0,1, picea azul 2,2 ± 0,2; **truncada** en `[max(2, μ−2σ), μ+2σ]` | Troncos por especie | numeros en `tree-shapes.ts` |
+| Grosor del tronco por especie (0,45; 0,40; **0,75**; 0,50; **0,22**; 0,40) y que crezca con `√(desnudo/μ)` | Troncos por especie | numeros en `tree-shapes.ts` |
+| **Casi todas las copas quedan justo sobre la cabeza** (el minimo es 2 y el jugador mide 1,93); solo el alerce las deja altas | Troncos por especie | las medias de la tabla |
 | El tronco va en escalones de **un cuarto de bloque** (13 alturas) | Arboles altos | un numero |
 | Coniferas, frondosos y los **raros** sacan el tronco de la misma normal | Arboles altos | un `if` |
 | El **alto de copa** de cada especie (5; 4,5; 3,5; 3; 5; 4,5) y el numero de pisos de las coniferas | Arboles con forma de su especie | numeros en `tree-shapes.ts` |
@@ -256,6 +258,25 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Troncos por especie — HECHO (2026-09-27)
+
+Pediste tres cosas: que no asomara el canto de arriba del tronco, que el tronco
+desnudo fuera de cada especie (2-5 bloques de palo bajo la picea negra se veian
+raros) y que el grosor tambien. La unica regla comun que dejaste: **nunca menos
+de 2 bloques**.
+
+- **El canto asomaba** porque el tronco de las coniferas era un rectangulo que
+  subia al 85 % de la copa, donde el cono ya es mas estrecho que el. Ahora
+  estrecha del pie a la copa y acaba en punta dentro de ella. Se mide: pixeles
+  de tronco con aire encima por dentro de la copa, cero en las seis especies
+  (con el rectangulo de antes, 2 en tres coniferas; el humo cae).
+- **Tronco y grosor por especie**, del porte real de cada una: la tabla, en
+  «Esperando tu juicio» y en `CLAUDE.md`. Medido del dibujo, cada especie cae en
+  su rango y el roble es el mas grueso y la picea negra la mas fina.
+- Lo que cambia al jugar: **casi todas las copas quedan justo sobre la cabeza**,
+  porque casi todas las especies rozan el minimo de 2; solo el alerce las lleva
+  altas. El tronco medio de los arboles colocados paso de 3,5 a 2,6.
 
 ## Arboles con forma de su especie, y sombras al suelo — HECHO (2026-09-27)
 

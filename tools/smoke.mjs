@@ -228,17 +228,17 @@ async function desktopPass(browser, baseUrl) {
   check(around.relief.levels > 1, `el terreno sale a una sola altura: ${around.relief.levels}`);
 
   // Los controles de PC: el racimo del pulgar oculto, el ojo y la ayuda a la vista.
-  // El tronco desnudo de los arboles, MEDIDO del dibujo: de 2 a 5 bloques segun
-  // una normal (encargo del autor), para que el jugador vea por debajo de la
-  // copa. Con el arte de antes, el tronco que asomaba medio 0,8.
+  // El tronco desnudo de los arboles, MEDIDO del dibujo. Cada especie tiene el
+  // suyo, y la unica regla comun es del autor: nunca menos de 2 bloques, para
+  // que el jugador pase por debajo de la copa. Con el arte de antes de alargarlo,
+  // el tronco que asomaba medio 0,8.
   const tr = spawn.trunks;
   check(tr.n > 50, `apenas se colocaron arboles (${tr.n})`);
-  check(tr.min >= 1.9 && tr.max <= 5.1, `tronco fuera de 2-5 bloques: ${tr.min.toFixed(2)}-${tr.max.toFixed(2)}`);
-  check(tr.mean > spawn.sizes.jugador + 0.5, `el tronco medio (${tr.mean.toFixed(2)}) no deja pasar por debajo al jugador`);
-  check(tr.max - tr.min > 2, `los troncos no varian: ${tr.min.toFixed(2)}-${tr.max.toFixed(2)}`);
-  // Y la copa de cada arbol, con la forma de su especie real (`tree-shapes.ts`):
-  // su ancho:alto MEDIDO del dibujo, a un 15 % del de la especie, y de 3 a 5
-  // bloques de alto como pidio el autor.
+  check(tr.min >= 1.9, `hay troncos de menos de 2 bloques: ${tr.min.toFixed(2)}`);
+  // Y cada arbol con la forma de su especie real (`tree-shapes.ts`): ancho:alto
+  // de la copa a un 15 % del de la especie y de 3 a 5 bloques de alto como pidio
+  // el autor; tronco desnudo dentro del rango de su especie; y el canto de
+  // arriba del tronco sin asomar por la copa.
   check(spawn.crowns.length === 6, `faltan especies de arbol: ${spawn.crowns.length}`);
   for (const c of spawn.crowns) {
     check(
@@ -246,7 +246,20 @@ async function desktopPass(browser, baseUrl) {
       `${c.especie}: ancho:alto ${c.ratio.toFixed(2)}, su especie pide ${c.esperado.toFixed(2)}`,
     );
     check(c.alto >= 2.8 && c.alto <= 5.2, `${c.especie}: copa de ${c.alto.toFixed(2)} bloques de alto`);
+    check(
+      c.troncoMin >= c.rango[0] - 0.15 && c.troncoMax <= c.rango[1] + 0.15,
+      `${c.especie}: tronco ${c.troncoMin.toFixed(2)}-${c.troncoMax.toFixed(2)}, ` +
+        `su especie pide ${c.rango[0].toFixed(2)}-${c.rango[1].toFixed(2)}`,
+    );
+    check(c.asoma === 0, `${c.especie}: el tronco asoma por la copa (${c.asoma} pixeles)`);
   }
+  // El grosor, coherente con las especies: el roble el mas grueso, la picea negra
+  // la mas fina.
+  const thick = [...spawn.crowns].sort((a, b) => a.grosor - b.grosor);
+  check(
+    thick[0].especie.startsWith('Picea negra') && thick[5].especie.startsWith('Roble'),
+    `grosores fuera de orden: ${thick.map((c) => `${c.especie.split(' (')[0]} ${c.grosor.toFixed(2)}`).join(', ')}`,
+  );
   check(!(await page.isVisible('#thumbPad')), 'los botones del pulgar se ven en PC');
   check(await page.isVisible('#proj'), 'el ojo de la proyeccion no se ve');
   check(await page.isVisible('#help'), 'la ayuda de teclado no se ve en PC');

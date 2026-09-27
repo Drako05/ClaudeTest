@@ -37,11 +37,22 @@ import { Feature } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
 import { LOOKS } from './palette.js';
 import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
-import { TRUNK_BUCKETS, TRUNK_MEAN, bucketBlocks, trunkBlocks, trunkBucket } from './trunk.js';
+import { bucketBlocks, trunkBlocks, trunkBucket, trunkRange, TRUNK_BUCKETS } from './trunk.js';
 import { TREE_SHAPES, treeShapeOf } from './tree-shapes.js';
 
 /** Las especies de arbol adulto, las que tienen forma propia. */
 const TREES = Object.keys(TREE_SHAPES).map(Number) as Feature[];
+
+/** El escalon de arte del tronco medio de esa especie. */
+function meanBucket(feature: Feature): number {
+  return trunkBucket(treeShapeOf(feature)?.bareMean ?? 2);
+}
+
+/** Los escalones de los dos extremos del tronco de esa especie. */
+function rangeBuckets(feature: Feature): number[] {
+  const shape = treeShapeOf(feature);
+  return shape ? trunkRange(shape).map(trunkBucket) : [];
+}
 
 /**
  * Dos quads cruzados a 90 grados, con el PIE EN `y = 0`.
@@ -152,6 +163,10 @@ interface Billboard {
   readonly bare: number;
   /** Ancho de la copa que deja ver el dibujo, en bloques. 0 si no es arbol. */
   readonly crownW: number;
+  /** Grosor del tronco a media altura del tramo desnudo, en bloques. */
+  readonly trunkW: number;
+  /** Pixeles de tronco por dentro de la copa con aire justo encima. Ver `trunkPeek`. */
+  readonly peek: number;
   /**
    * Geometria y material del aspa, UNO por especie y compartidos por todas sus
    * instancias. Antes cada sprite se creaba su propio material.
@@ -254,6 +269,65 @@ function crownWidth(art: FeatureArt, bareRows: number, unitsPerPixel: number): n
   return right < left ? 0 : (right - left + 1) * unitsPerPixel;
 }
 
+/** Pixeles del lienzo y un comprobador de «es color de tronco», o null. */
+function trunkPixels(
+  art: FeatureArt,
+  trunk: string,
+): { data: Uint8ClampedArray; width: number; height: number; isTrunk: (x: number, y: number) => boolean } | null {
+  const ctx = art.canvas.getContext('2d');
+  if (!ctx) return null;
+  const { width, height } = art.canvas;
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, width, height).data;
+  } catch {
+    return null;
+  }
+  const want = [1, 3, 5].map((i) => parseInt(trunk.slice(i, i + 2), 16));
+  const isTrunk = (x: number, y: number): boolean => {
+    const i = (y * width + x) * 4;
+    return data[i + 3] > 200 && want.every((c, k) => Math.abs(data[i + k] - c) <= 3);
+  };
+  return { data, width, height, isTrunk };
+}
+
+/**
+ * Grosor del tronco a `rowsUp` filas sobre el pie: la tirada de color de tronco
+ * que cruza la columna del centro, en unidades de mundo.
+ */
+function trunkWidth(art: FeatureArt, trunk: string, rowsUp: number, unitsPerPixel: number): number {
+  const px = trunkPixels(art, trunk);
+  if (!px) return 0;
+  const y = Math.round(art.anchorY * px.height - rowsUp);
+  const cx = Math.floor(art.anchorX * px.width);
+  if (!px.isTrunk(cx, y)) return 0;
+  let left = cx;
+  let right = cx;
+  while (left > 0 && px.isTrunk(left - 1, y)) left--;
+  while (right < px.width - 1 && px.isTrunk(right + 1, y)) right++;
+  return (right - left + 1) * unitsPerPixel;
+}
+
+/**
+ * Cuanto asoma el canto del tronco: pixeles de tronco POR DENTRO de la copa (por
+ * encima de su borde bajo) con aire justo encima. Un tronco que acaba en punta
+ * tapada da cero; el rectangulo de antes, cuyo canto de arriba salia por los
+ * lados del cono, no. Los huecos del alerce no cuentan: por ellos se ve el
+ * tronco de lado, pero encima de cada pixel sigue habiendo tronco o follaje.
+ */
+function trunkPeek(art: FeatureArt, trunk: string, bareRows: number): number {
+  const px = trunkPixels(art, trunk);
+  if (!px) return 0;
+  const bottom = Math.floor(art.anchorY * px.height - bareRows);
+  let count = 0;
+  for (let y = 1; y < bottom; y++) {
+    for (let x = 0; x < px.width; x++) {
+      if (px.isTrunk(x, y) && px.data[((y - 1) * px.width + x) * 4 + 3] <= 8) count++;
+    }
+  }
+  return count;
+}
+
 function fromArt(
   art: FeatureArt | null,
   scale: number,
@@ -288,6 +362,8 @@ function fromArt(
     visible: inkHeight(art, scale / (PX_PER_TILE * DETAIL)),
     bare,
     crownW: trunk ? crownWidth(art, bare / units, units) : 0,
+    trunkW: trunk ? trunkWidth(art, trunk, bare / units / 2, units) : 0,
+    peek: trunk ? trunkPeek(art, trunk, bare / units) : 0,
     geometry: cross ? crossGeometry(w, above, below) : null,
     // Basic y no Lambert: el arte ya lleva su luz horneada desde el noroeste y
     // el sprite tampoco se iluminaba, asi que asi el ASPECTO no cambia y solo
@@ -331,7 +407,7 @@ export class BillboardSet {
       // centro de la normal. Su ancho es el de todas sus alturas: el lienzo lo
       // decide la copa.
       const art = isTree(feature)
-        ? this.tree(feature, trunkBucket(TRUNK_MEAN))
+        ? this.tree(feature, meanBucket(feature))
         : fromArt(makeFeatureArt(feature, DETAIL), scaleOf(feature), true);
       if (art) this.byFeature.set(feature, art);
     }
@@ -384,13 +460,13 @@ export class BillboardSet {
       const art = this.byFeature.get(feature);
       if (art) out[name] = art.visible;
     }
-    // El arbol, con el tronco del centro de la normal; y los dos extremos del
-    // tronco desnudo, medidos en coniferas y frondosos.
-    const middle = this.tree(Feature.ForestTree, trunkBucket(TRUNK_MEAN));
+    // El arbol, con el tronco del centro de su normal; y los extremos del tronco
+    // desnudo de todas las especies, medidos.
+    const middle = this.tree(Feature.ForestTree, meanBucket(Feature.ForestTree));
     if (middle) out.arbol = middle.visible;
     const bares: number[] = [];
     for (const feature of TREES) {
-      for (const bucket of [0, TRUNK_BUCKETS - 1]) {
+      for (const bucket of rangeBuckets(feature)) {
         const art = this.tree(feature, bucket);
         if (art) bares.push(art.bare);
       }
@@ -406,12 +482,27 @@ export class BillboardSet {
    * La copa de cada especie de arbol, MEDIDA del dibujo, junto a la que pide su
    * especie real (`tree-shapes.ts`): alto, ancho y la relacion ancho:alto.
    */
-  get crowns(): Array<{ especie: string; alto: number; ancho: number; ratio: number; esperado: number }> {
+  get crowns(): Array<{
+    especie: string;
+    alto: number;
+    ancho: number;
+    ratio: number;
+    esperado: number;
+    /** Tronco desnudo medido en los dos extremos de su normal, y los de la tabla. */
+    troncoMin: number;
+    troncoMax: number;
+    rango: [number, number];
+    /** Grosor del tronco medido a media altura del tramo desnudo. */
+    grosor: number;
+    /** Pixeles de tronco con aire encima por dentro de la copa: su canto asomando. */
+    asoma: number;
+  }> {
     const out = [];
     for (const feature of TREES) {
       const shape = treeShapeOf(feature);
-      const art = this.tree(feature, trunkBucket(TRUNK_MEAN));
+      const art = this.tree(feature, meanBucket(feature));
       if (!shape || !art) continue;
+      const ends = rangeBuckets(feature).map((b) => this.tree(feature, b));
       const alto = art.visible - art.bare;
       out.push({
         especie: shape.species,
@@ -419,6 +510,11 @@ export class BillboardSet {
         ancho: art.crownW,
         ratio: alto > 0 ? art.crownW / alto : 0,
         esperado: shape.crownW / shape.crownH,
+        troncoMin: ends[0]?.bare ?? 0,
+        troncoMax: ends[1]?.bare ?? 0,
+        rango: trunkRange(shape),
+        grosor: art.trunkW,
+        asoma: Math.max(art.peek, ...ends.map((e) => e?.peek ?? 0)),
       });
     }
     return out;
@@ -438,8 +534,9 @@ export class BillboardSet {
     const ty = Math.floor(wy);
     // Los arboles, ademas, llevan su propia altura de tronco, que tambien es de
     // la casilla por la misma razon que el giro.
-    const art = isTree(feature)
-      ? this.tree(feature, trunkBucket(trunkBlocks(seed, tx, ty)))
+    const shape = treeShapeOf(feature);
+    const art = shape
+      ? this.tree(feature, trunkBucket(trunkBlocks(seed, tx, ty, shape)))
       : this.byFeature.get(feature);
     if (!art || !art.geometry || !art.material) return null;
     if (art.bare > 0) {

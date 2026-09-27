@@ -39,6 +39,14 @@ describe('formas de arbol por especie', () => {
     for (const f of [Feature.MeadowTree, Feature.MeadowTreeRare]) expect(ratio(f)).toBeGreaterThan(1);
   });
 
+  it('troncos coherentes: ninguna media baja de 2, el roble el mas grueso y la picea negra la mas fina', () => {
+    const all = Object.keys(TREE_SHAPES).map(Number) as Feature[];
+    for (const f of all) expect(treeShapeOf(f)!.bareMean).toBeGreaterThanOrEqual(2);
+    const byWidth = [...all].sort((a, b) => treeShapeOf(a)!.trunkW - treeShapeOf(b)!.trunkW);
+    expect(byWidth[0]).toBe(Feature.TundraTree);
+    expect(byWidth[byWidth.length - 1]).toBe(Feature.MeadowTree);
+  });
+
   it('la picea negra es la mas estrecha y el cerezo el mas ancho', () => {
     const all = Object.keys(TREE_SHAPES).map(Number) as Feature[];
     const sorted = [...all].sort((a, b) => ratio(a) - ratio(b));

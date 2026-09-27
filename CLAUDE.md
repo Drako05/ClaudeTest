@@ -526,24 +526,28 @@ terreno. Medido del dibujo:
 | | Antes | Ahora |
 |---|---|---|
 | Jugador | 0,78 | **1,93** |
-| Arbol | 1,22 | 3,17, y con tronco alto y copa de su especie **~5-10** |
-| Tronco desnudo del arbol | 0,3-0,4 | 0,78-1,13, y ahora **2-5** segun una normal |
+| Arbol | 1,22 | 3,17, y con tronco y copa de su especie **~5-9,5** |
+| Tronco desnudo del arbol | 0,3-0,4 | 0,78-1,13, y ahora **el de su especie, nunca menos de 2** |
 | Copa | ~0,9 | la de su especie real: ver la tabla de abajo |
 | Arbusto | 0,47 | 1,17 |
 | Brote | 0,29 | 0,88 |
 | Roca y minerales | 0,47 | 1,09 |
 
-**El tronco de cada arbol adulto mide de 2 a 5 bloques**, encargo del autor
-para que el jugador vea por debajo del follaje (antes asomaban 0,78-1,13 y la
-copa le tapaba la cabeza). Se lee como el tramo **desnudo** hasta la copa, que
-conserva su tamano y sube encima; sale de una **normal truncada** de media 3,5 y
-desviacion 0,75 (`trunk.ts`) —los numeros y el truncado son deduccion mia—. Dos
-cosas que no son de gusto:
+**El tronco desnudo de cada arbol adulto sale de la normal de su especie**, y la
+unica regla comun es del autor: **nunca menos de 2 bloques**, para que el
+jugador vea por debajo del follaje (antes asomaban 0,78-1,13 y la copa le tapaba
+la cabeza). Empezo siendo 2-5 comun a todos, y el autor lo quiso por especie al
+ver 2-5 bloques de palo bajo la picea negra, tan estrecha. Se lee como el tramo
+**desnudo** hasta la copa; sale de una **normal truncada** en
+`[max(2, μ−2σ), μ+2σ]` (`trunk.ts`) con la media y la desviacion de la tabla de
+especies de abajo —numeros y truncado son deduccion mia—. Dos cosas que no son
+de gusto:
 
 - **Es de la casilla**, de `hash2DFloat` como el giro del aspa: con azar vivo un
   arbol cambiaria de altura cada vez que su chunk se regenera (regla 3).
-- **Truncada, no recortada**: recortar a [2, 5] clavaria un 2,3 % de los arboles
-  exactamente en cada tope. `tests/trunk.test.ts` lo afirma y muerde.
+- **Truncada, no recortada**: recortar clavaria un 2,3 % de los arboles (mas, en
+  las especies que rozan el minimo) exactamente en cada tope.
+  `tests/trunk.test.ts` lo afirma y muerde.
 
 El arte se redibuja por **(especie, cuarto de bloque)**, cada combinacion una
 vez y solo cuando aparece (`BillboardSet.tree`): sigue siendo un Mesh por arbol
@@ -559,14 +563,23 @@ iterar proporciones a ojo. El reparto y el alcance son del autor: se toma **solo
 la forma** —relacion ancho:alto de la copa y silueta— con la copa en **3-5
 bloques de alto**; el alto exacto y el numero de pisos son deduccion mia.
 
-| Arbol | Especie | Copa alto × ancho | Silueta |
-|---|---|---|---|
-| Bosque | Picea comun | 5 × 2 | cono de 5 pisos |
-| Bosque raro | Alerce en otono | 4,5 × 2 | cono de 4 pisos, con huecos |
-| Pradera | Roble aislado | 3,5 × 4,4 | cupula lobulada |
-| Pradera raro | Cerezo japones | 3 × 4,5 | sombrilla |
-| Tundra | Picea negra | 5 × 1,25 | aguja con la punta engrosada, apuntada |
-| Tundra raro | Picea azul | 4,5 × 2 | cono denso de 6 pisos |
+| Arbol | Especie | Copa alto × ancho | Silueta | Tronco desnudo μ ± σ | Grosor |
+|---|---|---|---|---|---|
+| Bosque | Picea comun | 5 × 2 | cono de 5 pisos | 2,5 ± 0,35 | 0,45 |
+| Bosque raro | Alerce en otono | 4,5 × 2 | cono de 4 pisos, con huecos | 4 ± 0,5 | 0,40 |
+| Pradera | Roble aislado | 3,5 × 4,4 | cupula lobulada | 2,4 ± 0,3 | 0,75 |
+| Pradera raro | Cerezo japones | 3 × 4,5 | sombrilla | 2,2 ± 0,2 | 0,50 |
+| Tundra | Picea negra | 5 × 1,25 | aguja con la punta engrosada, apuntada | 2,1 ± 0,1 | 0,22 |
+| Tundra raro | Picea azul | 4,5 × 2 | cono denso de 6 pisos | 2,2 ± 0,2 | 0,40 |
+
+El grosor es el del pie para el tronco medio; uno mas alto de su especie sale mas
+grueso (`√(desnudo/μ)`). Y el tronco **estrecha y acaba en punta dentro de la
+copa**: fue un rectangulo que subia al 85 % de las coniferas, y ahi el cono ya
+es mas estrecho que el, asi que el autor vio asomar su canto por los lados. En
+las coniferas la punta cae a media altura de un piso, para quedar tapada
+tambien en el alerce, que entre piso y piso deja hueco. `BillboardSet.crowns`
+cuenta los pixeles de tronco con aire encima por dentro de la copa (`asoma`) y
+el humo exige cero; con el rectangulo de antes, caen tres coniferas.
 
 Sustituyo a un `CROWN = 1.5` comun que duro un dia. La copa se dibuja **desde
 su borde bajo, que es exactamente el tronco desnudo**: por eso las coniferas

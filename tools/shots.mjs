@@ -38,7 +38,10 @@ console.log(
 for (const c of await page.evaluate(() => window.__verdant.crowns)) {
   console.log(
     `COPA ${c.especie}: ${c.alto.toFixed(2)} alto × ${c.ancho.toFixed(2)} ancho · ` +
-      `ancho:alto ${c.ratio.toFixed(2)} (especie ${c.esperado.toFixed(2)})`,
+      `ancho:alto ${c.ratio.toFixed(2)} (especie ${c.esperado.toFixed(2)}) · ` +
+      `tronco ${c.troncoMin.toFixed(2)}-${c.troncoMax.toFixed(2)} ` +
+      `(especie ${c.rango[0].toFixed(2)}-${c.rango[1].toFixed(2)}) · ` +
+      `grosor ${c.grosor.toFixed(2)} · asoma ${c.asoma}`,
   );
 }
 

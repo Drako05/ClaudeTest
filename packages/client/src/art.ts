@@ -199,18 +199,47 @@ function makeTreeArt(
 
   drawShadow(ctx, footX, footY, 1);
 
-  if (shape.silhouette === 'cone' || shape.silhouette === 'spire') {
-    // El tronco sube por dentro de la copa: en el alerce asoma entre los pisos.
-    ctx.fillStyle = look.trunk;
-    ctx.fillRect(footX - 2.5, yB - h * 0.85, 5, bare + h * 0.85);
-    drawTiers(ctx, look, shape, footX, yB, w, h);
-  } else {
-    ctx.fillStyle = look.trunk;
-    ctx.fillRect(footX - 3, yB - h * 0.35, 6, bare + h * 0.35);
-    drawClusters(ctx, look, shape.silhouette === 'dome' ? DOME : UMBRELLA, footX, yB, w, h);
+  // El grosor es de la especie, y el arbol mas alto de los suyos es tambien el
+  // mas grueso.
+  const tw = shape.trunkW * Math.sqrt(bare / pxPerBlock / shape.bareMean) * pxPerBlock;
+  const conifer = shape.silhouette === 'cone' || shape.silhouette === 'spire';
+  // Donde acaba el tronco, ya dentro de la copa. En las coniferas, a media
+  // altura DE UN PISO, para que la punta caiga tapada tambien en el alerce, que
+  // entre piso y piso deja hueco; en los frondosos la cupula tapa el centro
+  // entero y basta con un tercio.
+  let tipRise = h * 0.3;
+  if (conifer) {
+    const { step, tierH } = tierLayout(shape, h);
+    tipRise = Math.floor(shape.tiers / 2) * step + tierH * 0.6;
   }
+  // El tronco estrecha del pie a la copa y **acaba en punta** dentro de ella.
+  // Fue un rectangulo hasta que el autor vio asomar su canto de arriba por los
+  // lados del cono, que ahi ya es mas estrecho que el; con punta no hay canto.
+  ctx.fillStyle = look.trunk;
+  ctx.beginPath();
+  ctx.moveTo(footX - tw / 2, footY);
+  ctx.lineTo(footX + tw / 2, footY);
+  ctx.lineTo(footX + tw * 0.35, yB);
+  ctx.lineTo(footX, yB - tipRise);
+  ctx.lineTo(footX - tw * 0.35, yB);
+  ctx.closePath();
+  ctx.fill();
+
+  if (conifer) drawTiers(ctx, look, shape, footX, yB, w, h);
+  else drawClusters(ctx, look, shape.silhouette === 'dome' ? DOME : UMBRELLA, footX, yB, w, h);
 
   return { canvas, anchorX: footX / width, anchorY: footY / height };
+}
+
+/**
+ * Como se reparten los pisos de una conifera: la aguja de la picea negra deja
+ * arriba sitio para su punta engrosada, y lo abierta que sea la especie decide
+ * cuanto se solapan (densa: cada piso tapa la mitad del siguiente).
+ */
+function tierLayout(shape: TreeShape, h: number): { bodyH: number; step: number; tierH: number } {
+  const bodyH = shape.silhouette === 'spire' ? h * 0.72 : h;
+  const step = bodyH / (shape.tiers + 1 - 2 * shape.open);
+  return { bodyH, step, tierH: step * (2 - 2 * shape.open) };
 }
 
 /**
@@ -255,11 +284,8 @@ function drawTiers(
   };
 
   const spire = shape.silhouette === 'spire';
-  // La aguja deja arriba sitio para la punta engrosada, que la solapa.
-  const bodyH = spire ? h * 0.72 : h;
+  const { bodyH, step, tierH } = tierLayout(shape, h);
   const n = shape.tiers;
-  const step = bodyH / (n + 1 - 2 * shape.open);
-  const tierH = step * (2 - 2 * shape.open);
   for (let i = 0; i < n; i++) {
     const rise = i * step;
     const taper = spire ? 1 - 0.6 * (rise / bodyH) : 1 - rise / bodyH;
