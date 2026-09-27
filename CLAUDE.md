@@ -489,10 +489,20 @@ constantemente (regla 3), asi que con azar vivo los arboles girarian solos al
 alejarte y volver. Un cuarto de vuelta basta, porque el aspa se repite cada 90
 grados.
 
-**Las sombras de un chunk van en UN `InstancedMesh`.** Una por elemento
-duplicaria las ~700 draw calls que ya cuesta el mundo; asi cuestan una por chunk
-—medido, 32 de mas en total—. Geometria y material de cada especie tambien se
-comparten entre todas sus instancias; antes cada sprite se creaba su material.
+**Las sombras de un chunk van en UNA malla.** Una por elemento duplicaria las
+~700 draw calls que ya cuesta el mundo; asi cuestan una por chunk —medido, 32 de
+mas en total—. Geometria y material de cada especie tambien se comparten entre
+todas sus instancias; antes cada sprite se creaba su material.
+
+**Y cada sombra cae al suelo de cada casilla que pisa**, no a la altura del pie:
+el autor vio medias sombras flotando sobre el hueco en los arboles al borde de
+un desnivel. `shadow-patches.ts` parte el cuadrado por casillas y apoya cada
+trozo en la superficie de la suya, que es **la misma que dibuja el terreno**
+(`cornerHeight` de `terrain-mesh.ts`, que tampoco registra chunks vecinos). Como
+dentro de una casilla el suelo es lineal, un cuadrilatero por trozo es exacto, y
+una sombra que cabe en su casilla sigue siendo uno solo. Por eso dejo de ser un
+`InstancedMesh`: ya no es la misma geometria repetida. `tests/shadow-patches.test.ts`
+lo afirma, con el cuadrado plano de antes para verlo fallar.
 
 Lo siguiente por aqui, que ya estaba en la lista de la migracion: **agrupar las
 aspas por (chunk, especie) en `InstancedMesh`**, que es lo que bajaria de verdad
@@ -516,9 +526,9 @@ terreno. Medido del dibujo:
 | | Antes | Ahora |
 |---|---|---|
 | Jugador | 0,78 | **1,93** |
-| Arbol | 1,22 | 3,17, y con tronco alto y copa grande **~5,3-8,7** (6,82 el medio) |
+| Arbol | 1,22 | 3,17, y con tronco alto y copa de su especie **~5-10** |
 | Tronco desnudo del arbol | 0,3-0,4 | 0,78-1,13, y ahora **2-5** segun una normal |
-| Copa del frondoso (alto) | ~0,9 | 2,47, y con `CROWN = 1.5` **3,69** |
+| Copa | ~0,9 | la de su especie real: ver la tabla de abajo |
 | Arbusto | 0,47 | 1,17 |
 | Brote | 0,29 | 0,88 |
 | Roca y minerales | 0,47 | 1,09 |
@@ -537,17 +547,40 @@ cosas que no son de gusto:
 
 El arte se redibuja por **(especie, cuarto de bloque)**, cada combinacion una
 vez y solo cuando aparece (`BillboardSet.tree`): sigue siendo un Mesh por arbol
-con geometria y material compartidos. `makeFeatureArt(feature, detail, bare)`
-alarga el tronco y sube la copa sin tocar sus coordenadas. Y el tronco se
+con geometria y material compartidos. `makeFeatureArt(feature, detail, { bare, pxPerBlock })`
+dibuja el tronco y apoya la copa encima. Y el tronco se
 **mide del dibujo**, no de la cuenta: la tirada del color del tronco en la
 columna del pie, que termina donde la copa se pinta encima
-(`window.__verdant.trunks`, que el humo afirma).
+(`window.__verdant.trunks`, que el humo afirma). La copa de cada arbol sale de
+su especie: ver abajo.
 
-**La copa crecio despues, a juego con el tronco**: a peticion del autor, que la
-vio pequena para el arbol nuevo, se multiplica por `CROWN = 1.5` (`art.ts`; el
-numero es deduccion mia). Se escala **desde su borde bajo**, asi que el tronco
-desnudo no se entera y sus comprobaciones siguen valiendo; y como el lienzo se
-ensancha con ella, **la sombra tumbada crece sola** (`widthOf` sale del ancho).
+**Cada arbol tiene la forma de una especie real** (`tree-shapes.ts`), para no
+iterar proporciones a ojo. El reparto y el alcance son del autor: se toma **solo
+la forma** —relacion ancho:alto de la copa y silueta— con la copa en **3-5
+bloques de alto**; el alto exacto y el numero de pisos son deduccion mia.
+
+| Arbol | Especie | Copa alto × ancho | Silueta |
+|---|---|---|---|
+| Bosque | Picea comun | 5 × 2 | cono de 5 pisos |
+| Bosque raro | Alerce en otono | 4,5 × 2 | cono de 4 pisos, con huecos |
+| Pradera | Roble aislado | 3,5 × 4,4 | cupula lobulada |
+| Pradera raro | Cerezo japones | 3 × 4,5 | sombrilla |
+| Tundra | Picea negra | 5 × 1,25 | aguja con penacho |
+| Tundra raro | Picea azul | 4,5 × 2 | cono denso de 6 pisos |
+
+Sustituyo a un `CROWN = 1.5` comun que duro un dia. La copa se dibuja **desde
+su borde bajo, que es exactamente el tronco desnudo**: por eso las coniferas
+tienen los pisos de base plana —con las puntas caidas, la copa bajaba de su
+borde y ni el tronco ni el ancho median lo que pedia la especie— y la sombrilla
+del cerezo apoya su racimo grande en el borde. Las dos cosas las destapo la
+medida, no la vista. Los raros dejaron de llevar su +15 % generico: ahora son
+especie propia. Y como el lienzo es del ancho de la copa, **la sombra tumbada
+sigue a cada especie** (`widthOf`): ancha bajo el roble, estrecha bajo la picea.
+
+`BillboardSet.crowns` mide del dibujo alto y ancho de cada copa (la caja de
+tinta por encima del tronco desnudo) y el humo afirma su ancho:alto a un 15 % del
+de la especie. Muerde: dibujando los frondosos tan anchos como altos, caen roble
+y cerezo.
 
 La medida del tronco busca el tronco **unas filas por encima del pie**: el
 lienzo redondea su alto al alza, el ancla es una fraccion del alto logico, y la

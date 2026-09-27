@@ -33,6 +33,14 @@ console.log(
   `TRONCOS (bloques): ${trunks.n} arboles · min ${trunks.min.toFixed(2)} · ` +
     `media ${trunks.mean.toFixed(2)} · max ${trunks.max.toFixed(2)}`,
 );
+// La copa de cada especie, medida, contra la relacion ancho:alto de su especie
+// real (ver `tree-shapes.ts`).
+for (const c of await page.evaluate(() => window.__verdant.crowns)) {
+  console.log(
+    `COPA ${c.especie}: ${c.alto.toFixed(2)} alto × ${c.ancho.toFixed(2)} ancho · ` +
+      `ancho:alto ${c.ratio.toFixed(2)} (especie ${c.esperado.toFixed(2)})`,
+  );
+}
 
 await page.screenshot({ path: 'screenshots/01-perspectiva.png' });
 

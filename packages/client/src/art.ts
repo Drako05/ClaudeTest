@@ -15,7 +15,8 @@
 
 import { Feature, isSapling, maturesInto, Terrain } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
-import { LOOKS, MINERAL_FACES, ROCK_FACES } from './palette.js';
+import { LOOKS, MINERAL_FACES, ROCK_FACES, type SpeciesLook as Look } from './palette.js';
+import { treeShapeOf, type TreeShape } from './tree-shapes.js';
 
 /** Ancho y alto, en pixeles del arte, del tile para el que se dibujo todo. */
 export const TILE_W = 32;
@@ -105,11 +106,15 @@ function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: 
  * del tile. La luz entra siempre por el noroeste, para que todas las especies se
  * lean como parte del mismo mundo.
  *
- * `bare`, solo para arboles, es cuanto tronco DESNUDO se quiere bajo la copa,
- * en pixeles de arte (ver `trunk.ts`). El lienzo crece hacia arriba y la copa
- * sube hasta ahi. Sin `bare`, el tronco es el de siempre.
+ * Los ARBOLES necesitan `tree`: cuanto tronco desnudo llevan (ver `trunk.ts`),
+ * en pixeles de arte, y cuantos pixeles de arte mide un bloque, porque su copa
+ * viene en bloques de `tree-shapes.ts`. Sin `tree`, un arbol no se dibuja.
  */
-export function makeFeatureArt(feature: Feature, detail = 1, bare?: number): FeatureArt | null {
+export function makeFeatureArt(
+  feature: Feature,
+  detail = 1,
+  tree?: { bare: number; pxPerBlock: number },
+): FeatureArt | null {
   if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES, detail);
   const mineral = MINERAL_FACES[feature];
   if (mineral) return makeRockArt(mineral, detail);
@@ -117,34 +122,24 @@ export function makeFeatureArt(feature: Feature, detail = 1, bare?: number): Fea
 
   const look = LOOKS[feature];
   if (!look) return null;
+  if (look.form !== 'bush') {
+    const shape = treeShapeOf(feature);
+    return shape && tree ? makeTreeArt(look, shape, tree.bare, tree.pxPerBlock, detail) : null;
+  }
 
   const grow = look.rare ? 1.15 : 1;
-  const tree = look.form !== 'bush';
-  // Borde bajo de la copa en el dibujo original, desde el pie.
-  const bottom = look.form === 'bush' ? 0 : canopyBottom(look.form, grow);
-  // Cuanto sube la copa: lo que falta desde su borde bajo de hoy hasta `bare`.
-  const up = bare === undefined || !tree ? 0 : Math.max(0, bare - bottom);
-  // Lo que la copa escalada sobresale por arriba de la de siempre, cuya cima
-  // estaba a 40 px del pie.
-  const taller = tree ? Math.ceil((40 * grow - bottom) * (CROWN - 1)) : 0;
-
-  const width = tree ? Math.ceil(44 * CROWN) : 44;
-  const height = 58 + Math.ceil(up) + taller;
+  const width = 44;
+  const height = 58;
   const made = newCanvas(width, height, detail);
   if (!made) return null;
   const [canvas, ctx] = made;
 
   const footX = width / 2;
   const footY = height - 6;
-  // La copa se escala por `CROWN` DESDE SU BORDE BAJO, que asi no se mueve y el
-  // tronco desnudo sigue midiendo lo que pidio `bare`. `crown(y)` lleva una
-  // altura del dibujo original (pixeles sobre el pie) a su sitio en el lienzo.
-  const base = footY - up - bottom;
-  const crown = (y: number): number => base - (y - bottom) * CROWN;
 
-  drawShadow(ctx, footX, footY, look.form === 'bush' ? 0.8 : 1);
+  drawShadow(ctx, footX, footY, 0.8);
 
-  if (look.form === 'bush') {
+  {
     ctx.fillStyle = look.dark;
     ctx.beginPath();
     ctx.ellipse(footX, footY - 7 * grow, 11 * grow, 9 * grow, 0, 0, Math.PI * 2);
@@ -165,63 +160,168 @@ export function makeFeatureArt(feature: Feature, detail = 1, bare?: number): Fea
         ctx.fill();
       }
     }
-  } else if (look.form === 'conifer') {
-    ctx.fillStyle = look.trunk;
-    ctx.fillRect(footX - 2.5, footY - 14 * grow - up, 5, 14 * grow + up);
-    // Tres pisos que estrechan hacia arriba: silueta alta y puntiaguda.
-    const tiers: Array<[number, number, string]> = [
-      [14 * grow, 13 * grow, look.dark],
-      [21 * grow, 10 * grow, look.mid],
-      [28 * grow, 6.5 * grow, look.light],
-    ];
-    for (const [rise, halfWidth, color] of tiers) {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(footX, crown(rise + 11 * grow));
-      ctx.lineTo(footX + halfWidth * CROWN, crown(rise - 2));
-      ctx.lineTo(footX - halfWidth * CROWN, crown(rise - 2));
-      ctx.closePath();
-      ctx.fill();
-    }
-  } else {
-    ctx.fillStyle = look.trunk;
-    ctx.fillRect(footX - 3, footY - 17 * grow - up, 6, 17 * grow + up);
-    ctx.fillStyle = look.dark;
-    ctx.beginPath();
-    ctx.arc(footX, crown(25 * grow), 15 * grow * CROWN, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.mid;
-    ctx.beginPath();
-    ctx.arc(footX - 2 * CROWN, crown(29 * grow), 11 * grow * CROWN, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = look.light;
-    ctx.beginPath();
-    ctx.arc(footX - 5 * CROWN, crown(32 * grow), 6.5 * grow * CROWN, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   return { canvas, anchorX: footX / width, anchorY: footY / height };
 }
 
 /**
- * Cuanto mas grande es la copa de un arbol adulto que en el arte original.
+ * Un arbol adulto con la forma de su especie (`tree-shapes.ts`) y `bare`
+ * pixeles de tronco desnudo bajo la copa.
  *
- * Al alargar el tronco a 2-5 bloques la copa se quedo en unos 2,4 de ancho y de
- * alto, mas pequena que el propio tronco: el arbol se leia como una piruleta, y
- * el autor pidio agrandarla. Con 1,5 la copa del frondoso mide unos 3,7 y queda
- * del orden del tronco medio (3,5), como un roble de Minecraft. **El numero es
- * deduccion mia**, a juzgar a ojo; esta en `docs/pendiente.md`.
+ * La copa se dibuja **desde su borde bajo, que es exactamente `bare`**: el
+ * tronco que se ve no depende de la forma. Y conserva el estilo de siempre: tres
+ * tonos, con la luz entrando por el noroeste (lo iluminado, arriba a la
+ * izquierda).
  */
-export const CROWN = 1.5;
+function makeTreeArt(
+  look: Look,
+  shape: TreeShape,
+  bare: number,
+  pxPerBlock: number,
+  detail: number,
+): FeatureArt | null {
+  const w = shape.crownW * pxPerBlock;
+  const h = shape.crownH * pxPerBlock;
+  // Ancho minimo: la sombra pintada del pie (se descarta en el 3D, pero es la
+  // silueta de apoyo) y, sobre todo, el ancho del lienzo decide el de la sombra
+  // tumbada (`widthOf`), que no puede quedarse en un hilo bajo la picea negra.
+  const width = Math.ceil(Math.max(w, 26) + 8);
+  const height = Math.ceil(6 + bare + h + 4);
+  const made = newCanvas(width, height, detail);
+  if (!made) return null;
+  const [canvas, ctx] = made;
+
+  const footX = width / 2;
+  const footY = height - 6;
+  /** Borde bajo de la copa. */
+  const yB = footY - bare;
+
+  drawShadow(ctx, footX, footY, 1);
+
+  if (shape.silhouette === 'cone' || shape.silhouette === 'spire') {
+    // El tronco sube por dentro de la copa: en el alerce asoma entre los pisos.
+    ctx.fillStyle = look.trunk;
+    ctx.fillRect(footX - 2.5, yB - h * 0.85, 5, bare + h * 0.85);
+    drawTiers(ctx, look, shape, footX, yB, w, h);
+  } else {
+    ctx.fillStyle = look.trunk;
+    ctx.fillRect(footX - 3, yB - h * 0.35, 6, bare + h * 0.35);
+    drawClusters(ctx, look, shape.silhouette === 'dome' ? DOME : UMBRELLA, footX, yB, w, h);
+  }
+
+  return { canvas, anchorX: footX / width, anchorY: footY / height };
+}
 
 /**
- * A cuantos pixeles del pie queda hoy el borde bajo de la copa: el tronco que
- * se ve desnudo con el dibujo original. En el frondoso es el circulo oscuro
- * (centro a 25, radio 15); en la conifera, la base del primer piso (a 14, que
- * baja 2 de mas).
+ * Pisos triangulares de conifera, de abajo arriba.
+ *
+ * Con `n` pisos de alto `tierH` separados `step`, la copa mide
+ * `tierH + (n-1)·step`; el alto de piso sale de lo abierta que sea la especie
+ * (densa: cada piso tapa la mitad del siguiente; el alerce deja hueco).
+ * El cono estrecha hasta la punta; la aguja de la picea negra solo a la mitad, y
+ * remata con su penacho.
  */
-function canopyBottom(form: 'conifer' | 'broadleaf', grow: number): number {
-  return form === 'conifer' ? 14 * grow - 2 : 10 * grow;
+function drawTiers(
+  ctx: CanvasRenderingContext2D,
+  look: Look,
+  shape: TreeShape,
+  footX: number,
+  yB: number,
+  w: number,
+  h: number,
+): void {
+  const n = shape.tiers;
+  const step = h / (n + 1 - 2 * shape.open);
+  const tierH = step * (2 - 2 * shape.open);
+  const spire = shape.silhouette === 'spire';
+  // Base plana y no caida: con las puntas por debajo, la copa bajaria de su
+  // borde bajo y ni el tronco desnudo ni el ancho medirian lo que dice la especie.
+  const droop = 0;
+  for (let i = 0; i < n; i++) {
+    const rise = i * step;
+    const taper = spire ? 1 - 0.5 * (rise / h) : 1 - rise / h;
+    const hw = (w / 2) * taper;
+    const base = yB - rise;
+    const apex = base - tierH;
+    // Todo el piso en sombra y la cara del noroeste iluminada, mas cuanto mas
+    // arriba: los pisos altos reciben mas cielo.
+    ctx.fillStyle = look.dark;
+    ctx.beginPath();
+    ctx.moveTo(footX, apex);
+    ctx.lineTo(footX + hw, base + droop);
+    ctx.lineTo(footX, base);
+    ctx.lineTo(footX - hw, base + droop);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = i >= (n * 2) / 3 ? look.light : look.mid;
+    ctx.beginPath();
+    ctx.moveTo(footX, apex);
+    ctx.lineTo(footX - hw, base + droop);
+    ctx.lineTo(footX - hw * 0.15, base);
+    ctx.closePath();
+    ctx.fill();
+  }
+  if (spire) {
+    // El penacho de la picea negra: un racimo denso en la punta.
+    const rx = w * 0.42;
+    const ry = step * 1.1;
+    const cy = yB - h + ry;
+    ctx.fillStyle = look.dark;
+    ctx.beginPath();
+    ctx.ellipse(footX, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = look.light;
+    ctx.beginPath();
+    ctx.ellipse(footX - rx * 0.3, cy - ry * 0.25, rx * 0.5, ry * 0.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
+ * Racimos de un frondoso en coordenadas de copa: `u` de -1 a 1 a lo ancho, `v`
+ * de 0 (borde bajo) a 1 (cima); `a` es el semieje en unidades de medio ancho y
+ * `b` en unidades de alto. Ninguno se sale de la caja, asi que la copa mide
+ * exactamente lo que dice su especie.
+ */
+type Cluster = readonly [u: number, v: number, a: number, b: number];
+interface ClusterSet {
+  readonly dark: readonly Cluster[];
+  readonly mid: readonly Cluster[];
+  readonly light: readonly Cluster[];
+}
+
+/** Roble: cupula ancha y lobulada, con la luz en los lobulos de arriba a la izquierda. */
+const DOME: ClusterSet = {
+  dark: [[0, 0.5, 1, 0.5], [-0.5, 0.62, 0.5, 0.36], [0.5, 0.62, 0.5, 0.36], [0, 0.72, 0.6, 0.28]],
+  mid: [[-0.25, 0.62, 0.6, 0.3], [0.3, 0.7, 0.4, 0.22]],
+  light: [[-0.45, 0.75, 0.3, 0.15], [-0.1, 0.85, 0.25, 0.12]],
+};
+
+/** Cerezo: sombrilla aplanada, con el vientre recto y los hombros anchos. */
+const UMBRELLA: ClusterSet = {
+  dark: [[0, 0.42, 1, 0.42], [-0.55, 0.62, 0.45, 0.32], [0.55, 0.62, 0.45, 0.32], [0, 0.7, 0.55, 0.3]],
+  mid: [[-0.3, 0.68, 0.55, 0.25], [0.35, 0.72, 0.4, 0.2]],
+  light: [[-0.5, 0.78, 0.3, 0.14], [-0.05, 0.85, 0.3, 0.12]],
+};
+
+function drawClusters(
+  ctx: CanvasRenderingContext2D,
+  look: Look,
+  set: ClusterSet,
+  footX: number,
+  yB: number,
+  w: number,
+  h: number,
+): void {
+  for (const [color, list] of [[look.dark, set.dark], [look.mid, set.mid], [look.light, set.light]] as const) {
+    ctx.fillStyle = color;
+    for (const [u, v, a, b] of list) {
+      ctx.beginPath();
+      ctx.ellipse(footX + (u * w) / 2, yB - v * h, (a * w) / 2, b * h, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 }
 
 /** Brote recien sembrado: pequeno, sin fruto y sin estorbar el paso. */

@@ -52,7 +52,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La normal del tronco: media **3,5**, desviacion **0,75**, **truncada** en 2-5 (no recortada) | Arboles altos | numeros en `trunk.ts` |
 | El tronco va en escalones de **un cuarto de bloque** (13 alturas) | Arboles altos | un numero |
 | Coniferas, frondosos y los **raros** sacan el tronco de la misma normal | Arboles altos | un `if` |
-| La copa **x1,5** (`CROWN`), fija y no ligada a la altura del tronco | Arboles altos | un numero |
+| El **alto de copa** de cada especie (5; 4,5; 3,5; 3; 5; 4,5) y el numero de pisos de las coniferas | Arboles con forma de su especie | numeros en `tree-shapes.ts` |
+| Los pisos de las coniferas con **base plana**, sin puntas caidas | Arboles con forma de su especie | una linea |
+| Los arboles raros **pierden su +15 %**: ahora son especie propia | Arboles con forma de su especie | un numero |
 | Desde arriba, un bosque denso con copas grandes **tapa mas al jugador** | Arboles altos | es el cabo de la camara que ya estaba pendiente |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
@@ -253,6 +255,25 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Arboles con forma de su especie, y sombras al suelo — HECHO (2026-09-27)
+
+Pediste que cada arbol tomara las proporciones de una especie real, para no
+iterar a ojo. Tu reparto: bosque = picea comun, bosque raro = alerce en otono,
+pradera = roble aislado, pradera raro = cerezo japones, tundra = picea negra,
+tundra raro = picea azul; y **solo la forma**, con la copa en 3-5 bloques de
+alto. Medido del dibujo, cada ancho:alto cae en el de su especie (0,40; 0,44;
+1,26; 1,49; 0,25; 0,44). La tabla, en `CLAUDE.md` (Proporciones) y en
+`tree-shapes.ts`. Lo que decidi yo esta arriba, en «Esperando tu juicio».
+
+Nota: la picea comun sale **igual de ancha que antes y mas alta**: tu viste la
+copa estrecha, pero una picea de verdad es estrecha. Los que se ensanchan son
+el roble y el cerezo.
+
+Y el fallo de las sombras: la sombra era un cuadrado plano a la altura del pie,
+asi que al borde de un desnivel quedaba media en el aire. Ahora se parte por
+casillas y cada trozo cae sobre la superficie de la suya, por abajo que este.
+Sigue costando una draw call por chunk.
 
 ## Arboles altos: el tronco mide de 2 a 5 bloques — HECHO (2026-09-26)
 

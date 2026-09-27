@@ -57,8 +57,11 @@ const SIDES: readonly Side[] = [
  * llamaria a `getChunk` y registraria el chunk vecino, con lo que dibujar
  * alteraria las cuentas de bioma. Es el mismo cuidado que tiene
  * `biome-edges.ts`.
+ *
+ * Tambien la usan las sombras (`shadow-patches.ts`), para caer exactamente
+ * sobre la superficie que se dibuja y no sobre otra cuenta parecida.
  */
-function cornerHeight(
+export function cornerHeight(
   world: World,
   chunk: Chunk,
   wx: number,

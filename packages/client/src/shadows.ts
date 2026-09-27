@@ -11,33 +11,33 @@
  *
  * Sin ella unos arboles de tres bloques parecen pegatinas flotando.
  *
- * **Todas las sombras de un chunk van en UN `InstancedMesh`.** Una malla por
- * elemento duplicaria las cerca de 600 draw calls que ya cuesta el mundo; asi
- * cuestan una por chunk. Comparten textura, geometria y material, que es
- * exactamente para lo que sirve instanciar.
+ * **Todas las sombras de un chunk van en UNA malla.** Una malla por elemento
+ * duplicaria las cerca de 600 draw calls que ya cuesta el mundo; asi cuestan una
+ * por chunk. Fue un `InstancedMesh` de cuadrados planos a la altura del pie
+ * hasta que el autor vio sombras flotando al borde de los desniveles: ahora cada
+ * sombra se parte por casillas y cae al suelo de cada una (`shadow-patches.ts`),
+ * y eso ya no es la misma geometria repetida, asi que se fusiona en una.
  */
 
 import {
+  BufferAttribute,
+  BufferGeometry,
   CanvasTexture,
   DoubleSide,
-  InstancedMesh,
+  Mesh,
   MeshBasicMaterial,
-  Object3D,
-  PlaneGeometry,
   type Texture,
 } from 'three';
+import { addShadowPatches, type PatchBuffers, type Surface } from './shadow-patches.js';
 
 /** Lado del lienzo de la mancha. Pequeno: es un degradado, no un dibujo. */
 const BLOB_PX = 64;
 
 /**
- * Cuanto se levanta del suelo.
- *
- * Lo justo para no pelear en profundidad con el terreno. En una ladera muy
- * inclinada el cuadrado se mete un poco en la cuesta, y se acepta: es una
- * mancha, no una proyeccion de verdad.
+ * Cuanto se levanta del suelo: lo justo para no pelear en profundidad con el
+ * terreno. Como cada trozo sigue a su casilla, tambien sobre un talud.
  */
-const LIFT = 0.03;
+export const LIFT = 0.03;
 
 /** Cuanto mide la mancha respecto al ancho de lo que la proyecta. */
 const SPREAD = 0.62;
@@ -67,29 +67,34 @@ function blobTexture(): Texture | null {
 
 /** Donde y de que tamano va cada sombra de un chunk. */
 export interface ShadowSpot {
+  /** Centro en el plano del mundo: `x` y `z` de three.js. */
   x: number;
-  y: number;
   z: number;
   /** Ancho de lo que la proyecta, en casillas. */
   width: number;
 }
 
 /**
- * Todas las sombras de un chunk en una sola malla instanciada.
+ * Todas las sombras de un chunk en una sola malla, cada una pegada al suelo de
+ * las casillas que pisa (`surface`, la misma que dibuja el terreno).
  *
  * Devuelve `null` si no hay ninguna, para no meter mallas vacias en la escena.
  */
-export function buildShadows(spots: readonly ShadowSpot[]): InstancedMesh | null {
+export function buildShadows(spots: readonly ShadowSpot[], surface: Surface): Mesh | null {
   if (spots.length === 0) return null;
   const texture = blobTexture();
   if (!texture) return null;
 
-  const geometry = new PlaneGeometry(1, 1);
-  // El plano nace de pie: se tumba una vez en la geometria y asi las instancias
-  // no tienen que llevar rotacion ninguna.
-  geometry.rotateX(-Math.PI / 2);
+  const buffers: PatchBuffers = { positions: [], uvs: [], indices: [] };
+  for (const spot of spots) {
+    addShadowPatches(spot.x, spot.z, spot.width * SPREAD, surface, LIFT, buffers);
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(buffers.positions), 3));
+  geometry.setAttribute('uv', new BufferAttribute(new Float32Array(buffers.uvs), 2));
+  geometry.setIndex(buffers.indices);
 
-  const mesh = new InstancedMesh(
+  const mesh = new Mesh(
     geometry,
     new MeshBasicMaterial({
       map: texture,
@@ -99,21 +104,8 @@ export function buildShadows(spots: readonly ShadowSpot[]): InstancedMesh | null
       depthWrite: false,
       side: DoubleSide,
     }),
-    spots.length,
   );
   // Se dibuja antes que los elementos, que van encima.
   mesh.renderOrder = -1;
-
-  const scratch = new Object3D();
-  for (let i = 0; i < spots.length; i++) {
-    const spot = spots[i];
-    const side = spot.width * SPREAD;
-    scratch.position.set(spot.x, spot.y + LIFT, spot.z);
-    scratch.scale.set(side, 1, side);
-    scratch.rotation.set(0, 0, 0);
-    scratch.updateMatrix();
-    mesh.setMatrixAt(i, scratch.matrix);
-  }
-  mesh.instanceMatrix.needsUpdate = true;
   return mesh;
 }

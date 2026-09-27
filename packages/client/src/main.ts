@@ -54,7 +54,7 @@ import { BillboardSet } from './billboards.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
 import { OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
-import { chunkMesh } from './terrain-mesh.js';
+import { chunkMesh, cornerHeight } from './terrain-mesh.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
 import { berrySpot, cliffSpot, mineralSpot, peakSpot, reliefAround } from './probes.js';
@@ -192,7 +192,7 @@ interface ChunkView {
   readonly mesh: Mesh;
   readonly props: import('three').Object3D[];
   /** Todas las sombras del chunk en una malla. Null si no hay ninguna. */
-  readonly shadows: import('three').InstancedMesh | null;
+  readonly shadows: Mesh | null;
   readonly triangles: number;
   revision: number;
 }
@@ -231,13 +231,16 @@ function buildChunk(cx: number, cy: number): ChunkView {
       if (prop) {
         scene.add(prop);
         props.push(prop);
-        spots.push({ x, y: ground, z: y, width: billboards.widthOf(feature) });
+        spots.push({ x, z: y, width: billboards.widthOf(feature) });
       }
     }
   }
   // Todas las sombras del chunk en una malla: una draw call en vez de una por
-  // elemento. Ver `shadows.ts`.
-  const shadows = buildShadows(spots);
+  // elemento. Cada una cae sobre la MISMA superficie que dibuja el terreno,
+  // casilla por casilla, aunque asome a un chunk vecino. Ver `shadows.ts`.
+  const shadows = buildShadows(spots, (tx, ty, fx, fy) =>
+    cornerHeight(state.world, chunk, tx, ty, fx, fy),
+  );
   if (shadows) scene.add(shadows);
   return { mesh, props, shadows, triangles: data.triangles, revision: chunk.revision };
 }
@@ -561,6 +564,8 @@ Object.defineProperty(window, '__verdant', {
       sizes: billboards.sizes,
       /** Tronco desnudo de los arboles colocados, medido del dibujo. */
       trunks: billboards.trunks,
+      /** La copa de cada especie, medida del dibujo, junto a la de su especie real. */
+      crowns: billboards.crowns,
       facing: [e.facingX[id], e.facingY[id]],
       /** Hacia donde mira la camara, que es de donde sale la mirada. */
       aim: [camera.forward().x, camera.forward().y],

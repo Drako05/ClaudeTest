@@ -37,7 +37,11 @@ import { Feature } from '@verdant/shared';
 import { hash2DFloat } from '@verdant/sim';
 import { LOOKS } from './palette.js';
 import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
-import { TRUNK_BUCKETS, bucketBlocks, trunkBlocks, trunkBucket } from './trunk.js';
+import { TRUNK_BUCKETS, TRUNK_MEAN, bucketBlocks, trunkBlocks, trunkBucket } from './trunk.js';
+import { TREE_SHAPES, treeShapeOf } from './tree-shapes.js';
+
+/** Las especies de arbol adulto, las que tienen forma propia. */
+const TREES = Object.keys(TREE_SHAPES).map(Number) as Feature[];
 
 /**
  * Dos quads cruzados a 90 grados, con el PIE EN `y = 0`.
@@ -146,6 +150,8 @@ interface Billboard {
   readonly visible: number;
   /** Tronco DESNUDO que deja ver el dibujo, en bloques. 0 si no es arbol. */
   readonly bare: number;
+  /** Ancho de la copa que deja ver el dibujo, en bloques. 0 si no es arbol. */
+  readonly crownW: number;
   /**
    * Geometria y material del aspa, UNO por especie y compartidos por todas sus
    * instancias. Antes cada sprite se creaba su propio material.
@@ -220,6 +226,34 @@ function bareHeight(art: FeatureArt, trunk: string, unitsPerPixel: number): numb
   return (foot - y) * unitsPerPixel;
 }
 
+/**
+ * Ancho de la copa en unidades de mundo: la caja de tinta de las filas que
+ * quedan por encima del tronco desnudo (`bareRows` filas del lienzo sobre el
+ * pie). Asi el tronco y la sombra pintada del pie no cuentan.
+ */
+function crownWidth(art: FeatureArt, bareRows: number, unitsPerPixel: number): number {
+  const ctx = art.canvas.getContext('2d');
+  if (!ctx) return 0;
+  const { width, height } = art.canvas;
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, width, height).data;
+  } catch {
+    return 0;
+  }
+  const bottom = Math.floor(art.anchorY * height - bareRows);
+  let left = width;
+  let right = -1;
+  for (let y = 0; y < bottom; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] <= 8) continue;
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+    }
+  }
+  return right < left ? 0 : (right - left + 1) * unitsPerPixel;
+}
+
 function fromArt(
   art: FeatureArt | null,
   scale: number,
@@ -244,13 +278,16 @@ function fromArt(
   // en el suelo hay que subir el centro `h / 2 - eso`.
   const above = art.anchorY * h;
   const below = h - above;
+  const units = scale / (PX_PER_TILE * DETAIL);
+  const bare = trunk ? bareHeight(art, trunk, units) : 0;
   return {
     texture,
     w,
     h,
     lift: below,
     visible: inkHeight(art, scale / (PX_PER_TILE * DETAIL)),
-    bare: trunk ? bareHeight(art, trunk, scale / (PX_PER_TILE * DETAIL)) : 0,
+    bare,
+    crownW: trunk ? crownWidth(art, bare / units, units) : 0,
     geometry: cross ? crossGeometry(w, above, below) : null,
     // Basic y no Lambert: el arte ya lleva su luz horneada desde el noroeste y
     // el sprite tampoco se iluminaba, asi que asi el ASPECTO no cambia y solo
@@ -290,7 +327,12 @@ export class BillboardSet {
   constructor() {
     for (const feature of Object.values(Feature)) {
       if (typeof feature !== 'number' || feature === Feature.None) continue;
-      const art = fromArt(makeFeatureArt(feature, DETAIL), scaleOf(feature), true);
+      // Un arbol se dibuja siempre con su tronco; el de referencia, con el del
+      // centro de la normal. Su ancho es el de todas sus alturas: el lienzo lo
+      // decide la copa.
+      const art = isTree(feature)
+        ? this.tree(feature, trunkBucket(TRUNK_MEAN))
+        : fromArt(makeFeatureArt(feature, DETAIL), scaleOf(feature), true);
       if (art) this.byFeature.set(feature, art);
     }
     this.player = fromArt(makePlayerArt(DETAIL), BASE, false);
@@ -302,7 +344,12 @@ export class BillboardSet {
     let art = this.trees.get(key);
     if (art === undefined) {
       const bare = bucketBlocks(bucket) * TREE_PX_PER_BLOCK;
-      art = fromArt(makeFeatureArt(feature, DETAIL, bare), ARBOL, true, LOOKS[feature]?.trunk);
+      art = fromArt(
+        makeFeatureArt(feature, DETAIL, { bare, pxPerBlock: TREE_PX_PER_BLOCK }),
+        ARBOL,
+        true,
+        LOOKS[feature]?.trunk,
+      );
       this.trees.set(key, art);
     }
     return art;
@@ -339,12 +386,10 @@ export class BillboardSet {
     }
     // El arbol, con el tronco del centro de la normal; y los dos extremos del
     // tronco desnudo, medidos en coniferas y frondosos.
-    const middle = this.tree(Feature.ForestTree, trunkBucket(3.5));
+    const middle = this.tree(Feature.ForestTree, trunkBucket(TRUNK_MEAN));
     if (middle) out.arbol = middle.visible;
-    // Lo que mide de alto la copa del frondoso: tinta total menos tronco desnudo.
-    const leafy = this.tree(Feature.MeadowTree, trunkBucket(3.5));
-    if (leafy) out.copa = leafy.visible - leafy.bare;    const bares: number[] = [];
-    for (const feature of [Feature.ForestTree, Feature.MeadowTree]) {
+    const bares: number[] = [];
+    for (const feature of TREES) {
       for (const bucket of [0, TRUNK_BUCKETS - 1]) {
         const art = this.tree(feature, bucket);
         if (art) bares.push(art.bare);
@@ -353,6 +398,28 @@ export class BillboardSet {
     if (bares.length) {
       out.troncoMin = Math.min(...bares);
       out.troncoMax = Math.max(...bares);
+    }
+    return out;
+  }
+
+  /**
+   * La copa de cada especie de arbol, MEDIDA del dibujo, junto a la que pide su
+   * especie real (`tree-shapes.ts`): alto, ancho y la relacion ancho:alto.
+   */
+  get crowns(): Array<{ especie: string; alto: number; ancho: number; ratio: number; esperado: number }> {
+    const out = [];
+    for (const feature of TREES) {
+      const shape = treeShapeOf(feature);
+      const art = this.tree(feature, trunkBucket(TRUNK_MEAN));
+      if (!shape || !art) continue;
+      const alto = art.visible - art.bare;
+      out.push({
+        especie: shape.species,
+        alto,
+        ancho: art.crownW,
+        ratio: alto > 0 ? art.crownW / alto : 0,
+        esperado: shape.crownW / shape.crownH,
+      });
     }
     return out;
   }
