@@ -14,6 +14,89 @@ import { mulberry32 } from '@verdant/sim';
 
 /** Cuanto dura el barrido del slash, en segundos. */
 export const SLASH_SECONDS = 0.22;
+/**
+ * Altura del barrido en tercera persona sobre los pies del personaje: la del
+ * **pecho**. Nacio en 0.9 —los `TILE_H * 0.9` del isometrico— y subio a 1.3
+ * cuando el personaje paso a medir casi dos bloques, porque 0.9 ya era su
+ * cintura. A media altura el barrido se lee como un tropiezo, no como un golpe.
+ */
+export const SLASH_CHEST = 1.3;
+
+/**
+ * Medio ancho de la cinta en tercera persona, en bloques.
+ *
+ * El isometrico trazaba 3 px con la casilla midiendo 32: un ancho de mundo de
+ * 0.094. Se redondea a 0.12 —medio ancho 0.06— porque este lienzo va sin
+ * antialias y un quad de dos pixeles y pico se deshilacha por cobertura parcial.
+ */
+export const SLASH_HALF_WIDTH = 0.06;
+
+/**
+ * Radio del arco en tercera persona: una casilla, donde caen los centros de las
+ * de enfrente. Deduccion mia.
+ */
+export const SLASH_RADIUS = 1;
+
+/**
+ * Radio y medio ancho del arco en PRIMERA persona. Se dibuja delante de los
+ * ojos, a menos de un bloque, y a esa distancia la cinta de tercera persona —que
+ * se mira desde seis— taparia media pantalla; esta se ve del grueso que aquella
+ * vista de lejos. Deduccion mia, a juzgar a ojo.
+ */
+export const SLASH_FP_RADIUS = 0.9;
+export const SLASH_FP_HALF_WIDTH = 0.02;
+
+/**
+ * El arco abarca lo que abarca el cono de la accion, ±45 grados (`sim/aim.ts`),
+ * y baja en diagonal de un extremo al otro para leerse como un tajo y no como
+ * una raya. Cuanto baja, en fraccion del radio, es deduccion mia.
+ */
+export const SLASH_SPREAD = Math.PI / 4;
+export const SLASH_SLANT = 0.25;
+const SLASH_SEGMENTS = 8;
+
+/**
+ * El trazo de un barrido DELANTE DE LA MIRADA, decision del autor al pasar la
+ * accion a un cono: antes iba clavado a las casillas que afectaba, y en primera
+ * persona a menudo ni se veia.
+ *
+ * `origin` es de donde sale —los ojos en primera persona, el pecho en tercera—,
+ * `(fx, fy)` el rumbo en el plano del mundo (`x`, `z` de three.js) y `pitch` la
+ * inclinacion, positiva hacia arriba: en primera persona el arco sigue a la
+ * mirada, arriba y abajo. Va de la derecha, arriba, a la izquierda, abajo.
+ */
+export function slashArc(
+  origin: Point3,
+  fx: number,
+  fy: number,
+  pitch: number,
+  radius: number,
+): Point3[] {
+  const len = Math.hypot(fx, fy) || 1;
+  const ux = fx / len;
+  const uz = fy / len;
+  // A la derecha de la mirada, igual que `camera.right()`.
+  const rx = -uz;
+  const rz = ux;
+  const cp = Math.cos(pitch);
+  const sp = Math.sin(pitch);
+  const out: Point3[] = [];
+  for (let i = 0; i <= SLASH_SEGMENTS; i++) {
+    const k = i / SLASH_SEGMENTS;
+    const theta = SLASH_SPREAD * (1 - 2 * k);
+    const c = Math.cos(theta) * radius;
+    const s = Math.sin(theta) * radius;
+    const slant = SLASH_SLANT * radius * (1 - 2 * k);
+    // El frente del arco se inclina con la mirada; el costado no.
+    out.push({
+      x: origin.x + ux * c * cp + rx * s,
+      y: origin.y + c * sp + slant,
+      z: origin.z + uz * c * cp + rz * s,
+    });
+  }
+  return out;
+}
+
 /** Cuanto tarda un escombro en apagarse una vez posado. */
 export const DEBRIS_SECONDS = 0.85;
 /** Escombros por objeto derribado. */
@@ -61,12 +144,22 @@ export interface Particle {
   fresh: boolean;
 }
 
+/** Un punto del mundo en coordenadas de three.js: `y` es la altura. */
+export interface Point3 {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
 export interface Slash {
   /**
-   * Las casillas del ANILLO que barre el arco, en el orden que las da
-   * `actionArea`. La que se pisa no entra: se recolecta, pero no se barre.
+   * El trazo, de la punta donde arranca a la punta donde acaba, en el mundo.
+   * Ya no pasa por las casillas afectadas: se dibuja delante de la mirada
+   * (`slashArc`), decision del autor al pasar la accion a un cono.
    */
-  tiles: ReadonlyArray<{ x: number; y: number }>;
+  points: readonly Point3[];
+  /** Medio ancho de la cinta, en unidades de mundo. */
+  halfWidth: number;
   age: number;
   ttl: number;
   /** True hasta el primer `advance`; ver la regla del fotograma alli. */
@@ -100,10 +193,11 @@ export class Effects {
     return { particles: this.live.length, slashes: this.slashList.length };
   }
 
-  /** Un barrido sobre las casillas del anillo que se alcanzan. */
-  spawnSlash(tiles: ReadonlyArray<{ x: number; y: number }>): void {
+  /** Un barrido por esos puntos del mundo (ver `slashArc`). */
+  spawnSlash(points: readonly Point3[], halfWidth = SLASH_HALF_WIDTH): void {
     this.slashList.push({
-      tiles: tiles.map((t) => ({ x: t.x, y: t.y })),
+      points: points.map((p) => ({ x: p.x, y: p.y, z: p.z })),
+      halfWidth,
       age: 0,
       ttl: SLASH_SECONDS,
       fresh: true,

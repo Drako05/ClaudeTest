@@ -43,9 +43,15 @@ export class EntityStore {
    */
   readonly takeoffVx: Float64Array;
   readonly takeoffVy: Float64Array;
-  /** Ultima direccion no nula de movimiento: define el tile que se recolecta. */
+  /**
+   * Hacia donde mira, en el plano: la ultima direccion no nula de movimiento, o
+   * la mirada de la camara si la hay. Es el eje del cono de la accion, y va sin
+   * redondear a ocho direcciones.
+   */
   readonly facingX: Float32Array;
   readonly facingY: Float32Array;
+  /** Componente vertical de la mirada (ver `Intent.aimZ`). */
+  readonly lookZ: Float32Array;
   readonly health: Float32Array;
   readonly hunger: Float32Array;
   readonly kind: Uint8Array;
@@ -64,6 +70,7 @@ export class EntityStore {
     this.takeoffVy = new Float64Array(capacity);
     this.facingX = new Float32Array(capacity);
     this.facingY = new Float32Array(capacity);
+    this.lookZ = new Float32Array(capacity);
     this.health = new Float32Array(capacity);
     this.hunger = new Float32Array(capacity);
     this.kind = new Uint8Array(capacity);
@@ -86,6 +93,7 @@ export class EntityStore {
     this.takeoffVy[id] = 0;
     this.facingX[id] = 0;
     this.facingY[id] = 1;
+    this.lookZ[id] = 0;
     this.health[id] = 100;
     this.hunger[id] = 100;
     this.kind[id] = kind;

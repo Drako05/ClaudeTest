@@ -355,6 +355,13 @@ export interface Intent {
    */
   aimX: number;
   aimY: number;
+  /**
+   * Componente vertical de la mirada: el seno de su inclinacion, negativo hacia
+   * abajo. Decide que segunda altura alcanza la accion —la de arriba, o la de
+   * abajo si se mira hacia abajo mas de 25 grados— (`levelStep` en `sim/aim.ts`).
+   * Sale de la camara, como `aimX`/`aimY`.
+   */
+  aimZ: number;
 }
 
 export function emptyIntent(): Intent {
@@ -368,5 +375,6 @@ export function emptyIntent(): Intent {
     run: false,
     aimX: 0,
     aimY: 0,
+    aimZ: 0,
   };
 }

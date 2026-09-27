@@ -46,7 +46,14 @@ import {
   type GameState,
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
-import { Effects } from './effects.js';
+import {
+  Effects,
+  SLASH_CHEST,
+  SLASH_FP_HALF_WIDTH,
+  SLASH_FP_RADIUS,
+  SLASH_RADIUS,
+  slashArc,
+} from './effects.js';
 import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
@@ -377,9 +384,11 @@ function frame(now: number): void {
   let eat = controls.takeEat();
   let plant = controls.takePlant();
   // La mirada es la de la camara, decision del autor: se acciona hacia donde se
-  // mira. El nucleo la encaja en sus ocho direcciones (regla 12).
+  // mira, con el rumbo real y su inclinacion, que decide la segunda altura del
+  // cono (regla 12).
   intent.aimX = fwd.x;
   intent.aimY = fwd.y;
+  intent.aimZ = Math.sin(camera.lookPitch);
 
   // Con escala cero el acumulador no avanza y la simulacion queda congelada; a
   // 64x corren los ticks que toquen, que con el techo de frame son a lo sumo
@@ -424,16 +433,24 @@ function frame(now: number): void {
       state.world.groundHeightAt(state.entities.x[state.playerId], state.entities.y[state.playerId]);
     if (gap > airPeak) airPeak = gap;
     if (accionando) {
-      // El arco recorre solo las casillas del anillo: la que se pisa se
-      // recolecta pero no se barre, por decision del autor. Se quita por
-      // COORDENADAS y no por posicion en la lista: `actionReach` filtra por
-      // altura, y si la apuntada cayera la propia se correria dentro del arco
-      // y el trazo cruzaria al personaje.
-      const tx = Math.floor(state.entities.x[state.playerId]);
-      const ty = Math.floor(state.entities.y[state.playerId]);
-      effects.spawnSlash(
-        actionReach(state.world, state.entities, state.playerId).filter((t) => t.x !== tx || t.y !== ty),
-      );
+      // El barrido va DELANTE DE LA MIRADA y no clavado a las casillas que
+      // afecta, decision del autor con el cono: en primera persona, delante de
+      // los ojos y con su inclinacion; en tercera, delante del pecho del
+      // personaje y girado con el rumbo. Sale siempre, haya algo que golpear o
+      // no: es el gesto, no el resultado.
+      const e = state.entities;
+      const id = state.playerId;
+      if (camera.projection === 'primera') {
+        const eye = camera.active.position;
+        effects.spawnSlash(
+          slashArc({ x: eye.x, y: eye.y, z: eye.z }, fwd.x, fwd.y, camera.lookPitch, SLASH_FP_RADIUS),
+          SLASH_FP_HALF_WIDTH,
+        );
+      } else {
+        effects.spawnSlash(
+          slashArc({ x: e.x[id], y: e.z[id] + SLASH_CHEST, z: e.y[id] }, fwd.x, fwd.y, 0, SLASH_RADIUS),
+        );
+      }
     }
     for (const hit of state.lastHarvest) {
       gathered += hit.amount + hit.seeds;

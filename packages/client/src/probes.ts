@@ -116,10 +116,10 @@ export interface ReachSpot {
  *
  * Al sureste porque la mirada es la de la camara y la camara arranca mirando al
  * noroeste (`camera.ts`, rumbo de un octavo de vuelta): nada mas aparecer en el
- * apoyo, la casilla apuntada es justo esa. La de apoyo tiene que ser pisable,
- * estar despejada y a la MISMA altura, porque la accion solo alcanza la altura
- * propia (regla 21); y ninguna de las dos puede ser talud, que es donde la
- * altura de una casilla deja de ser un numero solo.
+ * centro del apoyo, esa casilla cae justo en el eje del cono de la accion (regla
+ * 12). La de apoyo tiene que ser pisable, estar despejada y a la MISMA altura,
+ * que es la que el cono alcanza mire uno donde mire; y ninguna de las dos puede
+ * ser talud, que es donde la altura de una casilla deja de ser un numero solo.
  */
 function reachSpot(
   state: GameState,

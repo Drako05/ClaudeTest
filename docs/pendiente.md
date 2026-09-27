@@ -35,6 +35,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | `EYE = 1.6` para la camara, al crecer el personaje | Proporciones nuevas | un numero |
 | **El relieve se lee menos de la mitad de alto** tras las proporciones | Proporciones nuevas | calibracion del relieve |
 | El grosor del barrido: 0,12 casillas, redondeado al alza por el antialias | El barrido del 3D | un numero |
+| **La casilla que se pisa sigue entrando siempre** en el cono | La accion es un cono | una linea |
+| El barrido: radio 0,9 desde los ojos y 1 desde el pecho, medio ancho 0,02 en primera persona, y **baja en diagonal** de derecha a izquierda (un cuarto del radio) | La accion es un cono | numeros en `effects.ts` |
+| El barrido se **congela en el mundo** al nacer: girar la camara despues no lo arrastra | La accion es un cono | una linea |
 | El cuarto de vuelta propio de cada aspa | Las features ya son aspas | un numero |
 | El tamano y la intensidad de la sombra tumbada | Las features ya son aspas | dos numeros |
 | El material de las aspas **no se ilumina**, para que el aspecto no cambiara | Las features ya son aspas | cambiar a Lambert, con pegas |
@@ -258,6 +261,29 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## La accion es un cono — HECHO (2026-09-28)
+
+Pediste que la accion dejara de estar fijada a casillas: en primera persona se
+golpeaba lo que no estaba delante de los ojos, y el barrido a veces ni se veia.
+Tus decisiones:
+
+- **Cono de 1,5 bloques y 90 grados** alrededor de la mirada real (sin
+  redondearla a ocho direcciones); una casilla cuenta si su centro cae dentro.
+- **Dos alturas, en 3D**: la propia y la de arriba; mirando hacia abajo mas de
+  **25 grados**, la propia y la de abajo. Vale en las tres vistas: en primera
+  persona se entra mirando a -11 grados (arriba); la orbital arranca a 35
+  (abajo), y bajandola casi a ras de suelo pasa a la de arriba.
+- **El barrido delante de la mirada**: delante de los ojos en primera persona,
+  delante del pecho del personaje en tercera.
+- **Sembrar en la casilla de enfrente**: la primera que cruza el centro de la
+  mirada.
+
+Con el jugador centrado y mirando en recto el cono coge lo mismo que las cuatro
+casillas de antes; se nota al girar y al estar a medio paso. Lo que decidi yo,
+en «Esperando tu juicio». Medido: el barrido llega a pantalla en todos los
+rumbos de primera persona (9.000-19.000 pixeles) y en tercera como antes; y un
+test del nucleo afirma las dos alturas (con la segunda altura fija «arriba», cae).
 
 ## Troncos por especie — HECHO (2026-09-27)
 

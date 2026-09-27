@@ -7,7 +7,7 @@
  * lo juega leyendo el estado real por `window.__verdant` y guarda capturas.
  *
  * Es la heredera del humo del isometrico y se lleva todas sus comprobaciones que
- * son del JUEGO —andar, hambre, recolectar, semillas, area de cuatro casillas,
+ * son del JUEGO —andar, hambre, recolectar, semillas, cono de la accion,
  * barrido y escombros, joystick, pinza, carrera, salto, paredes, cima, mineral,
  * panel de desarrollo— mas una por cada cosa que se traslado del isometrico:
  * comer, sembrar, mirada de la camara, muerte y reinicio, HUD, reloj, panel del
@@ -322,16 +322,25 @@ async function desktopPass(browser, baseUrl) {
   // Y arrastrar es girar, no accionar: se decide al soltar.
   check(turned.sent.harvest === before.sent.harvest, 'arrastrar para girar acciono');
 
-  // El area: cuatro casillas distintas —tres del anillo que tocan al jugador y
-  // la que pisa, la ultima—, y lo que se alcanza es un subconjunto de ellas. La
-  // reticula marca exactamente lo alcanzable.
+  // El area es el cono de la mirada (regla 12): casillas distintas, todas
+  // delante del jugador y a menos de 1,5 bloques, y la que pisa la ultima. Lo
+  // que se alcanza es un subconjunto, y la reticula marca exactamente eso. Los
+  // numeros exactos del cono los miden los tests del nucleo; aqui, que el que
+  // llega al juego es el cono y sigue a la camara.
   const tile = [Math.floor(turned.x), Math.floor(turned.y)];
-  check(turned.area.length === 4, `el area no son 4 casillas: ${JSON.stringify(turned.area)}`);
-  check(new Set(turned.area.map((t) => t.join(','))).size === 4, `el area repite casilla: ${JSON.stringify(turned.area)}`);
-  turned.area.forEach(([tx, ty], i) => {
-    const d = Math.max(Math.abs(tx - tile[0]), Math.abs(ty - tile[1]));
-    check(d === (i < 3 ? 1 : 0), `casilla ${i} del area a distancia ${d}: ${tx},${ty}`);
-  });
+  check(turned.area.length >= 2, `el cono no coge nada delante: ${JSON.stringify(turned.area)}`);
+  check(
+    new Set(turned.area.map((t) => t.join(','))).size === turned.area.length,
+    `el area repite casilla: ${JSON.stringify(turned.area)}`,
+  );
+  check(turned.area.at(-1).join(',') === tile.join(','), `la ultima del area no es la que se pisa: ${JSON.stringify(turned.area)}`);
+  for (const [tx, ty] of turned.area.slice(0, -1)) {
+    const dx = tx + 0.5 - turned.x;
+    const dy = ty + 0.5 - turned.y;
+    const d = Math.hypot(dx, dy);
+    const cos = (dx * turned.aim[0] + dy * turned.aim[1]) / d;
+    check(d <= 1.5 + 1e-6 && cos >= Math.SQRT1_2 - 1e-6, `casilla ${tx},${ty} fuera del cono (a ${d.toFixed(2)}, cos ${cos.toFixed(2)})`);
+  }
   const inArea = new Set(turned.area.map((t) => t.join(',')));
   check(turned.reach.every((t) => inArea.has(t.join(','))), 'lo alcanzable sale del area');
   check(
@@ -340,10 +349,14 @@ async function desktopPass(browser, baseUrl) {
   );
 
   // Un clic sin arrastrar acciona, y el barrido llega a dibujarse. Desde el
-  // nacimiento, que es un rellano llano (regla 22): ahi las cuatro casillas
-  // estan al alcance, y el barrido no puede faltar por culpa del paisaje.
+  // nacimiento, que es un rellano llano (regla 22): ahi todo el cono esta al
+  // alcance. El barrido ya no depende del paisaje —va delante de la mirada—,
+  // pero lo que se recolecta si.
   const beforeClick = await open(page, baseUrl);
-  check(beforeClick.reach.length === 4, `en el nacimiento no se alcanzan las cuatro casillas (${beforeClick.reach.length})`);
+  check(
+    beforeClick.reach.length === beforeClick.area.length,
+    `en el nacimiento no se alcanza todo el cono (${beforeClick.reach.length} de ${beforeClick.area.length})`,
+  );
   await page.mouse.click(CLICK.x, CLICK.y);
   await page.waitForTimeout(400);
   const afterClick = await state(page);
@@ -351,6 +364,13 @@ async function desktopPass(browser, baseUrl) {
   check(afterClick.slashesDrawn > beforeClick.slashesDrawn, 'accionar no dibujo ningun barrido');
 
   // Recolectar de verdad, y los escombros contados como DIBUJADOS acumulados.
+  // Delante de una mata buscada a proposito (`?x=&y=`), no paseando: con el cono
+  // de la regla 12, pegado al borde de una casilla solo caen una o dos delante,
+  // y buscar algo que golpear andando a ciegas dejo de acertar. Una comprobacion
+  // que pasa por suerte es peor que una que falla.
+  const bush = (await spots(page)).berrySpot;
+  check(bush !== null, 'no se encontro ninguna mata que golpear');
+  if (bush) await open(page, baseUrl, `&x=${bush.stand.x}&y=${bush.stand.y}`);
   const gathered = await harvestUntil(page, (s) => sum(s.inventory) > 0);
   console.log(`  inventario tras recolectar: ${JSON.stringify(gathered.inventory)}`);
   check(sum(gathered.inventory) > 0, 'accionar no recolecto nada');
@@ -689,10 +709,10 @@ async function mobilePass(browser, baseUrl) {
   check(a.sent.plant > b.sent.plant, 'el boton de sembrar no llego a la Intent');
 
   // La accion: mantener repite, cuatro por segundo. Desde el nacimiento, que es
-  // un rellano llano (regla 22): ahi las cuatro casillas estan al alcance y el
-  // barrido tiene que salir, sin depender de donde dejo el joystick al jugador.
+  // un rellano llano (regla 22): ahi todo el cono esta al alcance, sin depender
+  // de donde dejo el joystick al jugador.
   const h0 = await open(page, baseUrl);
-  check(h0.reach.length === 4, `en el nacimiento no se alcanzan las cuatro casillas (${h0.reach.length})`);
+  check(h0.reach.length === h0.area.length, `en el nacimiento no se alcanza todo el cono (${h0.reach.length} de ${h0.area.length})`);
   await tapButton(page, '#action', 'touchstart');
   await page.waitForTimeout(1600);
   // Y sin soltar, ese mismo dedo se arrastra: gira la camara y la accion sigue

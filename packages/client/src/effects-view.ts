@@ -54,32 +54,6 @@ const PX_PER_TILE = 32;
 const OBJECT_SCALE = 2.3;
 
 /**
- * Cuanto se levanta el barrido sobre el suelo, en casillas.
- *
- * Es la **altura del pecho**, el mismo sitio que en el isometrico: alli el trazo
- * sube `TILE_H * 0.9`, o sea 0.9 NIVELES. A media altura el barrido se lee como
- * un tropiezo, no como un golpe.
- *
- * Va atado al PERSONAJE, no al tile, asi que sube con el: 0.9 era el pecho de
- * uno de 0,78 bloques y es la cintura de uno de 1,8. El ANCHO de la cinta, en
- * cambio, se queda donde estaba —marca las casillas que la accion afecta, o sea
- * que es del tile—.
- */
-const SLASH_LIFT = 1.3;
-
-/**
- * Medio ancho de la cinta del barrido, en casillas.
- *
- * El isometrico trazaba 3 px con la casilla midiendo 32, y su capa colgaba de la
- * camara, asi que ese grosor escalaba con el zoom: un ancho de MUNDO de 0.094
- * casillas. Aqui se redondea a 0.12 —medio ancho 0.06— por una diferencia real
- * entre los dos renderizadores: PixiJS suavizaba el trazo y este lienzo va sin
- * antialias, asi que un quad de dos pixeles y pico se deshilacha por cobertura
- * parcial justo donde el isometrico daba una linea limpia.
- */
-const SLASH_HALF_WIDTH = 0.06;
-
-/**
  * Cuantos barridos pueden verse a la vez.
  *
  * Manteniendo el boton se acciona cuatro veces por segundo y cada barrido dura
@@ -190,28 +164,20 @@ export class EffectsView {
         continue;
       }
 
-      // Las flanqueantes a los extremos y la apuntada en el centro, igual que en
-      // el isometrico: un solo trazo que recorre las tres casillas y se lee como
-      // un golpe, no como tres marcas sueltas.
-      const [aimed, left, right] = slash.tiles;
-      const path = [left, aimed, right].filter(Boolean);
-      if (path.length < 2) {
+      // El trazo ya viene en el mundo, delante de la mirada (`slashArc`).
+      const points = slash.points;
+      if (points.length < 2) {
         mesh.visible = false;
         continue;
       }
 
       // Barre de una punta a la otra: al principio solo se ve el arranque.
       const swept = Math.min(1, t * 1.6);
-      const points = path.map((tile) => ({
-        x: tile.x + 0.5,
-        y: world.groundHeightAt(tile.x + 0.5, tile.y + 0.5) + SLASH_LIFT,
-        z: tile.y + 0.5,
-      }));
       const last = Math.max(1, Math.ceil(swept * (points.length - 1)));
 
       // El trazo se AFILA al apagarse, igual que el isometrico, que pasa de 3 px
       // a 1.5 (`width: 3 - t * 1.5`).
-      ribbon(mesh.geometry as BufferGeometry, points.slice(0, last + 1), eye, SLASH_HALF_WIDTH * (1 - t * 0.5));
+      ribbon(mesh.geometry as BufferGeometry, points.slice(0, last + 1), eye, slash.halfWidth * (1 - t * 0.5));
       (mesh.material as MeshBasicMaterial).opacity = alpha;
       mesh.visible = true;
       this.slashesDrawn++;

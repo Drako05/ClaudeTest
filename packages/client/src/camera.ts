@@ -224,6 +224,18 @@ export class OrbitCamera {
     return { x: -Math.sin(this.yaw), y: -Math.cos(this.yaw) };
   }
 
+  /**
+   * Inclinacion de la mirada en radianes, positiva hacia ARRIBA, en la vista
+   * que este activa. La orbital mira siempre hacia abajo —su `pitch` es la
+   * elevacion desde la que mira—; la primera persona lleva la suya.
+   *
+   * Es la segunda mitad de la mirada de la accion: decide si el cono alcanza la
+   * altura de arriba o la de abajo (`levelStep` en `sim/aim.ts`).
+   */
+  get lookPitch(): number {
+    return this.projection === 'primera' ? this.fpPitch : -this.pitch;
+  }
+
   right(): { x: number; y: number } {
     return { x: Math.cos(this.yaw), y: -Math.sin(this.yaw) };
   }

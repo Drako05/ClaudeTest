@@ -432,6 +432,52 @@ describe('Mirada y area de efecto', () => {
     expect(gained).toBe(reported + seeds);
   });
 
+  it('alcanza dos alturas: la de arriba mirando al frente, la de abajo mirando hacia abajo', () => {
+    // Decision del autor con el cono: la propia y la de arriba, o la de abajo si
+    // se mira hacia abajo mas de 25 grados. Nunca las dos a la vez, ni dos mas.
+    const down = Math.sin((-40 * Math.PI) / 180);
+    const ahead = Math.sin((-11 * Math.PI) / 180);
+
+    /** Un sitio con la casilla del este `step` niveles por encima (o debajo). */
+    function spot(step: number): { x: number; y: number } {
+      const world = new World(2024);
+      for (let y = -60; y < 60; y++) {
+        for (let x = -60; x < 60; x++) {
+          const level = world.levelAt(x, y);
+          if (level >= 0 && world.levelAt(x + 1, y) === level + step) return { x, y };
+        }
+      }
+      throw new Error(`no hay un escalon de ${step}`);
+    }
+
+    /** Si una roca puesta en la casilla del este cae con esa mirada. */
+    function hits(at: { x: number; y: number }, lookZ: number): boolean {
+      const world = new World(2024);
+      world.setNow(0);
+      world.setFeature(at.x + 1, at.y, Feature.RockNode);
+      const store = new EntityStore(4);
+      const id = store.spawn(EntityKind.Player, at.x + 0.5, at.y + 0.5);
+      store.facingX[id] = 1;
+      store.facingY[id] = 0;
+      store.lookZ[id] = lookZ;
+      tryHarvestArea(world, store, id, new Int32Array(RESOURCE_COUNT), 0);
+      return world.featureAt(at.x + 1, at.y) === Feature.None;
+    }
+
+    const up = spot(1);
+    expect(hits(up, ahead)).toBe(true);
+    expect(hits(up, down)).toBe(false);
+
+    const below = spot(-1);
+    expect(hits(below, down)).toBe(true);
+    expect(hits(below, ahead)).toBe(false);
+
+    // Dos niveles es una pared: no se alcanza mire donde mire.
+    const wall = spot(2);
+    expect(hits(wall, ahead)).toBe(false);
+    expect(hits(wall, down)).toBe(false);
+  });
+
   it('sembrar sigue afectando solo a la casilla apuntada', () => {
     // Decision del autor: de tres en tres gastaria las semillas demasiado rapido.
     const world = new World(2024);

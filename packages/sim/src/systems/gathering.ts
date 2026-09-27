@@ -22,7 +22,7 @@ import {
   seedFor,
   speciesFor,
 } from '@verdant/shared';
-import { actionTiles, directionOf, type Offset } from '../aim.js';
+import { coneTiles, frontTile, levelStep, type Offset } from '../aim.js';
 import type { EntityStore } from '../entities.js';
 import { hash2DFloat } from '../rng.js';
 import { toChunkCoord, type World } from '../world.js';
@@ -50,43 +50,50 @@ export interface HarvestResult {
 }
 
 /**
- * Las casillas que afecta una accion de la entidad. La apuntada va la primera.
- *
- * Se calculan desde la casilla que PISA y no desde su posicion continua. Antes
- * era `floor(pos + mirada * 1.1)`, y con el personaje pegado al borde de su
- * casilla eso podia apuntar dos casillas mas alla; con un area de tres el fallo
- * pasaria de inadvertido a evidente.
+ * Las casillas del cono de la accion de la entidad, sin mirar el relieve: las
+ * del cono de la mas centrada a la mas ladeada, y la que se pisa la ultima
+ * (`coneTiles` en `sim/aim.ts`).
  */
 export function actionArea(store: EntityStore, id: number): Offset[] {
-  const dir = directionOf(store.facingX[id], store.facingY[id]);
-  const tileX = Math.floor(store.x[id]);
-  const tileY = Math.floor(store.y[id]);
-  // Sin mirada todavia, se apunta al sur, que es hacia donde nace mirando.
-  return actionTiles(tileX, tileY, dir < 0 ? 4 : dir);
+  return coneTiles(store.x[id], store.y[id], store.facingX[id], store.facingY[id]);
 }
 
 /**
- * Las casillas del area que estan **al alcance**, o sea a la altura propia.
- *
- * «La accion solo alcanza casillas a la misma altura»: para talar un arbol
- * subido a un bloque hay que subirse. Va aparte de `actionArea` y no dentro
- * porque aquella es geometria pura del anillo de direcciones —no conoce el
- * mundo y sus tests no deben necesitarlo—, mientras que esto es una pregunta
- * sobre el relieve.
- *
- * Se comparan NIVELES enteros y no la altura continua: es lo que dijo el autor
- * («la misma altura»), y ademas hace que estar a media rampa no cambie lo que
- * se alcanza a cada paso.
+ * Las dos alturas que alcanza la accion: la propia y la de arriba, o la de
+ * abajo si se mira hacia abajo (`levelStep`). Del autor, con el cono.
  */
-export function actionReach(world: World, store: EntityStore, id: number): Offset[] {
+function reachableLevels(world: World, store: EntityStore, id: number): [number, number] {
   const level = world.levelAt(Math.floor(store.x[id]), Math.floor(store.y[id]));
-  return actionArea(store, id).filter((t) => world.levelAt(t.x, t.y) === level);
+  return [level, level + levelStep(store.lookZ[id])];
 }
 
-/** Tile al que apunta la entidad. */
+/**
+ * Las casillas del cono que estan **al alcance**: las de la altura propia y las
+ * de la segunda que toque segun la mirada.
+ *
+ * Va aparte de `actionArea` y no dentro porque aquella es geometria pura del
+ * cono —no conoce el mundo y sus tests no deben necesitarlo—, mientras que esto
+ * es una pregunta sobre el relieve.
+ *
+ * Se comparan NIVELES enteros y no la altura continua, y eso hace que estar a
+ * media rampa no cambie lo que se alcanza a cada paso. Antes solo se alcanzaba
+ * la altura propia («para talar un arbol subido a un bloque hay que subirse»);
+ * el autor lo amplio a dos con el cono.
+ */
+export function actionReach(world: World, store: EntityStore, id: number): Offset[] {
+  const [own, other] = reachableLevels(world, store, id);
+  return actionArea(store, id).filter((t) => {
+    const level = world.levelAt(t.x, t.y);
+    return level === own || level === other;
+  });
+}
+
+/**
+ * La casilla de enfrente: la primera que cruza el centro de la mirada. Es donde
+ * se siembra.
+ */
 export function targetTile(store: EntityStore, id: number): { x: number; y: number } {
-  const [aimed] = actionArea(store, id);
-  return { x: aimed.x, y: aimed.y };
+  return frontTile(store.x[id], store.y[id], store.facingX[id], store.facingY[id]);
 }
 
 /**
@@ -108,8 +115,8 @@ export function tryHarvest(
 }
 
 /**
- * Recolecta las casillas del area que estan al alcance —las tres del anillo y
- * la que se pisa—, en orden fijo y empezando por la apuntada. Cada una rinde lo
+ * Recolecta las casillas del cono que estan al alcance —y la que se pisa—, en
+ * orden fijo y empezando por la mas centrada. Cada una rinde lo
  * suyo: tres arboles dan la madera de tres arboles,
  * como decidio el autor. El coste lo pone el ecosistema, que tardara mas en
  * reponerse de una tala tan rapida.
@@ -192,11 +199,10 @@ export function tryPlant(
   id: number,
   inventory: Int32Array,
 ): Feature | null {
-  // Sembrar alcanza lo mismo que recolectar: no se planta en la cima de un
-  // bloque desde abajo, por la misma razon por la que no se tala desde abajo.
-  const [aimed] = actionReach(world, store, id);
-  if (!aimed) return null;
-  const { x, y } = aimed;
+  // Se siembra en la casilla de enfrente (decision del autor), y alcanza las
+  // mismas dos alturas que recolectar: donde no se tala, tampoco se planta.
+  const { x, y } = targetTile(store, id);
+  if (!reachableLevels(world, store, id).includes(world.levelAt(x, y))) return null;
   if (world.featureAt(x, y) !== Feature.None) return null;
 
   const terrain = world.terrainAt(x, y);

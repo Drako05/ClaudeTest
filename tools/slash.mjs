@@ -36,6 +36,17 @@ const HEIGHT = 720;
  */
 const BOX = { x0: 320, y0: 120, x1: 960, y1: 520 };
 
+/**
+ * En primera persona se mira el ancho ENTERO, sin la franja de arriba (los
+ * botones del HUD y del ojo) ni la de abajo (el racimo y las barras).
+ *
+ * Alli el barrido cruza la vista de lado a lado —arranca arriba a la derecha y
+ * baja a la izquierda—, y la caja central solo lo ve a mitad de recorrido: un
+ * rumbo daba cero o 2.545 segun en que momento del trazo cayera la captura, con
+ * el trazo perfectamente visible en la esquina.
+ */
+const FULL_WIDTH = { x0: 0, y0: 60, x1: 1280, y1: 540 };
+
 /** Cuanto tiene que subir un canal para contar como aclarado por el efecto. */
 const LIFT = 12;
 
@@ -195,41 +206,33 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
   // pregunta no es «se ve desde algun sitio» sino «hay algun sitio desde el que
   // desaparezca». Un minimo en cero es el barrido esfumandose.
   //
-  // PERO solo cuentan los rumbos con ARCO que trazar. Al girar, las casillas de
-  // delante pueden quedar a otra altura y la accion alcanza solo la que se pisa,
-  // que no se barre (regla 12): ahi no hay nada que ver, y contarlo como «el
-  // barrido no se ve» daba ceros por el paisaje. Se cuentan aparte, como «sin
-  // arco». Asi salieron los ceros de «de cerca» durante tandas.
+  // Desde que el barrido va delante de la mirada y no clavado a las casillas
+  // (regla 12, con el cono), sale en todos los rumbos: ya no hay rumbos «sin
+  // arco» que contar aparte, y un cero es de verdad el barrido esfumandose.
   const turns = view === 'de cerca, girando' || view === 'primera persona' ? 4 : 1;
+  const box = view === 'primera persona' ? FULL_WIDTH : BOX;
   let worst = null;
   let noise = 0;
   let sent = 0;
   let gathered = 0;
   let pitch = 0;
-  let noArc = 0;
   for (let turn = 0; turn < turns; turn++) {
     if (turn > 0) await drag(-262, 0);
     const here = await page.evaluate(() => window.__verdant);
     pitch = here.projection === 'primera' ? here.fpPitch : here.pitch;
-    // La casilla propia siempre se alcanza y va la ultima: el arco necesita
-    // al menos dos del anillo.
-    if (here.reach.length - 1 < 2) {
-      noArc++;
-      continue;
-    }
 
     // Quieto el jugador y quieta la camara, dos fotogramas seguidos son
     // IDENTICOS. Asi que la referencia es una captura en reposo y lo que se mide
     // es lo que el efecto anade encima: el ruido de comparar dos capturas en
     // reposo dice cuanto vale cero.
     const reference = decodePng(await page.screenshot());
-    noise = Math.max(noise, (await sample(reference, 2)).max);
+    noise = Math.max(noise, (await sample(reference, 2, box)).max);
 
     const before = await page.evaluate(() => window.__verdant);
     await page.hover('#action');
     await page.mouse.down();
     await page.waitForTimeout(300);
-    const hitting = await sample(reference, 8);
+    const hitting = await sample(reference, 8, box);
     await page.mouse.up();
     const after = await page.evaluate(() => window.__verdant);
     await page.waitForTimeout(500);
@@ -239,27 +242,27 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
     if (view === 'normal') await writeFile(new URL('../screenshots/slash.png', import.meta.url), hitting.best);
 
     if (worst === null || hitting.max < worst) worst = hitting.max;
+    if (turns > 1) console.log(`  ${view}, rumbo ${turn + 1}: ${hitting.max} pixeles aclarados`);
     sent += after.slashesDrawn - before.slashesDrawn;
     gathered += after.gathered - before.gathered;
   }
 
-  results.push({ view, pitch, noise, lit: worst, sent, gathered, noArc });
+  results.push({ view, pitch, noise, lit: worst, sent, gathered });
 }
 
 console.log('');
-console.log('vista               elevacion  ruido  pixeles aclarados  barridos mandados  recogido  sin arco');
+console.log('vista               elevacion  ruido  pixeles aclarados  barridos mandados  recogido');
 for (const r of results) {
   console.log(
     `${r.view.padEnd(19)} ${r.pitch.toFixed(2).padStart(9)} ` +
     `${String(r.noise).padStart(6)} ${String(r.lit ?? '—').padStart(18)} ` +
-    `${String(r.sent).padStart(18)} ${String(r.gathered).padStart(9)} ${String(r.noArc).padStart(9)}`,
+    `${String(r.sent).padStart(18)} ${String(r.gathered).padStart(9)}`,
   );
 }
 console.log('');
 console.log('«pixeles aclarados» es el barrido llegando a pantalla; en la vista giratoria,');
 console.log('el PEOR de los cuatro rumbos. Con «recogido» a cero no hay escombros de por');
-console.log('medio y todo lo aclarado es del barrido. «Sin arco» son los rumbos donde');
-console.log('solo se alcanzaba la casilla propia: no hay barrido que ver y no cuentan.');
+console.log('medio y todo lo aclarado es del barrido.');
 console.log('');
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 
@@ -305,12 +308,12 @@ async function probe() {
 }
 
 /** Varias capturas seguidas contra la referencia; se queda con el maximo. */
-async function sample(reference, times) {
+async function sample(reference, times, box = BOX) {
   const counts = [];
   let best = null;
   for (let i = 0; i < times; i++) {
     const png = await page.screenshot();
-    const lit = brightened(reference, decodePng(png));
+    const lit = brightened(reference, decodePng(png), box);
     if (best === null || lit > Math.max(...counts)) best = png;
     counts.push(lit);
     await page.waitForTimeout(110);
@@ -332,11 +335,11 @@ async function sample(reference, times) {
  * hierba da un verde palido que no se acerca al blanco ni de lejos. Esa primera
  * version daba cero con el barrido perfectamente visible.
  */
-function brightened(reference, shot) {
+function brightened(reference, shot, box = BOX) {
   const { width } = shot;
   let n = 0;
-  for (let y = BOX.y0; y < BOX.y1; y++) {
-    for (let x = BOX.x0; x < BOX.x1; x++) {
+  for (let y = box.y0; y < box.y1; y++) {
+    for (let x = box.x0; x < box.x1; x++) {
       const i = (y * width + x) * 4;
       if (
         shot.data[i] - reference.data[i] >= LIFT &&

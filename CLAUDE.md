@@ -67,9 +67,10 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
 5. **El input produce `Intent`; nunca muta el estado.** Es lo que permitira
    enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
-   nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`), y es **la de la
-   camara**, decision del autor: cada tick sale de `camera.forward()` y el
-   nucleo la encaja en sus ocho direcciones. Se acciona hacia donde se mira; y
+   nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`, y `aimZ` para su
+   inclinacion), y es **la de la camara**, decision del autor: cada tick sale de
+   `camera.forward()` y `camera.lookPitch`, y el nucleo la usa **tal cual, sin
+   encajarla en ocho direcciones** (regla 12). Se acciona hacia donde se mira; y
    como el movimiento tambien se rota con la camara antes de entrar en la
    Intent, la Intent sigue siendo de mundo y puede viajar por red.
 
@@ -99,21 +100,33 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     arrasado reviviera dependia del orden en que se generaron los chunks —es
     decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
     que ningun test evidente lo delate.
-12. **Una accion afecta a cuatro casillas: la apuntada, sus dos vecinas en el
-    anillo de 8 direcciones y la que se pisa** (`sim/aim.ts`). De esa unica regla
-    salen los dos casos que describio el autor —en recto las flanqueantes quedan
-    en diagonal, en diagonal quedan ortogonales— y `tests/aim.test.ts` las tiene
-    todas. La casilla propia la sumo despues, con su enunciado sobre una rejilla
-    1-9 con el jugador en el 5: mirando a 2 se afectan 1, 2, 3 y 5; mirando a 3,
-    2, 3, 6 y 5 (hay un test con esos dos casos literales). El orden es fijo
-    —`[apuntada, flanco, flanco, propia]`—: sembrar sigue usando solo la
-    apuntada, y **el arco del barrido recorre solo las tres del anillo**, por
-    decision suya; la propia se recolecta pero no se barre. El cliente la quita
-    del arco por coordenadas, no por posicion, porque `actionReach` filtra por
-    altura y la lista se desplaza. El
-    area parte de la casilla que se PISA: antes se apuntaba con
-    `floor(pos + mirada * 1.1)`, que pegado al borde de la casilla podia saltar a
-    dos de distancia, y con tres casillas eso deja de pasar inadvertido.
+12. **Una accion afecta a un CONO que sale del jugador hacia donde mira**
+    (`sim/aim.ts`), decision del autor del 2026-09-28: **1,5 bloques y 90
+    grados** alrededor de la mirada real, sin redondearla a ocho direcciones;
+    una casilla entra si su centro cae dentro, y **la que se pisa entra
+    siempre** (deduccion mia: el autor la habia sumado al area vieja y el cono
+    nace en ella). Y **dos alturas**: la propia y la de arriba, o la de abajo
+    si se mira hacia abajo mas de **25 grados**, en las tres vistas (la orbital
+    arranca a 35, asi que alcanza la de abajo; bajandola a ras de suelo, la de
+    arriba). Sembrar va a **la casilla de enfrente**, la primera que cruza el
+    centro de la mirada, con las mismas dos alturas.
+
+    Sustituyo a cuatro casillas fijas —la apuntada, sus dos vecinas en el
+    anillo de 8 direcciones y la propia— porque en primera persona se golpeaba
+    lo que no estaba delante de los ojos. **Con el jugador centrado y mirando en
+    recto, el cono coge justo lo que cogia aquella**: la de enfrente y las
+    diagonales caen a 45 grados y a 1,41, y los dos casos del autor sobre la
+    rejilla 1-9 (mirando a 2: 1, 2, 3 y 5; mirando a 3: 2, 3, 6 y 5) siguen en
+    `tests/aim.test.ts`. El cambio se nota al girar: a 22,5 grados entran solo
+    las dos que caen dentro.
+
+    El cono parte de la posicion CONTINUA, no del centro de la casilla: es la
+    mirada real, y a medio paso se alcanza lo que se tiene delante. Desde
+    cualquier punto de la casilla propia el centro de la de dos mas alla queda
+    a mas de 1,5, asi que el cono nunca se salta una fila. El orden es fijo —de
+    la mas centrada a la mas ladeada, y la propia la ultima— y la casilla de
+    enfrente se busca recorriendo el rayo casilla a casilla (Amanatides-Woo),
+    no con un paso fijo, que podia saltarse la que el rayo roza por la esquina.
 
 13. **El relieve sale de la misma elevacion que el terreno.** `levelFrom` no es
     mas que otra forma de leer el `e < 0.42` que ya separaba el agua, asi que
@@ -351,16 +364,25 @@ Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
   come lo que haya entre la camara y el arco —un bloque, un arbol, el propio
   personaje—; sin lo segundo se ve de canto cuando su ancho cae a lo largo del
   rumbo desde el que se mira. Medido a 0.08 rad de elevacion: 104 pixeles
-  aclarados contra 2 y contra 13. Y **no lo tapa la pared de la casilla
-  golpeada**, que era mi primera sospecha y es falsa: el area solo alcanza
-  casillas de la altura propia, asi que el arco nunca cruza un desnivel.
+  aclarados contra 2 y contra 13.
 
-  La cinta va a la **altura del pecho**: nacio en 0.9 —los mismos `TILE_H * 0.9`
-  del isometrico leidos como niveles— y subio a **1.3** cuando el personaje paso
-  a medir casi dos bloques (ver Proporciones), porque 0.9 ya era su cintura. Mide
-  0.12 casillas de ancho, que son sus 3 px con la casilla a 32, y ese ancho no
-  cambio: es del tile, no del personaje. Se redondea al alza desde 0.094 porque
-  PixiJS suavizaba el trazo y este lienzo va sin antialias.
+  **El barrido va DELANTE DE LA MIRADA, no clavado a las casillas** (decision
+  del autor con el cono de la regla 12): es un arco de ±45 grados —lo que abarca
+  el cono— que baja en diagonal de la derecha a la izquierda (`slashArc` en
+  `effects.ts`, puro). En **primera persona** sale de los ojos, a 0,9 y con la
+  inclinacion de la mirada, y cruza la vista de lado a lado; en **tercera**, del
+  **pecho** del personaje, a una casilla y girado con el rumbo. Sale siempre,
+  haya algo que golpear o no: es el gesto, no el resultado. Se congela en el
+  mundo al nacer, asi que girar despues no lo arrastra. Radios, grosor en
+  primera persona (medio ancho 0,02, porque a un palmo de los ojos el de tercera
+  tapaba media pantalla) y la diagonal son deduccion mia.
+
+  El pecho nacio en 0.9 —los mismos `TILE_H * 0.9` del isometrico leidos como
+  niveles— y subio a **1.3** cuando el personaje paso a medir casi dos bloques
+  (ver Proporciones), porque 0.9 ya era su cintura. En tercera persona la cinta
+  mide 0.12 de ancho, que son los 3 px del isometrico con la casilla a 32,
+  redondeados al alza desde 0.094 porque PixiJS suavizaba el trazo y este lienzo
+  va sin antialias.
 
   **Y toda malla cuya geometria se reescriba cada frame lleva
   `frustumCulled = false`.** three.js calcula la esfera envolvente **una sola
@@ -743,11 +765,14 @@ recupera su angulo. El cuerpo del jugador no se dibuja desde dentro. Los numeros
 de la primera persona —ojos a 1,75, 70°, catalejo hasta 15°, la vuelta del
 catalejo con raton a los 0,8 s— son deduccion mia; estan en `docs/pendiente.md`.
 
-**Una medida de «se ve» tiene que saber cuando no hay nada que ver.** `npm run
-slash` daba cero en rumbos donde la accion solo alcanzaba la casilla propia,
-que no se barre: no era el barrido esfumandose, era que no habia arco. Ahora
-esos rumbos se cuentan aparte. Desde los ojos, cuando hay arco, se ve de sobra
-(miles de pixeles: la cinta pasa a un palmo de la camara).
+**Una medida de «se ve» tiene que mirar donde esta lo que mide.** `npm run
+slash` cuenta los pixeles aclarados en una caja central, y en primera persona
+el barrido arranca en la esquina de arriba a la derecha y cruza la vista entera:
+un rumbo daba cero o 2.545 segun el momento del trazo que pillara la captura, con
+el trazo perfectamente visible en la esquina. En primera persona mide ahora el
+ancho entero sin las franjas de botones, y da 9.000-19.000 en los cuatro rumbos.
+(Antes de que el barrido fuera delante de la mirada habia otro cero de mentira:
+rumbos donde solo se alcanzaba la casilla propia y no habia arco que trazar.)
 
 Ojo con una diferencia entre los dos mandos, que es deliberada: **el boton repite
 al mantenerlo** (cuatro veces por segundo, la cadencia de siempre) y **el raton

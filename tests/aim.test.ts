@@ -1,218 +1,101 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ACTION_TILES,
-  actionTiles,
-  DIRECTIONS,
-  directionOf,
-  EntityKind,
-  EntityStore,
-  facingOf,
-  isDiagonal,
+  ACTION_HALF_ANGLE,
+  ACTION_RANGE,
+  coneTiles,
+  frontTile,
+  LOOK_DOWN_ANGLE,
+  levelStep,
 } from '@verdant/sim';
-import { actionArea } from '@verdant/sim';
 
 /**
- * La mirada y el area de efecto.
- *
- * El autor lo describio en dos casos —mirando en recto y mirando en diagonal—
- * pero es una sola regla: la casilla apuntada mas sus dos vecinas en el anillo
- * de 8 direcciones, **y la casilla que se pisa**, que sumo despues. Aqui esta
- * esa regla escrita como tabla, para que sea comprobable y no una
- * interpretacion mia.
+ * El cono de la accion (regla 12): 1,5 bloques y 90 grados alrededor de la
+ * mirada real, con la casilla que se pisa siempre dentro. Numeros del autor.
  */
+const key = (t: { x: number; y: number }): string => `${t.x},${t.y}`;
+const set = (tiles: Array<{ x: number; y: number }>): Set<string> => new Set(tiles.map(key));
+const deg = (d: number): [number, number] => [Math.cos((d * Math.PI) / 180), Math.sin((d * Math.PI) / 180)];
 
-const N = 0;
-const NE = 1;
-const E = 2;
-const SE = 3;
-const S = 4;
-const SW = 5;
-const W = 6;
-const NW = 7;
-
-/** Las casillas como texto, para poder compararlas sin depender del orden. */
-function tilesOf(dir: number): Set<string> {
-  return new Set(actionTiles(0, 0, dir).map((t) => `${t.x},${t.y}`));
-}
-
-describe('El area de efecto, direccion por direccion', () => {
-  // La especificacion del autor, entera. Desde (0,0), en cada direccion.
-  const expected: ReadonlyArray<readonly [number, string, string[]]> = [
-    [N, 'norte', ['0,-1', '-1,-1', '1,-1', '0,0']],
-    [NE, 'noreste', ['1,-1', '0,-1', '1,0', '0,0']],
-    [E, 'este', ['1,0', '1,-1', '1,1', '0,0']],
-    [SE, 'sureste', ['1,1', '1,0', '0,1', '0,0']],
-    [S, 'sur', ['0,1', '1,1', '-1,1', '0,0']],
-    [SW, 'suroeste', ['-1,1', '0,1', '-1,0', '0,0']],
-    [W, 'oeste', ['-1,0', '-1,1', '-1,-1', '0,0']],
-    [NW, 'noroeste', ['-1,-1', '-1,0', '0,-1', '0,0']],
-  ];
-
-  for (const [dir, name, tiles] of expected) {
-    it(`mirando al ${name} afecta a ${tiles.join(' ')}`, () => {
-      expect(tilesOf(dir)).toEqual(new Set(tiles));
-    });
-  }
-
-  it('siempre son cuatro casillas distintas', () => {
-    for (let dir = 0; dir < DIRECTIONS.length; dir++) {
-      expect(actionTiles(0, 0, dir)).toHaveLength(ACTION_TILES);
-      expect(tilesOf(dir).size, `${dir} repite casilla`).toBe(ACTION_TILES);
-    }
+describe('cono de la accion', () => {
+  it('son los numeros del autor: 1,5 bloques y 90 grados', () => {
+    expect(ACTION_RANGE).toBe(1.5);
+    expect(ACTION_HALF_ANGLE).toBeCloseTo(Math.PI / 4, 12);
+    expect(LOOK_DOWN_ANGLE).toBeCloseTo((25 * Math.PI) / 180, 12);
   });
 
-  it('la casilla apuntada va siempre la primera', () => {
-    // De ella dependen sembrar y el reticulo, que marcan una sola casilla.
-    for (let dir = 0; dir < DIRECTIONS.length; dir++) {
-      const [first] = actionTiles(7, -3, dir);
-      expect(first).toEqual({ x: 7 + DIRECTIONS[dir].x, y: -3 + DIRECTIONS[dir].y });
-    }
+  it('en el centro de la casilla y mirando en recto, coge lo mismo que el area de antes', () => {
+    // Al este: la de enfrente, las dos diagonales y la propia.
+    const tiles = coneTiles(5.5, 5.5, 1, 0);
+    expect(set(tiles)).toEqual(set([{ x: 6, y: 5 }, { x: 6, y: 4 }, { x: 6, y: 6 }, { x: 5, y: 5 }]));
+    // La mas centrada primero y la propia la ultima.
+    expect(tiles[0]).toEqual({ x: 6, y: 5 });
+    expect(tiles[tiles.length - 1]).toEqual({ x: 5, y: 5 });
   });
 
-  it('las tres del anillo tocan al personaje, ninguna queda a dos casillas', () => {
-    for (let dir = 0; dir < DIRECTIONS.length; dir++) {
-      for (const tile of actionTiles(0, 0, dir).slice(0, 3)) {
-        expect(Math.max(Math.abs(tile.x), Math.abs(tile.y))).toBe(1);
+  it('en diagonal, la diagonal y sus dos ortogonales: el caso del autor mirando a 3', () => {
+    // Rejilla 1-9 con el jugador en el 5: mirando a 3 (noreste) se afectan 2, 3, 6 y 5.
+    expect(set(coneTiles(5.5, 5.5, ...deg(-45)))).toEqual(
+      set([{ x: 5, y: 4 }, { x: 6, y: 4 }, { x: 6, y: 5 }, { x: 5, y: 5 }]),
+    );
+  });
+
+  it('sigue la mirada real: a 22,5 grados solo entran las dos que caen dentro', () => {
+    // Al este-sureste: la de enfrente y la diagonal del sureste; la del noreste
+    // queda a 67,5 grados, fuera.
+    expect(set(coneTiles(5.5, 5.5, ...deg(22.5)))).toEqual(
+      set([{ x: 6, y: 5 }, { x: 6, y: 6 }, { x: 5, y: 5 }]),
+    );
+  });
+
+  it('no llega a la segunda casilla en recto: el alcance es 1,5', () => {
+    // Desde cualquier punto de la casilla propia, el centro de la de dos mas
+    // alla queda a mas de 1,5: el cono nunca se salta una fila.
+    for (const x of [5.0, 5.5, 5.9, 5.99]) {
+      expect(set(coneTiles(x, 5.5, 1, 0)).has('7,5')).toBe(false);
+    }
+    // Pero pegado al borde de la casilla, alcanza diagonales que desde el centro
+    // no: la del noreste pasa de 1,41 a 1,03.
+    expect(set(coneTiles(5.9, 5.1, 1, 0)).has('6,4')).toBe(true);
+  });
+
+  it('nada de lo que queda detras entra, salvo la casilla propia', () => {
+    for (const d of [0, 30, 90, 135, 200, 290]) {
+      const [fx, fy] = deg(d);
+      for (const t of coneTiles(5.5, 5.5, fx, fy)) {
+        if (t.x === 5 && t.y === 5) continue;
+        const dx = t.x + 0.5 - 5.5;
+        const dy = t.y + 0.5 - 5.5;
+        expect((dx * fx + dy * fy) / Math.hypot(dx, dy)).toBeGreaterThanOrEqual(Math.cos(Math.PI / 4) - 1e-9);
+        expect(Math.hypot(dx, dy)).toBeLessThanOrEqual(1.5 + 1e-9);
       }
     }
   });
 
-  it('la casilla que se pisa va siempre la ultima', () => {
-    // Lo que lee las tres primeras —sembrar, el arco del barrido— no cambia.
-    for (let dir = 0; dir < DIRECTIONS.length; dir++) {
-      expect(actionTiles(7, -3, dir)[3]).toEqual({ x: 7, y: -3 });
-    }
+  it('sin mirada solo queda la casilla propia', () => {
+    expect(coneTiles(5.5, 5.5, 0, 0)).toEqual([{ x: 5, y: 5 }]);
   });
 });
 
-/**
- * Los dos casos del autor, con SU numeracion: una rejilla 3x3 del 1 al 9, leida
- * como un teclado de telefono, con el jugador en el 5.
- *
- *   1 2 3
- *   4 5 6
- *   7 8 9
- */
-describe('El area en la rejilla del autor', () => {
-  /** Numero de la casilla (dx, dy) respecto al jugador, del 1 al 9. */
-  const cell = (t: { x: number; y: number }): number => (t.y + 1) * 3 + (t.x + 1) + 1;
-  /** Direccion hacia una casilla de la rejilla. */
-  const toward = (n: number): number => directionOf(((n - 1) % 3) - 1, Math.floor((n - 1) / 3) - 1);
-  const cells = (n: number): number[] => actionTiles(0, 0, toward(n)).map(cell).sort();
-
-  it('mirando a 2, afecta a 1, 2, 3 y 5', () => {
-    expect(cells(2)).toEqual([1, 2, 3, 5]);
-  });
-
-  it('mirando a 3, afecta a 2, 3, 5 y 6', () => {
-    expect(cells(3)).toEqual([2, 3, 5, 6]);
+describe('casilla de enfrente (donde se siembra)', () => {
+  it('es la primera que cruza el centro de la mirada', () => {
+    expect(frontTile(5.5, 5.5, 1, 0)).toEqual({ x: 6, y: 5 });
+    expect(frontTile(5.5, 5.5, 0, -1)).toEqual({ x: 5, y: 4 });
+    // Mirando casi al este pero pegado al borde de arriba, se sale por arriba.
+    expect(frontTile(5.5, 5.05, ...deg(-20))).toEqual({ x: 5, y: 4 });
+    expect(frontTile(5.5, 5.5, ...deg(-20))).toEqual({ x: 6, y: 5 });
   });
 });
 
-/**
- * El enunciado del autor, comprobado como propiedad y no solo como tabla: una
- * tabla podria estar mal copiada y seguir siendo consistente consigo misma.
- */
-describe('La forma del area segun el enunciado del autor', () => {
-  it('mirando en recto, las dos flanqueantes quedan en diagonal del personaje', () => {
-    for (const dir of [N, E, S, W]) {
-      const [aimed, ...flanks] = actionTiles(0, 0, dir).slice(0, 3);
-      // La apuntada es la de justo enfrente: ortogonal.
-      expect(aimed.x === 0 || aimed.y === 0).toBe(true);
-      for (const flank of flanks) {
-        expect(flank.x !== 0 && flank.y !== 0, `${flank.x},${flank.y} no es diagonal`).toBe(true);
-        // Y ademas pegada a la apuntada, «a lado y lado de la primera casilla».
-        expect(Math.abs(flank.x - aimed.x) + Math.abs(flank.y - aimed.y)).toBe(1);
-      }
-    }
-  });
-
-  it('mirando en diagonal, las flanqueantes son adyacentes al personaje y a la apuntada', () => {
-    for (const dir of [NE, SE, SW, NW]) {
-      const [aimed, ...flanks] = actionTiles(0, 0, dir).slice(0, 3);
-      expect(aimed.x !== 0 && aimed.y !== 0).toBe(true);
-      for (const flank of flanks) {
-        // Adyacente al personaje en ortogonal.
-        expect(Math.abs(flank.x) + Math.abs(flank.y)).toBe(1);
-        // Y adyacente a la apuntada.
-        expect(Math.abs(flank.x - aimed.x) + Math.abs(flank.y - aimed.y)).toBe(1);
-      }
-    }
-  });
-
-  it('las diagonales son las impares del anillo', () => {
-    for (let dir = 0; dir < DIRECTIONS.length; dir++) {
-      expect(isDiagonal(dir)).toBe(dir % 2 === 1);
-    }
-  });
-});
-
-describe('Redondear un vector cualquiera a una de las ocho', () => {
-  it('cada direccion se redondea a si misma', () => {
-    for (let dir = 0; dir < DIRECTIONS.length; dir++) {
-      expect(directionOf(DIRECTIONS[dir].x, DIRECTIONS[dir].y)).toBe(dir);
-    }
-  });
-
-  it('un vector intermedio cae en el sector que le toca', () => {
-    // Casi al este, ligeramente al norte: sigue siendo este hasta los 22.5 grados.
-    expect(directionOf(10, -1)).toBe(E);
-    expect(directionOf(10, -3)).toBe(E);
-    // Pasados los 22.5 grados ya es noreste.
-    expect(directionOf(10, -8)).toBe(NE);
-    expect(directionOf(1, -10)).toBe(N);
-  });
-
-  it('el vector nulo no apunta a ningun sitio', () => {
-    // Quien llame decide que hacer; lo que no puede es inventarse una direccion.
-    expect(directionOf(0, 0)).toBe(-1);
-  });
-
-  it('la mirada que se guarda es unitaria', () => {
-    for (let dir = 0; dir < DIRECTIONS.length; dir++) {
-      const f = facingOf(dir);
-      expect(Math.hypot(f.x, f.y)).toBeCloseTo(1, 12);
-      expect(directionOf(f.x, f.y)).toBe(dir);
-    }
-  });
-});
-
-describe('El area de una entidad', () => {
-  function playerAt(x: number, y: number, fx: number, fy: number): [EntityStore, number] {
-    const store = new EntityStore(4);
-    const id = store.spawn(EntityKind.Player, x, y);
-    store.facingX[id] = fx;
-    store.facingY[id] = fy;
-    return [store, id];
-  }
-
-  it('parte de la casilla que pisa, no de su posicion exacta', () => {
-    // El fallo que esto cierra: se apuntaba con `floor(pos + mirada * 1.1)`, asi
-    // que pegado al borde de la casilla se saltaba a dos casillas de distancia.
-    // Se recorre el ancho entero de una casilla y el area no puede moverse.
-    for (const offset of [0.01, 0.25, 0.5, 0.75, 0.99]) {
-      const [store, id] = playerAt(4 + offset, 9 + offset, 1, 0);
-      expect(actionArea(store, id), `fallo con desplazamiento ${offset}`).toEqual([
-        { x: 5, y: 9 },
-        { x: 5, y: 8 },
-        { x: 5, y: 10 },
-        { x: 4, y: 9 },
-      ]);
-    }
-  });
-
-  it('sin mirada todavia, apunta al sur, que es hacia donde nace mirando', () => {
-    const [store, id] = playerAt(0.5, 0.5, 0, 0);
-    expect(actionArea(store, id)[0]).toEqual({ x: 0, y: 1 });
-  });
-
-  it('funciona igual en coordenadas negativas', () => {
-    const [store, id] = playerAt(-3.5, -7.5, 0, -1);
-    expect(actionArea(store, id)).toEqual([
-      { x: -4, y: -9 },
-      { x: -5, y: -9 },
-      { x: -3, y: -9 },
-      { x: -4, y: -8 },
-    ]);
+describe('las dos alturas', () => {
+  it('mirando al frente o arriba, la de arriba; mas de 25 grados hacia abajo, la de abajo', () => {
+    const z = (d: number): number => Math.sin((d * Math.PI) / 180);
+    expect(levelStep(z(0))).toBe(1);
+    expect(levelStep(z(40))).toBe(1);
+    // La primera persona entra mirando a -11 grados: todavia al frente.
+    expect(levelStep(z(-11))).toBe(1);
+    expect(levelStep(z(-24))).toBe(1);
+    expect(levelStep(z(-26))).toBe(-1);
+    // La orbital arranca a 35 grados de elevacion: mira hacia abajo.
+    expect(levelStep(z(-35))).toBe(-1);
   });
 });

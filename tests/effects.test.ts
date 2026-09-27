@@ -6,6 +6,8 @@ import {
   MAX_PARTICLES,
   progressOf,
   SLASH_SECONDS,
+  SLASH_SPREAD,
+  slashArc,
 } from '../packages/client/src/effects.js';
 import { debrisPalette, LOOKS, ROCK_FACES } from '../packages/client/src/palette.js';
 
@@ -148,7 +150,7 @@ describe('Escombros de lo recolectado', () => {
   it('todo caduca solo', () => {
     const effects = new Effects(8);
     effects.spawnDebris(0, 0, PALETTE);
-    effects.spawnSlash([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }]);
+    effects.spawnSlash([{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }]);
     run(effects, 3);
     expect(effects.count).toBe(0);
   });
@@ -163,29 +165,55 @@ describe('Escombros de lo recolectado', () => {
 });
 
 describe('El slash de la accion', () => {
-  it('cubre las tres casillas del area', () => {
-    const area = [
-      { x: 5, y: 5 },
-      { x: 5, y: 4 },
-      { x: 5, y: 6 },
-    ];
-    const effects = new Effects();
-    effects.spawnSlash(area);
-    expect(effects.slashes[0].tiles).toEqual(area);
+  const O = { x: 10, y: 3, z: 20 };
+
+  it('se dibuja delante de la mirada, abarcando lo que abarca el cono', () => {
+    // Mirando al este (+x en el mundo) sin inclinacion.
+    const arc = slashArc(O, 1, 0, 0, 1);
+    for (const p of arc) {
+      const dx = p.x - O.x;
+      const dz = p.z - O.z;
+      // Todo delante, a un radio de distancia en el plano...
+      expect(dx).toBeGreaterThan(0);
+      expect(Math.hypot(dx, dz)).toBeCloseTo(1, 9);
+      // ...y dentro de los ±45 grados del cono.
+      expect(Math.abs(Math.atan2(dz, dx))).toBeLessThanOrEqual(SLASH_SPREAD + 1e-9);
+    }
+    // De un extremo al otro del cono, y el centro justo delante.
+    const mid = arc[Math.floor(arc.length / 2)];
+    expect(mid.x - O.x).toBeCloseTo(1, 9);
+    expect(mid.z - O.z).toBeCloseTo(0, 9);
+    expect(Math.abs(arc[0].z - arc[arc.length - 1].z)).toBeCloseTo(2 * Math.sin(SLASH_SPREAD), 9);
+  });
+
+  it('va en diagonal: de la derecha y arriba a la izquierda y abajo', () => {
+    // Mirando al este, la derecha es +z (la misma que `camera.right()`).
+    const arc = slashArc(O, 1, 0, 0, 1);
+    expect(arc[0].z).toBeGreaterThan(O.z);
+    expect(arc[arc.length - 1].z).toBeLessThan(O.z);
+    expect(arc[0].y).toBeGreaterThan(arc[arc.length - 1].y);
+  });
+
+  it('en primera persona sigue la inclinacion de la mirada', () => {
+    const down = slashArc(O, 1, 0, -0.5, 1);
+    const mid = down[Math.floor(down.length / 2)];
+    // El centro del arco cae sobre el rayo de la mirada.
+    expect(mid.y - O.y).toBeCloseTo(Math.sin(-0.5), 9);
+    expect(mid.x - O.x).toBeCloseTo(Math.cos(-0.5), 9);
   });
 
   it('no se queda con la lista de quien lo pidio', () => {
     // Si guardara la referencia, mover al jugador movería un slash ya lanzado.
-    const area = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }];
+    const points = [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }];
     const effects = new Effects();
-    effects.spawnSlash(area);
-    area[0].x = 99;
-    expect(effects.slashes[0].tiles[0].x).toBe(0);
+    effects.spawnSlash(points);
+    points[0] = { x: 99, y: 0, z: 0 };
+    expect(effects.slashes[0].points[0].x).toBe(0);
   });
 
   it('dura lo acordado y avanza de cero a uno', () => {
     const effects = new Effects();
-    effects.spawnSlash([{ x: 0, y: 0 }]);
+    effects.spawnSlash([{ x: 0, y: 0, z: 0 }]);
     expect(progressOf(effects.slashes[0])).toBe(0);
 
     // El primer paso es el fotograma regalado: nace y se dibuja sin envejecer.
@@ -223,7 +251,7 @@ describe('El slash de la accion', () => {
 describe('Un efecto nace y se ve, por lento que vaya el fotograma', () => {
   it('el slash sobrevive a un fotograma mas largo que su propia vida', () => {
     const effects = new Effects();
-    effects.spawnSlash([{ x: 0, y: 0 }]);
+    effects.spawnSlash([{ x: 0, y: 0, z: 0 }]);
 
     // El peor fotograma medido en CI: 840 ms, casi cuatro vidas del slash.
     effects.advance(0.84);
@@ -249,7 +277,7 @@ describe('Un efecto nace y se ve, por lento que vaya el fotograma', () => {
     // solo entonces mirar, que es cuando dibuja el renderizador.
     const seen = (frame: number): boolean => {
       const effects = new Effects();
-      effects.spawnSlash([{ x: 0, y: 0 }]);
+      effects.spawnSlash([{ x: 0, y: 0, z: 0 }]);
       effects.advance(frame);
       return effects.slashes.length > 0;
     };

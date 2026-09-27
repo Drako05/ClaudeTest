@@ -13,7 +13,6 @@ import { moveAirborne, moveEntity } from './systems/movement.js';
 import { applyVertical, takeOff } from './systems/jump.js';
 import { updateSurvival } from './systems/survival.js';
 import { tryEat, tryHarvestArea, tryPlant, type HarvestResult } from './systems/gathering.js';
-import { directionOf, facingOf } from './aim.js';
 import { toChunkCoord, World } from './world.js';
 
 /** Radio de chunks mantenidos cargados alrededor del jugador. */
@@ -121,12 +120,15 @@ export function step(state: GameState, intent: Intent): void {
     // El apuntado manda sobre la mirada que acaba de fijar el movimiento: con
     // raton se mira a donde apunta el cursor aunque se ande en otra direccion.
     // Sin apuntado la mirada sigue al movimiento, que es lo de siempre.
-    const aimed = directionOf(intent.aimX, intent.aimY);
-    if (aimed >= 0) {
-      const facing = facingOf(aimed);
-      entities.facingX[playerId] = facing.x;
-      entities.facingY[playerId] = facing.y;
+    // La mirada entra tal cual, sin encajarla en ocho direcciones: es el eje del
+    // cono de la accion (`sim/aim.ts`), y redondearla era justo lo que hacia que
+    // en primera persona se golpeara lo que no estaba delante de los ojos.
+    const aimLen = Math.hypot(intent.aimX, intent.aimY);
+    if (aimLen > 0) {
+      entities.facingX[playerId] = intent.aimX / aimLen;
+      entities.facingY[playerId] = intent.aimY / aimLen;
     }
+    entities.lookZ[playerId] = intent.aimZ ?? 0;
 
     if (intent.harvest) {
       state.lastHarvest = tryHarvestArea(world, entities, playerId, inventory, state.tick);
