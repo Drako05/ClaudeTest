@@ -131,6 +131,64 @@
         #action { width: 80px; height: 80px; }
       }
       #proj:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
+      /* Sostener el ojo abre la barra del angulo: que el movil no saque su menu. */
+      #proj { -webkit-touch-callout: none; }
+
+      /*
+        La barra del angulo de vision de la primera persona (`fov-panel.ts`).
+
+        Sale DESDE DETRAS del ojo hacia la izquierda, como pidio el autor: nace
+        en el centro del ojo, una capa por debajo, y se despliega escalando
+        desde su borde derecho. Un largo comodo y no todo el ancho de arriba:
+        180 px de barra, con los grados a su izquierda y una marca cada 10.
+      */
+      #fovPanel {
+        position: fixed; z-index: 11;
+        top: calc(12px + env(safe-area-inset-top));
+        right: calc(34px + env(safe-area-inset-right));
+        height: 44px; padding: 0 34px 0 14px;
+        display: flex; align-items: center; gap: 10px;
+        color: #e8eef7; background: rgba(8, 14, 28, 0.82);
+        border: 1px solid rgba(140, 190, 255, 0.34); border-radius: 22px;
+        backdrop-filter: blur(6px);
+        font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        transform-origin: right center; transform: scaleX(0); opacity: 0;
+        visibility: hidden; pointer-events: none;
+        transition: transform .15s ease-out, opacity .15s ease-out, visibility 0s linear .15s;
+      }
+      #fovPanel.open {
+        transform: none; opacity: 1; visibility: visible; pointer-events: auto;
+        transition: transform .15s ease-out, opacity .15s ease-out, visibility 0s;
+      }
+      #fovValue { min-width: 3.2em; text-align: right; }
+      .fov-track { position: relative; width: 180px; height: 28px; }
+      #fovRange {
+        -webkit-appearance: none; appearance: none;
+        position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+        background: transparent; cursor: pointer; touch-action: none;
+      }
+      #fovRange:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 2px; }
+      #fovRange::-webkit-slider-runnable-track {
+        height: 4px; border-radius: 2px; background: rgba(170, 214, 255, .45);
+      }
+      #fovRange::-moz-range-track {
+        height: 4px; border-radius: 2px; background: rgba(170, 214, 255, .45);
+      }
+      #fovRange::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px;
+        border-radius: 50%; background: #e8eef7; border: 2px solid #3c68a8;
+      }
+      #fovRange::-moz-range-thumb {
+        width: 12px; height: 12px; border-radius: 50%;
+        background: #e8eef7; border: 2px solid #3c68a8;
+      }
+      /* Las marcas, una cada 10 grados de 50 a 100. Van metidas medio pulgar
+         por cada lado, que es por donde viaja el centro del pulgar. */
+      .fov-ticks {
+        position: absolute; left: 8px; right: 8px; bottom: 1px; height: 6px;
+        display: flex; justify-content: space-between; pointer-events: none;
+      }
+      .fov-ticks i { width: 1px; height: 100%; background: rgba(200, 225, 255, .7); }
 
       /* El joystick flotante: nace donde apoyas el pulgar dentro del cuadrante
          inferior izquierdo. Verlo es lo que hace evidente que esa zona es del
@@ -475,6 +533,16 @@
         <path class="eye-aim" d="M12 .8v3.4M12 19.8v3.4" />
       </svg>
     </button>
+    <!-- El angulo de vision de la primera persona. Va DESPUES del ojo en el
+         documento pero por debajo en capas: sale desde detras de el. -->
+    <div id="fovPanel" aria-hidden="true">
+      <output id="fovValue" for="fovRange">70°</output>
+      <div class="fov-track">
+        <input id="fovRange" type="range" min="50" max="100" step="1" value="70" tabindex="-1"
+               aria-label="Ángulo de visión en primera persona" />
+        <div class="fov-ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
     <!-- El HUD, arriba a la izquierda y cerrado al arrancar. El icono es una
          «i» de informacion, monocroma como el ojo. -->
     <button id="hudToggle" type="button" aria-expanded="false" aria-controls="hud"

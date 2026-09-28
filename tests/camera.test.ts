@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { FP_EYE, FP_FOV, FP_MIN_FOV, OrbitCamera } from '../packages/client/src/camera.js';
+import {
+  FP_EYE,
+  FP_FOV,
+  FP_FOV_MAX,
+  FP_FOV_MIN,
+  FP_MIN_FOV,
+  OrbitCamera,
+} from '../packages/client/src/camera.js';
 
 /**
  * Las tres vistas del ojo: perspectiva, isometrica y primera persona.
@@ -188,6 +195,39 @@ describe('El catalejo de la primera persona', () => {
     expect(cam.fov).toBeCloseTo(FP_FOV * 0.4, 9);
     for (let i = 0; i < 60; i++) cam.relaxSpyglass(1 / 60, false);
     expect(cam.fov).toBe(FP_FOV);
+  });
+
+  it('el angulo de la barra va de 50 a 100, al grado, y arranca en 70', () => {
+    const cam = fp();
+    expect(cam.fov).toBe(70);
+    cam.setFpFov(87.4);
+    expect(cam.fov).toBe(87);
+    cam.setFpFov(10);
+    expect(cam.fpFov).toBe(FP_FOV_MIN);
+    cam.setFpFov(400);
+    expect(cam.fpFov).toBe(FP_FOV_MAX);
+    cam.setFpFov(NaN);
+    expect(cam.fpFov).toBe(FP_FOV_MAX);
+  });
+
+  it('el catalejo parte del angulo elegido, llega a 15 y vuelve a el', () => {
+    const cam = fp();
+    cam.setFpFov(95);
+    cam.zoom(0.5);
+    expect(cam.fov).toBeCloseTo(47.5, 9);
+    cam.zoom(0.001);
+    expect(cam.fov).toBeCloseTo(FP_MIN_FOV, 9);
+    for (let i = 0; i < 60; i++) cam.relaxSpyglass(1 / 60, false);
+    expect(cam.fov).toBe(95);
+    cam.resize(800, 600);
+    expect(cam.firstPerson.fov).toBe(95);
+  });
+
+  it('el angulo de la primera persona no toca la perspectiva', () => {
+    const cam = new OrbitCamera();
+    const fov = cam.fov;
+    cam.setFpFov(100);
+    expect(cam.fov).toBe(fov);
   });
 
   it('en las otras vistas la pinza sigue siendo el zoom de siempre', () => {

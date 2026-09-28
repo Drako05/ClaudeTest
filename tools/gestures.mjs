@@ -115,6 +115,64 @@ await page.waitForTimeout(800);
 const stopped = await page.evaluate(() => window.__verdant);
 check(stopped.sent.harvest === released.sent.harvest, 'la accion siguio repitiendo tras soltar el dedo');
 
+// La barra del angulo de vision, con toques de verdad: sostener el ojo mas de
+// 1 s la abre SOLO en primera persona y al soltar no cambia de vista; un toque
+// corto cambia de vista y la cierra; tocar en otro sitio la cierra.
+const center = (id) => page.evaluate((i) => {
+  const r = document.getElementById(i).getBoundingClientRect();
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2, left: r.x, right: r.x + r.width };
+}, id);
+const probe = () => page.evaluate(() => window.__verdant);
+const eye = await center('proj');
+async function holdEye(ms) {
+  await real('touchStart', [eye]);
+  await page.waitForTimeout(ms);
+  const during = await probe();
+  await real('touchEnd', []);
+  await page.waitForTimeout(300);
+  return during;
+}
+async function tapReal(p) {
+  await real('touchStart', [p]);
+  await real('touchEnd', []);
+  await page.waitForTimeout(300);
+}
+const offFp = await holdEye(1300);
+check(offFp.projection !== 'primera' && !offFp.fovPanel, 'sostener el ojo fuera de la primera persona abrio la barra');
+check(!(await probe()).fovPanel, 'la barra quedo abierta fuera de la primera persona');
+for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) await tapReal(eye);
+check((await probe()).projection === 'primera', 'tocar el ojo no llevo a la primera persona');
+const early = await holdEye(500);
+check(!early.fovPanel, 'medio segundo en el ojo ya abrio la barra');
+check((await probe()).projection === 'perspectiva', 'un toque corto en el ojo no cambio de vista');
+for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) await tapReal(eye);
+const holding = await holdEye(1300);
+const afterHold = await probe();
+check(holding.fovPanel, 'sostener el ojo mas de 1 s en primera persona no abrio la barra');
+check(afterHold.fovPanel && afterHold.projection === 'primera',
+  `al soltar el ojo la barra se cerro o cambio la vista (${afterHold.projection})`);
+// Arrastrar el pulgar de la barra hasta el extremo derecho.
+const bar = await center('fovRange');
+const from = { x: bar.left + (bar.right - bar.left) * 0.4, y: bar.y };
+await real('touchStart', [from]);
+for (let i = 1; i <= 10; i++) await real('touchMove', [{ x: from.x + ((bar.right - from.x) * i) / 10, y: bar.y }]);
+await real('touchEnd', []);
+await page.waitForTimeout(300);
+const slid = await probe();
+console.log(`  angulo con el dedo: ${afterHold.fpFov} -> ${slid.fpFov}, barra abierta: ${slid.fovPanel}`);
+check(slid.fpFov > afterHold.fpFov && slid.fov === slid.fpFov, 'arrastrar la barra no cambio el angulo');
+check(slid.fovPanel, 'arrastrar la barra la cerro');
+await page.screenshot({ path: 'screenshots/movil-angulo.png' });
+await tapReal({ x: 200, y: 420 });
+check(!(await probe()).fovPanel, 'tocar el mundo no cerro la barra');
+await holdEye(1300);
+check((await probe()).fovPanel, 'la barra no volvio a abrirse');
+await tapReal(eye);
+const tapped = await probe();
+check(tapped.projection === 'perspectiva' && !tapped.fovPanel,
+  `un toque corto con la barra abierta no cambio de vista o no la cerro (${tapped.projection}, ${tapped.fovPanel})`);
+await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
+
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();
 server.close();

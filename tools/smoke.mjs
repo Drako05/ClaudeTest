@@ -449,6 +449,9 @@ async function desktopPass(browser, baseUrl) {
   await page.waitForTimeout(200);
   const orto = await state(page);
   check(orto.projection === 'orto', `el ojo no cambio a isometrica (${orto.projection})`);
+  // El raton paso por el ojo en perspectiva: la barra del angulo es solo de la
+  // primera persona.
+  check(orto.fovPanel === false, 'la barra del angulo se abrio fuera de la primera persona');
   check(await page.isVisible('#proj.flat'), 'el ojo no se entrecerro en isometrica');
   await page.click('#proj');
   await page.waitForTimeout(300);
@@ -456,13 +459,43 @@ async function desktopPass(browser, baseUrl) {
   check(fp.projection === 'primera', `el ojo no cambio a primera persona (${fp.projection})`);
   check(await page.isVisible('#proj.fp'), 'el ojo no lleva la mira en primera persona');
   check(fp.playerVisible === false, 'en primera persona se ve el cuerpo del personaje');
+  // La barra del angulo: sale al PASAR el raton por el ojo, sin clic; salir
+  // no la cierra, y cualquier accion —una tecla, un clic fuera— si.
+  const fovShown = async () => (await state(page)).fovPanel && (await page.isVisible('#fovPanel'));
+  await page.mouse.move(CLICK.x, CLICK.y);
+  await page.hover('#proj');
+  await page.waitForTimeout(250);
+  check(await fovShown(), 'pasar el raton por el ojo en primera persona no abrio la barra');
+  check((await page.textContent('#fovValue')) === '70°', 'la barra no arranca en 70°');
+  await page.locator('#fovRange').fill('90');
+  const wide = await state(page);
+  const wideLabel = await page.textContent('#fovValue');
+  console.log(`  angulo de vision: 70 -> ${wide.fpFov} (${wideLabel}), en uso ${wide.fov}`);
+  check(wide.fov === 90 && wide.fpFov === 90, `la barra no cambio el campo de vision (${wide.fov})`);
+  check(wideLabel === '90°', `el numero de la barra no siguio al angulo (${wideLabel})`);
+  await page.screenshot({ path: join(SHOTS, '3d-02c-angulo.png') });
+  await page.mouse.move(CLICK.x, CLICK.y);
+  await page.waitForTimeout(250);
+  check(await fovShown(), 'la barra se cerro al sacar el raton del ojo');
+  await page.keyboard.press('KeyE');
+  await page.waitForTimeout(250);
+  check(!(await fovShown()), 'una tecla no cerro la barra del angulo');
+  await page.hover('#proj');
+  await page.waitForTimeout(250);
+  check(await fovShown(), 'la barra no volvio a abrirse con el raton');
+  await page.mouse.click(CLICK.x, CLICK.y);
+  await page.waitForTimeout(250);
+  check(!(await fovShown()), 'un clic fuera no cerro la barra del angulo');
   // El barrido tiene que llegar a dibujarse tambien desde los ojos. Desde el
   // nacimiento, con las casillas al alcance (regla 22).
   const fpStart = await open(page, baseUrl);
   await page.keyboard.press('KeyP');
   await page.keyboard.press('KeyP');
   await page.waitForTimeout(300);
-  check((await state(page)).projection === 'primera', 'P no llevo a la primera persona');
+  const fpAgain = await state(page);
+  check(fpAgain.projection === 'primera', 'P no llevo a la primera persona');
+  check(fpAgain.fov === 90, `el angulo elegido no se recordo al recargar (${fpAgain.fov})`);
+  await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
   await page.mouse.click(CLICK.x, CLICK.y);
   await page.waitForTimeout(400);
   const fpHit = await state(page);

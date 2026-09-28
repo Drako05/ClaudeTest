@@ -60,6 +60,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | `I` | Inventario |
 | `R` | Mundo nuevo |
 | `P` | Vista: perspectiva → isometrica → primera persona |
+| Raton sobre el ojo | En primera persona, barra del angulo de vision (50-100°); cualquier accion la cierra |
 | `F3` | Panel de desarrollo |
 
 **Tactil** (aparece solo en dispositivos de puntero grueso, o al primer toque)
@@ -72,6 +73,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Boton ACCION | Accionar; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar la accion |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
 | Botones COMER y SEMBRAR | Comer bayas y sembrar |
+| Sostener el ojo mas de 1 s | En primera persona, barra del angulo de vision; tocar fuera la cierra |
 
 **La mirada es una sola** en las tres vistas: el centro de la pantalla es hacia
 donde mira el jugador. Se golpea con un sector plano de 2 bloques y 90 grados

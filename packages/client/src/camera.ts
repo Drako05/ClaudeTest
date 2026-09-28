@@ -65,8 +65,14 @@ const ORTHO_DISTANCE = 60;
 
 /** Por debajo de esta distancia, el jugador se oculta. **Deduccion mia.** */
 export const HIDE_PLAYER_BELOW = 1;
-/** Campo de vision de la primera persona: el de Minecraft. **Deduccion mia.** */
+/**
+ * Campo de vision de la primera persona por defecto: el de Minecraft. El
+ * jugador lo cambia con la barra del ojo (`fov-panel.ts`), entre `FP_FOV_MIN` y
+ * `FP_FOV_MAX`: rango y defecto son del autor. Grados verticales.
+ */
 export const FP_FOV = 70;
+export const FP_FOV_MIN = 50;
+export const FP_FOV_MAX = 100;
 /** Lo mas que estrecha el catalejo. **Deduccion mia.** */
 export const FP_MIN_FOV = 15;
 /** Lo que tarda el catalejo en volver, como constante de tiempo (segundos). */
@@ -96,6 +102,8 @@ export class OrbitCamera {
    * catalejo; la pinza o la rueda lo bajan y `relaxSpyglass` lo devuelve.
    */
   fovZoom = 1;
+  /** Campo de vision de la primera persona elegido en la barra, en grados. */
+  fpFov = FP_FOV;
 
   /**
    * La vista de arranque.
@@ -129,7 +137,17 @@ export class OrbitCamera {
   /** Campo de vision vertical en uso, en grados. Cero en la isometrica. */
   get fov(): number {
     if (this.projection === 'orto') return 0;
-    return this.projection === 'primera' ? FP_FOV * this.fovZoom : FOV;
+    return this.projection === 'primera' ? this.fpFov * this.fovZoom : FOV;
+  }
+
+  /**
+   * Fija el campo de vision de la primera persona, acotado y al grado. El
+   * catalejo parte de el (decision del autor): lo que estrecha es una fraccion
+   * de este, y al soltar vuelve aqui.
+   */
+  setFpFov(deg: number): void {
+    if (!Number.isFinite(deg)) return;
+    this.fpFov = clamp(Math.round(deg), FP_FOV_MIN, FP_FOV_MAX);
   }
 
   /** Perspectiva → isometrica → primera persona → perspectiva. */
@@ -162,7 +180,7 @@ export class OrbitCamera {
     if (this.projection === 'primera') {
       // En primera persona no hay distancia que acortar: el zoom es un
       // catalejo, que estrecha el campo de vision mientras dura el gesto.
-      this.fovZoom = clamp(this.fovZoom * factor, FP_MIN_FOV / FP_FOV, 1);
+      this.fovZoom = clamp(this.fovZoom * factor, FP_MIN_FOV / this.fpFov, 1);
       return;
     }
     // El minimo no es «lo mas cerca posible»: por debajo de unas diez casillas
@@ -189,7 +207,7 @@ export class OrbitCamera {
     this.perspective.aspect = aspect;
     this.perspective.updateProjectionMatrix();
     this.firstPerson.aspect = aspect;
-    this.firstPerson.fov = FP_FOV * this.fovZoom;
+    this.firstPerson.fov = this.fpFov * this.fovZoom;
     this.firstPerson.updateProjectionMatrix();
     // En ortografica el «zoom» es el ancho del encuadre, no la distancia: la
     // distancia no cambia el tamano de nada porque no hay fuga.

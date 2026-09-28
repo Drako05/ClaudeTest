@@ -59,6 +59,7 @@ import { buildShadows, type ShadowSpot } from './shadows.js';
 import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
 import { chunkMesh, cornerHeight } from './terrain-mesh.js';
+import { FovPanel } from './fov-panel.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
 import { berrySpot, cliffSpot, mineralSpot, peakSpot, reliefAround } from './probes.js';
@@ -134,12 +135,28 @@ function renderProjButton(): void {
   projButton.title = label;
 }
 
+/** La barra del angulo de vision de la primera persona, detras del ojo. */
+const fovPanel = new FovPanel(
+  document.getElementById('fovPanel') as HTMLElement,
+  document.getElementById('fovRange') as HTMLInputElement,
+  document.getElementById('fovValue') as HTMLElement,
+  projButton,
+  camera,
+);
+
 function toggleProjection(): void {
   camera.cycleProjection();
+  // Cambiar de vista la cierra siempre: un toque corto en el ojo, aunque
+  // estuviera abierta, cambia de vista como siempre (decision del autor).
+  fovPanel.hide();
   renderProjButton();
 }
 renderProjButton();
-projButton.addEventListener('click', toggleProjection);
+projButton.addEventListener('click', () => {
+  // El toque sostenido que abrio la barra no cambia de vista al soltar.
+  if (fovPanel.takeSwallowedClick()) return;
+  toggleProjection();
+});
 controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));
 controls.bindRunButton(document.getElementById('run'));
@@ -564,6 +581,9 @@ Object.defineProperty(window, '__verdant', {
       projection: camera.projection,
       /** Campo de vision en uso: el catalejo de la primera persona lo estrecha. */
       fov: camera.fov,
+      /** El angulo elegido en la barra del ojo, y si la barra esta abierta. */
+      fpFov: camera.fpFov,
+      fovPanel: fovPanel.open,
       /** A que distancia del pivote ha quedado la camara tras la colision. */
       camDistance: camera.camDistance,
       /** Cuanto queda la camara por ENCIMA del suelo que tiene debajo. */

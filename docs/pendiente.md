@@ -53,12 +53,16 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La mochila del inventario y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y el muslo | La franja de salud y hambre | SVG |
 | Con el inventario abierto en el movil, el panel **tapa** comer, sembrar y correr hasta que se cierra | La franja de salud y hambre | CSS |
 | El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `CLAUDE.md`, racimo del pulgar | un numero |
-| Primera persona: ojos a **1,75** sobre los pies, campo de vision **70°**, se entra mirando **-0,2 rad** hacia el suelo, catalejo hasta **15°** | `CLAUDE.md`, las tres vistas | numeros en `camera.ts` |
+| Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 50-100, 70 por defecto) | `CLAUDE.md`, las tres vistas | un numero en `camera.ts` |
+| La barra del angulo: **180 px** de largo, paso de **1 grado**, se despliega en **150 ms** | Angulo de vision ajustable | CSS y un atributo |
+| En PC la abre solo el **raton** al pasar; un dedo que toca el ojo no cuenta como pasar por encima | Angulo de vision ajustable | una linea en `fov-panel.ts` |
+| **Cualquier tecla** la cierra, flechas incluidas (con la barra enfocada no la mueven: se anda) | Angulo de vision ajustable | una linea |
+| Los grados son **verticales**, como el 70 de siempre: a 100, un movil apaisado ve mas de 140 en horizontal | Angulo de vision ajustable | una conversion |
 | Con raton el catalejo vuelve **0,8 s** despues del ultimo giro de rueda (no hay «soltar») | `CLAUDE.md`, las tres vistas | un numero |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
 | Tronco = el tramo **desnudo** hasta la copa, y la copa **conserva su tamano** | Arboles altos | redibujar el arte |
-| El tronco desnudo **por especie** (μ ± σ): picea comun 2,5 ± 0,35, alerce 4 ± 0,5, roble 2,4 ± 0,3, cerezo 2,2 ± 0,2, picea negra 2,1 ± 0,1, picea azul 2,2 ± 0,2; **truncada** en `[max(2, μ−2σ), μ+2σ]` | Troncos por especie | numeros en `tree-shapes.ts` |
-| Grosor del tronco por especie (0,45; 0,40; **0,75**; 0,50; **0,22**; 0,40) y que crezca con `√(desnudo/μ)` | Troncos por especie | numeros en `tree-shapes.ts` |
+| El tronco desnudo **por especie** (μ ± σ): picea comun 2,5 ± 0,35, alerce 4 ± 0,5, roble 2,4 ± 0,3, cerezo 2,2 ± 0,2, picea negra 2,1 ± 0,1, picea azul 2,2 ± 0,2; **truncada** en `[max(2, μ−2σ), μ+2σ]` | Troncos por especie | numeros en `sim/trunk.ts` |
+| Grosor del tronco por especie (0,45; 0,40; **0,75**; 0,50; **0,22**; 0,40) y que crezca con `√(desnudo/μ)` | Troncos por especie | numeros en `sim/trunk.ts` |
 | **Casi todas las copas quedan justo sobre la cabeza** (el minimo es 2 y el jugador mide 1,93); solo el alerce las deja altas | Troncos por especie | las medias de la tabla |
 | El tronco va en escalones de **un cuarto de bloque** (13 alturas) | Arboles altos | un numero |
 | Coniferas, frondosos y los **raros** sacan el tronco de la misma normal | Arboles altos | un `if` |
@@ -266,6 +270,23 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Angulo de vision ajustable — HECHO (2026-09-28)
+
+Pediste poder cambiar el campo de vision de la primera persona dentro del juego.
+Es una barra de 50 a 100 grados que sale desde detras del ojo, con una marca
+cada 10 y los grados a su izquierda, y arranca en 70. En PC se abre al pasar el
+raton por el ojo; en el movil, al sostenerlo mas de 1 s, y al soltar no cambia
+de vista. Un toque corto cambia de vista y la cierra, y cualquier otra accion o
+toque fuera tambien la cierra. Decidiste ademas que solo exista en primera
+persona, que el angulo se recuerde en cada dispositivo y que el catalejo parta
+de el. Lo que decidi yo esta arriba, en «Esperando tu juicio».
+
+Lo comprueban el humo (raton) y `npm run gestures`, este con toques de verdad.
+Sostener el ojo abre la barra solo en primera persona, medio segundo no la
+abre, el dedo la arrastra de 70 a 100 y tocar el mundo la cierra. El toque
+corto cambia de vista y la cierra. Con el clic del toque sostenido sin tragar,
+la comprobacion cae.
 
 ## Golpe por hitbox y una sola mirada — HECHO (2026-09-28)
 

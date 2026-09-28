@@ -758,6 +758,23 @@ orbitales, que «agarran el mundo»—; y la pinza es un **catalejo temporal**, 
 estrecha el campo de vision y al soltar vuelve. En la interfaz la ortografica
 se llama «isometrica», que es como la llama el autor.
 
+**El angulo de vision de la primera persona se ajusta en el juego**, con una
+barra de **50 a 100 grados** que sale desde detras del ojo, una marca cada 10 y
+los grados a su izquierda; **70 por defecto**. Todo eso y como se abre y se
+cierra es del autor (2026-09-28), y **solo existe en primera persona**. En
+**PC** se abre al **pasar el raton** por el ojo, sin clic, y salir no la
+cierra; en el **movil**, con un **toque sostenido de mas de 1 s**, y al soltar
+no cambia de vista. Un toque corto en el ojo cambia de vista como siempre y la
+cierra aunque estuviera abierta; cualquier accion —una tecla, la rueda, apoyar
+el raton o el dedo fuera de ella— tambien. Por eso al ojo no lo cierra su
+`pointerdown` sino su `click`: si no, sostenerlo con la barra abierta la haria
+parpadear. El angulo **se recuerda** en el navegador de cada dispositivo
+(`localStorage`, solo comodidad) y **el catalejo parte de el**. La logica va en
+`fov-panel.ts`; el toque sostenido lo comprueba `tools/gestures.mjs` con toques
+de verdad, porque tras sostener un dedo el navegador aun manda su `click`, y
+sin tragarselo se cambiaba de vista al soltar (medido: con el clic sin tragar,
+cae). Son grados **verticales**, como siempre.
+
 **Las tres comparten la mirada ENTERA** (decision del autor, 2026-09-28): el
 mismo pivote —los ojos del jugador, `EYE_HEIGHT = 1,75` en el nucleo, que es
 tambien el origen del golpe— y la misma direccion, rumbo e inclinacion, que es
@@ -788,7 +805,7 @@ decision del autor.
 
 El cuerpo del jugador no se dibuja desde dentro. Los numeros —ojos a 1,75, la
 inclinacion de arranque −0,62 (los 35 grados de la perspectiva de siempre), el
-tope de ±83 grados, 70° en primera persona, catalejo hasta 15°, la vuelta del
+tope de ±83 grados, catalejo hasta 15°, la vuelta del
 catalejo con raton a los 0,8 s, el margen de 0,3 y los topes de la colision— son
 deduccion mia; estan en `docs/pendiente.md`.
 
