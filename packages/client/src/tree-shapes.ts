@@ -44,24 +44,12 @@ export interface TreeShape {
    * El alerce es el que lo tiene: pierde la aguja y deja ver el tronco.
    */
   readonly open: number;
-  /**
-   * Tronco DESNUDO, del suelo a la copa: media y desviacion de la normal de la
-   * que sale cada arbol (`trunk.ts`), en bloques. Cada especie el suyo, porque
-   * en la picea negra, tan estrecha, un palo largo se veia raro (el autor). La
-   * unica regla que no es de la especie es suya: nunca menos de 2.
-   */
-  readonly bareMean: number;
-  readonly bareSd: number;
-  /**
-   * Grosor del tronco en el pie, en bloques, para el arbol de tronco medio. Uno
-   * mas alto de su especie sale mas grueso (`√(desnudo/media)`).
-   */
-  readonly trunkW: number;
 }
 
 /**
- * Las medias de tronco desnudo, sus desviaciones y los grosores son deduccion
- * mia a partir del porte de cada especie; estan en `docs/pendiente.md`.
+ * Solo la COPA: el tronco de cada especie —su tramo desnudo y su grosor— vive en
+ * el nucleo (`TREE_TRUNKS` en `sim/trunk.ts`), porque es el hitbox del arbol y
+ * el golpe lo decide la simulacion (regla 12).
  */
 export const TREE_SHAPES: Partial<Record<Feature, TreeShape>> = {
   // Picea abies: cono esbelto, de un tercio largo de ancho que de alto. En el
@@ -69,40 +57,34 @@ export const TREE_SHAPES: Partial<Record<Feature, TreeShape>> = {
   [Feature.ForestTree]: {
     species: 'Picea comun (Picea abies)',
     silhouette: 'cone', crownH: 5, crownW: 2, tiers: 5, open: 0,
-    bareMean: 2.5, bareSd: 0.35, trunkW: 0.45,
   },
   // Larix decidua: cono mas abierto y ralo; en otono, dorado y con huecos. Es
   // de luz y se poda mucho: el fuste mas largo de todos, hasta la mitad.
   [Feature.ForestTreeRare]: {
     species: 'Alerce europeo en otono (Larix decidua)',
     silhouette: 'cone', crownH: 4.5, crownW: 2, tiers: 4, open: 0.55,
-    bareMean: 4, bareSd: 0.5, trunkW: 0.4,
   },
   // Quercus robur aislado: cupula mas ancha que alta, fuste corto y muy grueso.
   [Feature.MeadowTree]: {
     species: 'Roble aislado (Quercus robur)',
     silhouette: 'dome', crownH: 3.5, crownW: 4.4, tiers: 0, open: 0,
-    bareMean: 2.4, bareSd: 0.3, trunkW: 0.75,
   },
   // Prunus serrulata: sombrilla baja y muy ancha sobre un fuste corto.
   [Feature.MeadowTreeRare]: {
     species: 'Cerezo japones en flor (Prunus serrulata)',
     silhouette: 'umbrella', crownH: 3, crownW: 4.5, tiers: 0, open: 0,
-    bareMean: 2.2, bareSd: 0.2, trunkW: 0.5,
   },
   // Picea mariana: la aguja de la taiga, una cuarta parte de ancha que de alta,
   // con la punta tupida y ramas casi hasta el suelo sobre un tronco fino.
   [Feature.TundraTree]: {
     species: 'Picea negra (Picea mariana)',
     silhouette: 'spire', crownH: 5, crownW: 1.25, tiers: 7, open: 0,
-    bareMean: 2.1, bareSd: 0.1, trunkW: 0.22,
   },
   // Picea pungens: cono denso y regular, algo mas ancho que la comun; crecida
   // en abierto, la copa baja hasta el suelo.
   [Feature.TundraTreeRare]: {
     species: 'Picea azul (Picea pungens)',
     silhouette: 'cone', crownH: 4.5, crownW: 2, tiers: 6, open: 0,
-    bareMean: 2.2, bareSd: 0.2, trunkW: 0.4,
   },
 };
 

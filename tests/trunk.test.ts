@@ -8,12 +8,13 @@ import {
   trunkBucket,
   trunkRange,
   type TrunkLaw,
-} from '../packages/client/src/trunk.js';
-import { TREE_SHAPES, treeShapeOf } from '../packages/client/src/tree-shapes.js';
+  TREE_TRUNKS,
+  treeTrunkOf,
+} from '@verdant/sim';
 
 /**
  * El tronco desnudo de los arboles adultos: cada especie con su normal truncada
- * (`tree-shapes.ts`) y una sola regla comun, del autor: nunca menos de 2 bloques.
+ * (`TREE_TRUNKS` en `sim/trunk.ts`) y una sola regla comun, del autor: nunca menos de 2 bloques.
  */
 function sample(law: TrunkLaw, seed = 12345): number[] {
   const values: number[] = [];
@@ -26,11 +27,11 @@ function sample(law: TrunkLaw, seed = 12345): number[] {
 const mean = (v: number[]): number => v.reduce((a, b) => a + b, 0) / v.length;
 
 describe('tronco de los arboles, por especie', () => {
-  const species = Object.keys(TREE_SHAPES).map(Number) as Feature[];
+  const species = Object.keys(TREE_TRUNKS).map(Number) as Feature[];
 
   it('ninguno baja de 2 bloques, y cada especie se queda en su rango', () => {
     for (const f of species) {
-      const shape = treeShapeOf(f)!;
+      const shape = treeTrunkOf(f)!;
       const [lo, hi] = trunkRange(shape);
       expect(lo).toBeGreaterThanOrEqual(TRUNK_MIN);
       for (const v of sample(shape)) {
@@ -42,7 +43,7 @@ describe('tronco de los arboles, por especie', () => {
 
   it('la media de cada especie queda cerca de la suya', () => {
     for (const f of species) {
-      const shape = treeShapeOf(f)!;
+      const shape = treeTrunkOf(f)!;
       // Truncar por abajo en 2 empuja la media hacia arriba en las especies que
       // rozan el minimo; nunca mas de media desviacion.
       const m = mean(sample(shape));
@@ -52,14 +53,14 @@ describe('tronco de los arboles, por especie', () => {
   });
 
   it('la picea negra lleva el tronco mas corto y el alerce el mas largo', () => {
-    const means = species.map((f) => [f, mean(sample(treeShapeOf(f)!))] as const);
+    const means = species.map((f) => [f, mean(sample(treeTrunkOf(f)!))] as const);
     means.sort((a, b) => a[1] - b[1]);
     expect(means[0][0]).toBe(Feature.TundraTree);
     expect(means[means.length - 1][0]).toBe(Feature.ForestTreeRare);
   });
 
   it('es de la casilla: la misma casilla da siempre lo mismo', () => {
-    const law = treeShapeOf(Feature.ForestTreeRare)!;
+    const law = treeTrunkOf(Feature.ForestTreeRare)!;
     expect(trunkBlocks(7, 10, -3, law)).toBe(trunkBlocks(7, 10, -3, law));
     expect(trunkBlocks(8, 10, -3, law)).not.toBe(trunkBlocks(7, 10, -3, law));
     expect(trunkBlocks(7, 11, -3, law)).not.toBe(trunkBlocks(7, 10, -3, law));
@@ -82,7 +83,7 @@ describe('tronco de los arboles, por especie', () => {
 
   it('se trunca, no se recorta: no se amontonan arboles en los topes', () => {
     for (const f of species) {
-      const shape = treeShapeOf(f)!;
+      const shape = treeTrunkOf(f)!;
       const [lo, hi] = trunkRange(shape);
       // Recortando, un 2,3 % (o mas, donde el minimo corta dentro de la
       // campana) quedaria clavado exactamente en el tope.

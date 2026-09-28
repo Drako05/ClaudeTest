@@ -17,7 +17,7 @@ import {
   type Scene,
 } from 'three';
 import { CHUNK_SIZE } from '@verdant/shared';
-import { actionReach, groundHeight, type GameState, type World } from '@verdant/sim';
+import { actionReach, groundHeight, targetTile, type GameState, type World } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
 
 const LIFT = 0.03;
@@ -68,18 +68,19 @@ export class Overlays {
    */
   private readonly aimed = lines(0xffffff, 0.55);
   private readonly flanks = lines(0xffffff, 0.22);
+  /** Donde se sembraria: la casilla en que la mirada toca el suelo. */
+  private readonly plant = lines(0xb8f28a, 0.45);
   private readonly grids = new Map<string, LineSegments>();
   private readonly borders = new Map<string, { mesh: LineSegments; segments: number; misplaced: number }>();
 
   constructor(private readonly scene: Scene) {
-    scene.add(this.aimed, this.flanks);
+    scene.add(this.aimed, this.flanks, this.plant);
   }
 
   /**
-   * Marca las casillas que la accion ALCANZA, cada una a su altura.
-   *
-   * Solo lo alcanzable: marcar tambien lo que queda encima de una pared
-   * prometeria algo que la accion no cumple (regla 21).
+   * Marca las casillas de los objetos que el golpe ALCANZA —cuyo hitbox toca el
+   * sector, regla 12—, el mas cercano mas fuerte; y, en verde, donde se
+   * sembraria. Solo lo que la accion cumple: nada de lo que el sector no toca.
    */
   updateReticle(state: GameState): void {
     const area = actionReach(state.world, state.entities, state.playerId);
@@ -88,6 +89,10 @@ export class Overlays {
     area.forEach((t, i) => pushSquare(i === 0 ? aimed : flanks, state.world, t.x, t.y));
     setPositions(this.aimed, aimed);
     setPositions(this.flanks, flanks);
+    const plant: number[] = [];
+    const where = targetTile(state.world, state.entities, state.playerId);
+    if (where) pushSquare(plant, state.world, where.x, where.y);
+    setPositions(this.plant, plant);
   }
 
   /** Casillas marcadas por la reticula ahora mismo. */

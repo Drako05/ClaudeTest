@@ -106,14 +106,15 @@ function drawShadow(ctx: CanvasRenderingContext2D, x: number, y: number, scale: 
  * del tile. La luz entra siempre por el noroeste, para que todas las especies se
  * lean como parte del mismo mundo.
  *
- * Los ARBOLES necesitan `tree`: cuanto tronco desnudo llevan (ver `trunk.ts`),
- * en pixeles de arte, y cuantos pixeles de arte mide un bloque, porque su copa
- * viene en bloques de `tree-shapes.ts`. Sin `tree`, un arbol no se dibuja.
+ * Los ARBOLES necesitan `tree`: su tronco desnudo y su grosor en el pie, en
+ * pixeles de arte (salen de `treeTrunkAt` del nucleo, que es tambien su hitbox),
+ * y cuantos pixeles de arte mide un bloque, porque su copa viene en bloques de
+ * `tree-shapes.ts`. Sin `tree`, un arbol no se dibuja.
  */
 export function makeFeatureArt(
   feature: Feature,
   detail = 1,
-  tree?: { bare: number; pxPerBlock: number },
+  tree?: { bare: number; width: number; pxPerBlock: number },
 ): FeatureArt | null {
   if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES, detail);
   const mineral = MINERAL_FACES[feature];
@@ -124,7 +125,7 @@ export function makeFeatureArt(
   if (!look) return null;
   if (look.form !== 'bush') {
     const shape = treeShapeOf(feature);
-    return shape && tree ? makeTreeArt(look, shape, tree.bare, tree.pxPerBlock, detail) : null;
+    return shape && tree ? makeTreeArt(look, shape, tree.bare, tree.width, tree.pxPerBlock, detail) : null;
   }
 
   const grow = look.rare ? 1.15 : 1;
@@ -178,6 +179,7 @@ function makeTreeArt(
   look: Look,
   shape: TreeShape,
   bare: number,
+  tw: number,
   pxPerBlock: number,
   detail: number,
 ): FeatureArt | null {
@@ -199,9 +201,6 @@ function makeTreeArt(
 
   drawShadow(ctx, footX, footY, 1);
 
-  // El grosor es de la especie, y el arbol mas alto de los suyos es tambien el
-  // mas grueso.
-  const tw = shape.trunkW * Math.sqrt(bare / pxPerBlock / shape.bareMean) * pxPerBlock;
   const conifer = shape.silhouette === 'cone' || shape.silhouette === 'spire';
   // Donde acaba el tronco, ya dentro de la copa. En las coniferas, a media
   // altura DE UN PISO, para que la punta caiga tapada tambien en el alerce, que

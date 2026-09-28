@@ -37,29 +37,26 @@ import {
   type Terrain,
 } from '@verdant/shared';
 import {
-  actionArea,
   actionReach,
   clockLabel,
+  EYE_HEIGHT,
+  hitboxAt,
+  strikeOf,
+  targetTile,
   skipTime,
   step,
   toChunkCoord,
   type GameState,
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
-import {
-  Effects,
-  SLASH_CHEST,
-  SLASH_FP_HALF_WIDTH,
-  SLASH_FP_RADIUS,
-  SLASH_RADIUS,
-  slashArc,
-} from './effects.js';
+import { Effects, SLASH_FP_HALF_WIDTH, SLASH_HALF_WIDTH, slashEdge } from './effects.js';
+import { cameraClearance } from './camera-collision.js';
 import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
-import { OrbitCamera, type Projection } from './camera.js';
+import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
 import { chunkMesh, cornerHeight } from './terrain-mesh.js';
 import { Hud } from './hud.js';
@@ -433,24 +430,18 @@ function frame(now: number): void {
       state.world.groundHeightAt(state.entities.x[state.playerId], state.entities.y[state.playerId]);
     if (gap > airPeak) airPeak = gap;
     if (accionando) {
-      // El barrido va DELANTE DE LA MIRADA y no clavado a las casillas que
-      // afecta, decision del autor con el cono: en primera persona, delante de
-      // los ojos y con su inclinacion; en tercera, delante del pecho del
-      // personaje y girado con el rumbo. Sale siempre, haya algo que golpear o
-      // no: es el gesto, no el resultado.
+      // El barrido recorre el BORDE CURVO DEL AREA REAL del golpe, pedido del
+      // autor: el extremo de cada rayo del sector, ya cortado por el terreno,
+      // que sale de los ojos en las tres vistas. Es el mismo golpe que acaba de
+      // decidir la simulacion. Sale siempre, haya algo que golpear o no: es el
+      // gesto, no el resultado.
       const e = state.entities;
       const id = state.playerId;
-      if (camera.projection === 'primera') {
-        const eye = camera.active.position;
-        effects.spawnSlash(
-          slashArc({ x: eye.x, y: eye.y, z: eye.z }, fwd.x, fwd.y, camera.lookPitch, SLASH_FP_RADIUS),
-          SLASH_FP_HALF_WIDTH,
-        );
-      } else {
-        effects.spawnSlash(
-          slashArc({ x: e.x[id], y: e.z[id] + SLASH_CHEST, z: e.y[id] }, fwd.x, fwd.y, 0, SLASH_RADIUS),
-        );
-      }
+      const eye = { x: e.x[id], y: e.y[id], z: e.z[id] + EYE_HEIGHT };
+      effects.spawnSlash(
+        slashEdge(eye, strikeOf(state.world, e, id).rays),
+        camera.projection === 'primera' ? SLASH_FP_HALF_WIDTH : SLASH_HALF_WIDTH,
+      );
     }
     for (const hit of state.lastHarvest) {
       gathered += hit.amount + hit.seeds;
@@ -499,11 +490,6 @@ function frame(now: number): void {
   // La altura que LLEVA, no la del suelo: con gravedad dejan de ser lo mismo, y
   // leyendo el suelo el personaje seguiria pegado al terreno saltando.
   const ph = state.entities.z[state.playerId];
-  if (player) {
-    billboards.moveTo(player, px, ph, py);
-    // En primera persona se mira desde dentro: el cuerpo no se dibuja.
-    player.visible = camera.projection !== 'primera';
-  }
   water.position.set(px, WATER_Y, py);
 
   const w = window.innerWidth;
@@ -511,7 +497,25 @@ function frame(now: number): void {
   renderer.setSize(w, h, false);
   // La niebla solo con fuga: en la isometrica lavaba la escena entera.
   scene.fog = camera.projection === 'orto' ? null : haze;
-  camera.follow(px, ph, py, w, h);
+  // La camara no atraviesa bloques ni objetos (pedido del autor): choca con el
+  // mismo terreno y los mismos hitboxes que el golpe. Los ejes de three.js
+  // (`y` arriba) pasan a los del nucleo (`z` arriba).
+  const pivot = { x: px, y: py, z: ph + EYE_HEIGHT };
+  camera.follow(px, ph, py, w, h, (back, want) =>
+    cameraClearance(
+      pivot,
+      { x: back.x, y: back.z, z: back.y },
+      want,
+      (x, y) => state.world.groundHeightAt(x, y),
+      (tx, ty) => hitboxAt(state.world, tx, ty),
+    ),
+  );
+  if (player) {
+    billboards.moveTo(player, px, ph, py);
+    // Desde dentro no se dibuja el cuerpo: en primera persona, y cuando la
+    // colision deja la camara pegada al personaje, que llenaria la pantalla.
+    player.visible = camera.projection !== 'primera' && camera.camDistance >= HIDE_PLAYER_BELOW;
+  }
   renderer.render(scene, camera.active);
 
   // El HUD a 10 Hz: basta para que las barras respondan y no reescribe el DOM
@@ -560,7 +564,12 @@ Object.defineProperty(window, '__verdant', {
       projection: camera.projection,
       /** Campo de vision en uso: el catalejo de la primera persona lo estrecha. */
       fov: camera.fov,
-      fpPitch: camera.fpPitch,
+      /** A que distancia del pivote ha quedado la camara tras la colision. */
+      camDistance: camera.camDistance,
+      /** Cuanto queda la camara por ENCIMA del suelo que tiene debajo. */
+      camClearance:
+        camera.active.position.y -
+        state.world.groundHeightAt(camera.active.position.x, camera.active.position.z),
       playerVisible: player?.visible ?? false,
       running: controls.running,
       dev: dev.active,
@@ -586,11 +595,12 @@ Object.defineProperty(window, '__verdant', {
       facing: [e.facingX[id], e.facingY[id]],
       /** Hacia donde mira la camara, que es de donde sale la mirada. */
       aim: [camera.forward().x, camera.forward().y],
-      // Las dos cosas y por separado: `area` es la GEOMETRIA del apuntado
-      // —tres casillas del anillo y la que se pisa— y `reach` las que estan a la altura
-      // propia y se pueden accionar. En terreno escalonado difieren.
-      area: actionArea(e, id).map((t) => [t.x, t.y]),
+      /** Inclinacion de la mirada del jugador, como la tiene la simulacion. */
+      lookZ: e.lookZ[id],
+      // Las casillas de los objetos cuyo hitbox toca el golpe (regla 12), del mas
+      // cercano al mas lejano, y donde se sembraria.
       reach: actionReach(state.world, e, id).map((t) => [t.x, t.y]),
+      plantTile: ((t) => (t ? [t.x, t.y] : null))(targetTile(state.world, e, id)),
       terrain: TERRAIN_NAMES[state.world.terrainAt(tx, ty)],
       level: state.world.levelAt(tx, ty),
       biome: BIOME_NAMES[biome],

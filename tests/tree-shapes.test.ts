@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Feature } from '@verdant/shared';
 import { TREE_SHAPES, treeShapeOf } from '../packages/client/src/tree-shapes.js';
+import { treeTrunkOf } from '@verdant/sim';
 
 /**
  * Cada arbol con la forma de su especie real (reparto del autor, 2026-09-27),
@@ -41,8 +42,8 @@ describe('formas de arbol por especie', () => {
 
   it('troncos coherentes: ninguna media baja de 2, el roble el mas grueso y la picea negra la mas fina', () => {
     const all = Object.keys(TREE_SHAPES).map(Number) as Feature[];
-    for (const f of all) expect(treeShapeOf(f)!.bareMean).toBeGreaterThanOrEqual(2);
-    const byWidth = [...all].sort((a, b) => treeShapeOf(a)!.trunkW - treeShapeOf(b)!.trunkW);
+    for (const f of all) expect(treeTrunkOf(f)!.bareMean).toBeGreaterThanOrEqual(2);
+    const byWidth = [...all].sort((a, b) => treeTrunkOf(a)!.trunkW - treeTrunkOf(b)!.trunkW);
     expect(byWidth[0]).toBe(Feature.TundraTree);
     expect(byWidth[byWidth.length - 1]).toBe(Feature.MeadowTree);
   });

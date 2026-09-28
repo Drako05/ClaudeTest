@@ -35,9 +35,14 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | `EYE = 1.6` para la camara, al crecer el personaje | Proporciones nuevas | un numero |
 | **El relieve se lee menos de la mitad de alto** tras las proporciones | Proporciones nuevas | calibracion del relieve |
 | El grosor del barrido: 0,12 casillas, redondeado al alza por el antialias | El barrido del 3D | un numero |
-| **La casilla que se pisa sigue entrando siempre** en el cono | La accion es un cono | una linea |
-| El barrido: radio 0,9 desde los ojos y 1 desde el pecho, medio ancho 0,02 en primera persona, y **baja en diagonal** de derecha a izquierda (un cuarto del radio) | La accion es un cono | numeros en `effects.ts` |
+| Los ojos a **1,75** para las tres vistas y el golpe (la orbital miraba a 1,6) | Golpe por hitbox y una sola mirada | un numero en `sim/aim.ts` |
+| Inclinacion de arranque **−0,62** tambien en primera persona (antes entraba a −0,2) y tope de **±83 grados** | Golpe por hitbox y una sola mirada | numeros en `camera.ts` |
+| Sembrar a menos de 2 bloques **en horizontal**, no a lo largo de la mirada (asi basta mirar 41 grados abajo, no 61) | Golpe por hitbox y una sola mirada | una linea |
+| Hitboxes: arbusto 0,9 de ancho × 1,1, roca y minerales 0,9 × 1,0, brote 0,3 × 0,85 | Golpe por hitbox y una sola mirada | numeros en `gathering.ts` |
+| Colision de camara: se para **0,3** antes, la isometrica a **60** como mucho, y el jugador se oculta con la camara a menos de **1** | Golpe por hitbox y una sola mirada | numeros en `camera*.ts` |
+| Grosor del barrido en primera persona: medio ancho **0,04** a 2 bloques | Golpe por hitbox y una sola mirada | un numero en `effects.ts` |
 | El barrido se **congela en el mundo** al nacer: girar la camara despues no lo arrastra | La accion es un cono | una linea |
+| En tercera persona **el personaje tapa el centro de la pantalla**, que es hacia donde se golpea | Golpe por hitbox y una sola mirada | un encuadre por encima del hombro |
 | El cuarto de vuelta propio de cada aspa | Las features ya son aspas | un numero |
 | El tamano y la intensidad de la sombra tumbada | Las features ya son aspas | dos numeros |
 | El material de las aspas **no se ilumina**, para que el aspecto no cambiara | Las features ya son aspas | cambiar a Lambert, con pegas |
@@ -262,7 +267,40 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
 
 ---
 
-## La accion es un cono — HECHO (2026-09-28)
+## Golpe por hitbox y una sola mirada — HECHO (2026-09-28)
+
+Probaste el cono en el movil: funcionaba, pero se quedaba corto. Pediste:
+
+- **Alcance 2 bloques**, y el **cono plano, inclinado hacia el punto exacto de
+  vision**: ahora es un sector de 90 grados en el plano de la mirada, que sale
+  de los ojos.
+- **El golpe solo cuenta si toca un hitbox**; el del arbol es su **tronco
+  desnudo**, no las hojas. Todo objeto tiene el suyo. **El terreno tapa el
+  golpe.** Se siembra **donde la mirada toca el suelo**.
+- **El barrido recorre el borde curvo del area real**: el extremo de cada rayo
+  del sector, cortado por el terreno.
+- **Primera y tercera persona comparten el punto central**, que es la
+  direccion en que mira el jugador; **la isometrica tambien**. La tercera persona
+  **mira hacia arriba**, y la camara **choca** con bloques y troncos.
+
+Lo que cambia al jugar, y conviene que lo mires tu:
+
+- El sector es plano: **mirando al frente pasa por encima de un arbusto** (los
+  ojos a 1,75, el arbusto a 1,1). Para golpearlo hay que mirarlo; con la
+  camara de arranque (35 grados hacia abajo) se alcanza.
+- **Para sembrar hay que mirar unos 41 grados hacia abajo** en llano, algo mas
+  que la camara de arranque.
+- **En tercera persona el personaje tapa el centro de la pantalla**, porque la
+  mirada pasa por sus ojos.
+
+El tronco de cada arbol se mudo al nucleo (`sim/trunk.ts`): el que se dibuja y
+el que se golpea son el mismo numero. Medido: mirando arriba del todo, la camara
+queda a 0,46 de los ojos y 0,30 sobre el suelo; el barrido llega a pantalla en
+todas las vistas y rumbos. Lo que decidi yo, arriba en «Esperando tu juicio».
+
+## La accion es un cono — SUSTITUIDO (2026-09-28)
+
+Lo que sigue quedo sustituido el mismo dia por el golpe por hitbox de arriba.
 
 Pediste que la accion dejara de estar fijada a casillas: en primera persona se
 golpeaba lo que no estaba delante de los ojos, y el barrido a veces ni se veia.

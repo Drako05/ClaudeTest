@@ -34,10 +34,18 @@ import {
   type Texture,
 } from 'three';
 import { Feature } from '@verdant/shared';
-import { hash2DFloat } from '@verdant/sim';
+import {
+  bucketBlocks,
+  hash2DFloat,
+  treeTrunkAt,
+  treeTrunkOf,
+  trunkBucket,
+  trunkRange,
+  trunkWidthFor,
+  TRUNK_BUCKETS,
+} from '@verdant/sim';
 import { LOOKS } from './palette.js';
 import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
-import { bucketBlocks, trunkBlocks, trunkBucket, trunkRange, TRUNK_BUCKETS } from './trunk.js';
 import { TREE_SHAPES, treeShapeOf } from './tree-shapes.js';
 
 /** Las especies de arbol adulto, las que tienen forma propia. */
@@ -45,13 +53,13 @@ const TREES = Object.keys(TREE_SHAPES).map(Number) as Feature[];
 
 /** El escalon de arte del tronco medio de esa especie. */
 function meanBucket(feature: Feature): number {
-  return trunkBucket(treeShapeOf(feature)?.bareMean ?? 2);
+  return trunkBucket(treeTrunkOf(feature)?.bareMean ?? 2);
 }
 
 /** Los escalones de los dos extremos del tronco de esa especie. */
 function rangeBuckets(feature: Feature): number[] {
-  const shape = treeShapeOf(feature);
-  return shape ? trunkRange(shape).map(trunkBucket) : [];
+  const trunk = treeTrunkOf(feature);
+  return trunk ? trunkRange(trunk).map(trunkBucket) : [];
 }
 
 /**
@@ -419,9 +427,12 @@ export class BillboardSet {
     const key = feature * TRUNK_BUCKETS + bucket;
     let art = this.trees.get(key);
     if (art === undefined) {
-      const bare = bucketBlocks(bucket) * TREE_PX_PER_BLOCK;
+      const trunk = treeTrunkOf(feature);
+      const bareBlocks = bucketBlocks(bucket);
+      const bare = bareBlocks * TREE_PX_PER_BLOCK;
+      const width = (trunk ? trunkWidthFor(trunk, bareBlocks) : 0) * TREE_PX_PER_BLOCK;
       art = fromArt(
-        makeFeatureArt(feature, DETAIL, { bare, pxPerBlock: TREE_PX_PER_BLOCK }),
+        makeFeatureArt(feature, DETAIL, { bare, width, pxPerBlock: TREE_PX_PER_BLOCK }),
         ARBOL,
         true,
         LOOKS[feature]?.trunk,
@@ -512,7 +523,7 @@ export class BillboardSet {
         esperado: shape.crownW / shape.crownH,
         troncoMin: ends[0]?.bare ?? 0,
         troncoMax: ends[1]?.bare ?? 0,
-        rango: trunkRange(shape),
+        rango: trunkRange(treeTrunkOf(feature)!),
         grosor: art.trunkW,
         asoma: Math.max(art.peek, ...ends.map((e) => e?.peek ?? 0)),
       });
@@ -533,11 +544,10 @@ export class BillboardSet {
     const tx = Math.floor(wx);
     const ty = Math.floor(wy);
     // Los arboles, ademas, llevan su propia altura de tronco, que tambien es de
-    // la casilla por la misma razon que el giro.
-    const shape = treeShapeOf(feature);
-    const art = shape
-      ? this.tree(feature, trunkBucket(trunkBlocks(seed, tx, ty, shape)))
-      : this.byFeature.get(feature);
+    // la casilla por la misma razon que el giro. Sale del nucleo, que la usa de
+    // hitbox: el tronco que se ve es el que se golpea.
+    const trunk = treeTrunkAt(seed, tx, ty, feature);
+    const art = trunk ? this.tree(feature, trunk.bucket) : this.byFeature.get(feature);
     if (!art || !art.geometry || !art.material) return null;
     if (art.bare > 0) {
       const p = this.placed;

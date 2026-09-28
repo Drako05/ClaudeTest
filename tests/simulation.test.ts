@@ -5,7 +5,9 @@ import {
   EntityKind,
   EntityStore,
   HUNGER_DECAY_PER_SEC,
-  actionArea,
+  hitboxAt,
+  targetTile,
+  treeTrunkAt,
   moveEntity,
   RUN_MULTIPLIER,
   RUN_SPEED,
@@ -337,27 +339,26 @@ describe('Congelar la supervivencia', () => {
  * La mirada viaja en la Intent, asi que estos tests la ejercitan por donde
  * entrara tambien desde la red: nadie escribe `facingX` a mano.
  */
-describe('Mirada y area de efecto', () => {
-  it('el apuntado de la Intent fija la mirada', () => {
+describe('Mirada y golpe', () => {
+  it('el apuntado de la Intent fija la mirada, con su inclinacion', () => {
     const state = createGame(31337);
     state.survivalFrozen = true;
 
     const aim = emptyIntent();
     aim.aimX = 1;
     aim.aimY = 0;
+    aim.aimZ = -0.5;
     step(state, aim);
-    expect(actionArea(state.entities, state.playerId)[0]).toEqual({
-      x: Math.floor(state.entities.x[state.playerId]) + 1,
-      y: Math.floor(state.entities.y[state.playerId]),
-    });
+    expect(state.entities.facingX[state.playerId]).toBeCloseTo(1, 6);
+    expect(state.entities.facingY[state.playerId]).toBeCloseTo(0, 6);
+    expect(state.entities.lookZ[state.playerId]).toBeCloseTo(-0.5, 6);
 
-    aim.aimX = 0;
-    aim.aimY = -1;
+    // Sin redondear a ocho direcciones: la mirada entra tal cual.
+    aim.aimX = Math.cos(0.3);
+    aim.aimY = Math.sin(0.3);
     step(state, aim);
-    expect(actionArea(state.entities, state.playerId)[0]).toEqual({
-      x: Math.floor(state.entities.x[state.playerId]),
-      y: Math.floor(state.entities.y[state.playerId]) - 1,
-    });
+    expect(state.entities.facingX[state.playerId]).toBeCloseTo(Math.cos(0.3), 6);
+    expect(state.entities.facingY[state.playerId]).toBeCloseTo(Math.sin(0.3), 6);
   });
 
   it('el apuntado manda aunque se ande en otra direccion', () => {
@@ -388,136 +389,102 @@ describe('Mirada y area de efecto', () => {
     expect(state.entities.facingY[state.playerId]).toBeCloseTo(0, 6);
   });
 
-  it('recolectar vacia las cuatro casillas —la propia incluida— y suma el botin de todas', () => {
+  /**
+   * Un rellano llano de 3x3 alrededor de `(x, y)` en el mundo 2024, sin agua ni
+   * taludes, con todo lo que tuviera quitado y el jugador en su centro, de pie
+   * y mirando al este con esa inclinacion.
+   */
+  function onFlat(lookZ: number) {
     const world = new World(2024);
     world.setNow(0);
-    const store = new EntityStore(4);
-
-    // Un sitio donde las cuatro casillas del area tengan algo que recolectar,
-    // tambien la que se pisa: es la que el autor sumo a la regla.
-    let placed: { id: number; tiles: ReturnType<typeof actionArea> } | null = null;
-    for (let y = -40; y < 40 && !placed; y++) {
-      for (let x = -40; x < 40; x++) {
+    for (let y = -60; y < 60; y++) {
+      for (let x = -60; x < 60; x++) {
+        const level = world.levelAt(x, y);
+        if (level < 0) continue;
+        let ok = true;
+        for (let dy = -1; dy <= 1 && ok; dy++) {
+          for (let dx = -1; dx <= 2 && ok; dx++) {
+            ok = world.levelAt(x + dx, y + dy) === level && world.rampDirAt(x + dx, y + dy) < 0;
+          }
+        }
+        if (!ok) continue;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 2; dx++) world.setFeature(x + dx, y + dy, Feature.None);
+        }
+        const store = new EntityStore(4);
         const id = store.spawn(EntityKind.Player, x + 0.5, y + 0.5);
+        store.z[id] = world.groundHeightAt(x + 0.5, y + 0.5);
         store.facingX[id] = 1;
         store.facingY[id] = 0;
-        const tiles = actionArea(store, id);
-        // Todas, ademas, a la altura del jugador: desde que la altura
-        // estorba, la accion no alcanza lo que esta subido a un bloque.
-        const level = world.levelAt(x, y);
-        if (
-          tiles.every(
-            (t) => lifeKindOf(world.featureAt(t.x, t.y)) !== null && world.levelAt(t.x, t.y) === level,
-          )
-        ) {
-          placed = { id, tiles };
-          break;
-        }
-        store.count--; // se descarta la entidad de prueba
+        store.lookZ[id] = lookZ;
+        return { world, store, id, x, y };
       }
     }
-    expect(placed, 'no se encontro un area con vida en las cuatro casillas').not.toBeNull();
+    throw new Error('no hay un rellano llano');
+  }
+  const down = (deg: number) => Math.sin((-deg * Math.PI) / 180);
+
+  it('recolectar se lleva todo lo que el golpe toca y suma el botin de todo', () => {
+    const { world, store, id, x, y } = onFlat(down(45));
+    const rocks = [
+      { x: x + 1, y },
+      { x: x + 1, y: y - 1 },
+      { x: x + 1, y: y + 1 },
+    ];
+    for (const r of rocks) world.setFeature(r.x, r.y, Feature.RockNode);
+    // Y una fuera de alcance, a dos casillas en recto: no cae.
+    world.setFeature(x + 2, y, Feature.RockNode);
 
     const inventory = new Int32Array(RESOURCE_COUNT);
-    const results = tryHarvestArea(world, store, placed!.id, inventory, 0);
+    const results = tryHarvestArea(world, store, id, inventory, 0);
 
-    expect(results).toHaveLength(4);
-    for (const tile of placed!.tiles) {
-      expect(world.featureAt(tile.x, tile.y)).toBe(Feature.None);
-    }
-    // El botin del inventario es la suma exacta de lo que reporto cada casilla.
-    const reported = results.reduce((sum, r) => sum + r.amount, 0);
-    const gained = Array.from(inventory).reduce((sum, n) => sum + n, 0);
-    const seeds = results.reduce((sum, r) => sum + r.seeds, 0);
-    expect(gained).toBe(reported + seeds);
+    expect(results).toHaveLength(3);
+    for (const r of rocks) expect(world.featureAt(r.x, r.y)).toBe(Feature.None);
+    expect(world.featureAt(x + 2, y)).toBe(Feature.RockNode);
+    const reported = results.reduce((sum, r) => sum + r.amount + r.seeds, 0);
+    expect(Array.from(inventory).reduce((sum, n) => sum + n, 0)).toBe(reported);
   });
 
-  it('alcanza dos alturas: la de arriba mirando al frente, la de abajo mirando hacia abajo', () => {
-    // Decision del autor con el cono: la propia y la de arriba, o la de abajo si
-    // se mira hacia abajo mas de 25 grados. Nunca las dos a la vez, ni dos mas.
-    const down = Math.sin((-40 * Math.PI) / 180);
-    const ahead = Math.sin((-11 * Math.PI) / 180);
+  it('del arbol se golpea el tronco que se dibuja, no la copa', () => {
+    const at = onFlat(0);
+    at.world.setFeature(at.x + 1, at.y, Feature.MeadowTree);
+    // El hitbox es exactamente el tronco que dibuja el cliente.
+    const box = hitboxAt(at.world, at.x + 1, at.y)!;
+    const trunk = treeTrunkAt(at.world.seed, at.x + 1, at.y, Feature.MeadowTree)!;
+    expect(box.z1 - box.z0).toBeCloseTo(trunk.bare, 9);
+    expect(box.x1 - box.x0).toBeCloseTo(trunk.width, 9);
 
-    /** Un sitio con la casilla del este `step` niveles por encima (o debajo). */
-    function spot(step: number): { x: number; y: number } {
-      const world = new World(2024);
-      for (let y = -60; y < 60; y++) {
-        for (let x = -60; x < 60; x++) {
-          const level = world.levelAt(x, y);
-          if (level >= 0 && world.levelAt(x + 1, y) === level + step) return { x, y };
-        }
-      }
-      throw new Error(`no hay un escalon de ${step}`);
-    }
+    // Mirando al frente, a la altura de los ojos, el tronco cae.
+    tryHarvestArea(at.world, at.store, at.id, new Int32Array(RESOURCE_COUNT), 0);
+    expect(at.world.featureAt(at.x + 1, at.y)).toBe(Feature.None);
 
-    /** Si una roca puesta en la casilla del este cae con esa mirada. */
-    function hits(at: { x: number; y: number }, lookZ: number): boolean {
-      const world = new World(2024);
-      world.setNow(0);
-      world.setFeature(at.x + 1, at.y, Feature.RockNode);
-      const store = new EntityStore(4);
-      const id = store.spawn(EntityKind.Player, at.x + 0.5, at.y + 0.5);
-      store.facingX[id] = 1;
-      store.facingY[id] = 0;
-      store.lookZ[id] = lookZ;
-      tryHarvestArea(world, store, id, new Int32Array(RESOURCE_COUNT), 0);
-      return world.featureAt(at.x + 1, at.y) === Feature.None;
-    }
-
-    const up = spot(1);
-    expect(hits(up, ahead)).toBe(true);
-    expect(hits(up, down)).toBe(false);
-
-    const below = spot(-1);
-    expect(hits(below, down)).toBe(true);
-    expect(hits(below, ahead)).toBe(false);
-
-    // Dos niveles es una pared: no se alcanza mire donde mire.
-    const wall = spot(2);
-    expect(hits(wall, ahead)).toBe(false);
-    expect(hits(wall, down)).toBe(false);
+    // Mirando por encima del tronco, a la copa, no.
+    const high = onFlat(Math.sin((60 * Math.PI) / 180));
+    high.world.setFeature(high.x + 1, high.y, Feature.MeadowTree);
+    tryHarvestArea(high.world, high.store, high.id, new Int32Array(RESOURCE_COUNT), 0);
+    expect(high.world.featureAt(high.x + 1, high.y)).toBe(Feature.MeadowTree);
   });
 
-  it('sembrar sigue afectando solo a la casilla apuntada', () => {
-    // Decision del autor: de tres en tres gastaria las semillas demasiado rapido.
-    const world = new World(2024);
-    world.setNow(0);
-    const store = new EntityStore(4);
-
-    let spot: { id: number; tiles: ReturnType<typeof actionArea> } | null = null;
-    for (let y = -40; y < 40 && !spot; y++) {
-      for (let x = -40; x < 40; x++) {
-        const id = store.spawn(EntityKind.Player, x + 0.5, y + 0.5);
-        store.facingX[id] = 1;
-        store.facingY[id] = 0;
-        const tiles = actionArea(store, id);
-        const free = tiles.every(
-          (t) => world.featureAt(t.x, t.y) === Feature.None && !world.isSolidAt(t.x, t.y),
-        );
-        if (free && lifeKindOf(world.featureAt(tiles[0].x, tiles[0].y)) === null) {
-          spot = { id, tiles };
-          break;
-        }
-        store.count--;
-      }
-    }
-    expect(spot, 'no se encontro un area libre para sembrar').not.toBeNull();
-
+  it('sembrar va a la casilla donde la mirada toca el suelo, y solo a esa', () => {
+    const { world, store, id, x, y } = onFlat(down(50));
     const inventory = new Int32Array(RESOURCE_COUNT);
     inventory[Resource.TreeSeed] = 3;
     inventory[Resource.PlantSeed] = 3;
-    const planted = tryPlant(world, store, spot!.id, inventory);
+    expect(targetTile(world, store, id)).toEqual({ x: x + 1, y });
+    const planted = tryPlant(world, store, id, inventory);
 
+    // Puede no brotar si el terreno no sostiene ninguna especie; si brota, es
+    // ahi, una sola, y gasta una semilla.
     if (planted !== null) {
-      expect(world.featureAt(spot!.tiles[0].x, spot!.tiles[0].y)).not.toBe(Feature.None);
-      // Las dos flanqueantes siguen vacias.
-      expect(world.featureAt(spot!.tiles[1].x, spot!.tiles[1].y)).toBe(Feature.None);
-      expect(world.featureAt(spot!.tiles[2].x, spot!.tiles[2].y)).toBe(Feature.None);
-      // Ni la que se pisa: sembrar no alcanza la casilla propia.
-      expect(world.featureAt(spot!.tiles[3].x, spot!.tiles[3].y)).toBe(Feature.None);
-      // Y solo se gasto una semilla.
-      const left = inventory[Resource.TreeSeed] + inventory[Resource.PlantSeed];
-      expect(left).toBe(5);
+      expect(world.featureAt(x + 1, y)).not.toBe(Feature.None);
+      expect(world.featureAt(x + 1, y - 1)).toBe(Feature.None);
+      expect(world.featureAt(x + 1, y + 1)).toBe(Feature.None);
+      expect(world.featureAt(x, y)).toBe(Feature.None);
+      expect(inventory[Resource.TreeSeed] + inventory[Resource.PlantSeed]).toBe(5);
     }
+
+    // Mirando al frente la mirada no toca el suelo: no se siembra.
+    store.lookZ[id] = 0;
+    expect(targetTile(world, store, id)).toBeNull();
   });
 });

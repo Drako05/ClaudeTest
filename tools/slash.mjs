@@ -219,7 +219,7 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
   for (let turn = 0; turn < turns; turn++) {
     if (turn > 0) await drag(-262, 0);
     const here = await page.evaluate(() => window.__verdant);
-    pitch = here.projection === 'primera' ? here.fpPitch : here.pitch;
+    pitch = here.pitch;
 
     // Quieto el jugador y quieta la camara, dos fotogramas seguidos son
     // IDENTICOS. Asi que la referencia es una captura en reposo y lo que se mide

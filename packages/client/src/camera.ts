@@ -11,25 +11,18 @@
  * persona**, que pidio el autor despues. Las dos primeras orbitan alrededor del
  * jugador; la tercera va en sus ojos.
  *
- * Las tres comparten el RUMBO (`yaw`): cambiar de vista sigue mirando al mismo
- * sitio, y `forward()` —de donde salen el movimiento y la mirada de la accion,
- * regla 5— vale igual en todas. La inclinacion, en cambio, es de cada una:
- * volver a tercera persona recupera el angulo que tenia.
+ * **Las tres comparten la MIRADA ENTERA** (decision del autor, 2026-09-28): el
+ * mismo pivote —los ojos del jugador— y la misma direccion, rumbo e
+ * inclinacion, que es la direccion en que mira el jugador. La primera persona
+ * esta en el pivote; las otras dos, **detras de el sobre la linea de la
+ * mirada**, mirandolo: el centro de la pantalla es siempre hacia donde se mira,
+ * y cambiar de vista sigue mirando exactamente al mismo sitio. Mirar hacia
+ * arriba en tercera persona es bajar la camara por detras; para eso la camara
+ * choca con el terreno y los hitboxes (`camera-collision.ts`).
  */
 
+import { EYE_HEIGHT } from '@verdant/sim';
 import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three';
-
-/**
- * Altura del punto al que mira la orbita, sobre los pies del jugador.
- *
- * Sube de 1.2 a 1.6 al crecer el personaje: 1.2 le quedaba por encima de la
- * cabeza cuando medía 0,78 bloques y le quedaría por las rodillas midiendo 1,8.
- * 1.6 es su cabeza, y de paso la altura de ojos de Minecraft.
- *
- * **Es deduccion mia**, corregible: conservar la proporcion exacta de antes
- * daria 2,8, que deja la camara mirando muy por encima del personaje.
- */
-const EYE = 1.6;
 
 /** Apertura vertical de la perspectiva, en grados. */
 const FOV = 45;
@@ -45,16 +38,37 @@ const FOV = 45;
 const PERSPECTIVE_PULL = 0.5 / Math.tan((FOV / 2) * (Math.PI / 180));
 
 /**
- * Altura de los ojos en primera persona, sobre los pies. El personaje mide 1,93
- * bloques y en Minecraft los ojos van al 90 % de la altura. **Deduccion mia.**
+ * Altura de los ojos sobre los pies: el pivote de las tres vistas y el origen
+ * del golpe, asi que vive en el nucleo (`EYE_HEIGHT`). Antes la orbital miraba a
+ * 1,6 y la primera persona iba a 1,75; al compartir la mirada, 1,75 para todas.
  */
-export const FP_EYE = 1.75;
+export const FP_EYE = EYE_HEIGHT;
+
+/** Tope de la inclinacion, arriba y abajo: 83 grados. **Deduccion mia.** */
+export const PITCH_LIMIT = 1.45;
+
+/**
+ * Inclinacion de arranque: los 35 grados desde arriba que tenia la perspectiva,
+ * que es la vista con la que se entra. **Deduccion mia**: la primera persona
+ * entraba mirando a -0,2 y, al compartir la mirada, entra asi.
+ */
+const START_PITCH = -0.62;
+
+/**
+ * Hasta donde se aleja la isometrica. En ortografica la distancia no cambia el
+ * tamano de nada, asi que no hace falta ir lejos: basta con salir del relieve
+ * cercano, y la colision se encarga del resto. Estuvo a 220 con el plano cercano
+ * en -400 para no recortar montanas; empujada por la colision, lo que queda
+ * detras de la camara no puede pintarse delante.
+ */
+const ORTHO_DISTANCE = 60;
+
+/** Por debajo de esta distancia, el jugador se oculta. **Deduccion mia.** */
+export const HIDE_PLAYER_BELOW = 1;
 /** Campo de vision de la primera persona: el de Minecraft. **Deduccion mia.** */
 export const FP_FOV = 70;
 /** Lo mas que estrecha el catalejo. **Deduccion mia.** */
 export const FP_MIN_FOV = 15;
-/** Inclinacion con la que se entra en primera persona: un poco hacia el suelo. */
-const FP_START_PITCH = -0.2;
 /** Lo que tarda el catalejo en volver, como constante de tiempo (segundos). */
 const SPYGLASS_RELAX = 0.08;
 
@@ -65,15 +79,18 @@ export type Projection = (typeof PROJECTIONS)[number];
 export class OrbitCamera {
   /** Giro alrededor del eje vertical, en radianes. */
   yaw = Math.PI * 0.25;
-  /** Elevacion sobre el horizonte. Acotada para no pasar por los polos. */
-  pitch = 0.62;
-  /** Distancia al jugador, en casillas. */
+  /**
+   * Inclinacion de la mirada, positiva hacia ARRIBA, la misma en las tres
+   * vistas. Acotada a `±PITCH_LIMIT` para no pasar por los polos.
+   */
+  pitch = START_PITCH;
+  /** Distancia al jugador que se QUIERE en perspectiva, en casillas. */
   distance = 26;
   /**
-   * Inclinacion de la mirada en primera persona: positiva hacia arriba. Propia,
-   * para no pisar la elevacion de la orbita.
+   * Distancia a la que ha quedado de verdad la camara en el ultimo `follow`,
+   * despues de la colision. Cero en primera persona.
    */
-  fpPitch = FP_START_PITCH;
+  camDistance = 0;
   /**
    * El catalejo: fraccion del campo de vision de la primera persona. Vale 1 sin
    * catalejo; la pinza o la rueda lo bajan y `relaxSpyglass` lo devuelve.
@@ -90,8 +107,12 @@ export class OrbitCamera {
    */
   projection: Projection = 'perspectiva';
 
-  readonly perspective = new PerspectiveCamera(FOV, 1, 0.5, 900);
-  readonly orthographic = new OrthographicCamera(-1, 1, 1, -1, -400, 900);
+  /**
+   * Plano cercano de 0,1 y no 0,5: con la colision la camara puede quedar a un
+   * palmo del suelo o de un tronco, y a 0,5 se recortaria lo que tiene al lado.
+   */
+  readonly perspective = new PerspectiveCamera(FOV, 1, 0.1, 900);
+  readonly orthographic = new OrthographicCamera(-1, 1, 1, -1, 0.05, 900);
   /**
    * La de primera persona, con plano cercano de 0,05 y no 0,5: pegado a un arbol
    * o a una pared, lo que queda a medio bloque no puede recortarse.
@@ -124,17 +145,16 @@ export class OrbitCamera {
    * la derecha, mirada a la derecha—; el vertical no:
    *
    * - en las orbitales el arrastre «agarra el mundo»: bajar el dedo baja la
-   *   camara, y el limite de elevacion evita quedarse mirando el cenit;
+   *   camara, o sea que se mira mas hacia arriba;
    * - en primera persona el dedo **lleva la mirada**, como en los shooters de
    *   movil: subir el dedo es mirar arriba. Decision del autor.
+   *
+   * Los dos mueven la MISMA inclinacion: solo cambia el sentido del dedo.
    */
   orbit(dx: number, dy: number): void {
     this.yaw -= dx * 0.006;
-    if (this.projection === 'primera') {
-      this.fpPitch = clamp(this.fpPitch - dy * 0.005, -1.4, 1.4);
-    } else {
-      this.pitch = clamp(this.pitch - dy * 0.005, 0.08, 1.45);
-    }
+    const sign = this.projection === 'primera' ? -1 : 1;
+    this.pitch = clamp(this.pitch + sign * dy * 0.005, -PITCH_LIMIT, PITCH_LIMIT);
   }
 
   zoom(factor: number): void {
@@ -181,33 +201,47 @@ export class OrbitCamera {
     this.orthographic.updateProjectionMatrix();
   }
 
+  /** La direccion de la mirada en three.js (`y` es la altura), unitaria. */
+  look(): Vector3 {
+    const f = this.forward();
+    const cos = Math.cos(this.pitch);
+    return new Vector3(f.x * cos, Math.sin(this.pitch), f.y * cos);
+  }
+
   /**
-   * Recoloca la camara: mirando al jugador en las orbitales, o en sus ojos.
-   * `x`/`z` son las coordenadas del mundo y `y` la altura de sus pies.
+   * Recoloca la camara. `x`/`z` son las coordenadas del mundo y `y` la altura de
+   * los pies; el pivote son los ojos, `EYE_HEIGHT` por encima.
+   *
+   * En primera persona la camara esta en el pivote. En las otras dos, detras de
+   * el sobre la linea de la mirada y mirandolo, a la distancia que deje libre
+   * `clearance` (la colision: recibe la direccion del pivote a la camara y la
+   * distancia que se quiere, y devuelve la que cabe). Sin ella, a la que toque.
    */
-  follow(x: number, y: number, z: number, width: number, height: number): void {
+  follow(
+    x: number,
+    y: number,
+    z: number,
+    width: number,
+    height: number,
+    clearance?: (back: Vector3, want: number) => number,
+  ): void {
+    this.target.set(x, y + FP_EYE, z);
+    const look = this.look();
     if (this.projection === 'primera') {
-      const f = this.forward();
-      const cos = Math.cos(this.fpPitch);
-      this.firstPerson.position.set(x, y + FP_EYE, z);
-      this.target.set(x + f.x * cos, y + FP_EYE + Math.sin(this.fpPitch), z + f.y * cos);
-      this.firstPerson.lookAt(this.target);
+      this.camDistance = 0;
+      this.firstPerson.position.copy(this.target);
+      this.firstPerson.lookAt(this.target.clone().add(look));
       this.resize(width, height);
       return;
     }
-    this.target.set(x, y + EYE, z);
-    const cos = Math.cos(this.pitch);
-    const offset = new Vector3(
-      Math.sin(this.yaw) * cos,
-      Math.sin(this.pitch),
-      Math.cos(this.yaw) * cos,
-      // En ortografica la distancia no cambia el tamano de nada —no hay fuga—,
-      // asi que la camara se aleja lo bastante para no recortar la montana mas
-      // alta. En perspectiva se acerca justo hasta encuadrar lo mismo.
-    ).multiplyScalar(this.projection === 'orto' ? 220 : this.distance * PERSPECTIVE_PULL);
+    // En perspectiva se acerca justo hasta encuadrar lo mismo que la
+    // ortografica; en esta la distancia no cambia el tamano de nada.
+    const want = this.projection === 'orto' ? ORTHO_DISTANCE : this.distance * PERSPECTIVE_PULL;
+    const back = look.clone().negate();
+    this.camDistance = clearance ? clearance(back, want) : want;
 
     const camera = this.active;
-    camera.position.copy(this.target).add(offset);
+    camera.position.copy(this.target).addScaledVector(back, this.camDistance);
     camera.lookAt(this.target);
     this.resize(width, height);
   }
@@ -225,15 +259,12 @@ export class OrbitCamera {
   }
 
   /**
-   * Inclinacion de la mirada en radianes, positiva hacia ARRIBA, en la vista
-   * que este activa. La orbital mira siempre hacia abajo —su `pitch` es la
-   * elevacion desde la que mira—; la primera persona lleva la suya.
-   *
-   * Es la segunda mitad de la mirada de la accion: decide si el cono alcanza la
-   * altura de arriba o la de abajo (`levelStep` en `sim/aim.ts`).
+   * Inclinacion de la mirada en radianes, positiva hacia ARRIBA: la misma en
+   * las tres vistas. Es la segunda mitad de la mirada de la accion, la que
+   * inclina el sector del golpe (regla 12).
    */
   get lookPitch(): number {
-    return this.projection === 'primera' ? this.fpPitch : -this.pitch;
+    return this.pitch;
   }
 
   right(): { x: number; y: number } {

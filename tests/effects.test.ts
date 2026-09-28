@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { Feature } from '@verdant/shared';
+import { EYE_HEIGHT, STRIKE_RANGE, strike } from '@verdant/sim';
 import {
   DEBRIS_PER_BURST,
   Effects,
   MAX_PARTICLES,
   progressOf,
   SLASH_SECONDS,
-  SLASH_SPREAD,
-  slashArc,
+  slashEdge,
 } from '../packages/client/src/effects.js';
 import { debrisPalette, LOOKS, ROCK_FACES } from '../packages/client/src/palette.js';
 
@@ -165,41 +165,23 @@ describe('Escombros de lo recolectado', () => {
 });
 
 describe('El slash de la accion', () => {
-  const O = { x: 10, y: 3, z: 20 };
-
-  it('se dibuja delante de la mirada, abarcando lo que abarca el cono', () => {
-    // Mirando al este (+x en el mundo) sin inclinacion.
-    const arc = slashArc(O, 1, 0, 0, 1);
-    for (const p of arc) {
-      const dx = p.x - O.x;
-      const dz = p.z - O.z;
-      // Todo delante, a un radio de distancia en el plano...
-      expect(dx).toBeGreaterThan(0);
-      expect(Math.hypot(dx, dz)).toBeCloseTo(1, 9);
-      // ...y dentro de los ±45 grados del cono.
-      expect(Math.abs(Math.atan2(dz, dx))).toBeLessThanOrEqual(SLASH_SPREAD + 1e-9);
-    }
-    // De un extremo al otro del cono, y el centro justo delante.
-    const mid = arc[Math.floor(arc.length / 2)];
-    expect(mid.x - O.x).toBeCloseTo(1, 9);
-    expect(mid.z - O.z).toBeCloseTo(0, 9);
-    expect(Math.abs(arc[0].z - arc[arc.length - 1].z)).toBeCloseTo(2 * Math.sin(SLASH_SPREAD), 9);
-  });
-
-  it('va en diagonal: de la derecha y arriba a la izquierda y abajo', () => {
-    // Mirando al este, la derecha es +z (la misma que `camera.right()`).
-    const arc = slashArc(O, 1, 0, 0, 1);
-    expect(arc[0].z).toBeGreaterThan(O.z);
-    expect(arc[arc.length - 1].z).toBeLessThan(O.z);
-    expect(arc[0].y).toBeGreaterThan(arc[arc.length - 1].y);
-  });
-
-  it('en primera persona sigue la inclinacion de la mirada', () => {
-    const down = slashArc(O, 1, 0, -0.5, 1);
-    const mid = down[Math.floor(down.length / 2)];
-    // El centro del arco cae sobre el rayo de la mirada.
-    expect(mid.y - O.y).toBeCloseTo(Math.sin(-0.5), 9);
-    expect(mid.x - O.x).toBeCloseTo(Math.cos(-0.5), 9);
+  it('recorre el borde del area real: el extremo de cada rayo del golpe', () => {
+    // Un golpe de verdad del nucleo, con el suelo cortando los rayos de un lado.
+    const eye = { x: 10.5, y: 3.5, z: 20 + EYE_HEIGHT };
+    const ground = (_x: number, y: number) => (y > 4.2 ? 21.6 : 20);
+    const hit = strike(eye, 1, 0, -0.3, ground, () => null);
+    const edge = slashEdge(eye, hit.rays);
+    expect(edge).toHaveLength(hit.rays.length);
+    hit.rays.forEach((ray, i) => {
+      // En coordenadas de three.js: `y` es la altura y `z` el eje sur.
+      expect(edge[i].x).toBeCloseTo(eye.x + ray.dir.x * ray.length, 9);
+      expect(edge[i].y).toBeCloseTo(eye.z + ray.dir.z * ray.length, 9);
+      expect(edge[i].z).toBeCloseTo(eye.y + ray.dir.y * ray.length, 9);
+    });
+    // Los rayos que no tocan suelo llegan a los 2 bloques del alcance; los del
+    // lado del escalon se quedan antes.
+    expect(Math.max(...hit.rays.map((r) => r.length))).toBeCloseTo(STRIKE_RANGE, 9);
+    expect(Math.min(...hit.rays.map((r) => r.length))).toBeLessThan(STRIKE_RANGE);
   });
 
   it('no se queda con la lista de quien lo pidio', () => {

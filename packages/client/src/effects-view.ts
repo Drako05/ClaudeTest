@@ -164,7 +164,7 @@ export class EffectsView {
         continue;
       }
 
-      // El trazo ya viene en el mundo, delante de la mirada (`slashArc`).
+      // El trazo ya viene en el mundo, en el borde del area real del golpe (`slashEdge`).
       const points = slash.points;
       if (points.length < 2) {
         mesh.visible = false;

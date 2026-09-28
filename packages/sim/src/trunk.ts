@@ -17,10 +17,48 @@
  *
  * **Es de la casilla**, como el giro del aspa: sale de `hash2DFloat` y no de
  * `Math.random`, asi que un arbol no cambia de altura cuando su chunk se
- * descarta y se regenera (regla 3). Y es ARTE: `packages/sim` no se entera.
+ * descarta y se regenera (regla 3).
+ *
+ * **Vive en el nucleo desde que el tronco es el hitbox del arbol** (regla 12): el
+ * golpe cuenta solo si toca el tramo desnudo, y lo que decide un golpe es de la
+ * simulacion. Nacio en el cliente, como arte; el dibujo lo lee ahora de aqui, asi
+ * que el tronco que se ve y el que se golpea son el mismo numero.
  */
 
-import { hash2DFloat } from '@verdant/sim';
+import { Feature } from '@verdant/shared';
+import { hash2DFloat } from './rng.js';
+
+/**
+ * El tronco de cada especie de arbol: media y desviacion de su tramo desnudo, y
+ * su grosor en el pie para el arbol de tronco medio, en bloques. Del porte real
+ * de cada especie; los numeros son deduccion mia (estan en `docs/pendiente.md`).
+ * La forma de la copa va aparte, en el cliente (`tree-shapes.ts`): es solo arte.
+ */
+export interface TreeTrunk {
+  readonly bareMean: number;
+  readonly bareSd: number;
+  readonly trunkW: number;
+}
+
+export const TREE_TRUNKS: Partial<Record<Feature, TreeTrunk>> = {
+  // Picea comun: en el bosque se poda sola hasta un tercio del alto.
+  [Feature.ForestTree]: { bareMean: 2.5, bareSd: 0.35, trunkW: 0.45 },
+  // Alerce: de luz, se poda mucho: el fuste mas largo, hasta la mitad.
+  [Feature.ForestTreeRare]: { bareMean: 4, bareSd: 0.5, trunkW: 0.4 },
+  // Roble aislado: fuste corto y muy grueso.
+  [Feature.MeadowTree]: { bareMean: 2.4, bareSd: 0.3, trunkW: 0.75 },
+  // Cerezo japones: fuste corto, se abre pronto.
+  [Feature.MeadowTreeRare]: { bareMean: 2.2, bareSd: 0.2, trunkW: 0.5 },
+  // Picea negra: ramas casi hasta el suelo, tronco fino.
+  [Feature.TundraTree]: { bareMean: 2.1, bareSd: 0.1, trunkW: 0.22 },
+  // Picea azul: crecida en abierto, la copa baja hasta el suelo.
+  [Feature.TundraTreeRare]: { bareMean: 2.2, bareSd: 0.2, trunkW: 0.4 },
+};
+
+/** El tronco de esa especie, o `null` si no es un arbol adulto. */
+export function treeTrunkOf(feature: Feature): TreeTrunk | null {
+  return TREE_TRUNKS[feature] ?? null;
+}
 
 /** La regla del autor: ningun tronco desnudo mide menos de esto. */
 export const TRUNK_MIN = 2;
@@ -80,4 +118,29 @@ export function trunkBucket(blocks: number): number {
 /** La altura, en bloques, que dibuja ese escalon. */
 export function bucketBlocks(bucket: number): number {
   return TRUNK_MIN + bucket * TRUNK_STEP;
+}
+
+/** Grosor del tronco en el pie para un tramo desnudo de `bare` bloques. */
+export function trunkWidthFor(trunk: TreeTrunk, bare: number): number {
+  // El arbol mas alto de su especie es tambien el mas grueso.
+  return trunk.trunkW * Math.sqrt(bare / trunk.bareMean);
+}
+
+/**
+ * El tronco del arbol de esa casilla, TAL COMO SE DIBUJA: el tramo desnudo ya
+ * redondeado a su escalon de arte y su grosor en el pie. Es la unica fuente para
+ * el dibujo y para el hitbox (regla 12), asi que nunca pueden no coincidir.
+ * `null` si esa especie no es un arbol adulto.
+ */
+export function treeTrunkAt(
+  seed: number,
+  x: number,
+  y: number,
+  feature: Feature,
+): { bare: number; width: number; bucket: number } | null {
+  const trunk = treeTrunkOf(feature);
+  if (!trunk) return null;
+  const bucket = trunkBucket(trunkBlocks(seed, x, y, trunk));
+  const bare = bucketBlocks(bucket);
+  return { bare, width: trunkWidthFor(trunk, bare), bucket };
 }

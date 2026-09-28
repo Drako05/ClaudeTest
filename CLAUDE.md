@@ -69,8 +69,9 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
    nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`, y `aimZ` para su
    inclinacion), y es **la de la camara**, decision del autor: cada tick sale de
-   `camera.forward()` y `camera.lookPitch`, y el nucleo la usa **tal cual, sin
-   encajarla en ocho direcciones** (regla 12). Se acciona hacia donde se mira; y
+   `camera.forward()` y `camera.lookPitch`, que son **la misma en las tres
+   vistas**, y el nucleo la usa **tal cual, sin encajarla en ocho
+   direcciones**: inclina el sector del golpe (regla 12). Se acciona hacia donde se mira; y
    como el movimiento tambien se rota con la camara antes de entrar en la
    Intent, la Intent sigue siendo de mundo y puede viajar por red.
 
@@ -100,33 +101,35 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     arrasado reviviera dependia del orden en que se generaron los chunks —es
     decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
     que ningun test evidente lo delate.
-12. **Una accion afecta a un CONO que sale del jugador hacia donde mira**
-    (`sim/aim.ts`), decision del autor del 2026-09-28: **1,5 bloques y 90
-    grados** alrededor de la mirada real, sin redondearla a ocho direcciones;
-    una casilla entra si su centro cae dentro, y **la que se pisa entra
-    siempre** (deduccion mia: el autor la habia sumado al area vieja y el cono
-    nace en ella). Y **dos alturas**: la propia y la de arriba, o la de abajo
-    si se mira hacia abajo mas de **25 grados**, en las tres vistas (la orbital
-    arranca a 35, asi que alcanza la de abajo; bajandola a ras de suelo, la de
-    arriba). Sembrar va a **la casilla de enfrente**, la primera que cruza el
-    centro de la mirada, con las mismas dos alturas.
+12. **El golpe es un SECTOR PLANO que sale de los ojos y cuenta solo si toca
+    un hitbox** (`sim/aim.ts`), decision del autor del 2026-09-28: **2 bloques
+    y 90 grados** (±45) en el plano de la mirada —la direccion en que se mira,
+    con su inclinacion, y la horizontal a su derecha—, y **el terreno lo
+    corta**: no se golpea a traves del suelo ni de una pared. Se recorre con 33
+    rayos (a 2 bloques, un hueco de 0,1, menos que el tronco mas fino), cada uno
+    cortado donde entra en el terreno; cae todo objeto cuyo hitbox cruce alguno.
+    **Sembrar** va donde la mirada toca la cara de arriba del suelo, a menos de
+    2 bloques **en horizontal** (lo de horizontal es deduccion mia: a lo largo
+    de la mirada habria que mirar 61 grados abajo para sembrar en llano; asi,
+    41); ni en la cara de una pared ni mirando al cielo.
 
-    Sustituyo a cuatro casillas fijas —la apuntada, sus dos vecinas en el
-    anillo de 8 direcciones y la propia— porque en primera persona se golpeaba
-    lo que no estaba delante de los ojos. **Con el jugador centrado y mirando en
-    recto, el cono coge justo lo que cogia aquella**: la de enfrente y las
-    diagonales caen a 45 grados y a 1,41, y los dos casos del autor sobre la
-    rejilla 1-9 (mirando a 2: 1, 2, 3 y 5; mirando a 3: 2, 3, 6 y 5) siguen en
-    `tests/aim.test.ts`. El cambio se nota al girar: a 22,5 grados entran solo
-    las dos que caen dentro.
+    **Hitboxes** (`hitboxAt` en `systems/gathering.ts`): cajas verticales
+    centradas en su casilla y apoyadas en su suelo. **El del arbol es solo su
+    tronco desnudo** —del suelo a la copa y del grosor de su especie—, decision
+    del autor: las hojas no. Por eso el tronco de cada arbol **vive en el
+    nucleo** (`sim/trunk.ts`) y el cliente lo lee de ahi para dibujarlo: el que
+    se ve y el que se golpea son el mismo numero, escalon de cuarto de bloque
+    incluido, y un test lo afirma. Arbusto, roca, minerales y brote llevan
+    medidas sacadas de su dibujo (deduccion mia).
 
-    El cono parte de la posicion CONTINUA, no del centro de la casilla: es la
-    mirada real, y a medio paso se alcanza lo que se tiene delante. Desde
-    cualquier punto de la casilla propia el centro de la de dos mas alla queda
-    a mas de 1,5, asi que el cono nunca se salta una fila. El orden es fijo —de
-    la mas centrada a la mas ladeada, y la propia la ultima— y la casilla de
-    enfrente se busca recorriendo el rayo casilla a casilla (Amanatides-Woo),
-    no con un paso fijo, que podia saltarse la que el rayo roza por la esquina.
+    Es el tercer modelo, y cada uno cayo por lo mismo: la primera persona.
+    Cuatro casillas fijas (la apuntada, sus vecinas en el anillo de 8
+    direcciones y la propia) golpeaban lo que no estaba delante de los ojos; un
+    cono sobre casillas, con «dos alturas», se quedaba corto. Con la mirada
+    libre arriba y abajo, lo unico que decide es lo que hay delante: sin casilla
+    propia ni alturas, lo pone la geometria. **Consecuencia que conviene saber:
+    el sector es plano**, asi que mirando al frente pasa por encima de un
+    arbusto (1,1 de alto, los ojos a 1,75) y hay que mirar hacia el.
 
 13. **El relieve sale de la misma elevacion que el terreno.** `levelFrom` no es
     mas que otra forma de leer el `e < 0.42` que ya separaba el agua, asi que
@@ -366,23 +369,17 @@ Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
   rumbo desde el que se mira. Medido a 0.08 rad de elevacion: 104 pixeles
   aclarados contra 2 y contra 13.
 
-  **El barrido va DELANTE DE LA MIRADA, no clavado a las casillas** (decision
-  del autor con el cono de la regla 12): es un arco de ±45 grados —lo que abarca
-  el cono— que baja en diagonal de la derecha a la izquierda (`slashArc` en
-  `effects.ts`, puro). En **primera persona** sale de los ojos, a 0,9 y con la
-  inclinacion de la mirada, y cruza la vista de lado a lado; en **tercera**, del
-  **pecho** del personaje, a una casilla y girado con el rumbo. Sale siempre,
-  haya algo que golpear o no: es el gesto, no el resultado. Se congela en el
-  mundo al nacer, asi que girar despues no lo arrastra. Radios, grosor en
-  primera persona (medio ancho 0,02, porque a un palmo de los ojos el de tercera
-  tapaba media pantalla) y la diagonal son deduccion mia.
-
-  El pecho nacio en 0.9 —los mismos `TILE_H * 0.9` del isometrico leidos como
-  niveles— y subio a **1.3** cuando el personaje paso a medir casi dos bloques
-  (ver Proporciones), porque 0.9 ya era su cintura. En tercera persona la cinta
-  mide 0.12 de ancho, que son los 3 px del isometrico con la casilla a 32,
-  redondeados al alza desde 0.094 porque PixiJS suavizaba el trazo y este lienzo
-  va sin antialias.
+  **El barrido recorre el BORDE CURVO DEL AREA REAL del golpe** (pedido del
+  autor con el sector de la regla 12): el extremo de cada uno de sus 33 rayos,
+  ya cortados por el terreno, asi que donde el sector entra en el suelo o en una
+  pared el trazo se pega a el (`slashEdge` en `effects.ts`, puro). No se
+  recalcula nada: es el mismo golpe que decidio la simulacion. Sale de los ojos
+  en las tres vistas, siempre, haya algo que golpear o no —es el gesto, no el
+  resultado—, y se congela en el mundo al nacer. En primera persona, a 2
+  bloques de los ojos, lleva medio ancho 0,04 (deduccion mia); en tercera, 0,06:
+  los 3 px del isometrico con la casilla a 32, redondeados al alza desde 0,094
+  porque PixiJS suavizaba el trazo y este lienzo va sin antialias. Antes fue un
+  arco fijo delante de la mirada, y antes aun iba clavado a las casillas.
 
   **Y toda malla cuya geometria se reescriba cada frame lleva
   `frustumCulled = false`.** three.js calcula la esfera envolvente **una sola
@@ -462,8 +459,9 @@ segmento caiga fuera de su chunk. La geometria del contorno vive aparte en
 de la costura con `world.gen` para no registrar chunks por mirar.
 
 **La mirada es la de la camara, asi que la reticula tambien.** Marca las
-casillas que la accion ALCANZA (`actionReach`), cada una a su altura: marcar las
-de encima de una pared prometeria algo que la accion no cumple (regla 21).
+casillas de los objetos que el golpe ALCANZA —cuyo hitbox toca el sector, regla
+12—, el mas cercano mas fuerte, y en verde donde se sembraria. Solo lo que la
+accion cumple: nada que el sector no toque.
 
 La congelacion empieza puesta al abrir el panel y solo se aplica con el panel
 abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
@@ -561,9 +559,11 @@ jugador vea por debajo del follaje (antes asomaban 0,78-1,13 y la copa le tapaba
 la cabeza). Empezo siendo 2-5 comun a todos, y el autor lo quiso por especie al
 ver 2-5 bloques de palo bajo la picea negra, tan estrecha. Se lee como el tramo
 **desnudo** hasta la copa; sale de una **normal truncada** en
-`[max(2, μ−2σ), μ+2σ]` (`trunk.ts`) con la media y la desviacion de la tabla de
-especies de abajo —numeros y truncado son deduccion mia—. Dos cosas que no son
-de gusto:
+`[max(2, μ−2σ), μ+2σ]` con la media y la desviacion de la tabla de especies de
+abajo —numeros y truncado son deduccion mia—. **Vive en el nucleo**
+(`sim/trunk.ts`, con `TREE_TRUNKS`) desde que el tronco desnudo es el hitbox del
+arbol (regla 12): el cliente lo lee de ahi para dibujarlo, asi que el tronco que
+se ve y el que se golpea no pueden no coincidir. Dos cosas que no son de gusto:
 
 - **Es de la casilla**, de `hash2DFloat` como el giro del aspa: con azar vivo un
   arbol cambiaria de altura cada vez que su chunk se regenera (regla 3).
@@ -758,12 +758,39 @@ orbitales, que «agarran el mundo»—; y la pinza es un **catalejo temporal**, 
 estrecha el campo de vision y al soltar vuelve. En la interfaz la ortografica
 se llama «isometrica», que es como la llama el autor.
 
-Las tres comparten el **rumbo** (`yaw`): cambiar de vista sigue mirando al mismo
-sitio y `forward()` —movimiento y mirada de la accion— vale igual. La
-inclinacion es de cada una (`fpPitch` aparte), asi que volver a tercera persona
-recupera su angulo. El cuerpo del jugador no se dibuja desde dentro. Los numeros
-de la primera persona —ojos a 1,75, 70°, catalejo hasta 15°, la vuelta del
-catalejo con raton a los 0,8 s— son deduccion mia; estan en `docs/pendiente.md`.
+**Las tres comparten la mirada ENTERA** (decision del autor, 2026-09-28): el
+mismo pivote —los ojos del jugador, `EYE_HEIGHT = 1,75` en el nucleo, que es
+tambien el origen del golpe— y la misma direccion, rumbo e inclinacion, que es
+la direccion en que mira el jugador. La primera persona esta en el pivote; la
+perspectiva y la isometrica, **detras de el sobre la linea de la mirada y
+mirandolo**, asi que el centro de la pantalla es siempre hacia donde se mira y
+cambiar de vista no mueve la mirada. Antes cada vista tenia su inclinacion
+(`fpPitch` aparte) y la orbital miraba a 1,6: al compartir la mirada, una sola.
+**La isometrica tambien la comparte**, por decision del autor. Arrastrar
+conserva el sentido de cada vista —en primera persona arriba es mirar arriba; en
+las orbitales se «agarra el mundo»—, pero los dos mueven la misma inclinacion.
+
+**Y la tercera persona mira hacia arriba**, pedido del autor: la camara baja por
+detras, y para eso **choca** (`camera-collision.ts`, puro). Un rayo desde los
+ojos hacia donde iria la camara se para 0,3 antes del primer choque con el
+**terreno** que se dibuja o con un **hitbox** —el del arbol es su tronco, asi que
+la camara pasa entre las copas—. La isometrica se pone a 60 como mucho (su
+tamano no depende de la distancia) y su plano cercano paso de −400 a 0,05, para
+que lo que queda detras de una camara empujada no se pinte delante; el de la
+perspectiva, de 0,5 a 0,1, porque la camara puede quedar a un palmo del suelo.
+Con la camara a menos de 1 bloque el sprite del jugador se oculta. Los rayos no
+salen de los chunks cargados: el mas largo mide 60 y se carga radio 3 de 32.
+
+**Consecuencia a saber**: como la mirada pasa por los ojos del jugador, en
+tercera persona **el personaje tapa el centro de la pantalla**, que es justo
+hacia donde se golpea. Un encuadre «por encima del hombro» lo resolveria, y es
+decision del autor.
+
+El cuerpo del jugador no se dibuja desde dentro. Los numeros —ojos a 1,75, la
+inclinacion de arranque −0,62 (los 35 grados de la perspectiva de siempre), el
+tope de ±83 grados, 70° en primera persona, catalejo hasta 15°, la vuelta del
+catalejo con raton a los 0,8 s, el margen de 0,3 y los topes de la colision— son
+deduccion mia; estan en `docs/pendiente.md`.
 
 **Una medida de «se ve» tiene que mirar donde esta lo que mide.** `npm run
 slash` cuenta los pixeles aclarados en una caja central, y en primera persona

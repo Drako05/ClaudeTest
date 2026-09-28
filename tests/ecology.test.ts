@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   EntityKind,
   EntityStore,
-  tryHarvest,
+  EYE_HEIGHT,
+  harvestTile,
   tryPlant,
   World,
 } from '@verdant/sim';
@@ -158,11 +159,18 @@ describe('El ciclo de la siembra', () => {
    * era el propio. Ya no: una accion siempre afecta a casillas adyacentes, nunca
    * a la que se pisa.
    */
-  function playerOn(x: number, y: number): { store: EntityStore; id: number } {
+  /**
+   * Un jugador en la casilla al norte de `(x, y)`, de pie en su suelo y mirando
+   * al centro del suelo de esa casilla: es donde siembra (regla 12).
+   */
+  function playerOn(world: World, x: number, y: number): { store: EntityStore; id: number } {
     const store = new EntityStore(4);
     const id = store.spawn(EntityKind.Player, x + 0.5, y - 0.5);
+    store.z[id] = world.groundHeightAt(x + 0.5, y - 0.5);
+    const dz = world.groundHeightAt(x + 0.5, y + 0.5) - (store.z[id] + EYE_HEIGHT);
     store.facingX[id] = 0;
     store.facingY[id] = 1;
+    store.lookZ[id] = dz / Math.hypot(1, dz);
     return { store, id };
   }
 
@@ -186,8 +194,7 @@ describe('El ciclo de la siembra', () => {
       for (let x = -60; x < 60 && harvests < 120; x++) {
         if (lifeKindOf(world.featureAt(x, y)) !== LifeKind.Tree) continue;
         const before = inventory[Resource.TreeSeed];
-        const { store, id } = playerOn(x, y);
-        const result = tryHarvest(world, store, id, inventory, world.currentTick);
+        const result = harvestTile(world, x, y, inventory, world.currentTick);
         expect(result).not.toBeNull();
         const gained = inventory[Resource.TreeSeed] - before;
         counts.set(gained, (counts.get(gained) ?? 0) + 1);
@@ -212,9 +219,8 @@ describe('El ciclo de la siembra', () => {
     const cy = tree.y >> 5;
 
     const inventory = new Int32Array(RESOURCE_COUNT);
-    const { store, id } = playerOn(tree.x, tree.y);
     const balanced = world.isBiomeBalanced(cx, cy, world.biomeAt(tree.x, tree.y));
-    const result = tryHarvest(world, store, id, inventory, 0)!;
+    const result = harvestTile(world, tree.x, tree.y, inventory, 0)!;
 
     if (balanced) {
       // 3 de base con un 30 % de bonus.
@@ -231,7 +237,7 @@ describe('El ciclo de la siembra', () => {
     world.setNow(0);
     const tree = findTile(world, (f) => lifeKindOf(f) === LifeKind.Tree);
     const inventory = new Int32Array(RESOURCE_COUNT);
-    const { store, id } = playerOn(tree.x, tree.y);
+    const { store, id } = playerOn(world, tree.x, tree.y);
 
     // Se retira el arbol para dejar el tile libre y se siembra ahi mismo.
     world.setFeature(tree.x, tree.y, Feature.None);
@@ -244,7 +250,7 @@ describe('El ciclo de la siembra', () => {
 
     // Un brote ni estorba el paso ni se puede recolectar todavia.
     expect(world.isSolidAt(tree.x, tree.y)).toBe(false);
-    expect(tryHarvest(world, store, id, inventory, 0)).toBeNull();
+    expect(harvestTile(world, tree.x, tree.y, inventory, 0)).toBeNull();
 
     const adult = maturesInto(sapling!);
     world.setNow(MATURATION_TICKS - 1);
@@ -260,7 +266,7 @@ describe('El ciclo de la siembra', () => {
     world.setNow(0);
     const tree = findTile(world, (f) => lifeKindOf(f) === LifeKind.Tree);
     const inventory = new Int32Array(RESOURCE_COUNT);
-    const { store, id } = playerOn(tree.x, tree.y);
+    const { store, id } = playerOn(world, tree.x, tree.y);
 
     inventory[Resource.TreeSeed] = 1;
     expect(tryPlant(world, store, id, inventory)).toBeNull(); // ocupado

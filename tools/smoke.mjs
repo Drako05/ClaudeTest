@@ -306,11 +306,15 @@ async function desktopPass(browser, baseUrl) {
   const hudHunger = await page.evaluate(() => document.getElementById('hungerFill').style.width);
   check(hudHunger !== '100%', `la barra de hambre del HUD no bajo (${hudHunger})`);
 
-  // La mirada es la de la camara: la mirada del nucleo tiene que ser la de la
-  // camara encajada en ocho direcciones, y girar la camara tiene que girarla.
+  // La mirada es la de la camara (regla 5): el rumbo y la inclinacion del
+  // nucleo son los de la camara, y girarla los gira.
   const dot = (s) => s.facing[0] * s.aim[0] + s.facing[1] * s.aim[1];
   const before = await state(page);
-  check(dot(before) > 0.9, `la mirada no sigue a la camara: ${JSON.stringify([before.facing, before.aim])}`);
+  check(dot(before) > 0.99, `la mirada no sigue a la camara: ${JSON.stringify([before.facing, before.aim])}`);
+  check(
+    Math.abs(before.lookZ - Math.sin(before.pitch)) < 1e-3,
+    `la inclinacion del nucleo (${before.lookZ.toFixed(3)}) no es la de la camara (${before.pitch.toFixed(3)})`,
+  );
   await orbit(page, 260);
   const turned = await waitForLoop(page, 20);
   console.log(`  mirada: ${JSON.stringify(before.facing)} -> ${JSON.stringify(turned.facing)}`);
@@ -318,45 +322,46 @@ async function desktopPass(browser, baseUrl) {
     turned.facing[0] !== before.facing[0] || turned.facing[1] !== before.facing[1],
     'girar la camara no giro la mirada',
   );
-  check(dot(turned) > 0.9, `tras girar, la mirada no sigue a la camara: ${JSON.stringify([turned.facing, turned.aim])}`);
+  check(dot(turned) > 0.99, `tras girar, la mirada no sigue a la camara: ${JSON.stringify([turned.facing, turned.aim])}`);
   // Y arrastrar es girar, no accionar: se decide al soltar.
   check(turned.sent.harvest === before.sent.harvest, 'arrastrar para girar acciono');
 
-  // El area es el cono de la mirada (regla 12): casillas distintas, todas
-  // delante del jugador y a menos de 1,5 bloques, y la que pisa la ultima. Lo
-  // que se alcanza es un subconjunto, y la reticula marca exactamente eso. Los
-  // numeros exactos del cono los miden los tests del nucleo; aqui, que el que
-  // llega al juego es el cono y sigue a la camara.
-  const tile = [Math.floor(turned.x), Math.floor(turned.y)];
-  check(turned.area.length >= 2, `el cono no coge nada delante: ${JSON.stringify(turned.area)}`);
-  check(
-    new Set(turned.area.map((t) => t.join(','))).size === turned.area.length,
-    `el area repite casilla: ${JSON.stringify(turned.area)}`,
-  );
-  check(turned.area.at(-1).join(',') === tile.join(','), `la ultima del area no es la que se pisa: ${JSON.stringify(turned.area)}`);
-  for (const [tx, ty] of turned.area.slice(0, -1)) {
+  // Lo que el golpe alcanza (regla 12) esta delante y al alcance: todo objeto
+  // cuyo hitbox toca el sector cae en una casilla a menos de 2 bloques mas su
+  // media diagonal, hacia donde se mira. Los numeros exactos del sector los
+  // miden los tests del nucleo; aqui, que el que llega al juego es ese. Y la
+  // reticula marca exactamente eso.
+  for (const [tx, ty] of turned.reach) {
     const dx = tx + 0.5 - turned.x;
     const dy = ty + 0.5 - turned.y;
     const d = Math.hypot(dx, dy);
-    const cos = (dx * turned.aim[0] + dy * turned.aim[1]) / d;
-    check(d <= 1.5 + 1e-6 && cos >= Math.SQRT1_2 - 1e-6, `casilla ${tx},${ty} fuera del cono (a ${d.toFixed(2)}, cos ${cos.toFixed(2)})`);
+    check(d <= 2 + Math.SQRT1_2 + 1e-6, `se alcanza la casilla ${tx},${ty}, a ${d.toFixed(2)}`);
+    check(d < 0.8 || (dx * turned.aim[0] + dy * turned.aim[1]) / d > 0, `se alcanza la casilla ${tx},${ty}, que queda detras`);
   }
-  const inArea = new Set(turned.area.map((t) => t.join(',')));
-  check(turned.reach.every((t) => inArea.has(t.join(','))), 'lo alcanzable sale del area');
   check(
     turned.reticleTiles === turned.reach.length,
     `la reticula marca ${turned.reticleTiles} casillas y se alcanzan ${turned.reach.length}`,
   );
 
-  // Un clic sin arrastrar acciona, y el barrido llega a dibujarse. Desde el
-  // nacimiento, que es un rellano llano (regla 22): ahi todo el cono esta al
-  // alcance. El barrido ya no depende del paisaje —va delante de la mirada—,
-  // pero lo que se recolecta si.
-  const beforeClick = await open(page, baseUrl);
-  check(
-    beforeClick.reach.length === beforeClick.area.length,
-    `en el nacimiento no se alcanza todo el cono (${beforeClick.reach.length} de ${beforeClick.area.length})`,
+  // Mirar hacia arriba en tercera persona (pedido del autor): la camara baja
+  // por detras, y la colision la para antes del suelo. Arrastrar hacia abajo en
+  // la orbital «agarra el mundo» y sube la mirada.
+  await page.mouse.move(CLICK.x, 200);
+  await page.mouse.down();
+  await page.mouse.move(CLICK.x, 620, { steps: 12 });
+  await page.mouse.up();
+  const lookingUp = await waitForLoop(page, 20);
+  console.log(
+    `  mirando arriba: inclinacion ${lookingUp.pitch.toFixed(2)}, camara a ${lookingUp.camDistance.toFixed(2)}, ` +
+      `${lookingUp.camClearance.toFixed(2)} sobre el suelo`,
   );
+  check(lookingUp.pitch > 0.3, `arrastrar no subio la mirada (${lookingUp.pitch.toFixed(2)})`);
+  check(lookingUp.lookZ > 0, 'el nucleo no recibio la mirada hacia arriba');
+  check(lookingUp.camClearance > 0.05, `la camara se metio bajo el suelo (${lookingUp.camClearance.toFixed(2)})`);
+
+  // Un clic sin arrastrar acciona, y el barrido llega a dibujarse: sale siempre,
+  // haya algo que golpear o no.
+  const beforeClick = await open(page, baseUrl);
   await page.mouse.click(CLICK.x, CLICK.y);
   await page.waitForTimeout(400);
   const afterClick = await state(page);
@@ -510,6 +515,14 @@ async function resourcesPass(browser, baseUrl) {
     console.log(`  semillas tras recolectar: ${seeds}`);
     check(seeds > 0, 'recolectar no dejo ninguna semilla');
     let planted = seeded;
+    // Se siembra donde la mirada toca el suelo, a menos de 2 bloques (regla
+    // 12): con los ojos a 1,75 hay que mirar unos 41 grados hacia abajo, y la
+    // camara arranca a 35. Arrastrar hacia arriba en la orbital baja la mirada.
+    await page.mouse.move(CLICK.x, 400);
+    await page.mouse.down();
+    await page.mouse.move(CLICK.x, 340, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
     for (let i = 0; i < 8 && seeds > 0; i++) {
       await page.keyboard.press('KeyF');
       await page.waitForTimeout(250);
@@ -712,7 +725,6 @@ async function mobilePass(browser, baseUrl) {
   // un rellano llano (regla 22): ahi todo el cono esta al alcance, sin depender
   // de donde dejo el joystick al jugador.
   const h0 = await open(page, baseUrl);
-  check(h0.reach.length === h0.area.length, `en el nacimiento no se alcanza todo el cono (${h0.reach.length} de ${h0.area.length})`);
   await tapButton(page, '#action', 'touchstart');
   await page.waitForTimeout(1600);
   // Y sin soltar, ese mismo dedo se arrastra: gira la camara y la accion sigue

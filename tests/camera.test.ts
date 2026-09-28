@@ -44,7 +44,7 @@ describe('La primera persona', () => {
 
   it('mira hacia el mismo rumbo que da forward(), que es el de la accion', () => {
     const cam = fp();
-    cam.fpPitch = 0;
+    cam.pitch = 0;
     for (const yaw of [0, 0.7, 2.1, -1.3]) {
       cam.yaw = yaw;
       cam.follow(0, 0, 0, 800, 600);
@@ -84,20 +84,76 @@ describe('La primera persona', () => {
     expect(first.yaw).toBeCloseTo(orbital.yaw, 12);
   });
 
-  it('su inclinacion no toca la de la orbita: al volver, la orbita sigue igual', () => {
-    const cam = fp();
-    const orbitPitch = cam.pitch;
-    cam.orbit(0, -200);
-    cam.cycleProjection(); // vuelta a la perspectiva
-    expect(cam.pitch).toBe(orbitPitch);
-  });
 
   it('no se puede mirar mas alla de la vertical', () => {
     const cam = fp();
     cam.orbit(0, -100_000);
-    expect(cam.fpPitch).toBeLessThan(Math.PI / 2);
+    expect(cam.pitch).toBeLessThan(Math.PI / 2);
     cam.orbit(0, 100_000);
-    expect(cam.fpPitch).toBeGreaterThan(-Math.PI / 2);
+    expect(cam.pitch).toBeGreaterThan(-Math.PI / 2);
+  });
+});
+
+describe('Una sola mirada para las tres vistas', () => {
+  /** La camara en la vista `n` del ciclo (0 perspectiva, 1 isometrica, 2 primera). */
+  function view(n: number): OrbitCamera {
+    const cam = new OrbitCamera();
+    for (let i = 0; i < n; i++) cam.cycleProjection();
+    return cam;
+  }
+
+  it('las tres miran en la direccion de la mirada, y cambiar de vista no la mueve', () => {
+    for (const pitch of [-0.62, 0, 0.9]) {
+      const dirs = [0, 1, 2].map((n) => {
+        const cam = view(n);
+        cam.yaw = 0.8;
+        cam.pitch = pitch;
+        cam.follow(3, 2, -7, 800, 600);
+        return looking(cam);
+      });
+      const want = view(0);
+      want.yaw = 0.8;
+      want.pitch = pitch;
+      const look = want.look();
+      for (const d of dirs) {
+        expect(d.x).toBeCloseTo(look.x, 6);
+        expect(d.y).toBeCloseTo(look.y, 6);
+        expect(d.z).toBeCloseTo(look.z, 6);
+      }
+    }
+  });
+
+  it('en tercera persona el centro de la pantalla son los ojos del jugador', () => {
+    for (const n of [0, 1]) {
+      const cam = view(n);
+      cam.pitch = 0.4;
+      cam.follow(3, 2, -7, 800, 600);
+      // Sin render no se refrescan las matrices del mundo: se hace a mano.
+      cam.active.updateMatrixWorld();
+      // El pivote, proyectado, cae en el centro exacto de la imagen.
+      const eye = new Vector3(3, 2 + FP_EYE, -7).project(cam.active);
+      expect(eye.x).toBeCloseTo(0, 6);
+      expect(eye.y).toBeCloseTo(0, 6);
+    }
+  });
+
+  it('en tercera persona se puede mirar hacia arriba: la camara baja por detras', () => {
+    const cam = view(0);
+    cam.orbit(0, 100_000); // dedo abajo: en la orbital, «agarrar el mundo» sube la mirada
+    expect(cam.pitch).toBeGreaterThan(1);
+    cam.follow(0, 0, 0, 800, 600);
+    expect(looking(cam).y).toBeGreaterThan(0.8);
+    expect(cam.active.position.y).toBeLessThan(FP_EYE);
+  });
+
+  it('la colision acerca la camara, y sin obstaculos va a su distancia', () => {
+    const cam = view(0);
+    cam.follow(0, 0, 0, 800, 600);
+    const free = cam.camDistance;
+    cam.follow(0, 0, 0, 800, 600, () => 2.5);
+    expect(cam.camDistance).toBe(2.5);
+    expect(cam.active.position.distanceTo(new Vector3(0, FP_EYE, 0))).toBeCloseTo(2.5, 6);
+    expect(free).toBeGreaterThan(2.5);
   });
 });
 

@@ -50,9 +50,9 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Tecla | Accion |
 |---|---|
 | `WASD` / flechas | Moverse, relativo a la camara |
-| Arrastrar | Girar la camara |
+| Arrastrar | Girar la camara, tambien arriba y abajo (en tercera persona se puede mirar al cielo) |
 | Rueda, `+` / `-` | Zoom; en primera persona, catalejo que vuelve al dejar de girar |
-| Clic izquierdo | Accionar hacia donde mira la camara (si no se arrastro) |
+| Clic izquierdo | Golpear hacia donde mira la camara (si no se arrastro) |
 | `Espacio` | Saltar |
 | `Shift` | Correr: interruptor, se queda encendido |
 | `E` | Comer bayas |
@@ -72,6 +72,12 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Boton ACCION | Accionar; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar la accion |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
 | Botones COMER y SEMBRAR | Comer bayas y sembrar |
+
+**La mirada es una sola** en las tres vistas: el centro de la pantalla es hacia
+donde mira el jugador. Se golpea con un sector plano de 2 bloques y 90 grados
+que sale de sus ojos y solo cuenta si toca un objeto —de un arbol, su tronco—;
+el terreno lo tapa. Se siembra donde la mirada toca el suelo. La camara no
+atraviesa bloques ni troncos.
 
 **En los dos:** la salud (corazon) y el hambre (muslo) van siempre abajo, de
 borde a borde, con el boton del **inventario** en la esquina inferior izquierda.

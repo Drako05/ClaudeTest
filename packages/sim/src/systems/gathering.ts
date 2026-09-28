@@ -13,7 +13,9 @@ import {
   densityOfKind,
   Feature,
   harvestOf,
+  isInert,
   isRare,
+  isSapling,
   isTerrainSolid,
   LifeKind,
   MAX_SEEDS_PER_HARVEST,
@@ -22,7 +24,8 @@ import {
   seedFor,
   speciesFor,
 } from '@verdant/shared';
-import { coneTiles, frontTile, levelStep, type Offset } from '../aim.js';
+import { EYE_HEIGHT, plantTile, strike, type Hitbox, type Offset, type Strike, type Vec3 } from '../aim.js';
+import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import { hash2DFloat } from '../rng.js';
 import { toChunkCoord, type World } from '../world.js';
@@ -50,73 +53,89 @@ export interface HarvestResult {
 }
 
 /**
- * Las casillas del cono de la accion de la entidad, sin mirar el relieve: las
- * del cono de la mas centrada a la mas ladeada, y la que se pisa la ultima
- * (`coneTiles` en `sim/aim.ts`).
+ * Medidas de los hitboxes que no son arboles: medio ancho y alto, en bloques.
+ * Salen de lo que mide cada dibujo (1,17 el arbusto, 1,09 la roca, 0,88 el
+ * brote) y son **deduccion mia**; estan en `docs/pendiente.md`.
  */
-export function actionArea(store: EntityStore, id: number): Offset[] {
-  return coneTiles(store.x[id], store.y[id], store.facingX[id], store.facingY[id]);
+const BUSH_BOX = { half: 0.45, height: 1.1 };
+const ROCK_BOX = { half: 0.45, height: 1.0 };
+const SAPLING_BOX = { half: 0.15, height: 0.85 };
+
+/**
+ * El hitbox del objeto de una casilla, o `null` si no hay nada que golpear.
+ *
+ * Una caja vertical centrada en la casilla y apoyada en su suelo. **El del arbol
+ * es solo su tronco desnudo** (decision del autor: las hojas no), del suelo a la
+ * copa y del grosor de su especie, y sale de `treeTrunkAt`, lo mismo que dibuja
+ * el cliente: el tronco que se ve es el que se golpea.
+ */
+export function hitboxAt(world: World, tx: number, ty: number): Hitbox | null {
+  const feature = world.featureAt(tx, ty);
+  if (feature === Feature.None || !harvestOf(feature)) return null;
+  let half: number;
+  let height: number;
+  const trunk = treeTrunkAt(world.seed, tx, ty, feature);
+  if (trunk) {
+    half = trunk.width / 2;
+    height = trunk.bare;
+  } else if (isSapling(feature)) {
+    ({ half, height } = SAPLING_BOX);
+  } else if (isInert(feature)) {
+    ({ half, height } = ROCK_BOX);
+  } else {
+    ({ half, height } = BUSH_BOX);
+  }
+  const cx = tx + 0.5;
+  const cy = ty + 0.5;
+  const z0 = world.groundHeightAt(cx, cy);
+  return { x0: cx - half, x1: cx + half, y0: cy - half, y1: cy + half, z0, z1: z0 + height };
+}
+
+/** Los ojos de la entidad: el origen del golpe. */
+function eyeOf(store: EntityStore, id: number): Vec3 {
+  return { x: store.x[id], y: store.y[id], z: store.z[id] + EYE_HEIGHT };
 }
 
 /**
- * Las dos alturas que alcanza la accion: la propia y la de arriba, o la de
- * abajo si se mira hacia abajo (`levelStep`). Del autor, con el cono.
+ * El golpe de la entidad (regla 12): el sector plano de su mirada, cortado por
+ * el terreno, y los objetos cuyo hitbox toca.
  */
-function reachableLevels(world: World, store: EntityStore, id: number): [number, number] {
-  const level = world.levelAt(Math.floor(store.x[id]), Math.floor(store.y[id]));
-  return [level, level + levelStep(store.lookZ[id])];
+export function strikeOf(world: World, store: EntityStore, id: number): Strike {
+  return strike(
+    eyeOf(store, id),
+    store.facingX[id],
+    store.facingY[id],
+    store.lookZ[id],
+    (x, y) => world.groundHeightAt(x, y),
+    (tx, ty) => hitboxAt(world, tx, ty),
+  );
 }
 
 /**
- * Las casillas del cono que estan **al alcance**: las de la altura propia y las
- * de la segunda que toque segun la mirada.
- *
- * Va aparte de `actionArea` y no dentro porque aquella es geometria pura del
- * cono —no conoce el mundo y sus tests no deben necesitarlo—, mientras que esto
- * es una pregunta sobre el relieve.
- *
- * Se comparan NIVELES enteros y no la altura continua, y eso hace que estar a
- * media rampa no cambie lo que se alcanza a cada paso. Antes solo se alcanzaba
- * la altura propia («para talar un arbol subido a un bloque hay que subirse»);
- * el autor lo amplio a dos con el cono.
+ * Las casillas de los objetos que el golpe alcanza, del mas cercano al mas
+ * lejano. Es lo que se recolecta y lo que marca la reticula.
  */
 export function actionReach(world: World, store: EntityStore, id: number): Offset[] {
-  const [own, other] = reachableLevels(world, store, id);
-  return actionArea(store, id).filter((t) => {
-    const level = world.levelAt(t.x, t.y);
-    return level === own || level === other;
-  });
+  return strikeOf(world, store, id).targets.map(({ x, y }) => ({ x, y }));
 }
 
 /**
- * La casilla de enfrente: la primera que cruza el centro de la mirada. Es donde
- * se siembra.
+ * Donde se siembra: la casilla en que la mirada toca la cara de arriba del
+ * suelo, a menos del alcance, o `null`. Decision del autor.
  */
-export function targetTile(store: EntityStore, id: number): { x: number; y: number } {
-  return frontTile(store.x[id], store.y[id], store.facingX[id], store.facingY[id]);
+export function targetTile(world: World, store: EntityStore, id: number): Offset | null {
+  return plantTile(
+    eyeOf(store, id),
+    store.facingX[id],
+    store.facingY[id],
+    store.lookZ[id],
+    (x, y) => world.groundHeightAt(x, y),
+  );
 }
 
 /**
- * Recolecta el tile apuntado.
- *
- * El rendimiento sube un porcentaje fijo si el bioma esta equilibrado: es la
- * recompensa por cuidarlo. Las semillas se sortean con un hash de posicion y
- * tiempo, no con un generador con estado, para no romper el determinismo.
- */
-export function tryHarvest(
-  world: World,
-  store: EntityStore,
-  id: number,
-  inventory: Int32Array,
-  tick: number,
-): HarvestResult | null {
-  const { x, y } = targetTile(store, id);
-  return harvestTile(world, x, y, inventory, tick);
-}
-
-/**
- * Recolecta las casillas del cono que estan al alcance —y la que se pisa—, en
- * orden fijo y empezando por la mas centrada. Cada una rinde lo
+ * Recolecta todos los objetos que el golpe toca (regla 12), del mas cercano al
+ * mas lejano. Cada uno rinde lo
  * suyo: tres arboles dan la madera de tres arboles,
  * como decidio el autor. El coste lo pone el ecosistema, que tardara mas en
  * reponerse de una tala tan rapida.
@@ -199,10 +218,11 @@ export function tryPlant(
   id: number,
   inventory: Int32Array,
 ): Feature | null {
-  // Se siembra en la casilla de enfrente (decision del autor), y alcanza las
-  // mismas dos alturas que recolectar: donde no se tala, tampoco se planta.
-  const { x, y } = targetTile(store, id);
-  if (!reachableLevels(world, store, id).includes(world.levelAt(x, y))) return null;
+  // Se siembra donde la mirada toca la cara de arriba del suelo, a menos del
+  // alcance (decision del autor); si no llega, o da en una pared, no se siembra.
+  const aimed = targetTile(world, store, id);
+  if (!aimed) return null;
+  const { x, y } = aimed;
   if (world.featureAt(x, y) !== Feature.None) return null;
 
   const terrain = world.terrainAt(x, y);

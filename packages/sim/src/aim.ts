@@ -1,25 +1,27 @@
 /**
- * Mirada y area de efecto: un CONO que sale del jugador hacia donde mira.
+ * La mirada y el golpe: un SECTOR PLANO que sale de los ojos del jugador.
  *
- * Puro y sin dependencias del resto del nucleo, para no crear ciclos: lo usan
- * tanto la recoleccion como el dibujo del reticulo.
+ * Geometria pura: el suelo y los hitboxes entran como funciones, asi que se
+ * mide en Node sin mundo. `systems/gathering.ts` le pone el mundo.
  *
- * **El cono sustituyo a las cuatro casillas fijas** (2026-09-28, decision del
- * autor): la accion encajaba la mirada en ocho direcciones y afectaba siempre a
- * la apuntada, sus dos vecinas del anillo y la propia, y en primera persona eso
- * se sentia raro —se golpeaba a casillas que no estaban delante de los ojos—.
- * Ahora cuenta **la mirada real, sin redondear**. Sus numeros, del autor:
+ * **Regla 12, del autor (2026-09-28).** El golpe es un sector de **2 bloques**
+ * y **90 grados** (±45 alrededor de la mirada) **en el plano de la mirada**: el
+ * que forman la direccion en que se mira —con su inclinacion— y la horizontal a
+ * su derecha. Cuenta **solo si toca un hitbox**, y **el terreno lo corta**: no se
+ * golpea a traves de una pared ni del suelo.
  *
- * - **alcance 1,5 bloques y 90 grados** (±45 alrededor de la mirada): una
- *   casilla entra si su CENTRO cae dentro;
- * - **dos alturas**: la propia y la de arriba, o la de abajo si se mira hacia
- *   abajo mas de 25 grados (ver `levelStep`).
+ * Sustituyo a un cono sobre casillas (y este, a cuatro casillas fijas): con la
+ * mirada libre arriba y abajo, lo que decide que se golpea es lo que hay delante
+ * de los ojos, no en que casilla esta. Por eso ya no hay «dos alturas» ni casilla
+ * propia: lo decide la geometria.
  *
- * Con el jugador en el centro de su casilla y mirando en recto, el cono coge
- * justo lo que cogia el area vieja —la de enfrente y las dos diagonales, que
- * caen a 45 grados y a 1,41—, asi que el cambio se nota al girar, no al mirar de
- * frente. **La casilla que se pisa sigue entrando siempre**, porque la sumo el
- * autor al area vieja y el cono nace en ella; eso es deduccion mia.
+ * El sector se recorre con **`STRIKE_RAYS` rayos** a lo ancho: cada uno se corta
+ * donde entra en el terreno, y un objeto cae si algun rayo cruza su hitbox antes
+ * de ese corte. Con 33 rayos, a 2 bloques queda un hueco de 0,1 entre dos
+ * vecinos, menos que el tronco mas fino (0,22 el de la picea negra en el pie):
+ * nada que el sector toque se cuela entre rayos.
+ *
+ * Coordenadas del NUCLEO: `x`, `y` en el plano y `z` la altura.
  */
 
 /** Desplazamiento en tiles, o una casilla. */
@@ -28,82 +30,208 @@ export interface Offset {
   readonly y: number;
 }
 
-/** Hasta donde llega la accion desde el jugador, en bloques. Del autor. */
-export const ACTION_RANGE = 1.5;
-/** Medio angulo del cono: 90 grados en total. Del autor. */
-export const ACTION_HALF_ANGLE = Math.PI / 4;
-/**
- * Desde cuanta inclinacion hacia abajo se mira «hacia abajo», en radianes: 25
- * grados, del autor. Vale para las tres vistas: en primera persona se entra
- * mirando a -11 grados (alcanza la altura de arriba) y la orbital arranca a 35
- * (la de abajo), y bajandola casi a ras de suelo pasa a la de arriba.
- */
-export const LOOK_DOWN_ANGLE = (25 * Math.PI) / 180;
-
-/** Holgura para que los bordes del cono (45 grados, 1,5) cuenten como dentro. */
-const EDGE = 1e-9;
-
-/**
- * La altura que alcanza la accion ademas de la propia: `+1` la de arriba, `-1`
- * la de abajo. `lookZ` es la componente vertical de la mirada (el seno de su
- * inclinacion, negativo hacia abajo).
- */
-export function levelStep(lookZ: number): 1 | -1 {
-  return lookZ < -Math.sin(LOOK_DOWN_ANGLE) ? -1 : 1;
+/** Un punto o una direccion, con `z` la altura. */
+export interface Vec3 {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
 }
 
 /**
- * Las casillas del cono desde la posicion CONTINUA del jugador `(px, py)`
- * mirando hacia `(fx, fy)`, sin mirar el relieve.
- *
- * El orden es fijo: primero las del cono, de la mas centrada en la mirada a la
- * mas ladeada (y a igual angulo, la mas cercana); **la que se pisa, la ultima**.
- * Se parte de la posicion continua y no de la casilla porque el cono es de la
- * mirada real: a medio paso de una casilla se alcanza lo que se tiene delante,
- * no lo que tendria delante el centro de la casilla.
+ * Una caja vertical alineada con los ejes: `[x0, x1] × [y0, y1] × [z0, z1]`.
+ * Es el hitbox de un objeto (`hitboxAt` en `systems/gathering.ts`).
  */
-export function coneTiles(px: number, py: number, fx: number, fy: number): Offset[] {
-  const len = Math.hypot(fx, fy);
-  const ownX = Math.floor(px);
-  const ownY = Math.floor(py);
-  if (len === 0) return [{ x: ownX, y: ownY }];
-  const ux = fx / len;
-  const uy = fy / len;
-  const cosEdge = Math.cos(ACTION_HALF_ANGLE);
-  const found: Array<{ x: number; y: number; cos: number; d: number }> = [];
-  const r = Math.ceil(ACTION_RANGE) + 1;
-  for (let ty = ownY - r; ty <= ownY + r; ty++) {
-    for (let tx = ownX - r; tx <= ownX + r; tx++) {
-      if (tx === ownX && ty === ownY) continue;
-      const dx = tx + 0.5 - px;
-      const dy = ty + 0.5 - py;
-      const d = Math.hypot(dx, dy);
-      if (d === 0 || d > ACTION_RANGE + EDGE) continue;
-      const cos = (dx * ux + dy * uy) / d;
-      if (cos < cosEdge - EDGE) continue;
-      found.push({ x: tx, y: ty, cos, d });
+export interface Hitbox {
+  readonly x0: number;
+  readonly x1: number;
+  readonly y0: number;
+  readonly y1: number;
+  readonly z0: number;
+  readonly z1: number;
+}
+
+/**
+ * Altura de los ojos sobre los pies: el origen del golpe y el pivote de las tres
+ * camaras. El personaje mide 1,93 y en Minecraft los ojos van al 90 %.
+ * **Deduccion mia** (la primera persona ya la usaba; la orbital, 1,6).
+ */
+export const EYE_HEIGHT = 1.75;
+/** Alcance del golpe, en bloques. Del autor. */
+export const STRIKE_RANGE = 2;
+/** Medio angulo del sector: 90 grados en total. Del autor. */
+export const STRIKE_HALF_ANGLE = Math.PI / 4;
+/** Rayos con los que se recorre el sector, de su borde derecho al izquierdo. */
+export const STRIKE_RAYS = 33;
+
+/** Paso con el que se busca el suelo a lo largo de un rayo. */
+const GROUND_STEP = 0.05;
+
+/**
+ * La direccion en que se mira, unitaria: el rumbo `(fx, fy)` en el plano y la
+ * inclinacion como `lookZ`, su seno (positivo hacia arriba), que es lo que viaja
+ * en la Intent.
+ */
+export function lookVector(fx: number, fy: number, lookZ: number): Vec3 {
+  const len = Math.hypot(fx, fy) || 1;
+  const z = Math.max(-1, Math.min(1, lookZ));
+  const flat = Math.sqrt(1 - z * z);
+  // Sin rumbo, al sur: es hacia donde se nace mirando.
+  const ux = len ? fx / len : 0;
+  const uy = len ? fy / len : 1;
+  return { x: ux * flat, y: uy * flat, z };
+}
+
+/**
+ * Las direcciones de los rayos del sector, unitarias, de la derecha a la
+ * izquierda. Estan en el plano de la mirada y de la horizontal a su derecha.
+ */
+export function sectorRays(fx: number, fy: number, lookZ: number): Vec3[] {
+  const f = lookVector(fx, fy, lookZ);
+  const len = Math.hypot(fx, fy) || 1;
+  // A la derecha de la mirada, en horizontal (con `y` hacia el sur, es (-fy, fx)).
+  const rx = -(fy / len);
+  const ry = fx / len;
+  const out: Vec3[] = [];
+  for (let i = 0; i < STRIKE_RAYS; i++) {
+    const theta = STRIKE_HALF_ANGLE * (1 - (2 * i) / (STRIKE_RAYS - 1));
+    const c = Math.cos(theta);
+    const s = Math.sin(theta);
+    out.push({ x: f.x * c + rx * s, y: f.y * c + ry * s, z: f.z * c });
+  }
+  return out;
+}
+
+/** La altura del suelo en un punto del plano. */
+export type Ground = (x: number, y: number) => number;
+
+/**
+ * Donde entra el rayo en el terreno, como distancia desde el origen, o `null` si
+ * no entra antes de `maxT`. Y si entra por la CARA DE ARRIBA de la casilla —la
+ * que se pisa— o por un costado, que es lo que distingue sembrar en el suelo de
+ * sembrar en la pared de un bloque.
+ */
+export function groundHit(
+  origin: Vec3,
+  dir: Vec3,
+  maxT: number,
+  ground: Ground,
+): { t: number; top: boolean } | null {
+  const below = (t: number): boolean =>
+    origin.z + dir.z * t < ground(origin.x + dir.x * t, origin.y + dir.y * t);
+  if (below(0)) return { t: 0, top: false };
+  let prev = 0;
+  for (let t = GROUND_STEP; ; t += GROUND_STEP) {
+    const at = Math.min(t, maxT);
+    if (below(at)) {
+      // Afinar entre la ultima muestra al aire y la primera bajo tierra.
+      let lo = prev;
+      let hi = at;
+      for (let k = 0; k < 20; k++) {
+        const mid = (lo + hi) / 2;
+        if (below(mid)) hi = mid;
+        else lo = mid;
+      }
+      const x = origin.x + dir.x * hi;
+      const y = origin.y + dir.y * hi;
+      // Por la cara de arriba, el punto de entrada queda a ras de su suelo; por
+      // un costado, muy por debajo de la cima del bloque en que entra.
+      const top = ground(x, y) - (origin.z + dir.z * hi) < 0.05;
+      return { t: hi, top };
+    }
+    if (at >= maxT) return null;
+    prev = at;
+  }
+}
+
+/**
+ * Donde entra el rayo en la caja (metodo de las placas), o `null` si no la
+ * cruza entre `0` y `maxT`. Un origen dentro de la caja da `0`.
+ */
+export function rayBox(origin: Vec3, dir: Vec3, box: Hitbox, maxT: number): number | null {
+  let tmin = 0;
+  let tmax = maxT;
+  const axes: Array<[number, number, number, number]> = [
+    [origin.x, dir.x, box.x0, box.x1],
+    [origin.y, dir.y, box.y0, box.y1],
+    [origin.z, dir.z, box.z0, box.z1],
+  ];
+  for (const [o, d, lo, hi] of axes) {
+    if (Math.abs(d) < 1e-12) {
+      if (o < lo || o > hi) return null;
+      continue;
+    }
+    let t1 = (lo - o) / d;
+    let t2 = (hi - o) / d;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    if (t1 > tmin) tmin = t1;
+    if (t2 < tmax) tmax = t2;
+    if (tmin > tmax) return null;
+  }
+  return tmin;
+}
+
+/** Lo que alcanza un golpe: sus rayos ya cortados y los objetos que toca. */
+export interface Strike {
+  /** Cada rayo del sector, de derecha a izquierda, y hasta donde llega. */
+  readonly rays: ReadonlyArray<{ dir: Vec3; length: number }>;
+  /** Las casillas de los objetos tocados, del mas cercano al mas lejano. */
+  readonly targets: ReadonlyArray<Offset & { t: number }>;
+}
+
+/**
+ * El golpe desde `origin` —los ojos— mirando hacia `(fx, fy)` con inclinacion
+ * `lookZ`. `boxAt` da el hitbox del objeto de una casilla, o `null`.
+ */
+export function strike(
+  origin: Vec3,
+  fx: number,
+  fy: number,
+  lookZ: number,
+  ground: Ground,
+  boxAt: (tx: number, ty: number) => Hitbox | null,
+): Strike {
+  const rays = sectorRays(fx, fy, lookZ).map((dir) => {
+    const hit = groundHit(origin, dir, STRIKE_RANGE, ground);
+    return { dir, length: hit ? hit.t : STRIKE_RANGE };
+  });
+
+  // Solo pueden caer las casillas a menos del alcance mas media diagonal.
+  const reach = Math.ceil(STRIKE_RANGE) + 1;
+  const cx = Math.floor(origin.x);
+  const cy = Math.floor(origin.y);
+  const targets: Array<Offset & { t: number }> = [];
+  for (let ty = cy - reach; ty <= cy + reach; ty++) {
+    for (let tx = cx - reach; tx <= cx + reach; tx++) {
+      const box = boxAt(tx, ty);
+      if (!box) continue;
+      let best = Infinity;
+      for (const ray of rays) {
+        const t = rayBox(origin, ray.dir, box, ray.length);
+        if (t !== null && t < best) best = t;
+      }
+      if (best < Infinity) targets.push({ x: tx, y: ty, t: best });
     }
   }
-  found.sort((a, b) => b.cos - a.cos || a.d - b.d);
-  return [...found.map(({ x, y }) => ({ x, y })), { x: ownX, y: ownY }];
+  targets.sort((a, b) => a.t - b.t || a.y - b.y || a.x - b.x);
+  return { rays, targets };
 }
 
 /**
- * La casilla de enfrente: la primera que cruza el centro de la mirada saliendo
- * de la que se pisa. Es donde se siembra (decision del autor).
+ * Donde se siembra: la casilla en la que el centro de la mirada toca la cara de
+ * arriba del suelo, a menos del alcance. `null` si no llega, si mira al cielo o
+ * si da en la cara de una pared. Decision del autor.
  *
- * Se recorre el rayo con el algoritmo de Amanatides y Woo, casilla a casilla:
- * con un paso fijo, un rayo que roza una esquina podia saltarse la casilla que
- * de verdad cruza.
+ * El alcance se mide **en horizontal** desde el jugador, no a lo largo de la
+ * mirada (deduccion mia): con los ojos a 1,75, medido a lo largo de la mirada
+ * habria que mirar mas de 61 grados hacia abajo para sembrar en llano; asi
+ * basta con unos 41.
  */
-export function frontTile(px: number, py: number, fx: number, fy: number): Offset {
-  const ownX = Math.floor(px);
-  const ownY = Math.floor(py);
-  // Sin mirada, al sur, que es hacia donde se nace mirando.
-  if (fx === 0 && fy === 0) return { x: ownX, y: ownY + 1 };
-  const tMaxX = fx > 0 ? (ownX + 1 - px) / fx : fx < 0 ? (ownX - px) / fx : Infinity;
-  const tMaxY = fy > 0 ? (ownY + 1 - py) / fy : fy < 0 ? (ownY - py) / fy : Infinity;
-  return tMaxX < tMaxY
-    ? { x: ownX + Math.sign(fx), y: ownY }
-    : { x: ownX, y: ownY + Math.sign(fy) };
+export function plantTile(origin: Vec3, fx: number, fy: number, lookZ: number, ground: Ground): Offset | null {
+  const dir = lookVector(fx, fy, lookZ);
+  const flat = Math.hypot(dir.x, dir.y);
+  const hit = groundHit(origin, dir, Math.min(STRIKE_RANGE / Math.max(flat, 1e-3), 8), ground);
+  if (!hit || !hit.top) return null;
+  // Un pelo mas alla de la entrada, para caer dentro de la casilla y no en su borde.
+  const t = hit.t + 1e-6;
+  return { x: Math.floor(origin.x + dir.x * t), y: Math.floor(origin.y + dir.y * t) };
 }
