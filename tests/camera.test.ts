@@ -6,7 +6,9 @@ import {
   FP_FOV_MAX,
   FP_FOV_MIN,
   FP_MIN_FOV,
+  MOUSE_TURN,
   OrbitCamera,
+  PITCH_LIMIT,
 } from '../packages/client/src/camera.js';
 
 /**
@@ -236,5 +238,35 @@ describe('El catalejo de la primera persona', () => {
     cam.zoom(0.5);
     expect(cam.distance).toBeLessThan(d);
     expect(cam.fovZoom).toBe(1);
+  });
+});
+
+describe('El raton capturado de PC', () => {
+  it('raton arriba es mirar arriba en las tres vistas', () => {
+    for (let views = 0; views < 3; views++) {
+      const cam = new OrbitCamera();
+      for (let i = 0; i < views; i++) cam.cycleProjection();
+      const pitch = cam.pitch;
+      cam.turn(0, -40);
+      expect(cam.pitch).toBeCloseTo(pitch + 40 * MOUSE_TURN, 9);
+    }
+  });
+
+  it('raton a la derecha gira el rumbo como arrastrar a la derecha', () => {
+    const start = new OrbitCamera().yaw;
+    const mouse = new OrbitCamera();
+    const drag = new OrbitCamera();
+    mouse.turn(50, 0);
+    drag.orbit(50, 0);
+    expect(mouse.yaw).toBeCloseTo(start - 50 * MOUSE_TURN, 9);
+    expect(Math.sign(mouse.yaw - start)).toBe(Math.sign(drag.yaw - start));
+  });
+
+  it('la inclinacion se acota arriba y abajo', () => {
+    const cam = new OrbitCamera();
+    cam.turn(0, -1e6);
+    expect(cam.pitch).toBe(PITCH_LIMIT);
+    cam.turn(0, 1e6);
+    expect(cam.pitch).toBe(-PITCH_LIMIT);
   });
 });

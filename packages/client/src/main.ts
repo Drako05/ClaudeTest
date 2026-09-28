@@ -60,6 +60,7 @@ import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
 import { chunkMesh, cornerHeight } from './terrain-mesh.js';
 import { FovPanel } from './fov-panel.js';
+import { MouseLook } from './pointer-lock.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
 import { berrySpot, cliffSpot, mineralSpot, peakSpot, reliefAround } from './probes.js';
@@ -186,6 +187,22 @@ const dev = new DevTools({
     dev.observe(Array.from(state.inventory), state.entities.hunger[state.playerId], 0);
   },
 });
+
+/**
+ * El raton de PC lleva la mirada y soltarlo pausa (`pointer-lock.ts`). El panel
+ * de desarrollo suelta el cursor sin pausar; al cerrarlo se intenta capturar de
+ * nuevo, porque la tecla cuenta como gesto del usuario.
+ */
+const mouseLook = new MouseLook(canvas, () => dev.active);
+controls.mouseLook = mouseLook;
+window.addEventListener('keydown', (e) => {
+  if (e.code !== 'F3') return;
+  if (dev.active) mouseLook.release();
+  else mouseLook.capture();
+});
+const pauseEl = document.getElementById('pause') as HTMLElement;
+const pauseHint = document.getElementById('pauseHint') as HTMLElement;
+let everLocked = false;
 
 const billboards = new BillboardSet();
 const player = billboards.spawnPlayer();
@@ -322,6 +339,9 @@ function restart(): void {
   gathered = 0;
   jumps = 0;
   airPeak = 0;
+  // Se reinicia con un clic o con R, que son gestos: se aprovecha para volver a
+  // capturar el cursor que la muerte solto.
+  mouseLook.capture();
 }
 
 // --------------------------------------------------------------- bucle
@@ -407,7 +427,11 @@ function frame(now: number): void {
   // Con escala cero el acumulador no avanza y la simulacion queda congelada; a
   // 64x corren los ticks que toquen, que con el techo de frame son a lo sumo
   // 0.25 s de mundo por frame y escala.
-  const scaled = dt * dev.timeScale;
+  // Sin cursor capturado el juego esta en pausa (`pointer-lock.ts`): como la
+  // pausa del panel de desarrollo, escala cero. Lo pulsado durante la pausa se
+  // pierde con los pestillos de este frame, asi que no se dispara al reanudar.
+  const paused = mouseLook.paused;
+  const scaled = paused ? 0 : dt * dev.timeScale;
   accumulator += scaled;
   // Se copia cada frame: asi reiniciar o abrir el panel se resuelve solo.
   state.survivalFrozen = dev.survivalFrozen;
@@ -488,6 +512,8 @@ function frame(now: number): void {
 
   const look = controls.takeLook();
   camera.orbit(look.dx, look.dy);
+  const turn = mouseLook.takeTurn();
+  camera.turn(turn.dx, turn.dy);
   camera.zoom(controls.takeZoom());
   // El catalejo de la primera persona vuelve solo al soltar la pinza.
   camera.relaxSpyglass(dt, controls.zoomHeld);
@@ -534,6 +560,15 @@ function frame(now: number): void {
     player.visible = camera.projection !== 'primera' && camera.camDistance >= HIDE_PLAYER_BELOW;
   }
   renderer.render(scene, camera.active);
+
+  // Muerto, el cursor se suelta para poder pulsar «Reiniciar»; el aviso de
+  // pausa no se pinta encima de esa pantalla.
+  const dead = state.entities.alive[state.playerId] === 0;
+  if (dead) mouseLook.release();
+  if (mouseLook.locked) everLocked = true;
+  pauseEl.classList.toggle('show', paused && !dead);
+  const hint = everLocked ? 'Haz clic para continuar' : 'Haz clic para jugar';
+  if (pauseHint.textContent !== hint) pauseHint.textContent = hint;
 
   // El HUD a 10 Hz: basta para que las barras respondan y no reescribe el DOM
   // en cada frame.
@@ -583,6 +618,10 @@ Object.defineProperty(window, '__verdant', {
       fov: camera.fov,
       /** El angulo elegido en la barra del ojo, y si la barra esta abierta. */
       fpFov: camera.fpFov,
+      /** El raton capturado de PC y la pausa que trae soltarlo. */
+      paused: mouseLook.paused,
+      pointerLocked: mouseLook.locked,
+      mouseMode: mouseLook.mouseMode,
       fovPanel: fovPanel.open,
       /** A que distancia del pivote ha quedado la camara tras la colision. */
       camDistance: camera.camDistance,

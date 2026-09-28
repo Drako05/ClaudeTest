@@ -91,7 +91,57 @@ async function waitForLoop(page, ticks = 90) {
 
 async function open(page, baseUrl, query) {
   await page.goto(`${baseUrl}/?seed=${SEED}${query ?? ''}`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+  await play(page);
   return waitForLoop(page);
+}
+
+/**
+ * En PC el juego arranca en pausa hasta que un clic captura el cursor
+ * (`pointer-lock.ts`). El headless de Chromium SI captura; lo que no hace es
+ * soltar con Esc, asi que para soltar se usa `document.exitPointerLock()`.
+ */
+async function play(page) {
+  const s = await state(page);
+  if (!s.paused) return;
+  await page.mouse.click(CLICK.x, CLICK.y);
+  await page.waitForFunction(() => window.__verdant && !window.__verdant.paused, null, { timeout: 5000 });
+}
+
+/**
+ * Golpea. Con el cursor capturado, el clic se manda a mano al lienzo: en
+ * headless cada `mouse.down`/`up` capturado lleva pegado un movimiento espurio
+ * —medido, del tamano de la posicion del raton— que giraria la vista. En un
+ * navegador de verdad un clic no mueve.
+ */
+async function strike(page) {
+  if (!(await state(page)).pointerLocked) return page.mouse.click(CLICK.x, CLICK.y);
+  await page.evaluate(() => {
+    const canvas = document.getElementById('view');
+    for (const type of ['pointerdown', 'pointerup']) {
+      canvas.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'mouse', button: 0, bubbles: true }));
+    }
+  });
+}
+
+async function release(page) {
+  await page.evaluate(() => document.exitPointerLock());
+  await page.waitForFunction(() => window.__verdant.paused, null, { timeout: 5000 });
+}
+
+/**
+ * Mueve el raton capturado: la vista va con el cursor. Los `movementX`
+ * sinteticos del headless se anulan con el salto de vuelta al centro (medido),
+ * asi que se mandan a mano. Primero uno a cero, que es el que se descarta tras
+ * capturar.
+ */
+async function look(page, dx, dy) {
+  await page.evaluate(([mx, my]) => {
+    const send = (x, y) =>
+      document.dispatchEvent(new MouseEvent('mousemove', { movementX: x, movementY: y, bubbles: true }));
+    send(0, 0);
+    for (let i = 0; i < 8; i++) send(mx / 8, my / 8);
+  }, [dx, dy]);
 }
 
 async function hold(page, key, ms) {
@@ -100,8 +150,12 @@ async function hold(page, key, ms) {
   await page.keyboard.up(key);
 }
 
-/** Gira la camara arrastrando con el raton, que es como se gira en PC. */
+/**
+ * Gira la camara a la derecha lo mismo que arrastrar `dx` pixeles: con el
+ * cursor capturado, moviendo el raton; si no (panel de desarrollo), arrastrando.
+ */
 async function orbit(page, dx) {
+  if ((await state(page)).pointerLocked) return look(page, dx * 2.4, 0);
   await page.mouse.move(CLICK.x, CLICK.y);
   await page.mouse.down();
   await page.mouse.move(CLICK.x + dx, CLICK.y, { steps: 8 });
@@ -149,7 +203,7 @@ async function harvestUntil(page, done, rounds = 8) {
   let now = await state(page);
   for (let round = 0; round < rounds && !done(now); round++) {
     for (let i = 0; i < 3; i++) {
-      await page.mouse.click(CLICK.x, CLICK.y);
+      await strike(page);
       await page.waitForTimeout(260);
     }
     now = await waitForLoop(page, 20);
@@ -216,7 +270,28 @@ async function desktopPass(browser, baseUrl) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   watchProblems(page, 'escritorio');
 
+  // Arranca en pausa: sin cursor capturado el juego se detiene, con el aviso.
+  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+  await page.waitForTimeout(600);
+  const idle = await state(page);
+  await page.waitForTimeout(500);
+  const idleLater = await state(page);
+  const idleHint = await page.textContent('#pauseHint');
+  console.log(`  al cargar: pausa ${idle.paused}, aviso «${idleHint}», ticks ${idle.tick} -> ${idleLater.tick}`);
+  check(idle.mouseMode, 'el escritorio no se reconoce como PC con raton');
+  check(idle.paused && (await page.isVisible('#pause')), 'no arranca en pausa con el aviso');
+  check(idleHint === 'Haz clic para jugar', `el aviso de arranque dice «${idleHint}»`);
+  check(idleLater.tick === idle.tick, 'en pausa el tiempo avanza');
   const spawn = await open(page, baseUrl);
+  check(spawn.pointerLocked && !spawn.paused, 'el clic no capturo el cursor');
+  check(!(await page.isVisible('#pause')), 'el aviso de pausa sigue tras capturar');
+  check(spawn.sent.harvest === 0, 'el clic que captura el cursor golpeo');
+  // El salto espurio del primer movimiento tras capturar se descarta.
+  check(
+    spawn.yaw === idle.yaw && spawn.pitch === idle.pitch,
+    `capturar el cursor giro la vista (${idle.yaw.toFixed(2)} -> ${spawn.yaw.toFixed(2)})`,
+  );
   console.log(`  nace en ${spawn.x}, ${spawn.y}, nivel ${spawn.level}, ${spawn.biome}, ${spawn.clock}`);
   check(spawn.seed === SEED, `la semilla de la URL no se respeto (${spawn.seed})`);
   check(!spawn.clock.startsWith('00:'), `un mundo nuevo no deberia empezar a medianoche (${spawn.clock})`);
@@ -279,6 +354,9 @@ async function desktopPass(browser, baseUrl) {
   check(vit.health === 100 && vit.hunger >= 90, `barras de salida inesperadas: ${JSON.stringify(vit)}`);
   check(vit.right > 1280 - 30, `las barras no llegan al borde derecho (${vit.right})`);
 
+  // Los botones se pulsan con el cursor suelto, o sea en pausa: capturado, el
+  // clic va al lienzo y golpea.
+  await release(page);
   await page.click('#hudToggle');
   await page.waitForTimeout(250);
   const hud = await page.evaluate(() => ({
@@ -296,6 +374,7 @@ async function desktopPass(browser, baseUrl) {
   await page.screenshot({ path: join(SHOTS, '3d-01-spawn.png') });
   await page.click('#hudToggle');
   check(!(await page.isVisible('#hud')), 'el boton no volvio a cerrar el HUD');
+  await play(page);
 
   // Andar.
   const walked = await walkToOpenGround(page);
@@ -317,14 +396,15 @@ async function desktopPass(browser, baseUrl) {
   );
   await orbit(page, 260);
   const turned = await waitForLoop(page, 20);
+  console.log(`  raton capturado: rumbo ${before.yaw.toFixed(2)} -> ${turned.yaw.toFixed(2)}`);
   console.log(`  mirada: ${JSON.stringify(before.facing)} -> ${JSON.stringify(turned.facing)}`);
   check(
     turned.facing[0] !== before.facing[0] || turned.facing[1] !== before.facing[1],
     'girar la camara no giro la mirada',
   );
   check(dot(turned) > 0.99, `tras girar, la mirada no sigue a la camara: ${JSON.stringify([turned.facing, turned.aim])}`);
-  // Y arrastrar es girar, no accionar: se decide al soltar.
-  check(turned.sent.harvest === before.sent.harvest, 'arrastrar para girar acciono');
+  // Y mover el raton es mirar, no accionar.
+  check(turned.sent.harvest === before.sent.harvest, 'mover el raton acciono');
 
   // Lo que el golpe alcanza (regla 12) esta delante y al alcance: todo objeto
   // cuyo hitbox toca el sector cae en una casilla a menos de 2 bloques mas su
@@ -344,12 +424,9 @@ async function desktopPass(browser, baseUrl) {
   );
 
   // Mirar hacia arriba en tercera persona (pedido del autor): la camara baja
-  // por detras, y la colision la para antes del suelo. Arrastrar hacia abajo en
-  // la orbital «agarra el mundo» y sube la mirada.
-  await page.mouse.move(CLICK.x, 200);
-  await page.mouse.down();
-  await page.mouse.move(CLICK.x, 620, { steps: 12 });
-  await page.mouse.up();
+  // por detras, y la colision la para antes del suelo. Con el raton capturado,
+  // subir el raton es mirar arriba en las tres vistas.
+  await look(page, 0, -900);
   const lookingUp = await waitForLoop(page, 20);
   console.log(
     `  mirando arriba: inclinacion ${lookingUp.pitch.toFixed(2)}, camara a ${lookingUp.camDistance.toFixed(2)}, ` +
@@ -362,7 +439,7 @@ async function desktopPass(browser, baseUrl) {
   // Un clic sin arrastrar acciona, y el barrido llega a dibujarse: sale siempre,
   // haya algo que golpear o no.
   const beforeClick = await open(page, baseUrl);
-  await page.mouse.click(CLICK.x, CLICK.y);
+  await strike(page);
   await page.waitForTimeout(400);
   const afterClick = await state(page);
   check(afterClick.sent.harvest > beforeClick.sent.harvest, 'un clic no acciono');
@@ -416,6 +493,7 @@ async function desktopPass(browser, baseUrl) {
   check(z2 < z1, `+ no acerco la camara (${z1} -> ${z2})`);
 
   // El panel del entorno.
+  await release(page);
   await page.click('#statsToggle');
   check(await page.isVisible('#statsPanel'), 'el panel del entorno no se desplego');
   await page.waitForTimeout(300);
@@ -433,6 +511,7 @@ async function desktopPass(browser, baseUrl) {
   await page.screenshot({ path: join(SHOTS, '3d-02-panel.png') });
   await page.click('#statsToggle');
   check(!(await page.isVisible('#statsPanel')), 'el panel no se replego al volver a pulsar');
+  await play(page);
 
   // La carrera, con su estado en la ayuda.
   await page.keyboard.press('ShiftLeft');
@@ -443,6 +522,41 @@ async function desktopPass(browser, baseUrl) {
   check(runLabel.includes('ACTIVADO'), `la ayuda no dice que la carrera esta encendida (${runLabel})`);
   await page.keyboard.press('ShiftLeft');
 
+  // Soltar el cursor pone el juego en pausa (decision del autor). Esc lo
+  // suelta en un navegador de verdad; en headless se suelta a mano.
+  const inGame = await state(page);
+  await page.keyboard.press('KeyI');
+  await page.waitForTimeout(250);
+  const inv = await state(page);
+  check(inv.pointerLocked && !inv.paused, 'abrir el inventario solto el cursor o pauso');
+  check(await page.isVisible('#invPanel'), 'la I no abrio el inventario');
+  await page.keyboard.press('KeyI');
+  await release(page);
+  const esc = await state(page);
+  await page.waitForTimeout(500);
+  const escLater = await state(page);
+  const escHint = await page.textContent('#pauseHint');
+  console.log(`  soltar el cursor: pausa ${esc.paused}, aviso «${escHint}», ticks ${esc.tick} -> ${escLater.tick}`);
+  check(esc.paused && (await page.isVisible('#pause')), 'soltar el cursor no puso la pausa con su aviso');
+  check(escHint === 'Haz clic para continuar', `el aviso de pausa dice «${escHint}»`);
+  check(escLater.tick === esc.tick, 'en pausa el juego siguio corriendo');
+  await strike(page);
+  await page.waitForTimeout(300);
+  const resumed = await state(page);
+  check(resumed.pointerLocked && !resumed.paused, 'un clic en la pantalla no reanudo');
+  check(resumed.sent.harvest === inGame.sent.harvest, 'el clic que reanuda golpeo');
+  // El panel de desarrollo suelta el cursor pero no pausa.
+  await page.keyboard.press('F3');
+  await page.waitForTimeout(300);
+  const devOpen = await state(page);
+  check(devOpen.dev && !devOpen.pointerLocked && !devOpen.paused, 'F3 no solto el cursor o puso la pausa');
+  await page.keyboard.press('F3');
+  await page.waitForTimeout(300);
+  const devClosed = await state(page);
+  check(devClosed.pointerLocked || devClosed.paused, 'al cerrar F3 ni se capturo el cursor ni se pauso');
+  if (!devClosed.paused) await release(page);
+
+  // Con el cursor suelto (en pausa) se pulsan los botones.
   // El ojo recorre las tres vistas y lo dice con su forma: perspectiva →
   // isometrica (entrecerrado) → primera persona (con mira) → perspectiva.
   await page.click('#proj');
@@ -483,9 +597,10 @@ async function desktopPass(browser, baseUrl) {
   await page.hover('#proj');
   await page.waitForTimeout(250);
   check(await fovShown(), 'la barra no volvio a abrirse con el raton');
-  await page.mouse.click(CLICK.x, CLICK.y);
+  await strike(page);
   await page.waitForTimeout(250);
   check(!(await fovShown()), 'un clic fuera no cerro la barra del angulo');
+  check(!(await state(page)).paused, 'el clic en la pantalla no reanudo tras la barra');
   // El barrido tiene que llegar a dibujarse tambien desde los ojos. Desde el
   // nacimiento, con las casillas al alcance (regla 22).
   const fpStart = await open(page, baseUrl);
@@ -496,7 +611,7 @@ async function desktopPass(browser, baseUrl) {
   check(fpAgain.projection === 'primera', 'P no llevo a la primera persona');
   check(fpAgain.fov === 90, `el angulo elegido no se recordo al recargar (${fpAgain.fov})`);
   await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
-  await page.mouse.click(CLICK.x, CLICK.y);
+  await strike(page);
   await page.waitForTimeout(400);
   const fpHit = await state(page);
   check(fpHit.slashesDrawn > fpStart.slashesDrawn, 'en primera persona el barrido no se dibujo');
@@ -550,11 +665,8 @@ async function resourcesPass(browser, baseUrl) {
     let planted = seeded;
     // Se siembra donde la mirada toca el suelo, a menos de 2 bloques (regla
     // 12): con los ojos a 1,75 hay que mirar unos 41 grados hacia abajo, y la
-    // camara arranca a 35. Arrastrar hacia arriba en la orbital baja la mirada.
-    await page.mouse.move(CLICK.x, 400);
-    await page.mouse.down();
-    await page.mouse.move(CLICK.x, 340, { steps: 6 });
-    await page.mouse.up();
+    // camara arranca a 35. Bajar el raton baja la mirada.
+    await look(page, 0, 120);
     await page.waitForTimeout(300);
     for (let i = 0; i < 8 && seeds > 0; i++) {
       await page.keyboard.press('KeyF');
@@ -601,6 +713,8 @@ async function mobilePass(browser, baseUrl) {
   watchProblems(page, 'movil');
 
   const spawn = await open(page, baseUrl);
+  // El movil no entra en el raton capturado: ni modo raton ni pausa.
+  check(!spawn.mouseMode && !spawn.paused && !(await page.isVisible('#pause')), 'el movil arranco en pausa');
   check(await page.evaluate(() => document.body.classList.contains('touch-active')), 'el body no entro en modo tactil');
   for (const id of ['#action', '#jump', '#run', '#eat', '#plant', '#proj']) {
     check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);

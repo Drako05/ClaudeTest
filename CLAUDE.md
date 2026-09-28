@@ -696,7 +696,45 @@ personaje va como va.
 Y por eso mismo desaparecio el acelerador analogico (regla 5): la velocidad la
 elige el interruptor, no lo desplazado que este el pulgar.
 
-**En el 3D la accion es el clic izquierdo, y ahi hay un conflicto que resolver:**
+**En PC la mirada va con el raton, y soltar el cursor pone el juego en
+pausa** (decisiones del autor, 2026-09-28; `pointer-lock.ts`). Hacia donde se
+mueve el cursor se mueve la vista, en las tres vistas —raton arriba es mirar
+arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
+(Pointer Lock), que Esc suelta siempre. De ahi sale todo:
+
+- **Sin cursor capturado, el juego esta en pausa** (escala de tiempo cero, como
+  la pausa del panel de desarrollo), con el aviso «Juego en pausa». **Arranca
+  asi**: el navegador exige un clic para capturar. Con el cursor suelto se
+  pulsan los botones (ojo, HUD, inventario, barra del angulo).
+- **Un clic en la pantalla captura y reanuda, y ese clic no golpea.** Ya
+  capturado, el clic izquierdo golpea en el acto, al apoyar: no hay arrastre
+  que distinguir.
+- El **inventario** (I) no suelta el cursor; el **panel de desarrollo** (F3) lo
+  suelta pero **no pausa**, porque tiene su propia pausa y sirve para ver pasar
+  el tiempo; con el panel abierto se sigue arrastrando para girar, como antes.
+  Al cerrarlo se intenta capturar otra vez (la tecla cuenta como gesto).
+- Solo con puntero fino y hasta el primer toque de verdad (`mouseMode`): el
+  movil no cambia, y un portatil tactil jugado con el dedo no se congela.
+- Muerto, el cursor se suelta para poder pulsar «Reiniciar», y reiniciar lo
+  vuelve a capturar.
+
+Deducciones mias, en `docs/pendiente.md`: la sensibilidad (`MOUSE_TURN`,
+0,0025 rad por pixel), que un clic sea un golpe sin repetir, lo de la muerte, lo
+del tactil y los textos del aviso.
+
+**El primer movimiento tras capturar se descarta**: Chrome manda un salto
+espurio —en headless, el recorrido entero hasta el centro de la ventana— y,
+medido, llega ANTES que `pointerlockchange`, asi que se detecta en el propio
+`mousemove` (el primero con el cursor capturado). Sin eso, capturar giraba la
+vista 90 grados; el humo afirma que capturar no mueve la mirada. Y ojo al
+probarlo: **el headless de Chromium si captura, pero sus movimientos
+sinteticos no sirven** —cada `mouse.click` salta desde el centro y vuelve— y
+**Esc no suelta**. El humo manda `mousemove` con `movementX/Y` a mano, suelta con
+`document.exitPointerLock()` y manda los clics de golpe al lienzo a mano, porque en headless cada
+`mouse.down`/`up` capturado lleva pegado un movimiento espurio que gira la vista.
+
+**Con el cursor libre —el panel de desarrollo abierto— la accion
+es el clic izquierdo, y ahi hay un conflicto que resolver:**
 ese mismo boton gira la camara arrastrando. Se decide **al soltar** —lo que no se
 ha movido mas de `TAP_SLOP` era un clic; lo que si, era un arrastre y ya giro la
 vista—, y se mide contra el ORIGEN quedandose con el maximo, para que ir y volver

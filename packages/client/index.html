@@ -331,6 +331,20 @@
         background: rgba(6, 10, 20, .82); backdrop-filter: blur(3px);
       }
       #dead.show { display: flex; }
+      /* El aviso de pausa del raton de PC (`pointer-lock.ts`): sin cursor
+         capturado el juego se detiene. No se traga los clics —cae al lienzo,
+         que es el que captura— y deja los botones a mano. */
+      #pause {
+        position: fixed; left: 50%; top: 42%; z-index: 15; display: none;
+        transform: translate(-50%, -50%); pointer-events: none;
+        padding: 16px 28px; border-radius: 12px; text-align: center;
+        background: rgba(8, 14, 28, 0.82); border: 1px solid rgba(140, 190, 255, 0.34);
+        backdrop-filter: blur(6px); color: #e8eef7;
+        font: 600 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      #pause.show { display: block; }
+      #pause p { margin: 0 0 4px; font-size: 20px; letter-spacing: .12em; text-transform: uppercase; }
+      #pause span { color: #8fc4ff; }
       #dead p { margin: 0; font-size: 26px; letter-spacing: .1em; color: #ff8080; }
       #dead button {
         font: inherit; color: #0b1020; background: #8fc4ff; border: 0;
@@ -567,7 +581,7 @@
 
     <div id="help">
       <kbd id="kbdRun">Shift</kbd> <span id="runState">correr</span> &nbsp;
-      <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic</kbd> accionar &nbsp; <kbd>arrastrar</kbd> girar<br />
+      <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic</kbd> accionar &nbsp; <kbd>raton</kbd> mirar &nbsp; <kbd>Esc</kbd> pausa<br />
       <kbd>E</kbd> comer bayas &nbsp; <kbd>F</kbd> sembrar &nbsp; <kbd>I</kbd> inventario &nbsp;
       <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom &nbsp; <kbd>P</kbd> vista
     </div>
@@ -633,6 +647,10 @@
       </div>
     </div>
 
+    <div id="pause" role="status">
+      <p>Juego en pausa</p>
+      <span id="pauseHint">Haz clic para jugar</span>
+    </div>
     <div id="dead">
       <p>HAS MUERTO</p>
       <button id="restart">Reiniciar</button>

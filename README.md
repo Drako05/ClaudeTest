@@ -50,9 +50,11 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Tecla | Accion |
 |---|---|
 | `WASD` / flechas | Moverse, relativo a la camara |
-| Arrastrar | Girar la camara, tambien arriba y abajo (en tercera persona se puede mirar al cielo) |
+| Clic en la pantalla | Capturar el cursor y jugar (el juego arranca en pausa) |
+| Raton | Mirar: la vista va con el cursor, tambien arriba y abajo (en tercera persona se puede mirar al cielo) |
+| `Esc` | Soltar el cursor y **pausar**; con el cursor suelto se pulsan los botones |
 | Rueda, `+` / `-` | Zoom; en primera persona, catalejo que vuelve al dejar de girar |
-| Clic izquierdo | Golpear hacia donde mira la camara (si no se arrastro) |
+| Clic izquierdo | Golpear hacia donde mira la camara |
 | `Espacio` | Saltar |
 | `Shift` | Correr: interruptor, se queda encendido |
 | `E` | Comer bayas |
@@ -60,7 +62,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | `I` | Inventario |
 | `R` | Mundo nuevo |
 | `P` | Vista: perspectiva → isometrica → primera persona |
-| Raton sobre el ojo | En primera persona, barra del angulo de vision (50-100°); cualquier accion la cierra |
+| Raton sobre el ojo (en pausa) | En primera persona, barra del angulo de vision (50-100°); cualquier accion la cierra |
 | `F3` | Panel de desarrollo |
 
 **Tactil** (aparece solo en dispositivos de puntero grueso, o al primer toque)

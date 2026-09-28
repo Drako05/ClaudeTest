@@ -63,6 +63,12 @@ const START_PITCH = -0.62;
  */
 const ORTHO_DISTANCE = 60;
 
+/**
+ * Radianes por pixel del raton capturado: unos 0,14 grados, del orden de la
+ * sensibilidad por defecto de los shooters. **Deduccion mia.**
+ */
+export const MOUSE_TURN = 0.0025;
+
 /** Por debajo de esta distancia, el jugador se oculta. **Deduccion mia.** */
 export const HIDE_PLAYER_BELOW = 1;
 /**
@@ -173,6 +179,17 @@ export class OrbitCamera {
     this.yaw -= dx * 0.006;
     const sign = this.projection === 'primera' ? -1 : 1;
     this.pitch = clamp(this.pitch + sign * dy * 0.005, -PITCH_LIMIT, PITCH_LIMIT);
+  }
+
+  /**
+   * El raton capturado de PC (`pointer-lock.ts`): hacia donde se mueve el
+   * cursor, se mueve la mirada, en las TRES vistas (decision del autor). No es
+   * `orbit`: ahi el arrastre de las orbitales «agarra el mundo», y aqui el
+   * raton arriba es mirar arriba en todas.
+   */
+  turn(dx: number, dy: number): void {
+    this.yaw -= dx * MOUSE_TURN;
+    this.pitch = clamp(this.pitch - dy * MOUSE_TURN, -PITCH_LIMIT, PITCH_LIMIT);
   }
 
   zoom(factor: number): void {

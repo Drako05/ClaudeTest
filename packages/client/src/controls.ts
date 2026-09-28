@@ -13,6 +13,7 @@
  */
 
 import { Gestures, STICK_RADIUS } from './gestures.js';
+import type { MouseLook } from './pointer-lock.js';
 
 /** Cuanto aguanta el catalejo tras el ultimo giro de rueda, en ms. */
 const WHEEL_HOLD_MS = 800;
@@ -29,6 +30,8 @@ export class Controls {
   onToggleProjection: (() => void) | null = null;
   onRestart: (() => void) | null = null;
   onToggleInventory: (() => void) | null = null;
+  /** El raton capturado de PC, si lo hay: decide los clics antes que los gestos. */
+  mouseLook: MouseLook | null = null;
 
   /**
    * Enciende los controles de pulgar.
@@ -117,6 +120,15 @@ export class Controls {
       // declara puntero fino, asi que sin esta segunda via sus botones no
       // aparecerian nunca.
       if (e.pointerType === 'touch') Controls.revealTouchUi();
+
+      // El raton de PC con el cursor capturado (`pointer-lock.ts`): el clic que
+      // captura solo reanuda, y ya capturado golpea en el acto. Ninguno de los
+      // dos pasa por los gestos: sin cursor visible no hay arrastre.
+      const mouse = this.mouseLook?.pointerDown(e) ?? null;
+      if (mouse) {
+        if (mouse === 'strike') this.actionQueued = true;
+        return;
+      }
 
       // La captura puede fallar —un puntero ya soltado, un evento sintetico— y
       // si lanza aqui se lleva por delante el registro del dedo, que es lo que

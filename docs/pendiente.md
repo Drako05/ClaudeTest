@@ -54,6 +54,11 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Con el inventario abierto en el movil, el panel **tapa** comer, sembrar y correr hasta que se cierra | La franja de salud y hambre | CSS |
 | El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `CLAUDE.md`, racimo del pulgar | un numero |
 | Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 50-100, 70 por defecto) | `CLAUDE.md`, las tres vistas | un numero en `camera.ts` |
+| Sensibilidad del raton capturado: **0,0025 rad por pixel** (unos 0,14 grados) | El raton lleva la mirada | un numero en `camera.ts` |
+| Con el cursor capturado **un clic es un golpe** y mantener no repite | El raton lleva la mirada | un temporizador |
+| Al morir el cursor **se suelta** para pulsar «Reiniciar», y reiniciar lo vuelve a capturar | El raton lleva la mirada | una linea |
+| Un toque de verdad **apaga** el modo raton (portatil tactil), y ya no hay pausa por el cursor | El raton lleva la mirada | una linea |
+| Textos del aviso: «Haz clic para jugar» al arrancar y «Haz clic para continuar» despues | El raton lleva la mirada | HTML |
 | La barra del angulo: **180 px** de largo, paso de **1 grado**, se despliega en **150 ms** | Angulo de vision ajustable | CSS y un atributo |
 | En PC la abre solo el **raton** al pasar; un dedo que toca el ojo no cuenta como pasar por encima | Angulo de vision ajustable | una linea en `fov-panel.ts` |
 | **Cualquier tecla** la cierra, flechas incluidas (con la barra enfocada no la mueven: se anda) | Angulo de vision ajustable | una linea |
@@ -270,6 +275,20 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## El raton lleva la mirada, y soltarlo pausa — HECHO (2026-09-28)
+
+En PC, hacia donde se mueve el cursor se mueve la vista, en las tres vistas. El
+navegador captura el cursor, y Esc lo suelta y pone el juego en pausa con el
+aviso «Juego en pausa». Un clic en la pantalla lo captura otra vez y reanuda, y
+ese clic no golpea. Tambien arranca en pausa. El inventario no suelta el
+cursor; el panel de desarrollo lo suelta sin pausar. Todo eso lo decidiste tu;
+lo mio esta arriba, en «Esperando tu juicio».
+
+Medido en el humo: en pausa el reloj de ticks no se mueve, capturar no gira la
+vista (Chrome manda un salto espurio al capturar que se descarta, y sin eso
+giraba 90 grados), el clic que reanuda no golpea, F3 suelta sin pausar e I no
+suelta. El movil no cambia: los gestos y el humo movil pasan igual.
 
 ## Angulo de vision ajustable — HECHO (2026-09-28)
 
