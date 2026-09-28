@@ -1192,8 +1192,69 @@ console.log(`probando ${baseUrl}`);
 const proxyUrl = remote ? (process.env.HTTPS_PROXY ?? process.env.https_proxy) : undefined;
 const browser = await chromium.launch(proxyUrl ? { proxy: { server: proxyUrl } } : {});
 
+/**
+ * Pantalla de 144 Hz: ninguna pulsacion se pierde.
+ *
+ * La simulacion va a 60 Hz y la pantalla a lo que de. A mas de 60 Hz muchos
+ * frames no llevan tick, y el bucle recogia los pestillos en todos: los de un
+ * frame sin tick se tiraban en silencio (el autor: «a veces ataco o salto y no
+ * lo hace»). El headless va a unos 13 FPS, donde todo frame lleva tick y el
+ * fallo no existe, asi que aqui el reloj de `requestAnimationFrame` se finge a
+ * 144 Hz: cada frame avanza 1/144 s, vaya el navegador como vaya. Antes del
+ * arreglo se perdia mas de la mitad.
+ */
+async function highRefreshPass(browser, baseUrl) {
+  console.log('\n== pantalla de 144 Hz (pulsaciones que no se pierden) ==');
+  const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
+  watchProblems(page, 'refresco alto');
+  await page.addInitScript(() => {
+    const real = window.requestAnimationFrame.bind(window);
+    let t = null;
+    window.requestAnimationFrame = (cb) =>
+      real((now) => {
+        t = t === null ? now : t + 1000 / 144;
+        cb(t);
+      });
+  });
+  // Arriba al centro: en una ventana pequena la ayuda de teclado tapa el medio.
+  const clickAt = { x: 320, y: 110 };
+  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
+  await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+  await page.mouse.click(clickAt.x, clickAt.y);
+  await page.waitForFunction(() => window.__verdant && !window.__verdant.paused, null, { timeout: 5000 });
+  const afterTick = (t0, n) =>
+    page.waitForFunction(([base, k]) => window.__verdant.tick >= base + k, [t0, n], { timeout: 60000 });
+
+  // Golpes: uno por tick, cada uno esperando a que pase un tick para que dos
+  // no caigan en el mismo pestillo.
+  const STRIKES = 30;
+  const s0 = await state(page);
+  for (let i = 0; i < STRIKES; i++) {
+    const t = (await state(page)).tick;
+    await strike(page);
+    await afterTick(t, 1);
+  }
+  const s1 = await state(page);
+  const struck = s1.sent.harvest - s0.sent.harvest;
+
+  // Saltos en el sitio, en el rellano del nacimiento (regla 22), esperando a
+  // aterrizar entre uno y otro: el vuelo dura 0,4 s y se esperan 0,7.
+  const JUMPS = 5;
+  for (let i = 0; i < JUMPS; i++) {
+    const t = (await state(page)).tick;
+    await page.keyboard.press('Space');
+    await afterTick(t, 42);
+  }
+  const s2 = await state(page);
+  const jumped = s2.jumps - s1.jumps;
+  console.log(`  golpes ${struck}/${STRIKES}, saltos ${jumped}/${JUMPS}`);
+  check(struck === STRIKES, `a 144 Hz se perdieron ${STRIKES - struck} de ${STRIKES} golpes`);
+  check(jumped === JUMPS, `a 144 Hz se perdieron ${JUMPS - jumped} de ${JUMPS} saltos`);
+  await page.close();
+}
+
 const only = process.argv[2];
-const passes = { desktopPass, resourcesPass, mobilePass, devToolsPass, lifePass, reliefPass };
+const passes = { desktopPass, resourcesPass, mobilePass, devToolsPass, lifePass, reliefPass, highRefreshPass };
 try {
   for (const [name, pass] of Object.entries(passes)) {
     if (only && !name.startsWith(only)) continue;

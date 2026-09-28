@@ -78,8 +78,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Desde arriba, un bosque denso con copas grandes **tapa mas al jugador** | Arboles altos | es el cabo de la camara que ya estaba pendiente |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
-al encadenarlos. La causa esta localizada y el plan escrito, esperando a que
-decidas retomarlo.
+al encadenarlos, pulsados en pleno vuelo. La causa esta localizada y el plan
+escrito, y el 2026-09-28 decidiste **seguir sin margen de espera ni coyote
+time** hasta ver si basta el arreglo de los pestillos (abajo).
 
 ---
 
@@ -275,6 +276,25 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Ataques y saltos que no salian — ARREGLADO (2026-09-28)
+
+Lo viste jugando: moviendote, a veces atacas o saltas y no pasa nada, y a veces
+ni al segundo intento, tambien en llano. La causa estaba en el bucle del
+cliente, no en la simulacion: los pestillos del mando (salto, accion, comer,
+sembrar) se recogian en cada fotograma, y la simulacion va a 60 Hz; en un
+fotograma sin tick la pulsacion se tiraba. A mas de 60 Hz eso pasa en muchos
+fotogramas: un modelo del bucle da un 32 % de pulsaciones perdidas a 90 Hz, 50 %
+a 120 y 58 % a 144, y del 0,5 al 2,5 % a 60. Ahora esperan en el mando al primer
+fotograma con tick. En pausa se siguen tirando, a proposito.
+
+Una pasada nueva del humo finge una pantalla de 144 Hz y exige 30 de 30 golpes y
+5 de 5 saltos; sin el arreglo da 10 y 0.
+
+**Lo que queda por ver es tuyo**: si con esto dejan de perderse. Si aun se pierde
+algun salto, quedaria el otro canal —pulsarlo en el aire, al aterrizar o bajando
+un escalon, que medido es un 2,2 % del tiempo andando—, que es la seccion
+aparcada de mas abajo.
 
 ## El raton lleva la mirada, y soltarlo pausa — HECHO (2026-09-28)
 

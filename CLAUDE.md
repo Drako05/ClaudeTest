@@ -293,11 +293,24 @@ npm run typecheck && npm test && npm run smoke
 
 `npm run smoke` construye el cliente y lo juega en Chromium headless leyendo el
 estado real por `window.__verdant`. Los tests unitarios no detectan que el juego
-no arranque; esto si. Hace seis pasadas —escritorio, recursos (comer, sembrar,
-minar), movil con toques sinteticos, panel de desarrollo, muerte y noche, y
-relieve—; si tocas los controles, todas tienen que seguir pasando. Una sola se
-corre con `node tools/smoke.mjs <nombre>` tras `npm run build`, por ejemplo
-`node tools/smoke.mjs mobile`.
+no arranque; esto si. Hace siete pasadas —escritorio, recursos (comer, sembrar,
+minar), movil con toques sinteticos, panel de desarrollo, muerte y noche,
+relieve, y pantalla de 144 Hz—; si tocas los controles, todas tienen que seguir
+pasando. Una sola se corre con `node tools/smoke.mjs <nombre>` tras `npm run
+build`, por ejemplo `node tools/smoke.mjs mobile`.
+
+**Los pestillos del mando se recogen solo en un frame que corre algun tick.**
+La simulacion va a 60 Hz y la pantalla a lo que de; el bucle recogia salto,
+accion, comer y sembrar en TODOS los frames, y los de un frame sin tick se
+tiraban en silencio. A mas de 60 Hz eso es la mitad de los frames: el autor lo
+vio jugando —«ataco o salto y a veces no lo hace, a veces ni al segundo
+intento»— y un modelo del bucle lo midio en un 32 % de pulsaciones perdidas a
+90 Hz, 50 % a 120 y 58 % a 144 (a 60, del 0,5 al 2,5 %). Estuvo meses sin que
+el humo lo viera, porque el headless va a unos 13 FPS y ahi todo frame lleva
+tick. La pasada `highRefresh` finge el reloj de `requestAnimationFrame` a 144
+Hz y exige 30 de 30 golpes y 5 de 5 saltos; sin el arreglo da 10 y 0. **Lo que
+dependa del ritmo de fotogramas hay que medirlo con el reloj fingido**, no con
+el que tenga el headless.
 
 Dos habitos del humo que conviene conservar. Lo que depende del paisaje se
 comprueba **desde el nacimiento**, que es un rellano llano (regla 22) con las

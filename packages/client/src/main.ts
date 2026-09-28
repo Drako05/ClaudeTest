@@ -409,14 +409,7 @@ function frame(now: number): void {
   const intent = emptyIntent();
   intent.moveX = fwd.x * -move.y + rgt.x * move.x;
   intent.moveY = fwd.y * -move.y + rgt.y * move.x;
-  // El salto se consume una vez y solo entra en el PRIMER tick del frame: con
-  // un frame lento el bucle corre varios ticks seguidos, y repartir el mismo
-  // salto entre todos encadenaria saltos en el aire.
-  let jump = controls.takeJump();
   intent.run = controls.running;
-  let action = controls.takeAction();
-  let eat = controls.takeEat();
-  let plant = controls.takePlant();
   // La mirada es la de la camara, decision del autor: se acciona hacia donde se
   // mira, con el rumbo real y su inclinacion, que decide la segunda altura del
   // cono (regla 12).
@@ -428,11 +421,27 @@ function frame(now: number): void {
   // 64x corren los ticks que toquen, que con el techo de frame son a lo sumo
   // 0.25 s de mundo por frame y escala.
   // Sin cursor capturado el juego esta en pausa (`pointer-lock.ts`): como la
-  // pausa del panel de desarrollo, escala cero. Lo pulsado durante la pausa se
-  // pierde con los pestillos de este frame, asi que no se dispara al reanudar.
+  // pausa del panel de desarrollo, escala cero.
   const paused = mouseLook.paused;
   const scaled = paused ? 0 : dt * dev.timeScale;
   accumulator += scaled;
+
+  // Los pestillos (salto, accion, comer, sembrar) se recogen SOLO si este frame
+  // corre algun tick. La simulacion va a 60 Hz y la pantalla a lo que de: a mas
+  // de 60 Hz muchos frames no llevan tick, y recogerlos ahi los tiraba en
+  // silencio —medido en un modelo del bucle, un 32 % de las pulsaciones a 90 Hz,
+  // un 50 % a 120 y un 58 % a 144; a 60, del 0,5 al 2,5 % segun el temblor—.
+  // Asi esperan en el mando al primer frame con tick. Con el tiempo detenido
+  // (pausa) si se recogen, y se pierden: lo pulsado en pausa no se dispara al
+  // reanudar.
+  const collect = accumulator >= TICK_DT || scaled === 0;
+  // El salto se consume una vez y solo entra en el PRIMER tick del frame: con
+  // un frame lento el bucle corre varios ticks seguidos, y repartir el mismo
+  // salto entre todos encadenaria saltos en el aire.
+  let jump = collect && controls.takeJump();
+  let action = collect && controls.takeAction();
+  let eat = collect && controls.takeEat();
+  let plant = collect && controls.takePlant();
   // Se copia cada frame: asi reiniciar o abrir el panel se resuelve solo.
   state.survivalFrozen = dev.survivalFrozen;
   while (accumulator >= TICK_DT) {
