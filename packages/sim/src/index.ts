@@ -17,6 +17,7 @@ export * from './biome.js';
 export * from './worldgen.js';
 export * from './world.js';
 export * from './entities.js';
+export * from './inventory.js';
 export * from './tick.js';
 export * from './debug.js';
 export * from './systems/movement.js';

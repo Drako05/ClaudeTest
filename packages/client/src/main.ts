@@ -31,6 +31,7 @@ import {
   BIOME_NAMES,
   CHUNK_SIZE,
   Feature,
+  Resource,
   TERRAIN_NAMES,
   TICK_DT,
   emptyIntent,
@@ -60,10 +61,11 @@ import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
 import { chunkMesh, cornerHeight } from './terrain-mesh.js';
 import { FovPanel } from './fov-panel.js';
+import { ItemsUi } from './items-ui.js';
 import { MouseLook } from './pointer-lock.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
-import { berrySpot, cliffSpot, mineralSpot, peakSpot, reliefAround } from './probes.js';
+import { berrySpot, cliffSpot, mineralSpot, peakSpot, reliefAround, stoneOreSpot } from './probes.js';
 import { skyTint, tintCss } from './sky.js';
 import { randomSeed, seedFromLocation, startGame, writeSeedToLocation } from './start.js';
 
@@ -184,7 +186,13 @@ const dev = new DevTools({
     skipTime(state, ticks);
     // Tras un salto el estado observado cambia de golpe; no tiene sentido
     // registrarlo como si el jugador hubiera recolectado o comido.
-    dev.observe(Array.from(state.inventory), state.entities.hunger[state.playerId], 0);
+    dev.observe(state.inventory.totals(), state.entities.hunger[state.playerId], 0);
+  },
+  // Lo justo para el hacha y el pico de piedra (propuesta mia).
+  onKit: () => {
+    state.inventory.add(Resource.Branch, 6);
+    state.inventory.add(Resource.Stone, 5);
+    state.inventory.add(Resource.Fiber, 4);
   },
 });
 
@@ -193,13 +201,31 @@ const dev = new DevTools({
  * de desarrollo suelta el cursor sin pausar; al cerrarlo se intenta capturar de
  * nuevo, porque la tecla cuenta como gesto del usuario.
  */
-const mouseLook = new MouseLook(canvas, () => dev.active);
+/**
+ * La barra de la mano, el inventario por casillas y el panel de fabricar
+ * (`items-ui.ts`). Sus peticiones viajan en la `Intent` como todo lo demas.
+ */
+const items = new ItemsUi(() => state);
+hud.onInventoryOpen = () => items.render(state);
+
+/**
+ * El raton de PC lleva la mirada y soltarlo pausa (`pointer-lock.ts`). El panel
+ * de desarrollo suelta el cursor sin pausar; al cerrarlo se intenta capturar de
+ * nuevo, porque la tecla cuenta como gesto del usuario. El panel de fabricar
+ * hace lo mismo: sus botones piden cursor, y fabricar no es parar el juego
+ * (propuesta mia).
+ */
+const mouseLook = new MouseLook(canvas, () => dev.active || items.craftOpen);
 controls.mouseLook = mouseLook;
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'F3') return;
   if (dev.active) mouseLook.release();
-  else mouseLook.capture();
+  else if (!items.craftOpen) mouseLook.capture();
 });
+items.onCraftToggle = (open) => {
+  if (open) mouseLook.release();
+  else if (!dev.active) mouseLook.capture();
+};
 const pauseEl = document.getElementById('pause') as HTMLElement;
 const pauseHint = document.getElementById('pauseHint') as HTMLElement;
 let everLocked = false;
@@ -269,7 +295,7 @@ function buildChunk(cx: number, cy: number): ChunkView {
       if (prop) {
         scene.add(prop);
         props.push(prop);
-        spots.push({ x, z: y, width: billboards.widthOf(feature) });
+        if (feature !== Feature.Pebbles) spots.push({ x, z: y, width: billboards.widthOf(feature) });
       }
     }
   }
@@ -442,6 +468,9 @@ function frame(now: number): void {
   let action = collect && controls.takeAction();
   let eat = collect && controls.takeEat();
   let plant = collect && controls.takePlant();
+  // Las peticiones del inventario (mano, intercambiar, tirar, fabricar) no se
+  // tiran en pausa: esperan al primer frame con tick.
+  let asked = accumulator >= TICK_DT ? items.take() : null;
   // Se copia cada frame: asi reiniciar o abrir el panel se resuelve solo.
   state.survivalFrozen = dev.survivalFrozen;
   while (accumulator >= TICK_DT) {
@@ -451,6 +480,16 @@ function frame(now: number): void {
     eat = false;
     intent.plant = plant;
     plant = false;
+    if (asked) {
+      intent.select = asked.select;
+      intent.craft = asked.craft;
+      intent.swapA = asked.swapA;
+      intent.swapB = asked.swapB;
+      intent.discard = asked.discard;
+      asked = null;
+    } else {
+      intent.select = intent.craft = intent.swapA = intent.swapB = intent.discard = -1;
+    }
 
     // Mantener el boton repite cuatro veces por segundo, que es la cadencia de
     // siempre (`HARVEST_REPEAT_TICKS`, 15 ticks a 60 Hz). Se cuenta en TICKS y
@@ -493,6 +532,7 @@ function frame(now: number): void {
         camera.projection === 'primera' ? SLASH_FP_HALF_WIDTH : SLASH_HALF_WIDTH,
       );
     }
+    items.notice(state);
     for (const hit of state.lastHarvest) {
       gathered += hit.amount + hit.seeds;
       // Los escombros se posan en la cima del tile del que salieron, no en el
@@ -512,6 +552,8 @@ function frame(now: number): void {
   // maquina lenta cabria entero entre dos fotogramas. Con el tiempo ESCALADO:
   // pausar los congela y a 64x no inundan la pantalla.
   effects.advance(scaled);
+  // El aviso se apaga solo y la barra de trabajo sigue a lo que se golpea.
+  items.frame(state, dt);
   // La camara va con ellos porque la cinta del barrido se orienta hacia el ojo:
   // tumbada en el suelo se veia de canto al bajar la elevacion. Se pasa la del
   // frame ANTERIOR —`camera.follow` es unas lineas mas abajo—, y eso no se nota:
@@ -586,8 +628,9 @@ function frame(now: number): void {
     hudTimer = 0;
     const info = renderer.info.render;
     hud.update(state, fps, `${info.calls} · ${(triangles / 1000).toFixed(0)}k tri`);
+    items.render(state);
     dev.observe(
-      Array.from(state.inventory),
+      state.inventory.totals(),
       state.entities.hunger[state.playerId],
       state.world.biomeAt(Math.floor(px), Math.floor(py)),
     );
@@ -692,7 +735,18 @@ Object.defineProperty(window, '__verdant', {
       deadShown: hud.deadShown,
       hudOpen: hud.hudOpen,
       inventoryOpen: hud.inventoryOpen,
-      inventory: Array.from(state.inventory),
+      inventory: state.inventory.totals(),
+      /** Las casillas: objeto (o -1), cuantos y usos que le quedan. */
+      slots: Array.from(state.inventory.items).map((item, i) => ({
+        item,
+        count: state.inventory.counts[i],
+        wear: state.inventory.wear[i],
+      })),
+      selectedSlot: state.inventory.selected,
+      itemsSent: { ...items.sent },
+      toast: (document.getElementById('toast') as HTMLElement).classList.contains('show')
+        ? (document.getElementById('toast') as HTMLElement).textContent
+        : null,
       chunks: state.world.loadedChunkCount,
       tracked: state.world.trackedChunkCount,
       fps,
@@ -704,6 +758,7 @@ Object.defineProperty(window, '__verdant', {
         cliffSpot: cliffSpot(state),
         peakSpot: peakSpot(state),
         mineralSpot: mineralSpot(state),
+        stoneOreSpot: stoneOreSpot(state),
         berrySpot: berrySpot(state),
       }),
     };

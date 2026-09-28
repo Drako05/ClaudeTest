@@ -59,6 +59,19 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Al morir el cursor **se suelta** para pulsar «Reiniciar», y reiniciar lo vuelve a capturar | El raton lleva la mirada | una linea |
 | Un toque de verdad **apaga** el modo raton (portatil tactil), y ya no hay pausa por el cursor | El raton lleva la mirada | una linea |
 | Textos del aviso: «Haz clic para jugar» al arrancar y «Haz clic para continuar» despues | El raton lleva la mirada | HTML |
+| Inventario de **8 casillas** con pilas de **20**. Ojo: en la tanda 1 ya hay 12 objetos distintos, y un jugador que junta de todo **llena las 8** antes de minar (el test guionizado tiene que tirar cosas); la ropa de la tanda 2 es la que lo alivia | Recoleccion y fabricacion | un numero en `sim/inventory.ts` |
+| Lo que no cabe: el golpe **no completa** y el objeto se queda; tirar una casilla la **hace desaparecer** | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
+| Barra de la mano: casillas 1-4, **abajo al centro en PC y arriba al centro en el movil** (abajo estan el joystick y el racimo) | Recoleccion y fabricacion | CSS |
+| Trabajos: arbol 4 golpes (raro 6), roca 3, carbon 4, cobre 5, hierro 6 con pico de nivel 2; arbusto y guijarros 1 | Recoleccion y fabricacion | `workOf` en `shared` |
+| Herramientas de piedra: poder 1, **40 usos**; hacha = 3 ramas + 2 piedras + 2 fibras, pico = 3 ramas + 3 piedras + 2 fibras | Recoleccion y fabricacion | `toolStats` y `RECIPES` |
+| Un uso por **golpe util**, alcance a uno o a varios; golpear con el hacha una roca no gasta | Recoleccion y fabricacion | una linea |
+| El dano acumulado se pierde a los **3 s** sin golpear | Recoleccion y fabricacion | un numero |
+| Ramas a mano: 1 por golpe, **3 por arbol**, se reponen en **1 dia de juego**; talar da ademas 1 rama | Recoleccion y fabricacion | numeros en `gathering.ts` |
+| Fibra: **1-2** por arbusto; el bono del 30 % no se aplica a ramas ni fibra | Recoleccion y fabricacion | numeros en `gathering.ts` |
+| Guijarros: 1 piedra, **2 %** de las casillas vacias de tierra y **6 %** en roca; tumbados en el suelo, 0,6 de ancho y 0,2 de alto | Recoleccion y fabricacion | `worldgen.ts` y `gathering.ts` |
+| Fabricar es **instantaneo**; la tecla **C** y el boton del martillo; el panel **suelta el cursor sin pausar** | Recoleccion y fabricacion | una linea |
+| Las peticiones del inventario **no se tiran en pausa**: se aplican al reanudar | Recoleccion y fabricacion | una linea en `main.ts` |
+| «Materiales de piedra» en el panel de desarrollo | Recoleccion y fabricacion | quitarlo |
 | La barra del angulo: **180 px** de largo, paso de **1 grado**, se despliega en **150 ms** | Angulo de vision ajustable | CSS y un atributo |
 | En PC la abre solo el **raton** al pasar; un dedo que toca el ojo no cuenta como pasar por encima | Angulo de vision ajustable | una linea en `fov-panel.ts` |
 | **Cualquier tecla** la cierra, flechas incluidas (con la barra enfocada no la mueven: se anda) | Angulo de vision ajustable | una linea |
@@ -277,6 +290,53 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
 
 ---
 
+## Recoleccion y fabricacion — tanda 1 HECHA, tanda 2 ESPERANDO (2026-09-28)
+
+Pediste la progresion de un jugador real: aparece sin nada, recolecta con las
+manos, fabrica sus primeras herramientas, que le dan mejores recursos, y con
+ellos mejores herramientas e indumentaria. Tus decisiones:
+- trabajo por golpes;
+- la herramienta se equipa;
+- se desgastan y se rompen;
+- la ropa sirve para llevar mas;
+- lo basico se fabrica a mano y lo mejor en mesa u horno;
+- los metales se funden en un horno;
+- el inventario son casillas con pilas;
+- la roca a mano no da nada y la primera piedra son guijarros sueltos.
+
+Lo que decidi yo, con cifras, esta arriba en «Esperando tu juicio».
+
+**Tanda 1, hecha**: etapas 1 a 3.
+- A mano: guijarros (piedra), arbustos (bayas y fibra), arboles (ramas).
+- Hacha y pico de piedra, fabricados a mano.
+- El hacha tala en 4 golpes. El pico saca roca, carbon y cobre; el hierro dice
+  «Necesitas un pico mejor».
+
+Lo comprueban `tests/crafting.test.ts`, con una partida guionizada de las manos a
+los minerales, y el humo. El humo fabrica un pico desde el panel con los
+«Materiales de piedra» del panel de desarrollo y saca cobre golpe a golpe.
+
+**Tanda 2, esperando a que des por buena la 1** (el plan aprobado, para que no se
+pierda):
+
+- **Estaciones**, colocadas con F en la casilla que toca la mirada (sin estacion
+  en la mano, F siembra). Estorban el paso y se recogen a mano con 3 golpes.
+  - Mesa de trabajo = 8 madera: recetas de mesa a menos de 3 casillas.
+  - Horno = 10 piedra + 2 carbon: fundir a menos de 3 casillas.
+- **Fundir**, instantaneo:
+  - 2 mineral de cobre + 1 carbon = 1 lingote de cobre;
+  - 2 mineral de hierro + 2 carbon = 1 lingote de hierro.
+- **Herramientas de metal**, en la mesa:
+  - hacha y pico de cobre = 2 ramas + 3 lingotes de cobre; poder 2, 120 usos;
+    el pico de cobre mina hierro;
+  - hacha y pico de hierro = 2 ramas + 3 lingotes de hierro; poder 3, 250 usos.
+- **Indumentaria**, en la mesa, en dos huecos nuevos del personaje:
+  - bolsa de fibra (8 fibra), en la cintura: +2 casillas;
+  - mochila de armazon (10 fibra + 4 madera + 2 lingotes de cobre), en la
+    espalda: +6 casillas.
+  - No se puede quitar una prenda con sus casillas ocupadas.
+- **La otra mitad de la ley**, «experiencia», queda fuera: esta sin disenar.
+
 ## Ataques y saltos que no salian — ARREGLADO (2026-09-28)
 
 Lo viste jugando: moviendote, a veces atacas o saltas y no pasa nada, y a veces
@@ -291,9 +351,9 @@ fotograma con tick. En pausa se siguen tirando, a proposito.
 Una pasada nueva del humo finge una pantalla de 144 Hz y exige 30 de 30 golpes y
 5 de 5 saltos; sin el arreglo da 10 y 0.
 
-**Lo que queda por ver es tuyo**: si con esto dejan de perderse. Si aun se pierde
-algun salto, quedaria el otro canal —pulsarlo en el aire, al aterrizar o bajando
-un escalon, que medido es un 2,2 % del tiempo andando—, que es la seccion
+**Confirmado por el autor jugando**: «funciona excelente ahora». Si algun dia
+vuelve a perderse un salto, quedaria el otro canal —pulsarlo en el aire, al
+aterrizar o bajando un escalon, un 2,2 % del tiempo andando—, que es la seccion
 aparcada de mas abajo.
 
 ## El raton lleva la mirada, y soltarlo pausa — HECHO (2026-09-28)

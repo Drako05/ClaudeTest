@@ -7,6 +7,10 @@ import {
   phaseOf,
   skipTime,
   step,
+  tryCraft,
+  tryHarvestArea,
+  Inventory,
+  WorkState,
   World,
 } from '@verdant/sim';
 import {
@@ -19,6 +23,8 @@ import {
   LIFE_STEP_TICKS,
   LifeKind,
   lifeKindOf,
+  RECIPES,
+  Resource,
   withinEquilibrium,
 } from '@verdant/shared';
 
@@ -423,7 +429,7 @@ describe('El mundo sigue siendo determinista con la vida en marcha', () => {
         state.entities.y[state.playerId],
         state.world.trackedChunkCount,
         state.world.populationOf(cx, cy, biome, LifeKind.Tree),
-        ...Array.from(state.inventory),
+        ...state.inventory.totals(),
       ];
     }
     expect(run()).toEqual(run());
@@ -598,4 +604,49 @@ describe('Saltar el tiempo equivale a esperar quieto', () => {
       expect(snapshot(skipped)).toEqual(snapshot(waited));
     });
   }
+});
+
+describe('Capitulo II: combinar y herramientas', () => {
+  it('algunos recursos se combinan para crear cosas nuevas', () => {
+    // Ramas, piedra y fibra hacen un hacha: los materiales se gastan y el
+    // resultado es otra cosa, que no existia en el mundo.
+    const inv = new Inventory();
+    inv.add(Resource.Branch, 3);
+    inv.add(Resource.Stone, 2);
+    inv.add(Resource.Fiber, 2);
+    const axe = RECIPES.findIndex((r) => r.output === Resource.StoneAxe);
+    expect(tryCraft(inv, axe)).toBe(true);
+    expect(inv.count(Resource.StoneAxe)).toBe(1);
+    expect(inv.count(Resource.Branch) + inv.count(Resource.Stone) + inv.count(Resource.Fiber)).toBe(0);
+    expect(tryCraft(inv, axe)).toBe(false);
+  });
+
+  it('algunos recursos requieren herramientas para recolectarse', () => {
+    const state = createGame(12345);
+    const e = state.entities;
+    const id = state.playerId;
+    const tx = Math.floor(e.x[id]);
+    const ty = Math.floor(e.y[id]);
+    e.x[id] = tx + 0.5;
+    e.y[id] = ty + 0.5;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) state.world.setFeature(tx + dx, ty + dy, Feature.None);
+    state.world.setFeature(tx + 1, ty, Feature.CopperNode);
+    e.facingX[id] = 1;
+    e.facingY[id] = 0;
+    e.lookZ[id] = Math.sin((-30 * Math.PI) / 180);
+
+    // A mano, por muchos golpes que se den, el mineral sigue ahi.
+    const hands = new Inventory();
+    const work = new WorkState();
+    for (let t = 0; t < 20; t++) tryHarvestArea(state.world, e, id, hands, t, work);
+    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.CopperNode);
+    expect(hands.count(Resource.Copper)).toBe(0);
+
+    // Con un pico, sale.
+    const pick = new Inventory();
+    pick.add(Resource.StonePickaxe, 1);
+    for (let t = 0; t < 5; t++) tryHarvestArea(state.world, e, id, pick, 100 + t, work);
+    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.None);
+    expect(pick.count(Resource.Copper)).toBeGreaterThan(0);
+  });
 });

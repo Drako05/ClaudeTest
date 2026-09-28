@@ -27,6 +27,12 @@ const LOG_LIMIT = 12;
 export interface DevActions {
   /** Salta el tiempo indicado en ticks del mundo. */
   onSkip: (ticks: number) => void;
+  /**
+   * Da materiales para fabricar las herramientas de piedra: para probar la
+   * fabricacion y la mineria sin juntarlo todo a mano. Da materiales, no
+   * herramientas, para que fabricar se siga probando de verdad.
+   */
+  onKit: () => void;
 }
 
 export class DevTools {
@@ -183,6 +189,7 @@ export class DevTools {
         </div>
         <div class="devRow">
           <button data-toggle="survival" type="button">Sin hambre</button>
+          <button data-kit="piedra" type="button">Materiales de piedra</button>
         </div>
         <p class="devNote">Un salto no simula el movimiento de esas horas.</p>
       </div>
@@ -212,6 +219,9 @@ export class DevTools {
       if (button.dataset.speed) {
         this.speed = Number(button.dataset.speed);
         this.paused = false;
+      } else if (button.dataset.kit) {
+        this.actions.onKit();
+        this.push('materiales de piedra');
       } else if (button.dataset.jump) {
         this.actions.onSkip(Number(button.dataset.jump));
         // El rotulo del boton, tal cual: un dia del mundo dura ocho minutos

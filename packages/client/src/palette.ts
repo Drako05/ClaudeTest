@@ -93,7 +93,7 @@ function toHex(color: string): number {
  * dan variedad al estallido de un arbusto.
  */
 export function debrisPalette(feature: Feature): number[] {
-  if (feature === Feature.RockNode) return ROCK_FACES.map(toHex);
+  if (feature === Feature.RockNode || feature === Feature.Pebbles) return ROCK_FACES.map(toHex);
   const mineral = MINERAL_FACES[feature];
   if (mineral) return mineral.map(toHex);
 

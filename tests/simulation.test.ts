@@ -6,6 +6,7 @@ import {
   EntityStore,
   HUNGER_DECAY_PER_SEC,
   hitboxAt,
+  Inventory,
   targetTile,
   treeTrunkAt,
   moveEntity,
@@ -16,6 +17,7 @@ import {
   tryHarvestArea,
   tryPlant,
   WALK_SPEED,
+  WorkState,
   World,
 } from '@verdant/sim';
 import {
@@ -25,7 +27,6 @@ import {
   LifeKind,
   lifeKindOf,
   Resource,
-  RESOURCE_COUNT,
   TICK_DT,
   TICK_HZ,
   type Intent,
@@ -435,14 +436,22 @@ describe('Mirada y golpe', () => {
     // Y una fuera de alcance, a dos casillas en recto: no cae.
     world.setFeature(x + 2, y, Feature.RockNode);
 
-    const inventory = new Int32Array(RESOURCE_COUNT);
-    const results = tryHarvestArea(world, store, id, inventory, 0);
+    // La roca pide pico y tres golpes (trabajo por golpes): los dos primeros
+    // solo acumulan dano en las tres a la vez.
+    const inventory = new Inventory();
+    inventory.add(Resource.StonePickaxe, 1);
+    const work = new WorkState();
+    expect(tryHarvestArea(world, store, id, inventory, 0, work).results).toHaveLength(0);
+    expect(tryHarvestArea(world, store, id, inventory, 1, work).results).toHaveLength(0);
+    const { results } = tryHarvestArea(world, store, id, inventory, 2, work);
 
     expect(results).toHaveLength(3);
     for (const r of rocks) expect(world.featureAt(r.x, r.y)).toBe(Feature.None);
     expect(world.featureAt(x + 2, y)).toBe(Feature.RockNode);
     const reported = results.reduce((sum, r) => sum + r.amount + r.seeds, 0);
-    expect(Array.from(inventory).reduce((sum, n) => sum + n, 0)).toBe(reported);
+    expect(inventory.count(Resource.Stone)).toBe(reported);
+    // Un uso por golpe util, alcance a una roca o a tres.
+    expect(inventory.wear[0]).toBe(40 - 3);
   });
 
   it('del arbol se golpea el tronco que se dibuja, no la copa', () => {
@@ -454,22 +463,32 @@ describe('Mirada y golpe', () => {
     expect(box.z1 - box.z0).toBeCloseTo(trunk.bare, 9);
     expect(box.x1 - box.x0).toBeCloseTo(trunk.width, 9);
 
-    // Mirando al frente, a la altura de los ojos, el tronco cae.
-    tryHarvestArea(at.world, at.store, at.id, new Int32Array(RESOURCE_COUNT), 0);
+    // Mirando al frente, a la altura de los ojos, el tronco cae: cuatro golpes
+    // de hacha.
+    const axe = () => {
+      const inv = new Inventory();
+      inv.add(Resource.StoneAxe, 1);
+      return inv;
+    };
+    const work = new WorkState();
+    const inv = axe();
+    for (let t = 0; t < 4; t++) tryHarvestArea(at.world, at.store, at.id, inv, t, work);
     expect(at.world.featureAt(at.x + 1, at.y)).toBe(Feature.None);
 
     // Mirando por encima del tronco, a la copa, no.
     const high = onFlat(Math.sin((60 * Math.PI) / 180));
     high.world.setFeature(high.x + 1, high.y, Feature.MeadowTree);
-    tryHarvestArea(high.world, high.store, high.id, new Int32Array(RESOURCE_COUNT), 0);
+    const highWork = new WorkState();
+    const highInv = axe();
+    for (let t = 0; t < 4; t++) tryHarvestArea(high.world, high.store, high.id, highInv, t, highWork);
     expect(high.world.featureAt(high.x + 1, high.y)).toBe(Feature.MeadowTree);
   });
 
   it('sembrar va a la casilla donde la mirada toca el suelo, y solo a esa', () => {
     const { world, store, id, x, y } = onFlat(down(50));
-    const inventory = new Int32Array(RESOURCE_COUNT);
-    inventory[Resource.TreeSeed] = 3;
-    inventory[Resource.PlantSeed] = 3;
+    const inventory = new Inventory();
+    inventory.add(Resource.TreeSeed, 3);
+    inventory.add(Resource.PlantSeed, 3);
     expect(targetTile(world, store, id)).toEqual({ x: x + 1, y });
     const planted = tryPlant(world, store, id, inventory);
 
@@ -480,7 +499,7 @@ describe('Mirada y golpe', () => {
       expect(world.featureAt(x + 1, y - 1)).toBe(Feature.None);
       expect(world.featureAt(x + 1, y + 1)).toBe(Feature.None);
       expect(world.featureAt(x, y)).toBe(Feature.None);
-      expect(inventory[Resource.TreeSeed] + inventory[Resource.PlantSeed]).toBe(5);
+      expect(inventory.count(Resource.TreeSeed) + inventory.count(Resource.PlantSeed)).toBe(5);
     }
 
     // Mirando al frente la mirada no toca el suelo: no se siembra.

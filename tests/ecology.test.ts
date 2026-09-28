@@ -4,6 +4,7 @@ import {
   EntityStore,
   EYE_HEIGHT,
   harvestTile,
+  Inventory,
   tryPlant,
   World,
 } from '@verdant/sim';
@@ -20,7 +21,6 @@ import {
   MATURATION_TICKS,
   MAX_SEEDS_PER_HARVEST,
   maturesInto,
-  RESOURCE_COUNT,
   Resource,
 } from '@verdant/shared';
 
@@ -186,17 +186,18 @@ describe('El ciclo de la siembra', () => {
   it('recolectar deja entre cero y dos semillas', () => {
     const world = new World(2024);
     world.setNow(0);
-    const inventory = new Int32Array(RESOURCE_COUNT);
+    // Holgado: son 120 arboles y aqui se mide la semilla, no el inventario.
+    const inventory = new Inventory(256);
     const counts = new Map<number, number>();
     let harvests = 0;
 
     for (let y = -60; y < 60 && harvests < 120; y++) {
       for (let x = -60; x < 60 && harvests < 120; x++) {
         if (lifeKindOf(world.featureAt(x, y)) !== LifeKind.Tree) continue;
-        const before = inventory[Resource.TreeSeed];
+        const before = inventory.count(Resource.TreeSeed);
         const result = harvestTile(world, x, y, inventory, world.currentTick);
         expect(result).not.toBeNull();
-        const gained = inventory[Resource.TreeSeed] - before;
+        const gained = inventory.count(Resource.TreeSeed) - before;
         counts.set(gained, (counts.get(gained) ?? 0) + 1);
         harvests++;
       }
@@ -218,7 +219,7 @@ describe('El ciclo de la siembra', () => {
     const cx = tree.x >> 5;
     const cy = tree.y >> 5;
 
-    const inventory = new Int32Array(RESOURCE_COUNT);
+    const inventory = new Inventory();
     const balanced = world.isBiomeBalanced(cx, cy, world.biomeAt(tree.x, tree.y));
     const result = harvestTile(world, tree.x, tree.y, inventory, 0)!;
 
@@ -236,17 +237,17 @@ describe('El ciclo de la siembra', () => {
     const world = new World(2024);
     world.setNow(0);
     const tree = findTile(world, (f) => lifeKindOf(f) === LifeKind.Tree);
-    const inventory = new Int32Array(RESOURCE_COUNT);
+    const inventory = new Inventory();
     const { store, id } = playerOn(world, tree.x, tree.y);
 
     // Se retira el arbol para dejar el tile libre y se siembra ahi mismo.
     world.setFeature(tree.x, tree.y, Feature.None);
-    inventory[Resource.TreeSeed] = 1;
+    inventory.add(Resource.TreeSeed, 1);
 
     const sapling = tryPlant(world, store, id, inventory);
     expect(sapling).not.toBeNull();
     expect(isSapling(world.featureAt(tree.x, tree.y))).toBe(true);
-    expect(inventory[Resource.TreeSeed]).toBe(0);
+    expect(inventory.count(Resource.TreeSeed)).toBe(0);
 
     // Un brote ni estorba el paso ni se puede recolectar todavia.
     expect(world.isSolidAt(tree.x, tree.y)).toBe(false);
@@ -265,16 +266,15 @@ describe('El ciclo de la siembra', () => {
     const world = new World(2024);
     world.setNow(0);
     const tree = findTile(world, (f) => lifeKindOf(f) === LifeKind.Tree);
-    const inventory = new Int32Array(RESOURCE_COUNT);
+    const inventory = new Inventory();
     const { store, id } = playerOn(world, tree.x, tree.y);
 
-    inventory[Resource.TreeSeed] = 1;
+    inventory.add(Resource.TreeSeed, 1);
     expect(tryPlant(world, store, id, inventory)).toBeNull(); // ocupado
-    expect(inventory[Resource.TreeSeed]).toBe(1);
+    expect(inventory.count(Resource.TreeSeed)).toBe(1);
 
     world.setFeature(tree.x, tree.y, Feature.None);
-    inventory[Resource.TreeSeed] = 0;
-    inventory[Resource.PlantSeed] = 0;
+    inventory.remove(Resource.TreeSeed, 1);
     expect(tryPlant(world, store, id, inventory)).toBeNull(); // sin semillas
   });
 });

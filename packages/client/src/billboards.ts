@@ -102,6 +102,27 @@ export function crossGeometry(w: number, above: number, below: number): BufferGe
   return geometry;
 }
 
+/**
+ * Un quad TUMBADO en el suelo, centrado en el pie y un pelo por encima para
+ * no pelearse con el terreno. Para lo que se ve desde arriba y en aspa se
+ * leeria como una helice: los guijarros.
+ */
+export function flatGeometry(w: number): BufferGeometry {
+  const half = w / 2;
+  const lift = 0.03;
+  const geometry = new BufferGeometry();
+  geometry.setAttribute(
+    'position',
+    new BufferAttribute(
+      new Float32Array([-half, lift, half, half, lift, half, -half, lift, -half, half, lift, -half]),
+      3,
+    ),
+  );
+  geometry.setAttribute('uv', new BufferAttribute(new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), 2));
+  geometry.setIndex([0, 1, 2, 2, 1, 3]);
+  return geometry;
+}
+
 /** Pixeles de arte por unidad de mundo: un tile de 32 px es una casilla. */
 const PX_PER_TILE = 32;
 
@@ -414,9 +435,11 @@ export class BillboardSet {
       // Un arbol se dibuja siempre con su tronco; el de referencia, con el del
       // centro de la normal. Su ancho es el de todas sus alturas: el lienzo lo
       // decide la copa.
-      const art = isTree(feature)
+      let art = isTree(feature)
         ? this.tree(feature, meanBucket(feature))
         : fromArt(makeFeatureArt(feature, DETAIL), scaleOf(feature), true);
+      // Los guijarros van tumbados, y sin sombra: ya estan en el suelo.
+      if (art && feature === Feature.Pebbles) art = { ...art, geometry: flatGeometry(art.w) };
       if (art) this.byFeature.set(feature, art);
     }
     this.player = fromArt(makePlayerArt(DETAIL), BASE, false);

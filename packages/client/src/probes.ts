@@ -10,7 +10,7 @@
  */
 
 import {
-  type Feature,
+  Feature,
   harvestOf,
   isFeatureSolid,
   isTerrainSolid,
@@ -164,6 +164,19 @@ function reachSpot(
  */
 export function mineralSpot(state: GameState): ReachSpot | null {
   return reachSpot(state, 200, (f, t) => t === Terrain.Rock && MINERAL_NODES.includes(f));
+}
+
+/**
+ * Un mineral que sale con el pico de piedra: carbon o cobre. El hierro pide
+ * uno de cobre (propuesta mia de la tanda 1), asi que no vale para probar que
+ * el pico de piedra mina.
+ */
+export function stoneOreSpot(state: GameState): ReachSpot | null {
+  return reachSpot(
+    state,
+    200,
+    (f, t) => t === Terrain.Rock && (f === Feature.CoalNode || f === Feature.CopperNode),
+  );
 }
 
 /** Una mata con bayas, para comer: comer es lo unico que las gasta. */

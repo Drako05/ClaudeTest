@@ -902,6 +902,58 @@ casillas a paso completo, vuelo 0.400 s. `GRAVITY = 62` y `JUMP_SPEED = 12` son
 **deduccion del agente** a partir del caso que describio el autor, no numeros
 suyos: puede corregirlos, y `tests/jump.test.ts` afirma la relacion que los ata.
 
+## Recoleccion y fabricacion
+
+La progresion la pidio el autor tal como la viviria un jugador: aparece sin
+nada, recolecta con las manos, fabrica sus primeras herramientas, que le dan
+mejores recursos, y con ellos fabrica mejores herramientas e indumentaria. Va
+en dos tandas; la **tanda 1** (manos → herramientas de piedra → lo que sacan)
+esta hecha, y la **tanda 2** (mesa, horno, fundir, cobre, hierro y ropa) espera
+a que el autor de por buena la primera. El plan entero, con sus cifras, esta en
+`docs/pendiente.md`.
+
+Decisiones del autor, que no se tocan sin preguntarle:
+
+- **Trabajo por golpes.** Cada objeto pide un trabajo (`workOf`) y cada golpe
+  suma el poder de lo que se lleva en la mano (`toolStats`); a mano, algunas
+  cosas no se completan. Un arbol sin hacha no cae: suelta ramas. Roca y
+  minerales piden pico, y el hierro uno mejor.
+- **Se equipa una herramienta**: las casillas 1-4 son la barra y la elegida es
+  la mano. La eleccion viaja en la `Intent` (`select`), como fabricar
+  (`craft`), intercambiar (`swapA`/`swapB`) y tirar (`discard`): regla 5.
+- **Se desgastan y se rompen.**
+- **Casillas con pilas** (`sim/inventory.ts`), y la ropa las ampliara.
+- **La roca a mano no da nada**: la primera piedra son **guijarros** sueltos
+  en el suelo, una feature inerte y finita que no estorba el paso.
+- Lo basico se fabrica a mano en cualquier sitio; lo mejor pedira mesa u horno.
+
+Lo que el codigo tiene que respetar:
+
+- **Un botin entra entero o no entra** (`Inventory.fits`): si no cabe, el golpe
+  no completa y el objeto se queda en el mundo, con su dano, para acabarlo en
+  cuanto haya sitio. Nada se reparte a medias ni se pierde.
+- **El dano acumulado y las ramas arrancadas viven en `WorkState`**, fuera del
+  chunk como el overlay (regla 4). El dano se pierde a los `DAMAGE_DECAY_TICKS`
+  sin golpear; las ramas se reponen **por el tiempo transcurrido**, no por
+  pasos, asi que vivirlo y saltarlo con `skipTime` da lo mismo (hay test).
+- **`harvestTile` es la primitiva que completa**, sin golpes ni herramientas;
+  la usan `tryHarvestArea` y los tests del ecosistema.
+- **Los guijarros no mueven nada**: salen solo en casillas que se quedarian
+  vacias y con su propio hash, asi que ningun umbral ni ninguna otra feature
+  cambia (reglas 2 y 3). Van **tumbados** en el suelo (`flatGeometry`), no en
+  aspa: vistos desde arriba, dos laminas cruzadas se leian como una helice.
+- **Las peticiones del inventario no se tiran en pausa**, al reves que salto y
+  accion: son orden, no acciones en el mundo, y esperan al primer tick.
+- **El panel de fabricar (C) suelta el cursor sin pausar**, como el de
+  desarrollo, y capturar es asincrono: si el cursor se captura con uno de los
+  dos abierto, `pointer-lock.ts` lo suelta en el acto (sin eso, F3 y C
+  seguidos dejaban el panel abierto con el cursor capturado).
+
+Para probar sin juntarlo todo a mano, el panel de desarrollo tiene
+**«Materiales de piedra»**: da materiales, no herramientas, para que fabricar
+se pruebe de verdad. El humo lo usa para minar con un pico fabricado desde el
+panel.
+
 ## Si tocas la generacion del mundo
 
 Cambiar una escala de ruido invalida los umbrales de bioma, que estan calibrados

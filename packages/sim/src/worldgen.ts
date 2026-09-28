@@ -12,6 +12,7 @@ import {
   CHUNK_SIZE,
   densityFor,
   Feature,
+  isTerrainSolid,
   LifeKind,
   RARE_CHANCE,
   rareOf,
@@ -20,6 +21,10 @@ import {
 } from '@verdant/shared';
 import { levelFrom, MAX_LEVEL, OUTCROP_RISE, rampDirOf, SEA_LEVEL } from './relief.js';
 import { hash2DFloat, SimplexNoise } from './rng.js';
+
+/** Guijarros: fraccion de las casillas vacias de tierra, y de roca. **Propuesta mia.** */
+const PEBBLES_LAND = 0.02;
+const PEBBLES_ROCK = 0.06;
 
 /** Escalas de muestreo del ruido, en tiles. Mayor = accidentes geograficos mas grandes. */
 const ELEVATION_SCALE = 1 / 220;
@@ -304,7 +309,20 @@ export class WorldGen {
     threshold += density.copper;
     if (roll < threshold) return Feature.CopperNode;
 
-    return Feature.None;
+    return this.pebblesAt(wx, wy, terrain);
+  }
+
+  /**
+   * Guijarros sueltos: la primera piedra, la que se coge a mano (decision del
+   * autor). Solo en casillas de tierra que se quedarian vacias y con su propio
+   * hash, asi que no mueven ninguna otra feature ni ningun umbral (reglas 2 y 3).
+   * Densidad **propuesta mia**: 2 % del suelo, 6 % en roca, donde se
+   * desprenden.
+   */
+  private pebblesAt(wx: number, wy: number, terrain: Terrain): Feature {
+    if (isTerrainSolid(terrain)) return Feature.None;
+    const chance = terrain === Terrain.Rock ? PEBBLES_ROCK : PEBBLES_LAND;
+    return hash2DFloat(this.seed ^ 0x7c3e9a15, wx, wy) < chance ? Feature.Pebbles : Feature.None;
   }
 
   /**

@@ -37,13 +37,13 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Ley | Estado | Donde vive | Prueba |
 |---|---|---|---|
 | Pueden ser finitos, consumibles y renovables | **Cumplida** | La vida se repone via el ecosistema; roca y minerales son inertes y no vuelven | «el ecosistema repone lo recolectado», «la piedra es inerte: ni cuenta como vida ni se repone», «la piedra sigue siendo inerte y de cantidad fija» |
-| Todo recurso tiene origen, transformacion y destino | **Parcial** | Origen (worldgen), destino (inventario) y un primer ciclo cerrado: recolectar deja semillas que se siembran y maduran | «sembrar consume una semilla y el brote madura a adulto» — falta el procesado y el crafteo |
+| Todo recurso tiene origen, transformacion y destino | **Parcial** | Origen (worldgen), destino (inventario), un ciclo cerrado —recolectar deja semillas que se siembran y maduran— y la primera transformacion: fabricar (`tryCraft`) | «sembrar consume una semilla y el brote madura a adulto», «algunos recursos se combinan para crear cosas nuevas» — falta el procesado (fundir, tanda 2) |
 | Los mas basicos se generan con el terreno | **Cumplida** | `sim/worldgen.ts` — `featureAt` decide segun el bioma | tests de `world-quality` |
 | Deben ser recolectados para usarlos | **Cumplida** | `sim/systems/gathering.ts` | «recolectar un arbol da madera y vacia el tile» |
 | En su mayoria requieren ser procesados | **Pendiente** | — | — |
-| Algunos podran combinarse para crear cosas nuevas | **Pendiente** | — | — |
+| Algunos podran combinarse para crear cosas nuevas | **Cumplida** | `RECIPES` en `shared` y `tryCraft` en `sim/systems/gathering.ts`: ramas, piedra y fibra hacen el hacha y el pico de piedra | «algunos recursos se combinan para crear cosas nuevas», `tests/crafting.test.ts` |
 | Categorias: minerales, quimicos, organicos | **Parcial** | Los minerales existen y viven donde deben: carbon, hierro y cobre solo en la montana. Faltan los quimicos y una taxonomia explicita | «solo aparecen sobre roca», «los tres existen y el carbon es el mas comun» |
-| Se requieren herramientas y experiencia | **Pendiente** | — | — |
+| Se requieren herramientas y experiencia | **Parcial** | Herramientas si: trabajo por golpes (`workOf`, `toolStats`), la roca y los minerales piden pico, un arbol sin hacha no cae, y el hierro pide un pico mejor. La experiencia sigue pendiente | «algunos recursos requieren herramientas para recolectarse», `tests/crafting.test.ts` |
 
 ## Capitulo III: La vida
 

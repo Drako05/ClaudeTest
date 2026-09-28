@@ -7,12 +7,21 @@
  * repeticion de bugs, tests). El render interpola aparte, en el cliente.
  */
 
-import { CHUNK_SIZE, DAY_TICKS, RESOURCE_COUNT, TICK_DT, type Intent } from '@verdant/shared';
+import { CHUNK_SIZE, DAY_TICKS, TICK_DT, type Intent } from '@verdant/shared';
 import { EntityKind, EntityStore } from './entities.js';
 import { moveAirborne, moveEntity } from './systems/movement.js';
 import { applyVertical, takeOff } from './systems/jump.js';
 import { updateSurvival } from './systems/survival.js';
-import { tryEat, tryHarvestArea, tryPlant, type HarvestResult } from './systems/gathering.js';
+import {
+  tryCraft,
+  tryEat,
+  tryHarvestArea,
+  tryPlant,
+  WorkState,
+  type Blocked,
+  type HarvestResult,
+} from './systems/gathering.js';
+import { Inventory } from './inventory.js';
 import { toChunkCoord, World } from './world.js';
 
 /** Radio de chunks mantenidos cargados alrededor del jugador. */
@@ -25,11 +34,19 @@ export interface GameState {
   readonly world: World;
   readonly entities: EntityStore;
   readonly playerId: number;
-  /** Cantidades por Resource. Int32Array para mantener el estado en datos planos. */
-  readonly inventory: Int32Array;
+  /** El inventario por casillas (decision del autor). Se nace sin nada. */
+  readonly inventory: Inventory;
+  /** Dano acumulado y ramas arrancadas: el trabajo a medias del jugador. */
+  readonly work: WorkState;
   tick: number;
   /** Lo recolectado en el ultimo tick, una entrada por casilla. Efimero. */
   lastHarvest: HarvestResult[];
+  /** Por que el ultimo golpe no hizo algo (inventario lleno, falta pico). Efimero. */
+  lastBlocked: Blocked | null;
+  /** True si en el ultimo tick se rompio la herramienta de la mano. Efimero. */
+  lastBroke: boolean;
+  /** Receta fabricada en el ultimo tick, o -1. Efimero. */
+  lastCrafted: number;
   /** Chunk en el que estaba el jugador el tick anterior, para streaming perezoso. */
   streamCx: number;
   streamCy: number;
@@ -66,9 +83,13 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     world,
     entities,
     playerId,
-    inventory: new Int32Array(RESOURCE_COUNT),
+    inventory: new Inventory(),
+    work: new WorkState(),
     tick: Math.max(0, Math.floor(startTick)),
     lastHarvest: [],
+    lastBlocked: null,
+    lastBroke: false,
+    lastCrafted: -1,
     streamCx: Number.NaN,
     streamCy: Number.NaN,
     survivalFrozen: false,
@@ -98,6 +119,9 @@ function streamChunks(state: GameState): void {
 export function step(state: GameState, intent: Intent): void {
   const { entities, playerId, world, inventory } = state;
   state.lastHarvest = [];
+  state.lastBlocked = null;
+  state.lastBroke = false;
+  state.lastCrafted = -1;
 
   // El tiempo avanza antes que nada: el resto del tick actua sobre el mundo tal
   // y como esta AHORA, con la vegetacion ya puesta al dia.
@@ -130,8 +154,18 @@ export function step(state: GameState, intent: Intent): void {
     }
     entities.lookZ[playerId] = intent.aimZ ?? 0;
 
+    // El inventario antes que el golpe: elegir la herramienta y golpear en el
+    // mismo tick golpea ya con ella.
+    if (intent.select >= 0) inventory.select(intent.select);
+    if (intent.swapA >= 0 && intent.swapB >= 0) inventory.swap(intent.swapA, intent.swapB);
+    if (intent.discard >= 0) inventory.discard(intent.discard);
+    if (intent.craft >= 0 && tryCraft(inventory, intent.craft)) state.lastCrafted = intent.craft;
+
     if (intent.harvest) {
-      state.lastHarvest = tryHarvestArea(world, entities, playerId, inventory, state.tick);
+      const swing = tryHarvestArea(world, entities, playerId, inventory, state.tick, state.work);
+      state.lastHarvest = swing.results;
+      state.lastBlocked = swing.blocked;
+      state.lastBroke = swing.broke;
     }
     if (intent.plant) {
       tryPlant(world, entities, playerId, inventory);

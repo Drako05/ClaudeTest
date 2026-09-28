@@ -16,7 +16,6 @@ import {
   EQUILIBRIUM_BAND,
   LIFE_KIND_NAMES,
   LifeKind,
-  Resource,
 } from '@verdant/shared';
 import { clockLabel, dayNumber, toChunkCoord, type GameState } from '@verdant/sim';
 
@@ -92,14 +91,6 @@ export class Hud {
     hud: byId('hud'),
     invToggle: byId('invToggle'),
     invPanel: byId('invPanel'),
-    wood: byId('wood'),
-    stone: byId('stone'),
-    berries: byId('berries'),
-    treeSeed: byId('treeSeed'),
-    plantSeed: byId('plantSeed'),
-    coal: byId('coal'),
-    iron: byId('iron'),
-    copper: byId('copper'),
     statsToggle: byId('statsToggle'),
     statsPanel: byId('statsPanel'),
     biomeName: byId('biomeName'),
@@ -152,10 +143,16 @@ export class Hud {
     if (open) this.updateInfo(this.current());
   }
 
-  /** El inventario: su boton o la tecla I. */
+  /**
+   * El inventario: su boton o la tecla I. Sus casillas las pinta `items-ui.ts`;
+   * aqui solo se abre y se cierra, y se avisa para que las pinte en el acto.
+   */
   toggleInventory(): void {
-    if (Hud.flip(this.el.invToggle, this.el.invPanel)) this.updateInventory(this.current());
+    if (Hud.flip(this.el.invToggle, this.el.invPanel)) this.onInventoryOpen?.();
   }
+
+  /** Se llama al abrir el inventario. */
+  onInventoryOpen: (() => void) | null = null;
 
   get hudOpen(): boolean {
     return !this.el.hud.hidden;
@@ -185,22 +182,8 @@ export class Hud {
     el.hungerBar.setAttribute('aria-valuenow', String(Math.ceil(hunger)));
 
     el.dead.classList.toggle('show', entities.alive[playerId] === 0);
-    if (this.inventoryOpen) this.updateInventory(state);
     if (this.hudOpen) this.updateInfo(state);
     this.updateStats(state);
-  }
-
-  private updateInventory(state: GameState): void {
-    const { inventory } = state;
-    const el = this.el;
-    el.wood.textContent = String(inventory[Resource.Wood]);
-    el.stone.textContent = String(inventory[Resource.Stone]);
-    el.berries.textContent = String(inventory[Resource.Berries]);
-    el.treeSeed.textContent = String(inventory[Resource.TreeSeed]);
-    el.plantSeed.textContent = String(inventory[Resource.PlantSeed]);
-    el.coal.textContent = String(inventory[Resource.Coal]);
-    el.iron.textContent = String(inventory[Resource.Iron]);
-    el.copper.textContent = String(inventory[Resource.Copper]);
   }
 
   private updateInfo(state: GameState): void {

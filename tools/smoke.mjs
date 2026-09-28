@@ -461,13 +461,17 @@ async function desktopPass(browser, baseUrl) {
   await page.keyboard.press('KeyI');
   await page.waitForTimeout(250);
   check(await page.isVisible('#invPanel'), 'I no abrio el inventario');
+  // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
+  // no llevan numero, llevan desgaste).
   const hudTotal = await page.evaluate(() =>
-    ['wood', 'stone', 'berries', 'coal', 'iron', 'copper', 'treeSeed', 'plantSeed']
-      .map((id) => Number(document.getElementById(id).textContent))
+    Array.from(document.querySelectorAll('#invGrid .slot em'))
+      .map((el) => Number(el.textContent))
       .reduce((a, b) => a + b, 0),
   );
-  const nowTotal = sum((await state(page)).inventory);
+  const nowSlots = (await state(page)).slots;
+  const nowTotal = sum(nowSlots.filter((s) => s.item >= 0 && s.item < 10).map((s) => s.count));
   check(hudTotal === nowTotal, `el inventario en pantalla (${hudTotal}) no es el del juego (${nowTotal})`);
+  check(sum(gathered.inventory.slice(0, 10)) > 0 && gathered.inventory[9] > 0, 'un arbusto no dio fibra');
   await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
   await page.keyboard.press('KeyI');
   await page.waitForTimeout(150);
@@ -512,6 +516,29 @@ async function desktopPass(browser, baseUrl) {
   await page.click('#statsToggle');
   check(!(await page.isVisible('#statsPanel')), 'el panel no se replego al volver a pulsar');
   await play(page);
+
+  // La barra de la mano: siempre a la vista, y las teclas 1-4 eligen casilla.
+  check(await page.isVisible('#hotbar'), 'la barra de la mano no se ve en PC');
+  const beforeSelect = await state(page);
+  await page.keyboard.press('Digit3');
+  await page.waitForTimeout(250);
+  const selected = await state(page);
+  check(selected.itemsSent.select > beforeSelect.itemsSent.select, 'la tecla 3 no llego a la Intent');
+  check(selected.selectedSlot === 2, `la tecla 3 no eligio la casilla 3 (${selected.selectedSlot})`);
+  await page.keyboard.press('Digit1');
+  // C abre el panel de fabricar, que suelta el cursor SIN pausar, y lo cierra.
+  await page.keyboard.press('KeyC');
+  await page.waitForTimeout(250);
+  const crafting = await state(page);
+  check(await page.isVisible('#craftPanel'), 'C no abrio el panel de fabricar');
+  check(!crafting.pointerLocked && !crafting.paused, 'el panel de fabricar no solto el cursor o pauso');
+  check((await page.locator('#craftList .recipe').count()) === 2, 'el panel no lista las dos herramientas de piedra');
+  await page.keyboard.press('KeyC');
+  await page.waitForTimeout(250);
+  const crafted = await state(page);
+  check(!(await page.isVisible('#craftPanel')), 'C no cerro el panel de fabricar');
+  check(crafted.pointerLocked || crafted.paused, 'al cerrar el panel ni se capturo el cursor ni se pauso');
+  if (crafted.paused) await play(page);
 
   // La carrera, con su estado en la ayuda.
   await page.keyboard.press('ShiftLeft');
@@ -657,41 +684,83 @@ async function resourcesPass(browser, baseUrl) {
     check(fed.inventory[2] < withBerries.inventory[2], 'comer no gasto ninguna baya');
     check(fed.hunger > withBerries.hunger, 'comer no lleno el hambre');
 
-    // Sembrar: hace falta una semilla, y la semilla cae con una probabilidad.
-    const seeded = await harvestUntil(page, (s) => s.inventory[3] + s.inventory[4] > 0, 10);
+    // Un arbusto a mano da fibra ademas de bayas (etapa 1).
+    check(withBerries.inventory[9] > 0, `el arbusto no dio fibra: ${JSON.stringify(withBerries.inventory)}`);
+
+    // Sembrar: hace falta una semilla, y la semilla cae con una probabilidad
+    // —y ya solo de arbustos, porque un arbol a mano no cae—. Que siembre lo
+    // miden los tests del nucleo; aqui, que F llega a la Intent.
+    const seeded = await harvestUntil(page, (s) => s.inventory[3] + s.inventory[4] > 0, 4);
     const seeds = seeded.inventory[3] + seeded.inventory[4];
     console.log(`  semillas tras recolectar: ${seeds}`);
-    check(seeds > 0, 'recolectar no dejo ninguna semilla');
     let planted = seeded;
     // Se siembra donde la mirada toca el suelo, a menos de 2 bloques (regla
     // 12): con los ojos a 1,75 hay que mirar unos 41 grados hacia abajo, y la
     // camara arranca a 35. Bajar el raton baja la mirada.
     await look(page, 0, 120);
     await page.waitForTimeout(300);
-    for (let i = 0; i < 8 && seeds > 0; i++) {
+    for (let i = 0; i < 8; i++) {
       await page.keyboard.press('KeyF');
       await page.waitForTimeout(250);
       planted = await state(page);
-      if (planted.inventory[3] + planted.inventory[4] < seeds) break;
+      if (seeds === 0 || planted.inventory[3] + planted.inventory[4] < seeds) break;
       // A otra casilla: girar la camara cambia la apuntada.
       await orbit(page, 120);
       await hold(page, 'KeyW', 150);
     }
     check(planted.sent.plant > seeded.sent.plant, 'F no llego a la Intent');
-    check(planted.inventory[3] + planted.inventory[4] < seeds, 'sembrar no consumio ninguna semilla');
+    if (seeds > 0) {
+      check(planted.inventory[3] + planted.inventory[4] < seeds, 'sembrar no consumio ninguna semilla');
+    }
   }
 
   // Minar: la montana se pisa y sus minerales se sacan.
-  const mineral = where.mineralSpot;
+  // Con el pico de piedra se mina carbon o cobre; el hierro pide uno mejor.
+  const mineral = where.stoneOreSpot ?? where.mineralSpot;
   check(mineral !== null, 'no se encontro ningun mineral en el mundo de prueba');
   if (mineral) {
-    const arrived = await open(page, baseUrl, `&x=${mineral.stand.x}&y=${mineral.stand.y}`);
+    // Con el panel de desarrollo abierto (cursor libre, sin pausa): sus
+    // «Materiales de piedra» dan lo justo para fabricar, y fabricar se prueba de
+    // verdad, con el panel y su boton.
+    const arrived = await open(page, baseUrl, `&x=${mineral.stand.x}&y=${mineral.stand.y}&dev=1`);
     console.log(`  ${mineral.kind} en ${mineral.node.x},${mineral.node.y}; aparece en ${arrived.terrain} / ${arrived.biome}`);
     check(arrived.biome === 'Tierras altas', `el bioma no es el esperado: ${arrived.biome}`);
-    const mined = await harvestUntil(page, (s) => s.inventory.slice(5).some((n) => n > 0), 2);
+    const ores = (s) => s.inventory[5] + s.inventory[6] + s.inventory[7];
+    // A mano, un mineral no da nada y lo avisa.
+    await strike(page);
+    await page.waitForTimeout(300);
+    const byHand = await state(page);
+    console.log(`  a mano: aviso «${byHand.toast}»`);
+    check(ores(byHand) === 0, 'un mineral se saco a mano');
+    check(byHand.toast === 'Necesitas un pico', `a mano no se aviso de que falta el pico (${byHand.toast})`);
+    // Fabricar el pico de piedra desde el panel.
+    await page.click('[data-kit="piedra"]');
+    await page.keyboard.press('KeyC');
+    await page.waitForTimeout(250);
+    const beforeCraft = await state(page);
+    await page.locator('#craftList .recipe').nth(1).locator('button').click();
+    await page.waitForTimeout(400);
+    const made = await state(page);
+    const pickSlot = made.slots.findIndex((s) => s.item === 11);
+    console.log(`  pico fabricado en la casilla ${pickSlot + 1}, aviso «${made.toast}»`);
+    check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'Fabricar no llego a la Intent');
+    check(pickSlot >= 0 && pickSlot < 4, `el pico no quedo en la barra (${pickSlot})`);
+    await page.keyboard.press('KeyC');
+    if (pickSlot >= 0) await page.keyboard.press(`Digit${pickSlot + 1}`);
+    await page.waitForTimeout(250);
+    // Con el pico, golpe a golpe: el hierro pide uno mejor, lo demas sale.
+    const iron = mineral.kind.includes('hierro');
+    let mined = await state(page);
+    for (let i = 0; i < 10 && ores(mined) === 0 && !(iron && mined.toast); i++) {
+      await strike(page);
+      await page.waitForTimeout(260);
+      mined = await state(page);
+    }
     await page.screenshot({ path: join(SHOTS, '3d-03-montana.png') });
-    console.log(`  piedra ${mined.inventory[1]}, carbon/hierro/cobre ${mined.inventory.slice(5).join('/')}`);
-    check(mined.inventory.slice(5).some((n) => n > 0), `no se saco ningun mineral: ${JSON.stringify(mined.inventory)}`);
+    console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickSlot]?.wear}`);
+    if (iron) check(mined.toast === 'Necesitas un pico mejor', `el hierro no pidio un pico mejor (${mined.toast})`);
+    else check(ores(mined) > 0, `con pico no se saco ningun mineral: ${JSON.stringify(mined.inventory)}`);
+    check(iron || (mined.slots[pickSlot]?.wear ?? 40) < 40, 'el pico no se desgasto al minar');
     const walked = await bestWalk(page, mined);
     check(walked > 1, 'el jugador no pudo caminar dentro de la montana');
   }
@@ -720,9 +789,18 @@ async function mobilePass(browser, baseUrl) {
     check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);
   }
   check(!(await page.isVisible('#help')), 'la ayuda de teclado se ve en el movil');
-  for (const id of ['#vitals', '#invToggle', '#hudToggle']) {
+  for (const id of ['#vitals', '#invToggle', '#hudToggle', '#craftToggle', '#hotbar']) {
     check(await page.isVisible(id), `${id} no se ve en el movil`);
   }
+  // La barra de la mano, arriba en el movil: tocar una casilla la elige.
+  const beforeTap = await state(page);
+  await page.tap('#hotbar .slot:nth-child(2)');
+  await page.waitForTimeout(300);
+  const tapped = await state(page);
+  check(tapped.itemsSent.select > beforeTap.itemsSent.select && tapped.selectedSlot === 1,
+    `tocar la casilla 2 de la barra no la eligio (${tapped.selectedSlot})`);
+  const bar = await page.evaluate(() => document.getElementById('hotbar').getBoundingClientRect().toJSON());
+  check(bar.top < 100 && bar.left >= 0 && bar.right <= 390, `la barra del movil no cabe arriba: ${JSON.stringify(bar)}`);
   // El racimo cabe en la pantalla y queda ENTERO por encima de la franja de
   // salud y hambre, que llega hasta el borde derecho.
   const layout = await page.evaluate(() => ({

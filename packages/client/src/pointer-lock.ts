@@ -50,6 +50,13 @@ export class MouseLook {
     private readonly devOpen: () => boolean,
   ) {
     this.fine = window.matchMedia?.('(pointer: fine)').matches ?? false;
+    // Capturar es asincrono: si entre pedirlo y conseguirlo se abrio un panel
+    // que quiere el cursor libre (desarrollo, fabricar), se suelta en el acto.
+    // Sin esto, pulsar F3 y C seguidos dejaba el panel abierto con el cursor
+    // capturado y sus botones sin poder pulsarse.
+    document.addEventListener('pointerlockchange', () => {
+      if (this.locked && this.devOpen()) document.exitPointerLock();
+    });
     document.addEventListener('mousemove', (e) => {
       const first = !this.wasLocked;
       this.wasLocked = this.locked;

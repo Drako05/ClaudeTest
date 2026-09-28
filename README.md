@@ -59,6 +59,8 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | `Shift` | Correr: interruptor, se queda encendido |
 | `E` | Comer bayas |
 | `F` | Sembrar |
+| `1`-`4` | Elegir la casilla de la barra: lo que se lleva en la mano |
+| `C` | Fabricar (suelta el cursor sin pausar) |
 | `I` | Inventario |
 | `R` | Mundo nuevo |
 | `P` | Vista: perspectiva → isometrica → primera persona |
@@ -75,6 +77,8 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Boton ACCION | Accionar; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar la accion |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
 | Botones COMER y SEMBRAR | Comer bayas y sembrar |
+| Barra de arriba | Tocar una casilla la pone en la mano |
+| Boton del martillo, junto al inventario | Fabricar |
 | Sostener el ojo mas de 1 s | En primera persona, barra del angulo de vision; tocar fuera la cierra |
 
 **La mirada es una sola** en las tres vistas: el centro de la pantalla es hacia
@@ -82,6 +86,13 @@ donde mira el jugador. Se golpea con un sector plano de 2 bloques y 90 grados
 que sale de sus ojos y solo cuenta si toca un objeto —de un arbol, su tronco—;
 el terreno lo tapa. Se siembra donde la mirada toca el suelo. La camara no
 atraviesa bloques ni troncos.
+
+**Recolectar y fabricar.** Se nace sin nada. A mano se cogen guijarros
+(piedra), fibra y bayas de los arbustos, y ramas de los arboles, que no caen
+sin hacha. Con eso se fabrican el hacha y el pico de piedra, que talan arboles
+y sacan piedra, carbon y cobre golpe a golpe; el hierro pide un pico mejor. Las
+herramientas se gastan y se rompen, y el inventario son ocho casillas con pilas
+de veinte.
 
 **En los dos:** la salud (corazon) y el hambre (muslo) van siempre abajo, de
 borde a borde, con el boton del **inventario** en la esquina inferior izquierda.

@@ -45,6 +45,13 @@ export enum Feature {
   CoalNode = 20,
   IronNode = 21,
   CopperNode = 22,
+
+  /**
+   * Guijarros sueltos en el suelo: la primera piedra, la que se coge con las
+   * manos (decision del autor: una roca a mano no da nada). Inertes y finitos
+   * como la roca, pero no estorban el paso.
+   */
+  Pebbles = 23,
 }
 
 /** Los tres minerales, en el orden en que se sortean. */
@@ -56,7 +63,7 @@ export const MINERAL_NODES: readonly Feature[] = [
 
 /** True si es roca o mineral: no cuenta como vida y no se repone. */
 export function isInert(f: Feature): boolean {
-  return f === Feature.RockNode || MINERAL_NODES.includes(f);
+  return f === Feature.RockNode || f === Feature.Pebbles || MINERAL_NODES.includes(f);
 }
 
 export function biomeOfTerrain(t: Terrain): BiomeKind {
@@ -220,7 +227,7 @@ export function isTerrainSolid(t: Terrain): boolean {
 
 /** Features que bloquean el paso. Los brotes no estorban: aun son pequenos. */
 export function isFeatureSolid(f: Feature): boolean {
-  if (isSapling(f)) return false;
+  if (isSapling(f) || f === Feature.Pebbles) return false;
   return isInert(f) || lifeKindOf(f) === LifeKind.Tree;
 }
 
@@ -231,10 +238,21 @@ export enum Resource {
   TreeSeed = 3,
   PlantSeed = 4,
   Coal = 5,
+  /** Mineral, no metal: se funde en un horno (decision del autor). */
   Iron = 6,
   Copper = 7,
+  /** Lo que suelta un arbol golpeado sin hacha. */
+  Branch = 8,
+  /** Lo que suelta un arbusto ademas de sus bayas. */
+  Fiber = 9,
+  StoneAxe = 10,
+  StonePickaxe = 11,
 }
-export const RESOURCE_COUNT = 8;
+/**
+ * Cuantos objetos distintos hay. «Recurso» abarca tambien las herramientas:
+ * todo lo que ocupa una casilla del inventario.
+ */
+export const RESOURCE_COUNT = 12;
 export const RESOURCE_NAMES: readonly string[] = [
   'Madera',
   'Piedra',
@@ -242,8 +260,132 @@ export const RESOURCE_NAMES: readonly string[] = [
   'Semilla de arbol',
   'Semilla de planta',
   'Carbon',
-  'Hierro',
-  'Cobre',
+  'Mineral de hierro',
+  'Mineral de cobre',
+  'Rama',
+  'Fibra',
+  'Hacha de piedra',
+  'Pico de piedra',
+];
+
+// ---------------------------------------------------------------- herramientas
+
+/**
+ * Con que se trabaja cada cosa. Decision del autor: **trabajo por golpes**,
+ * cada objeto pide varios y una herramienta mejor pide menos, y con las manos
+ * algunos no se completan.
+ */
+export enum ToolKind {
+  Hand = 0,
+  Axe = 1,
+  Pickaxe = 2,
+}
+
+export interface ToolStats {
+  kind: ToolKind;
+  /** Trabajo que suma cada golpe a lo de su clase. */
+  power: number;
+  /** Nivel: el hierro pide un pico de nivel 2 (cobre). */
+  tier: number;
+  /** Golpes utiles hasta romperse (decision del autor: se desgastan). */
+  uses: number;
+}
+
+/** Las cifras son **propuesta mia** (plan de la tanda 1), no del autor. */
+export function toolStats(item: Resource): ToolStats | null {
+  switch (item) {
+    case Resource.StoneAxe:
+      return { kind: ToolKind.Axe, power: 1, tier: 1, uses: 40 };
+    case Resource.StonePickaxe:
+      return { kind: ToolKind.Pickaxe, power: 1, tier: 1, uses: 40 };
+    default:
+      return null;
+  }
+}
+
+/** Cuantos caben en una casilla: uno si es herramienta, veinte si no. */
+export function stackMax(item: Resource): number {
+  return toolStats(item) ? 1 : 20;
+}
+
+export interface Work {
+  /** Con que se trabaja. `Hand` quiere decir que vale cualquier cosa. */
+  tool: ToolKind;
+  /** Nivel minimo de la herramienta. */
+  tier: number;
+  /** Golpes de poder 1 que pide. */
+  work: number;
+}
+
+/**
+ * Lo que pide cada objeto para recolectarse. `null` si no se recolecta (un
+ * brote, o nada). Cifras **propuestas mias** (plan de la tanda 1).
+ */
+export function workOf(f: Feature): Work | null {
+  if (!harvestOf(f)) return null;
+  switch (lifeKindOf(f)) {
+    case LifeKind.Tree:
+      return { tool: ToolKind.Axe, tier: 1, work: isRare(f) ? 6 : 4 };
+    case LifeKind.Plant:
+      return { tool: ToolKind.Hand, tier: 0, work: 1 };
+    default:
+      break;
+  }
+  switch (f) {
+    case Feature.Pebbles:
+      return { tool: ToolKind.Hand, tier: 0, work: 1 };
+    case Feature.RockNode:
+      return { tool: ToolKind.Pickaxe, tier: 1, work: 3 };
+    case Feature.CoalNode:
+      return { tool: ToolKind.Pickaxe, tier: 1, work: 4 };
+    case Feature.CopperNode:
+      return { tool: ToolKind.Pickaxe, tier: 1, work: 5 };
+    case Feature.IronNode:
+      return { tool: ToolKind.Pickaxe, tier: 2, work: 6 };
+    default:
+      return null;
+  }
+}
+
+// ---------------------------------------------------------------- fabricar
+
+/** Donde se fabrica: lo basico, a mano en cualquier sitio (decision del autor). */
+export enum Station {
+  Hand = 0,
+}
+
+export interface Recipe {
+  output: Resource;
+  count: number;
+  inputs: readonly { item: Resource; count: number }[];
+  station: Station;
+}
+
+/**
+ * Las recetas, por indice: el indice es lo que viaja en la `Intent`. Cifras
+ * **propuestas mias** (plan de la tanda 1).
+ */
+export const RECIPES: readonly Recipe[] = [
+  {
+    output: Resource.StoneAxe,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 3 },
+      { item: Resource.Stone, count: 2 },
+      { item: Resource.Fiber, count: 2 },
+    ],
+    station: Station.Hand,
+  },
+  {
+    output: Resource.StonePickaxe,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 3 },
+      { item: Resource.Stone, count: 3 },
+      { item: Resource.Fiber, count: 2 },
+    ],
+    station: Station.Hand,
+  },
 ];
 
 export interface Harvest {
@@ -300,6 +442,8 @@ export function harvestOf(f: Feature): Harvest | null {
       return { resource: Resource.Iron, amount: 1, max: 2, seed: null, inert: true };
     case Feature.CopperNode:
       return { resource: Resource.Copper, amount: 2, max: 3, seed: null, inert: true };
+    case Feature.Pebbles:
+      return { resource: Resource.Stone, amount: 1, max: 1, seed: null, inert: true };
     default:
       return null;
   }
@@ -362,6 +506,15 @@ export interface Intent {
    * Sale de la camara, como `aimX`/`aimY`.
    */
   aimZ: number;
+  /** Casilla de la barra que se quiere en la mano, o -1 si no cambia. */
+  select: number;
+  /** Receta que se quiere fabricar (indice en `RECIPES`), o -1. */
+  craft: number;
+  /** Intercambiar dos casillas del inventario; -1 si no. */
+  swapA: number;
+  swapB: number;
+  /** Casilla que se tira, o -1. */
+  discard: number;
 }
 
 export function emptyIntent(): Intent {
@@ -376,5 +529,10 @@ export function emptyIntent(): Intent {
     aimX: 0,
     aimY: 0,
     aimZ: 0,
+    select: -1,
+    craft: -1,
+    swapA: -1,
+    swapB: -1,
+    discard: -1,
   };
 }

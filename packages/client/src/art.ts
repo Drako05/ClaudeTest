@@ -117,6 +117,7 @@ export function makeFeatureArt(
   tree?: { bare: number; width: number; pxPerBlock: number },
 ): FeatureArt | null {
   if (feature === Feature.RockNode) return makeRockArt(ROCK_FACES, detail);
+  if (feature === Feature.Pebbles) return makePebblesArt(ROCK_FACES, detail);
   const mineral = MINERAL_FACES[feature];
   if (mineral) return makeRockArt(mineral, detail);
   if (isSapling(feature)) return makeSaplingArt(feature, detail);
@@ -414,6 +415,41 @@ function makeRockArt(faces: readonly string[], detail = 1): FeatureArt | null {
   ctx.fill();
 
   return { canvas, anchorX: footX / 40, anchorY: footY / 40 };
+}
+
+/**
+ * Guijarros sueltos, vistos DESDE ARRIBA: van tumbados en el suelo
+ * (`flatGeometry` en `billboards.ts`), no en aspa. Tres piedras con los colores
+ * de la roca, de la que se desprenden; en aspa se leian como una helice.
+ */
+function makePebblesArt(faces: readonly string[], detail = 1): FeatureArt | null {
+  const [base, face, highlight] = faces;
+  const made = newCanvas(14, 14, detail);
+  if (!made) return null;
+  const [canvas, ctx] = made;
+  for (const [x, y, r] of [
+    [4.5, 5, 2.4],
+    [9.5, 6.5, 2],
+    [6.5, 10, 1.7],
+  ]) {
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.beginPath();
+    ctx.ellipse(x + 0.6, y + 0.7, r * 1.15, r, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = base;
+    ctx.beginPath();
+    ctx.ellipse(x, y, r * 1.15, r, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = face;
+    ctx.beginPath();
+    ctx.ellipse(x - r * 0.2, y - r * 0.2, r * 0.8, r * 0.65, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = highlight;
+    ctx.beginPath();
+    ctx.ellipse(x - r * 0.45, y - r * 0.45, r * 0.35, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  return { canvas, anchorX: 0.5, anchorY: 0.5 };
 }
 
 /** El personaje, con el mismo criterio de apoyo y luz que las features. */
