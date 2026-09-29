@@ -13,13 +13,15 @@ import { moveAirborne, moveEntity } from './systems/movement.js';
 import { applyVertical, takeOff } from './systems/jump.js';
 import { updateSurvival } from './systems/survival.js';
 import {
-  tryCraft,
+  craftNear,
   tryHarvestArea,
   tryUse,
   WorkState,
   type Blocked,
   type HarvestResult,
   type Hit,
+  type Opened,
+  type Used,
 } from './systems/gathering.js';
 import { Inventory } from './inventory.js';
 import { toChunkCoord, World } from './world.js';
@@ -43,8 +45,13 @@ export interface GameState {
   lastHarvest: HarvestResult[];
   /** Lo golpeado en el ultimo tick que siguio en pie. Efimero. */
   lastHits: Hit[];
-  /** Que hizo el ultimo `use`: comer, sembrar o nada. Efimero. */
-  lastUsed: 'ate' | 'planted' | null;
+  /** Que hizo el ultimo `use`: comer, sembrar, colocar, abrir o nada. Efimero. */
+  lastUsed: Used | null;
+  /**
+   * La estacion que abrio el ultimo `use`, o `null`. Efimero: el cliente abre su
+   * panel al verlo (decision del autor: sus recetas solo se ven al usarla).
+   */
+  lastOpened: Opened | null;
   /** Por que el ultimo golpe no hizo algo (inventario lleno, falta pico). Efimero. */
   lastBlocked: Blocked | null;
   /** True si en el ultimo tick se rompio la herramienta de la mano. Efimero. */
@@ -93,6 +100,7 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     lastHarvest: [],
     lastHits: [],
     lastUsed: null,
+    lastOpened: null,
     lastBlocked: null,
     lastBroke: false,
     lastCrafted: -1,
@@ -127,6 +135,7 @@ export function step(state: GameState, intent: Intent): void {
   state.lastHarvest = [];
   state.lastHits = [];
   state.lastUsed = null;
+  state.lastOpened = null;
   state.lastBlocked = null;
   state.lastBroke = false;
   state.lastCrafted = -1;
@@ -168,7 +177,7 @@ export function step(state: GameState, intent: Intent): void {
     if (intent.moveFrom >= 0 && intent.moveTo >= 0) inventory.move(intent.moveFrom, intent.moveTo);
     if (intent.discard >= 0) inventory.discard(intent.discard);
     if (intent.craft >= 0) {
-      const crafted = tryCraft(inventory, intent.craft);
+      const crafted = craftNear(world, entities, playerId, inventory, intent.craft);
       if (crafted === 'ok') state.lastCrafted = intent.craft;
       else if (crafted === 'full') state.lastBlocked = 'full';
     }
@@ -180,7 +189,9 @@ export function step(state: GameState, intent: Intent): void {
       state.lastBlocked = swing.blocked;
       state.lastBroke = swing.broke;
     }
-    if (intent.use) state.lastUsed = tryUse(world, entities, playerId, inventory);
+    if (intent.use) {
+      state.lastUsed = tryUse(world, entities, playerId, inventory, (o) => (state.lastOpened = o));
+    }
     if (!state.survivalFrozen) updateSurvival(entities, playerId, TICK_DT);
   }
 

@@ -52,6 +52,15 @@ export enum Feature {
    * como la roca, pero no estorban el paso.
    */
   Pebbles = 23,
+
+  /**
+   * Las estaciones de fabricacion (tanda 2). No las genera el mundo nunca: solo
+   * las pone el jugador, con USAR y la estacion en la mano, asi que viven en el
+   * overlay (regla 4). Estorban el paso y se desmontan a mano con 3 golpes
+   * (decisiones del autor).
+   */
+  Workbench = 24,
+  Furnace = 25,
 }
 
 /** Los tres minerales, en el orden en que se sortean. */
@@ -228,7 +237,12 @@ export function isTerrainSolid(t: Terrain): boolean {
 /** Features que bloquean el paso. Los brotes no estorban: aun son pequenos. */
 export function isFeatureSolid(f: Feature): boolean {
   if (isSapling(f) || f === Feature.Pebbles) return false;
-  return isInert(f) || lifeKindOf(f) === LifeKind.Tree;
+  return isInert(f) || isStation(f) || lifeKindOf(f) === LifeKind.Tree;
+}
+
+/** True si es una estacion de fabricacion puesta por el jugador. */
+export function isStation(f: Feature): boolean {
+  return f === Feature.Workbench || f === Feature.Furnace;
 }
 
 export enum Resource {
@@ -247,12 +261,26 @@ export enum Resource {
   Fiber = 9,
   StoneAxe = 10,
   StonePickaxe = 11,
+  // Tanda 2. Al final, para no mover los numeros de los que ya existian.
+  /** Lo que sale del horno (decision del autor: los metales se funden). */
+  CopperIngot = 12,
+  IronIngot = 13,
+  CopperAxe = 14,
+  CopperPickaxe = 15,
+  IronAxe = 16,
+  IronPickaxe = 17,
+  /** Las estaciones, en la mano: USAR las coloca donde toca la mirada. */
+  Workbench = 18,
+  Furnace = 19,
+  /** La ropa: se equipa en PERSONAJE y abre casillas (decision del autor). */
+  FiberBag = 20,
+  FrameBackpack = 21,
 }
 /**
  * Cuantos objetos distintos hay. «Recurso» abarca tambien las herramientas:
  * todo lo que ocupa una casilla del inventario.
  */
-export const RESOURCE_COUNT = 12;
+export const RESOURCE_COUNT = 22;
 export const RESOURCE_NAMES: readonly string[] = [
   'Madera',
   'Piedra',
@@ -266,6 +294,16 @@ export const RESOURCE_NAMES: readonly string[] = [
   'Fibra',
   'Hacha de piedra',
   'Pico de piedra',
+  'Lingote de cobre',
+  'Lingote de hierro',
+  'Hacha de cobre',
+  'Pico de cobre',
+  'Hacha de hierro',
+  'Pico de hierro',
+  'Mesa de trabajo',
+  'Horno',
+  'Bolsa de fibra',
+  'Mochila de armazon',
 ];
 
 // ---------------------------------------------------------------- herramientas
@@ -291,21 +329,58 @@ export interface ToolStats {
   uses: number;
 }
 
-/** Las cifras son **propuesta mia** (plan de la tanda 1), no del autor. */
+/**
+ * Las de piedra son **propuesta mia** (plan de la tanda 1); las de metal, del
+ * plan de la tanda 2 que aprobo el autor: cobre poder 2 y 120 usos, hierro
+ * poder 3 y 250. El nivel sube uno por metal, asi el pico de cobre mina hierro.
+ */
 export function toolStats(item: Resource): ToolStats | null {
   switch (item) {
     case Resource.StoneAxe:
       return { kind: ToolKind.Axe, power: 1, tier: 1, uses: 40 };
     case Resource.StonePickaxe:
       return { kind: ToolKind.Pickaxe, power: 1, tier: 1, uses: 40 };
+    case Resource.CopperAxe:
+      return { kind: ToolKind.Axe, power: 2, tier: 2, uses: 120 };
+    case Resource.CopperPickaxe:
+      return { kind: ToolKind.Pickaxe, power: 2, tier: 2, uses: 120 };
+    case Resource.IronAxe:
+      return { kind: ToolKind.Axe, power: 3, tier: 3, uses: 250 };
+    case Resource.IronPickaxe:
+      return { kind: ToolKind.Pickaxe, power: 3, tier: 3, uses: 250 };
     default:
       return null;
   }
 }
 
-/** Cuantos caben en una casilla: uno si es herramienta, cien si no (el autor). */
+/**
+ * Cuantos caben en una casilla: uno si es herramienta o prenda, cien si no (el
+ * autor). Las estaciones se apilan como un material (propuesta mia).
+ */
 export function stackMax(item: Resource): number {
-  return toolStats(item) ? 1 : 100;
+  return toolStats(item) || garmentOf(item) !== null ? 1 : 100;
+}
+
+// ---------------------------------------------------------------- ropa
+
+/**
+ * Donde se lleva una prenda: dos de los diez huecos de PERSONAJE (decision del
+ * autor: la mochila en el centro de la columna derecha y el cinturon abajo a la
+ * derecha).
+ */
+export enum Wear {
+  Waist = 0,
+  Back = 1,
+}
+
+/** Casillas que abre cada hueco con su prenda puesta (plan de la tanda 2). */
+export const WEAR_SLOTS: readonly number[] = [2, 6];
+
+/** El hueco de una prenda, o `null` si no se viste. */
+export function garmentOf(item: Resource): Wear | null {
+  if (item === Resource.FiberBag) return Wear.Waist;
+  if (item === Resource.FrameBackpack) return Wear.Back;
+  return null;
 }
 
 export interface Work {
@@ -342,6 +417,10 @@ export function workOf(f: Feature): Work | null {
       return { tool: ToolKind.Pickaxe, tier: 1, work: 5 };
     case Feature.IronNode:
       return { tool: ToolKind.Pickaxe, tier: 2, work: 6 };
+    // Una estacion se desmonta a mano con 3 golpes (plan aprobado).
+    case Feature.Workbench:
+    case Feature.Furnace:
+      return { tool: ToolKind.Hand, tier: 0, work: 3 };
     default:
       return null;
   }
@@ -349,13 +428,45 @@ export function workOf(f: Feature): Work | null {
 
 // ---------------------------------------------------------------- fabricar
 
-/** Donde se fabrica: lo basico, a mano en cualquier sitio (decision del autor). */
+/**
+ * Donde se fabrica: lo basico, a mano en cualquier sitio; lo mejor, en una mesa
+ * o un horno (decision del autor). Las recetas de una estacion solo se ven al
+ * usarla, y solo se fabrican a menos de `STATION_RANGE` de ella.
+ */
 export enum Station {
   Hand = 0,
+  Workbench = 1,
+  Furnace = 2,
+}
+
+/** Distancia a la que una estacion sirve, en casillas (plan aprobado: 3). */
+export const STATION_RANGE = 3;
+
+export const STATION_NAMES: readonly string[] = ['A mano', 'Mesa de trabajo', 'Horno'];
+
+/** La feature que es cada estacion puesta en el mundo. */
+export function featureOfStation(s: Station): Feature {
+  if (s === Station.Workbench) return Feature.Workbench;
+  if (s === Station.Furnace) return Feature.Furnace;
+  return Feature.None;
+}
+
+/** La estacion que es una feature, o `null`. */
+export function stationOfFeature(f: Feature): Station | null {
+  if (f === Feature.Workbench) return Station.Workbench;
+  if (f === Feature.Furnace) return Station.Furnace;
+  return null;
+}
+
+/** La feature que se coloca al USAR un objeto de la mano, o `None`. */
+export function placedFeatureOf(item: Resource): Feature {
+  if (item === Resource.Workbench) return Feature.Workbench;
+  if (item === Resource.Furnace) return Feature.Furnace;
+  return Feature.None;
 }
 
 export interface Recipe {
-  /** Categoria del recetario (decision del autor: hoy, «Herramientas»). */
+  /** Categoria del recetario; cada estacion ensena solo las suyas. */
   category: string;
   output: Resource;
   count: number;
@@ -389,6 +500,103 @@ export const RECIPES: readonly Recipe[] = [
       { item: Resource.Fiber, count: 2 },
     ],
     station: Station.Hand,
+  },
+
+  // Tanda 2: cifras del plan que aprobo el autor. Las categorias son mias.
+  {
+    category: 'Estaciones',
+    output: Resource.Workbench,
+    count: 1,
+    inputs: [{ item: Resource.Wood, count: 8 }],
+    station: Station.Hand,
+  },
+  {
+    category: 'Estaciones',
+    output: Resource.Furnace,
+    count: 1,
+    inputs: [
+      { item: Resource.Stone, count: 10 },
+      { item: Resource.Coal, count: 2 },
+    ],
+    station: Station.Hand,
+  },
+  {
+    category: 'Fundicion',
+    output: Resource.CopperIngot,
+    count: 1,
+    inputs: [
+      { item: Resource.Copper, count: 2 },
+      { item: Resource.Coal, count: 1 },
+    ],
+    station: Station.Furnace,
+  },
+  {
+    category: 'Fundicion',
+    output: Resource.IronIngot,
+    count: 1,
+    inputs: [
+      { item: Resource.Iron, count: 2 },
+      { item: Resource.Coal, count: 2 },
+    ],
+    station: Station.Furnace,
+  },
+  {
+    category: 'Herramientas',
+    output: Resource.CopperAxe,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 2 },
+      { item: Resource.CopperIngot, count: 3 },
+    ],
+    station: Station.Workbench,
+  },
+  {
+    category: 'Herramientas',
+    output: Resource.CopperPickaxe,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 2 },
+      { item: Resource.CopperIngot, count: 3 },
+    ],
+    station: Station.Workbench,
+  },
+  {
+    category: 'Herramientas',
+    output: Resource.IronAxe,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 2 },
+      { item: Resource.IronIngot, count: 3 },
+    ],
+    station: Station.Workbench,
+  },
+  {
+    category: 'Herramientas',
+    output: Resource.IronPickaxe,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 2 },
+      { item: Resource.IronIngot, count: 3 },
+    ],
+    station: Station.Workbench,
+  },
+  {
+    category: 'Ropa',
+    output: Resource.FiberBag,
+    count: 1,
+    inputs: [{ item: Resource.Fiber, count: 8 }],
+    station: Station.Workbench,
+  },
+  {
+    category: 'Ropa',
+    output: Resource.FrameBackpack,
+    count: 1,
+    inputs: [
+      { item: Resource.Fiber, count: 10 },
+      { item: Resource.Wood, count: 4 },
+      { item: Resource.CopperIngot, count: 2 },
+    ],
+    station: Station.Workbench,
   },
 ];
 
@@ -448,6 +656,11 @@ export function harvestOf(f: Feature): Harvest | null {
       return { resource: Resource.Copper, amount: 2, max: 3, seed: null, inert: true };
     case Feature.Pebbles:
       return { resource: Resource.Stone, amount: 1, max: 1, seed: null, inert: true };
+    // Desmontar una estacion devuelve la estacion, entera.
+    case Feature.Workbench:
+      return { resource: Resource.Workbench, amount: 1, max: 1, seed: null, inert: true };
+    case Feature.Furnace:
+      return { resource: Resource.Furnace, amount: 1, max: 1, seed: null, inert: true };
     default:
       return null;
   }
@@ -474,9 +687,10 @@ export interface Intent {
   moveY: number;
   harvest: boolean;
   /**
-   * Usar o interactuar (clic derecho, boton USAR): con lo que se lleva en la
-   * mano —una baya se come, una semilla se siembra— o, en el futuro, con lo
-   * que se mira. Decision del autor: sustituye a comer y sembrar por tecla.
+   * Usar o interactuar (clic derecho, boton USAR). Mirando una estacion, la
+   * abre; si no, con lo que se lleva en la mano: una baya se come, una semilla
+   * se siembra y una estacion se coloca. Decisiones del autor: sustituye a
+   * comer y sembrar por tecla.
    */
   use: boolean;
   /**
@@ -518,7 +732,9 @@ export interface Intent {
   craft: number;
   /**
    * Mover lo de una casilla a otra (arrastrar): el mismo objeto se apila y uno
-   * distinto se intercambia. -1 si no.
+   * distinto se intercambia. Los huecos de ropa tienen indice propio
+   * (`EQUIP_WAIST`, `EQUIP_BACK` en `sim/inventory.ts`): hacia ellos se equipa,
+   * desde ellos se quita. -1 si no.
    */
   moveFrom: number;
   moveTo: number;

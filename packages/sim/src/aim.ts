@@ -220,6 +220,42 @@ export function strike(
 }
 
 /**
+ * Lo que mira el centro de la mirada: la casilla del primer hitbox que cruza el
+ * rayo central, cortado por el terreno y a menos del alcance, o `null`. Es con
+ * lo que USAR abre una estacion (decision del autor: mirarla basta, lleves lo
+ * que lleves en la mano). Lo que quede detras del primer hitbox no se mira.
+ */
+export function gazeTarget(
+  origin: Vec3,
+  fx: number,
+  fy: number,
+  lookZ: number,
+  ground: Ground,
+  boxAt: (tx: number, ty: number) => Hitbox | null,
+): Offset | null {
+  const dir = lookVector(fx, fy, lookZ);
+  const hit = groundHit(origin, dir, STRIKE_RANGE, ground);
+  const length = hit ? hit.t : STRIKE_RANGE;
+  const reach = Math.ceil(STRIKE_RANGE) + 1;
+  const cx = Math.floor(origin.x);
+  const cy = Math.floor(origin.y);
+  let best: Offset | null = null;
+  let bestT = Infinity;
+  for (let ty = cy - reach; ty <= cy + reach; ty++) {
+    for (let tx = cx - reach; tx <= cx + reach; tx++) {
+      const box = boxAt(tx, ty);
+      if (!box) continue;
+      const t = rayBox(origin, dir, box, length);
+      if (t !== null && t < bestT) {
+        bestT = t;
+        best = { x: tx, y: ty };
+      }
+    }
+  }
+  return best;
+}
+
+/**
  * Donde se siembra: la casilla en la que el centro de la mirada toca la cara de
  * arriba del suelo, a menos del alcance. `null` si no llega, si mira al cielo o
  * si da en la cara de una pared. Decision del autor.

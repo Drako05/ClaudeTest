@@ -1,61 +1,132 @@
 /**
  * El inventario por casillas (decision del autor: casillas con pilas, y la ropa
- * anadira casillas).
+ * anade casillas).
  *
- * Cada casilla guarda UN tipo de objeto hasta su tope (`stackMax`): veinte de
- * un recurso, una herramienta con su desgaste. Las cuatro primeras son la
- * barra, y la elegida es lo que se tiene en la mano.
+ * Cada casilla guarda UN tipo de objeto hasta su tope (`stackMax`): cien de un
+ * recurso, una herramienta con su desgaste. Las cuatro primeras son la barra, y
+ * la elegida es lo que se tiene en la mano.
  *
  * Todo lo que entra lo hace de golpe o no entra: `fits` responde antes de
  * tocar nada, para que un botin que no cabe deje el objeto en el mundo en vez
  * de repartirse a medias (propuesta mia del plan: no se pierde nada).
+ *
+ * **La ropa abre tramos fijos** (tanda 2): detras de las casillas base van las
+ * de la cintura y detras las de la espalda, y un tramo sin su prenda no existe
+ * para nada —ni para meter, ni para sacar, ni para arrastrar—. Que el tramo sea
+ * fijo y no «las ultimas N» es lo que hace bien definida la regla del autor:
+ * **una prenda no se quita con sus casillas ocupadas** (propuesta mia).
  */
 
-import { RESOURCE_COUNT, stackMax, toolStats, type Resource } from '@verdant/shared';
+import {
+  garmentOf,
+  RESOURCE_COUNT,
+  stackMax,
+  toolStats,
+  Wear,
+  WEAR_SLOTS,
+  type Resource,
+} from '@verdant/shared';
 
 /** Casillas con que se empieza: 16, decision del autor. */
 export const START_SLOTS = 16;
 /** Las primeras casillas forman la barra de la mano. */
 export const HOTBAR_SLOTS = 4;
+/**
+ * Indices de los huecos de ropa para arrastrar (`Intent.moveFrom`/`moveTo`,
+ * `discard`): lejos de cualquier casilla, para que no se confundan.
+ */
+export const EQUIP_BASE = 1000;
+export const EQUIP_WAIST = EQUIP_BASE + Wear.Waist;
+export const EQUIP_BACK = EQUIP_BASE + Wear.Back;
 
 const EMPTY = -1;
+const EXTRA_SLOTS = WEAR_SLOTS.reduce((a, b) => a + b, 0);
 
 export interface Bundle {
   item: Resource;
   count: number;
 }
 
+/** El hueco de ropa que es un indice de arrastre, o `null` si es una casilla. */
+export function wearOfSlot(slot: number): Wear | null {
+  const w = slot - EQUIP_BASE;
+  return w >= 0 && w < WEAR_SLOTS.length ? (w as Wear) : null;
+}
+
 export class Inventory {
-  /** Objeto de cada casilla, o -1 si esta vacia. */
+  /** Objeto de cada casilla, o -1 si esta vacia. Incluye los tramos de la ropa. */
   readonly items: Int16Array;
   readonly counts: Int32Array;
   /** Usos que le quedan a la herramienta de cada casilla. */
   readonly wear: Int32Array;
+  /** La prenda de cada hueco (`Wear`), o `null`. */
+  readonly worn: (Resource | null)[] = WEAR_SLOTS.map(() => null);
   /** Casilla de la barra que se tiene en la mano. */
   selected = 0;
 
-  constructor(readonly size: number = START_SLOTS) {
+  /** `base`: las casillas sin ropa. Los tramos de la ropa van detras. */
+  constructor(readonly base: number = START_SLOTS) {
+    const size = base + EXTRA_SLOTS;
     this.items = new Int16Array(size).fill(EMPTY);
     this.counts = new Int32Array(size);
     this.wear = new Int32Array(size);
   }
 
-  itemAt(slot: number): Resource | null {
-    const item = this.items[slot];
-    return item === EMPTY ? null : (item as Resource);
+  /** Cuantos indices de casilla hay, abiertos o no: el tope para recorrerlas. */
+  get size(): number {
+    return this.items.length;
   }
 
-  /** Cuantos hay de un objeto, sumando todas las casillas. */
+  /** El tramo de casillas de un hueco de ropa: `[desde, hasta)`. */
+  rangeOf(w: Wear): [number, number] {
+    let start = this.base;
+    for (let i = 0; i < w; i++) start += WEAR_SLOTS[i];
+    return [start, start + WEAR_SLOTS[w]];
+  }
+
+  /** Si una casilla existe ahora mismo: las base siempre; las de ropa, con ella. */
+  isOpen(slot: number): boolean {
+    if (slot < 0 || slot >= this.size) return false;
+    if (slot < this.base) return true;
+    for (let w = 0; w < WEAR_SLOTS.length; w++) {
+      const [a, b] = this.rangeOf(w);
+      if (slot >= a && slot < b) return this.worn[w] !== null;
+    }
+    return false;
+  }
+
+  /** Cuantas casillas hay abiertas: 16, 18, 22 o 24. */
+  openSlots(): number {
+    let n = 0;
+    for (let i = 0; i < this.size; i++) if (this.isOpen(i)) n++;
+    return n;
+  }
+
+  itemAt(slot: number): Resource | null {
+    const w = wearOfSlot(slot);
+    if (w !== null) return this.worn[w];
+    const item = this.items[slot];
+    return item === EMPTY || item === undefined ? null : (item as Resource);
+  }
+
+  /**
+   * Cuantos hay de un objeto, sumando las casillas. Lo que se lleva puesto NO
+   * cuenta: no se gasta en una receta.
+   */
   count(item: Resource): number {
     let n = 0;
     for (let i = 0; i < this.size; i++) if (this.items[i] === item) n += this.counts[i];
     return n;
   }
 
-  /** Totales por objeto, indexados por `Resource`: lo que pinta el HUD. */
+  /**
+   * Totales por objeto, indexados por `Resource`, **con lo puesto**: asi
+   * equiparse una prenda no cuenta como perderla en el registro de objetos.
+   */
   totals(): number[] {
     const out = new Array<number>(RESOURCE_COUNT).fill(0);
     for (let i = 0; i < this.size; i++) if (this.items[i] !== EMPTY) out[this.items[i]] += this.counts[i];
+    for (const g of this.worn) if (g !== null) out[g]++;
     return out;
   }
 
@@ -107,6 +178,14 @@ export class Inventory {
     return true;
   }
 
+  /** Gasta uno de lo que se lleva en la mano (una estacion al colocarla). */
+  spendInHand(): void {
+    const slot = this.selected;
+    if (this.items[slot] === EMPTY) return;
+    this.counts[slot]--;
+    if (this.counts[slot] <= 0) this.clear(slot);
+  }
+
   select(slot: number): void {
     if (slot >= 0 && slot < HOTBAR_SLOTS) this.selected = slot;
   }
@@ -114,10 +193,14 @@ export class Inventory {
   /**
    * Arrastrar una casilla a otra (decision del autor): el mismo objeto se apila
    * hasta el tope y lo que sobra se queda en el origen; uno distinto, o una
-   * herramienta, se intercambia.
+   * herramienta, se intercambia. Hacia o desde un hueco de ropa, equipa o quita.
    */
   move(from: number, to: number): void {
-    if (from < 0 || to < 0 || from >= this.size || to >= this.size || from === to) return;
+    if (wearOfSlot(from) !== null || wearOfSlot(to) !== null) {
+      this.moveWorn(from, to);
+      return;
+    }
+    if (!this.isOpen(from) || !this.isOpen(to) || from === to) return;
     const item = this.items[from];
     if (item === EMPTY) return;
     if (this.items[to] === item && !toolStats(item as Resource)) {
@@ -132,7 +215,7 @@ export class Inventory {
   }
 
   swap(a: number, b: number): void {
-    if (a < 0 || b < 0 || a >= this.size || b >= this.size || a === b) return;
+    if (!this.isOpen(a) || !this.isOpen(b) || a === b) return;
     const item = this.items[a];
     const count = this.counts[a];
     const wear = this.wear[a];
@@ -144,9 +227,53 @@ export class Inventory {
     this.wear[b] = wear;
   }
 
-  /** Tira lo de una casilla. Aun no hay objetos sueltos: desaparece. */
+  /** True si el tramo de un hueco de ropa no tiene nada: la prenda se puede quitar. */
+  rangeEmpty(w: Wear): boolean {
+    const [a, b] = this.rangeOf(w);
+    for (let i = a; i < b; i++) if (this.items[i] !== EMPTY) return false;
+    return true;
+  }
+
+  /**
+   * Tira lo de una casilla. Aun no hay objetos sueltos: desaparece. Una prenda
+   * puesta se tira solo si se podria quitar.
+   */
   discard(slot: number): void {
-    if (slot >= 0 && slot < this.size) this.clear(slot);
+    const w = wearOfSlot(slot);
+    if (w !== null) {
+      if (this.worn[w] !== null && this.rangeEmpty(w)) this.worn[w] = null;
+      return;
+    }
+    if (this.isOpen(slot)) this.clear(slot);
+  }
+
+  /**
+   * Equipar (casilla → hueco) o quitar (hueco → casilla). Solo entra en un hueco
+   * su prenda y solo si esta libre; y una prenda solo se quita a una casilla
+   * vacia de fuera de su tramo, y con el tramo vacio (el autor).
+   */
+  private moveWorn(from: number, to: number): void {
+    const wFrom = wearOfSlot(from);
+    const wTo = wearOfSlot(to);
+    if (wFrom === null && wTo !== null) {
+      const item = this.itemAt(from);
+      if (!this.isOpen(from) || item === null || garmentOf(item) !== wTo) return;
+      if (this.worn[wTo] !== null) return;
+      this.worn[wTo] = item;
+      this.clear(from);
+      return;
+    }
+    if (wFrom !== null && wTo === null) {
+      const item = this.worn[wFrom];
+      if (item === null || !this.isOpen(to) || this.items[to] !== EMPTY) return;
+      if (!this.rangeEmpty(wFrom)) return;
+      const [a, b] = this.rangeOf(wFrom);
+      if (to >= a && to < b) return;
+      this.worn[wFrom] = null;
+      this.items[to] = item;
+      this.counts[to] = 1;
+      this.wear[to] = 0;
+    }
   }
 
   private clear(slot: number): void {
@@ -156,10 +283,11 @@ export class Inventory {
   }
 
   private clone(): Inventory {
-    const c = new Inventory(this.size);
+    const c = new Inventory(this.base);
     c.items.set(this.items);
     c.counts.set(this.counts);
     c.wear.set(this.wear);
+    for (let w = 0; w < this.worn.length; w++) c.worn[w] = this.worn[w];
     c.selected = this.selected;
     return c;
   }
@@ -169,13 +297,13 @@ export class Inventory {
     const max = stackMax(item);
     let left = count;
     for (let i = 0; i < this.size && left > 0; i++) {
-      if (this.items[i] !== item || this.counts[i] >= max) continue;
+      if (this.items[i] !== item || this.counts[i] >= max || !this.isOpen(i)) continue;
       const n = Math.min(left, max - this.counts[i]);
       this.counts[i] += n;
       left -= n;
     }
     for (let i = 0; i < this.size && left > 0; i++) {
-      if (this.items[i] !== EMPTY) continue;
+      if (this.items[i] !== EMPTY || !this.isOpen(i)) continue;
       const n = Math.min(left, max);
       this.items[i] = item;
       this.counts[i] = n;

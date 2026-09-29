@@ -21,23 +21,37 @@ import {
   LifeKind,
   lifeKindOf,
   MAX_SEEDS_PER_HARVEST,
+  placedFeatureOf,
   RECIPES,
   Resource,
   saplingOf,
   seedFor,
   speciesFor,
   Station,
+  stationOfFeature,
   TICK_HZ,
   ToolKind,
   toolStats,
   workOf,
 } from '@verdant/shared';
-import { EYE_HEIGHT, plantTile, strike, type Hitbox, type Offset, type Strike, type Vec3 } from '../aim.js';
+import {
+  EYE_HEIGHT,
+  gazeTarget,
+  plantTile,
+  strike,
+  type Hitbox,
+  type Offset,
+  type Strike,
+  type Vec3,
+} from '../aim.js';
 import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
+import { NO_RAMP } from '../relief.js';
 import { hash2DFloat } from '../rng.js';
+import { stationNear } from '../stations.js';
 import { toChunkCoord, type World } from '../world.js';
+import { BODY_RADIUS } from './movement.js';
 
 export const BERRIES_PER_MEAL = 1;
 export const HUNGER_PER_BERRY = 14;
@@ -132,6 +146,14 @@ const SAPLING_BOX = { half: 0.15, height: 0.85 };
  * su dibujo tumbado. **Propuesta mia.**
  */
 const PEBBLES_BOX = { half: 0.3, height: 0.2 };
+/**
+ * Las estaciones ocupan su casilla entera: la mesa, un bloque; el horno, un
+ * cuarto mas alto. **Propuesta mia**, y es tambien lo que se dibuja.
+ */
+export const STATION_BOXES: Readonly<Record<Station.Workbench | Station.Furnace, { half: number; height: number }>> = {
+  [Station.Workbench]: { half: 0.5, height: 1 },
+  [Station.Furnace]: { half: 0.5, height: 1.25 },
+};
 
 /**
  * El hitbox del objeto de una casilla, o `null` si no hay nada que golpear.
@@ -147,7 +169,10 @@ export function hitboxAt(world: World, tx: number, ty: number): Hitbox | null {
   let half: number;
   let height: number;
   const trunk = treeTrunkAt(world.seed, tx, ty, feature);
-  if (trunk) {
+  const station = stationOfFeature(feature);
+  if (station === Station.Workbench || station === Station.Furnace) {
+    ({ half, height } = STATION_BOXES[station]);
+  } else if (trunk) {
     half = trunk.width / 2;
     height = trunk.bare;
   } else if (isSapling(feature)) {
@@ -406,13 +431,21 @@ export function harvestTile(
 }
 
 /**
- * Fabrica una receta si hay materiales y el resultado cabe. Lo basico se
- * fabrica a mano en cualquier sitio (decision del autor); es instantaneo
- * (propuesta mia). Devuelve true si fabrico.
+ * Fabrica una receta si hay materiales, si el resultado cabe y si se esta
+ * donde se fabrica. Lo basico, a mano en cualquier sitio; lo mejor, junto a su
+ * mesa u horno (decisiones del autor). Es instantaneo (propuesta mia; fundir
+ * tambien, del plan aprobado).
+ *
+ * `near` dice si hay una estacion de ese tipo a mano; sin ella, solo valen las
+ * recetas de mano. `step` le pasa `stationNear` con la posicion del jugador.
  */
-export function tryCraft(inventory: Inventory, recipe: number): 'ok' | 'missing' | 'full' {
+export function tryCraft(
+  inventory: Inventory,
+  recipe: number,
+  near: (s: Station) => boolean = (s) => s === Station.Hand,
+): 'ok' | 'missing' | 'full' {
   const r = RECIPES[recipe];
-  if (!r || r.station !== Station.Hand) return 'missing';
+  if (!r || !near(r.station)) return 'missing';
   for (const input of r.inputs) if (inventory.count(input.item) < input.count) return 'missing';
   if (!inventory.fits([{ item: r.output, count: r.count }], r.inputs)) return 'full';
   for (const input of r.inputs) inventory.remove(input.item, input.count);
@@ -420,23 +453,105 @@ export function tryCraft(inventory: Inventory, recipe: number): 'ok' | 'missing'
   return 'ok';
 }
 
+/** Que hizo un `use`. */
+export type Used = 'ate' | 'planted' | 'placed' | 'opened';
+
+/** La estacion que se abrio al usarla, y donde esta. */
+export interface Opened {
+  station: Station;
+  x: number;
+  y: number;
+}
+
 /**
- * Usar lo que se lleva en la mano (clic derecho, boton USAR), decision del
- * autor: una baya se come, una semilla se siembra —esa semilla, donde la
- * mirada toca el suelo—. Lo que se mira (puertas y demas) llegara despues.
+ * Lo que mira el centro de la mirada, si es una estacion: su casilla, o `null`.
+ */
+export function stationInSight(world: World, store: EntityStore, id: number): Opened | null {
+  const at = gazeTarget(
+    eyeOf(store, id),
+    store.facingX[id],
+    store.facingY[id],
+    store.lookZ[id],
+    (x, y) => world.groundHeightAt(x, y),
+    (tx, ty) => hitboxAt(world, tx, ty),
+  );
+  if (!at) return null;
+  const station = stationOfFeature(world.featureAt(at.x, at.y));
+  return station === null ? null : { station, x: at.x, y: at.y };
+}
+
+/**
+ * Usar (clic derecho, boton USAR), decisiones del autor:
+ * - **mirando una estacion, la abre**, lleve lo que lleve en la mano;
+ * - si no, con lo de la mano: una baya se come, una semilla se siembra —esa
+ *   semilla, donde la mirada toca el suelo— y una estacion se coloca ahi.
+ *
+ * `opened` recibe la estacion abierta, para que el cliente abra su panel: la
+ * apertura sale de la Intent como todo lo demas (regla 5).
  */
 export function tryUse(
   world: World,
   store: EntityStore,
   id: number,
   inventory: Inventory,
-): 'ate' | 'planted' | null {
+  opened?: (o: Opened) => void,
+): Used | null {
+  const sight = stationInSight(world, store, id);
+  if (sight) {
+    opened?.(sight);
+    return 'opened';
+  }
   const item = inventory.inHand();
   if (item === Resource.Berries) return tryEat(store, id, inventory) ? 'ate' : null;
   if (item === Resource.TreeSeed || item === Resource.PlantSeed) {
     return tryPlant(world, store, id, inventory, item) ? 'planted' : null;
   }
+  if (item !== null && placedFeatureOf(item) !== Feature.None) {
+    return tryPlace(world, store, id, inventory) ? 'placed' : null;
+  }
   return null;
+}
+
+/**
+ * Coloca la estacion de la mano donde la mirada toca el suelo, a menos del
+ * alcance, como una semilla (decision del autor). Hace falta una casilla
+ * vacia, sin agua, **sin talud** —una caja sobre una rampa quedaria colgando
+ * por un lado— y que no pise el cuerpo del jugador, que se quedaria dentro de
+ * algo que estorba (las dos, propuesta mia).
+ */
+export function tryPlace(world: World, store: EntityStore, id: number, inventory: Inventory): boolean {
+  const item = inventory.inHand();
+  if (item === null) return false;
+  const feature = placedFeatureOf(item);
+  if (feature === Feature.None) return false;
+  const at = targetTile(world, store, id);
+  if (!at) return false;
+  const { x, y } = at;
+  if (world.featureAt(x, y) !== Feature.None) return false;
+  if (isTerrainSolid(world.terrainAt(x, y))) return false;
+  if (world.rampDirAt(x, y) !== NO_RAMP) return false;
+  const px = store.x[id];
+  const py = store.y[id];
+  const touches =
+    x >= Math.floor(px - BODY_RADIUS) &&
+    x <= Math.floor(px + BODY_RADIUS) &&
+    y >= Math.floor(py - BODY_RADIUS) &&
+    y <= Math.floor(py + BODY_RADIUS);
+  if (touches) return false;
+  inventory.spendInHand();
+  world.setFeature(x, y, feature);
+  return true;
+}
+
+/** `tryCraft` con las estaciones que hay alrededor de la entidad. */
+export function craftNear(
+  world: World,
+  store: EntityStore,
+  id: number,
+  inventory: Inventory,
+  recipe: number,
+): 'ok' | 'missing' | 'full' {
+  return tryCraft(inventory, recipe, (s) => stationNear(world, store.x[id], store.y[id], s));
 }
 
 /**
