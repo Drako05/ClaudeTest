@@ -91,10 +91,14 @@ troncos.
 **Recolectar y fabricar.** Se nace sin nada. A mano se cogen guijarros
 (piedra), fibra y bayas de los arbustos, y ramas de los arboles, que no caen
 sin hacha. Con eso se fabrican el hacha y el pico de piedra, que talan arboles
-y sacan piedra, carbon y cobre golpe a golpe; el hierro pide un pico mejor. Las
-herramientas se gastan y se rompen, y el inventario son dieciseis casillas con
-pilas de cien. Al golpear algo que no se rompe saltan esquirlas pequenas, y lo
-que entra o sale del inventario se anota en letra pequena («+5 Madera»).
+y sacan piedra, carbon y cobre golpe a golpe; el hierro pide un pico mejor.
+Luego, a mano, la **mesa de trabajo** y el **horno**, que se ponen en el suelo
+con clic derecho (USAR) y se usan mirandolos: el horno funde el cobre y el
+hierro en lingotes, y la mesa hace con ellos las herramientas de metal, la
+bolsa y la mochila, que se arrastran a su hueco del personaje y dan casillas.
+Las herramientas se gastan y se rompen, y el inventario son dieciseis casillas
+con pilas de cien. Al golpear algo que no se rompe saltan esquirlas pequenas, y
+lo que entra o sale del inventario se anota en letra pequena («+5 Madera»).
 
 **En los dos:** la salud (corazon) y el hambre (muslo) van siempre abajo. En
 PC, de borde a borde, con el **HUD** (hora, dia, semilla, posicion, FPS) arriba
@@ -205,8 +209,9 @@ Encima de eso, lo que vino despues:
   con la forma de una especie real y un tronco de al menos 2 para ver por
   debajo de la copa—, dia y noche, y los efectos reutilizando la fisica que ya
   existia. La camara choca con el terreno y los troncos.
-- **Recolectar y fabricar**: de las manos a las herramientas de piedra, con
-  inventario por casillas (tanda 1; la 2 —mesa, horno, metales y ropa— espera).
+- **Recolectar y fabricar**: de las manos a las herramientas de piedra (tanda
+  1), y de ahi a la mesa, el horno, los metales y la ropa (tanda 2), con
+  inventario por casillas.
 
 **Antes del multijugador quedan cabos de la camara nueva:** los sprites de
 varias direcciones para el personaje y agrupar las aspas para bajar las draw

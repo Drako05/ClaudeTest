@@ -61,6 +61,18 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Un toque de verdad **apaga** el modo raton (portatil tactil), y ya no hay pausa por el cursor | El raton lleva la mirada | una linea |
 | Textos del aviso: «Haz clic para jugar» al arrancar y «Haz clic para continuar» despues | El raton lleva la mirada | HTML |
 | Casillas iniciales y tope: **16 y 100**, ya decididos por el autor (antes, 8 y 20 mios) | Recoleccion y fabricacion | — |
+| Mesa de **1 × 1 × 1** bloques y horno de **1,25** de alto: la caja que se ve es la que estorba y se golpea | Recoleccion y fabricacion, tanda 2 | numeros en `gathering.ts` (`STATION_BOXES`) |
+| Una estacion **no se coloca en un talud** (quedaria colgando) **ni donde pise el cuerpo** del jugador | Recoleccion y fabricacion, tanda 2 | dos lineas en `tryPlace` |
+| Los 3 de la estacion se miden **del centro del jugador al centro de su casilla** | Recoleccion y fabricacion, tanda 2 | una linea en `stations.ts` |
+| USAR abre lo que toca **el rayo central** de la mirada, a 2,5 como el golpe; lo que haya detras de otra cosa no se abre | Recoleccion y fabricacion, tanda 2 | `gazeTarget` en `aim.ts` |
+| La ropa abre **tramos fijos**: la cintura las casillas 17-18, la espalda las 19-24, aunque solo se lleve una | Recoleccion y fabricacion, tanda 2 | `inventory.ts` |
+| Una prenda se quita **solo a una casilla vacia** de fuera de su tramo; tirarla puesta, solo con el tramo vacio | Recoleccion y fabricacion, tanda 2 | `inventory.ts` |
+| Categorias: a mano **Herramientas y Estaciones**; mesa **Herramientas y Ropa**; horno **Fundicion** | Recoleccion y fabricacion, tanda 2 | texto en `RECIPES` |
+| Las estaciones se apilan **hasta 100** como un material; herramientas y prendas, de una en una | Recoleccion y fabricacion, tanda 2 | `stackMax` |
+| Nivel de las herramientas: **piedra 1, cobre 2, hierro 3** (el hierro pide 2) | Recoleccion y fabricacion, tanda 2 | `toolStats` |
+| El **dibujo** de la mesa (tablas, cuadricula arriba, patas, sierra y martillo) y del horno (ladrillo, boca con brasa, tiro arriba); el frente mira a un lado **al azar de la casilla**, no hacia quien la puso | Recoleccion y fabricacion, tanda 2 | `stations-view.ts` |
+| Nombres cortos y descripciones de los objetos nuevos; los huecos de ropa vacios dicen «Espalda» y «Cintura» | Recoleccion y fabricacion, tanda 2 | texto en `inventory-ui.ts` |
+| «Materiales de metal» en el panel de desarrollo: lo justo para toda la tanda 2 | Recoleccion y fabricacion, tanda 2 | quitarlo |
 | Lo que no cabe: el golpe **no completa** y el objeto se queda, sin aviso; tirar (soltar fuera del panel y confirmar) lo **hace desaparecer**, hasta que haya objetos en el suelo | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
 | Las **descripciones** de los objetos (una frase cada uno) | Inventario de los bocetos | texto en `inventory-ui.ts` |
 | La **barrita de desgaste** en las herramientas (no estaba en el boceto) | Inventario de los bocetos | CSS |
@@ -69,9 +81,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Tamanos de la pantalla del movil (ataque 96, usar 64, correr y saltar 62; la barra de arriba encoge hasta dejar 10 px a cada redondo) | Inventario de los bocetos | CSS |
 | El arrastre empieza a los **6 px** | Inventario de los bocetos | un numero |
 | Esquirlas de golpe: saturacion al **40 %**, opacidad **45 %** (las **8** por golpe son tuyas) | Inventario de los bocetos | numeros en `effects*.ts` |
-| Las diez casillas de equipables se ven **apagadas** hasta la ropa | Inventario de los bocetos | CSS |
-| La zona de lo seleccionado mide siempre lo mismo (una descripcion larga se desliza dentro) y en PERSONAJE dice «Equipables: llegaran con la ropa» | Ajustes del inventario, 2.ª ronda | CSS y texto |
-| Usar mirando a algo (sin nada util en la mano) **aun no hace nada** | Inventario de los bocetos | llega con puertas y demas |
+| Los ocho equipables sin ropa todavia se ven **apagados** | Inventario de los bocetos | CSS |
+| La zona de lo seleccionado mide siempre lo mismo (una descripcion larga se desliza dentro); en PERSONAJE describe la prenda tocada | Ajustes del inventario, 2.ª ronda | CSS |
+| Usar mirando a algo que no es una estacion **aun no hace nada** | Inventario de los bocetos | llega con puertas y demas |
 | Los **dibujos** de los iconos: mano abierta, espada y pico cruzados, mochila, tres barras | Ajustes del inventario | SVG en `index.html` |
 | Pestanas del movil en letra de **16 px**, subrayada la elegida | Ajustes del inventario | CSS |
 | El **dibujo nuevo del ataque**: espada con hoja de contorno, guarda y pomo, y pico en media luna; el mango se corta bajo la hoja | Ajustes, 3.ª ronda | SVG en `index.html` |
@@ -434,7 +446,7 @@ golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
 
-## Recoleccion y fabricacion — tanda 1 HECHA, tanda 2 ESPERANDO (2026-09-28)
+## Recoleccion y fabricacion — tandas 1 y 2 HECHAS (2026-09-28 y 2026-09-29)
 
 Pediste la progresion de un jugador real: aparece sin nada, recolecta con las
 manos, fabrica sus primeras herramientas, que le dan mejores recursos, y con
@@ -460,29 +472,55 @@ Lo comprueban `tests/crafting.test.ts`, con una partida guionizada de las manos 
 los minerales, y el humo. El humo fabrica un pico desde el panel con los
 «Materiales de piedra» del panel de desarrollo y saca cobre golpe a golpe.
 
-**Tanda 2, esperando a que des por buena la 1** (el plan aprobado, para que no se
-pierda):
-
-- **Estaciones**, colocadas con F en la casilla que toca la mirada (sin estacion
-  en la mano, F siembra). Estorban el paso y se recogen a mano con 3 golpes.
-  - **A decidir al empezar la tanda: F ya no existe** (el 2026-09-28 sembrar
-    paso a USAR con la semilla en la mano). Lo natural seria colocar tambien
-    con USAR, llevando la estacion en la mano; es decision tuya.
-  - Mesa de trabajo = 8 madera: recetas de mesa a menos de 3 casillas.
-  - Horno = 10 piedra + 2 carbon: fundir a menos de 3 casillas.
-- **Fundir**, instantaneo:
-  - 2 mineral de cobre + 1 carbon = 1 lingote de cobre;
-  - 2 mineral de hierro + 2 carbon = 1 lingote de hierro.
+**Tanda 2, hecha el 2026-09-29.** El plan aprobado, con lo que decidiste al
+empezarla (F ya no existia):
+- **Mesa de trabajo** (8 madera) y **horno** (10 piedra + 2 carbon), fabricados
+  a mano en la categoria «Estaciones».
+- **Se colocan con USAR** llevandolos en la mano, donde la mirada toca el
+  suelo, como una semilla. Son **cajas en 3D**, no aspas. Estorban el paso y se
+  desmontan a mano en 3 golpes; vuelven al inventario enteras.
+- **USAR mirando una estacion la abre siempre**, lleves lo que lleves en la
+  mano. Se abre el mismo panel que con E, pero RECETAS (la pestana Recetas en
+  el movil) muestra solo las de esa estacion, con su nombre de titulo. **Con E
+  no salen**: solo se ven usandola.
+- **El panel de una estacion se cierra solo a mas de 3 casillas** de ella. El
+  nucleo usa la misma cuenta (`stationNear`) para aceptar la receta.
+- **Fundir es una receta mas del horno**: mantener 1,5 s. 2 cobre + 1 carbon
+  dan un lingote de cobre; 2 hierro + 2 carbon, uno de hierro.
 - **Herramientas de metal**, en la mesa:
-  - hacha y pico de cobre = 2 ramas + 3 lingotes de cobre; poder 2, 120 usos;
-    el pico de cobre mina hierro;
-  - hacha y pico de hierro = 2 ramas + 3 lingotes de hierro; poder 3, 250 usos.
-- **Indumentaria**, en la mesa, en dos huecos nuevos del personaje:
-  - bolsa de fibra (8 fibra), en la cintura: +2 casillas;
+  - hacha y pico de cobre = 2 ramas + 3 lingotes, poder 2, 120 usos; el pico
+    de cobre mina hierro;
+  - de hierro = 2 ramas + 3 lingotes, poder 3, 250 usos.
+- **Ropa**, en la mesa, y se arrastra a su hueco de PERSONAJE:
+  - bolsa de fibra (8 fibra), en la cintura, abajo a la derecha: +2 casillas;
   - mochila de armazon (10 fibra + 4 madera + 2 lingotes de cobre), en la
-    espalda: +6 casillas.
-  - No se puede quitar una prenda con sus casillas ocupadas.
-- **La otra mitad de la ley**, «experiencia», queda fuera: esta sin disenar.
+    espalda, en el centro de la columna derecha: +6 casillas.
+  - No se quita una prenda con sus casillas ocupadas.
+- «Experiencia», la otra mitad de la ley, sigue fuera: esta sin disenar.
+
+Lo comprueban:
+- `tests/stations.test.ts`: colocar, estorbar, desmontar, abrir, la distancia,
+  fundir, los picos de metal, la ropa y una partida de la mesa a la mochila;
+- dos leyes nuevas en `tests/world-laws.test.ts`;
+- la pasada `stations` del humo, que lo juega con el raton desde el nacimiento
+  y esta en su casilla de la CI.
+
+Mis deducciones van arriba, en «Esperando tu juicio». Hay tambien dos cosas
+que tienes que saber:
+
+- **El golpe tumba todo lo que toca** (regla 12), tambien una estacion:
+  talando un arbol pegado a la mesa, los golpes la desmontan tambien (3
+  golpes, y el dano se olvida a los 3 s). Lo deje asi por coherencia. Que la
+  estacion solo reciba el golpe cuando es lo mas cercano del sector es una
+  linea.
+- **En el movil la ropa se equipa desde la barra.** Las paginas del panel van
+  de una en una, asi que la rejilla del inventario y los huecos de PERSONAJE
+  no estan a la vista a la vez; la barra de la mano si. La prenda se lleva
+  primero a la barra y de ahi a su hueco. Si lo quieres de otra forma (por
+  ejemplo, tocar la prenda y un boton «Ponerse»), es decision tuya.
+- **No hay iconos nuevos**: el plan los mencionaba, pero las casillas van con
+  nombre corto y sin iconos por decision tuya; los objetos nuevos llevan
+  nombre corto y descripcion como los demas.
 
 ## Ataques y saltos que no salian — ARREGLADO (2026-09-28)
 

@@ -275,6 +275,66 @@ console.log(`  fabricar manteniendo: ${beforeHold.inventory[11]} -> ${afterHold2
 check(afterHold2.inventory[11] === beforeHold.inventory[11] + 1, 'mantener la receta 1,5 s con el dedo no fabrico');
 await page.screenshot({ path: 'screenshots/movil-recetas.png' });
 
+// La mesa y la ropa con el dedo (tanda 2): fabricar la mesa, llevarla a la
+// barra, ponerla con USAR mirando al suelo, abrirla con USAR, fabricar la bolsa
+// y ponersela arrastrandola desde la barra a su hueco de PERSONAJE, que es como
+// se hace en el movil (las paginas del panel van de una en una).
+await page.evaluate(() => document.querySelector('[data-kit="metal"]').click());
+await page.waitForTimeout(300);
+const holdTouch = async (p) => {
+  await real('touchStart', [p]);
+  await page.waitForTimeout(2000);
+  await real('touchEnd', []);
+  await page.waitForTimeout(400);
+};
+const tabNamed = (name) => page.evaluate((n) => {
+  const t = Array.from(document.querySelectorAll('#recipeTabs .slot')).find((el) => el.textContent === n);
+  const r = t.getBoundingClientRect();
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+}, name);
+await tapReal(await tabNamed('Estaciones'));
+await holdTouch(await at('#recipeList .recipe:nth-child(1) .result'));
+check((await probe()).inventory[18] === 1, 'no se fabrico la mesa con el dedo');
+await tapReal(await at('#invTabs button:nth-child(2)'));
+const benchSlot = (await probe()).slots.findIndex((x) => x.item === 18);
+if (benchSlot > 0) await dragReal(await slotAt(benchSlot + 1), await at('#hotbar .slot:nth-child(1)'));
+await tapReal(invBtn);
+await tapReal(await at('#hotbar .slot:nth-child(1)'));
+const benchInHand = await probe();
+check(benchInHand.slots[benchInHand.selectedSlot].item === 18, 'la mesa no quedo en la mano');
+// Mirar abajo arrastrando un dedo por el mundo, hasta tener suelo a tiro.
+let dy = 70;
+for (let i = 0; i < 8 && (await probe()).lookZ > -0.8; i++) {
+  const z0 = (await probe()).lookZ;
+  await dragReal({ x: 195, y: 330 }, { x: 195, y: 330 + dy });
+  if ((await probe()).lookZ > z0) dy = -dy;
+}
+const aimed = await probe();
+console.log(`  mirando abajo: lookZ ${aimed.lookZ.toFixed(2)}, sembraria en ${JSON.stringify(aimed.plantTile)}`);
+const useBtn = await center('use');
+await tapReal(useBtn);
+await page.waitForTimeout(300);
+const benchPlaced = await probe();
+console.log(`  USAR con la mesa: estaciones ${JSON.stringify(benchPlaced.stationTiles)}`);
+check(benchPlaced.stationTiles.some((t) => t.feature === 24), 'USAR con el dedo no puso la mesa');
+await tapReal(useBtn);
+await page.waitForTimeout(300);
+const benchOpen = await probe();
+check(benchOpen.inventoryOpen && benchOpen.panelStation === 1 && benchOpen.inventoryPage === 'recetas',
+  `USAR mirando la mesa no abrio sus recetas: ${benchOpen.inventoryOpen} ${benchOpen.panelStation} ${benchOpen.inventoryPage}`);
+await tapReal(await tabNamed('Ropa'));
+await holdTouch(await at('#recipeList .recipe:nth-child(1) .result'));
+check((await probe()).inventory[20] === 1, 'no se fabrico la bolsa en la mesa con el dedo');
+await tapReal(await at('#invTabs button:nth-child(2)'));
+const bagSlot = (await probe()).slots.findIndex((x) => x.item === 20);
+if (bagSlot !== 1) await dragReal(await slotAt(bagSlot + 1), await at('#hotbar .slot:nth-child(2)'));
+await tapReal(await at('#invTabs button:nth-child(1)'));
+await dragReal(await at('#hotbar .slot:nth-child(2)'), await at('#charGrid [data-slot="1000"]'));
+const belted = await probe();
+console.log(`  bolsa a la cintura: ${JSON.stringify(belted.worn)}, casillas ${belted.openSlots}`);
+check(belted.worn[0] === 20 && belted.openSlots === 18, 'arrastrar la bolsa a la cintura con el dedo no la puso');
+await page.screenshot({ path: 'screenshots/movil-personaje-ropa.png' });
+
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();
 server.close();

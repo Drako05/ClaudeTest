@@ -34,7 +34,7 @@ jobs:
         # Una casilla por pasada de `tools/smoke.mjs` (se lanza por el prefijo
         # de su nombre) y los gestos con toques de verdad. Si se anade una
         # pasada al humo, va aqui tambien: el escaner de la auditoria lo cruza.
-        pasada: [desktop, resources, mobile, devTools, life, relief, highRefresh, gestures]
+        pasada: [desktop, resources, stations, mobile, devTools, life, relief, highRefresh, gestures]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

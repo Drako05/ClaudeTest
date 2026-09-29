@@ -23,8 +23,14 @@ import {
   LIFE_STEP_TICKS,
   LifeKind,
   lifeKindOf,
+  garmentOf,
+  placedFeatureOf,
   RECIPES,
+  RESOURCE_COUNT,
+  RESOURCE_NAMES,
   Resource,
+  Station,
+  toolStats,
   withinEquilibrium,
 } from '@verdant/shared';
 
@@ -619,6 +625,47 @@ describe('Capitulo II: combinar y herramientas', () => {
     expect(inv.count(Resource.StoneAxe)).toBe(1);
     expect(inv.count(Resource.Branch) + inv.count(Resource.Stone) + inv.count(Resource.Fiber)).toBe(0);
     expect(tryCraft(inv, axe)).toBe('missing');
+  });
+
+  it('todo recurso tiene destino: se gasta en una receta o se usa', () => {
+    // Desde la tanda 2 no queda nada que solo se acumule: la madera hace la
+    // mesa, el carbon y los minerales van al horno, los lingotes a la mesa.
+    const spent = new Set(RECIPES.flatMap((r) => r.inputs.map((i) => i.item)));
+    const eatenOrSown = [Resource.Berries, Resource.TreeSeed, Resource.PlantSeed];
+    for (let item = 0 as Resource; item < RESOURCE_COUNT; item++) {
+      const destiny =
+        spent.has(item) ||
+        eatenOrSown.includes(item) ||
+        toolStats(item) !== null ||
+        garmentOf(item) !== null ||
+        placedFeatureOf(item) !== Feature.None;
+      expect(destiny, RESOURCE_NAMES[item]).toBe(true);
+    }
+  });
+
+  it('los minerales requieren procesarse: solo el horno los usa, y sus lingotes hacen las herramientas', () => {
+    // «En su mayoria requieren ser procesados»: ninguna receta fuera del horno
+    // gasta mineral en bruto, y lo que sale del horno es lo que piden las
+    // herramientas de metal.
+    const ores = [Resource.Copper, Resource.Iron];
+    for (const r of RECIPES) {
+      const usesOre = r.inputs.some((i) => ores.includes(i.item));
+      expect(usesOre ? r.station : Station.Furnace).toBe(Station.Furnace);
+    }
+    const ingotUsers = RECIPES.filter((r) =>
+      r.inputs.some((i) => i.item === Resource.CopperIngot || i.item === Resource.IronIngot),
+    );
+    expect(ingotUsers.map((r) => r.output)).toEqual(
+      expect.arrayContaining([Resource.CopperPickaxe, Resource.IronPickaxe]),
+    );
+    // Y el lingote no se saca de la mina: solo del horno.
+    const inv = new Inventory();
+    inv.add(Resource.Copper, 2);
+    inv.add(Resource.Coal, 1);
+    const ingot = RECIPES.findIndex((r) => r.output === Resource.CopperIngot);
+    expect(tryCraft(inv, ingot)).toBe('missing');
+    expect(tryCraft(inv, ingot, (s) => s === Station.Furnace)).toBe('ok');
+    expect(inv.count(Resource.CopperIngot)).toBe(1);
   });
 
   it('algunos recursos requieren herramientas para recolectarse', () => {

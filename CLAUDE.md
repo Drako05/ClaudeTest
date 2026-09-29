@@ -304,7 +304,8 @@ cada entrega. La skill `auditoria` si la espera, porque cierra una tanda.
 
 **La CI va repartida** (`.github/workflows/ci.yml`): un trabajo para typecheck
 y tests, y una **matriz con una maquina por pasada del humo** —`desktop`,
-`resources`, `mobile`, `devTools`, `life`, `relief`, `highRefresh`— mas otra
+`resources`, `stations`, `mobile`, `devTools`, `life`, `relief`,
+`highRefresh`— mas otra
 para los gestos, todas a la vez; y un trabajo final, «CI completa», que solo sale
 verde si todo lo esta. Cada pasada se lanza por el prefijo de su nombre
 (`node tools/smoke.mjs life`). **Si anades una pasada al humo, anadela a la
@@ -324,9 +325,10 @@ a proposito: el contenedor muere con la sesion y la skill tiene que crecer.
 
 `npm run smoke` construye el cliente y lo juega en Chromium headless leyendo el
 estado real por `window.__verdant`. Los tests unitarios no detectan que el juego
-no arranque; esto si. Hace siete pasadas —escritorio, recursos (comer, sembrar,
-minar), movil con toques sinteticos, panel de desarrollo, muerte y noche,
-relieve, y pantalla de 144 Hz—; si tocas los controles, todas tienen que seguir
+no arranque; esto si. Hace ocho pasadas —escritorio, recursos (comer, sembrar,
+minar), estaciones (mesa, horno, fundir y ropa), movil con toques sinteticos,
+panel de desarrollo, muerte y noche, relieve, y pantalla de 144 Hz—; si tocas
+los controles, todas tienen que seguir
 pasando. Una sola se corre con `node tools/smoke.mjs <nombre>` tras `npm run
 build`, por ejemplo `node tools/smoke.mjs mobile`.
 
@@ -961,27 +963,30 @@ suyos: puede corregirlos, y `tests/jump.test.ts` afirma la relacion que los ata.
 
 La progresion la pidio el autor tal como la viviria un jugador: aparece sin
 nada, recolecta con las manos, fabrica sus primeras herramientas, que le dan
-mejores recursos, y con ellos fabrica mejores herramientas e indumentaria. Va
-en dos tandas; la **tanda 1** (manos → herramientas de piedra → lo que sacan)
-esta hecha, y la **tanda 2** (mesa, horno, fundir, cobre, hierro y ropa) espera
-a que el autor de por buena la primera. El plan entero, con sus cifras, esta en
-`docs/pendiente.md`.
+mejores recursos, y con ellos fabrica mejores herramientas e indumentaria. Fue
+en dos tandas, las dos hechas: la **tanda 1** (manos → herramientas de piedra →
+lo que sacan) y la **tanda 2** (mesa, horno, fundir, cobre, hierro y ropa). Las
+cifras y lo que decidio el autor en cada una estan en `docs/pendiente.md`.
 
 Decisiones del autor, que no se tocan sin preguntarle:
 
 - **Trabajo por golpes.** Cada objeto pide un trabajo (`workOf`) y cada golpe
   suma el poder de lo que se lleva en la mano (`toolStats`); a mano, algunas
   cosas no se completan. Un arbol sin hacha no cae: suelta ramas. Roca y
-  minerales piden pico, y el hierro uno mejor.
+  minerales piden pico, y el hierro uno de cobre o mejor.
 - **Se equipa una herramienta**: las casillas 1-4 (la primera fila del
   inventario) son la barra y la elegida es la mano. La eleccion viaja en la
   `Intent` (`select`), como fabricar (`craft`), mover (`moveFrom`/`moveTo`),
   tirar (`discard`) y usar (`use`): regla 5.
-- **Usar** (clic derecho, boton USAR) es con lo de la mano: bayas se comen, una
-  semilla se siembra —esa, no otra— donde toca la mirada (`tryUse`). Lo que se
-  mira (puertas y demas) llegara despues.
+- **Usar** (clic derecho, boton USAR): **mirando una estacion, la abre**, se
+  lleve lo que se lleve en la mano; si no, es con lo de la mano: bayas se
+  comen, una semilla se siembra —esa, no otra— y una mesa o un horno se coloca,
+  las dos donde toca la mirada (`tryUse`). Lo demas que se mira (puertas)
+  llegara despues.
 - **Se desgastan y se rompen.**
-- **16 casillas con pilas de 100** (`sim/inventory.ts`), y la ropa las ampliara.
+- **16 casillas con pilas de 100** (`sim/inventory.ts`), y la ropa las amplia:
+  la bolsa en la cintura, +2; la mochila en la espalda, +6. Se arrastran a su
+  hueco de PERSONAJE, y **no se quitan con sus casillas ocupadas**.
   **Arrastrar mueve**: el mismo objeto se apila y lo que sobra se queda; uno
   distinto se intercambia (`Inventory.move`). Con el inventario abierto se
   arrastra entre la rejilla y la barra de la mano; **cerrado, dentro de la
@@ -1012,7 +1017,12 @@ Decisiones del autor, que no se tocan sin preguntarle:
   con `state.lastHits` del nucleo), y **no hay barra de progreso**.
 - **La roca a mano no da nada**: la primera piedra son **guijarros** sueltos
   en el suelo, una feature inerte y finita que no estorba el paso.
-- Lo basico se fabrica a mano en cualquier sitio; lo mejor pedira mesa u horno.
+- Lo basico se fabrica a mano en cualquier sitio; lo mejor, en la **mesa de
+  trabajo** o el **horno** (tanda 2). Se colocan con USAR, son **cajas**, no
+  aspas, estorban el paso y se desmontan a mano en 3 golpes. **Sus recetas no
+  salen con E**: USAR mirando la estacion abre el mismo panel con las suyas, y
+  se cierra solo al alejarse a mas de 3 casillas. Fundir es una receta mas del
+  horno.
 
 Lo que el codigo tiene que respetar:
 
@@ -1025,6 +1035,20 @@ Lo que el codigo tiene que respetar:
   pasos, asi que vivirlo y saltarlo con `skipTime` da lo mismo (hay test).
 - **`harvestTile` es la primitiva que completa**, sin golpes ni herramientas;
   la usan `tryHarvestArea` y los tests del ecosistema.
+- **Las estaciones viven en el overlay** (regla 4): el mundo no las genera
+  nunca, son inertes para el ecosistema (`lifeKindOf` da `null`) y desmontarlas
+  las devuelve enteras por `harvestOf`. **Donde sirven lo decide una sola
+  funcion**, `stationNear` (`sim/stations.ts`): el nucleo la usa para aceptar
+  una receta y el panel para cerrarse, asi que lo que la interfaz deja intentar
+  es lo que el nucleo acepta. La caja que se dibuja (`stations-view.ts`) mide
+  lo que su hitbox (`STATION_BOXES`), como el tronco de los arboles.
+- **La ropa abre tramos fijos** detras de las 16 casillas: la cintura el suyo
+  y la espalda el suyo, aunque solo se lleve una prenda. Un tramo cerrado no
+  existe para meter, sacar ni arrastrar (`Inventory.isOpen`). Los huecos de
+  ropa tienen indice de arrastre propio (`EQUIP_WAIST`, `EQUIP_BACK`), asi que
+  ponerse y quitarse viajan en la `Intent` como mover. Lo puesto **cuenta en
+  `totals()`** —equiparse no es «-1 Mochila» en el registro— **pero no en
+  `count()`**: una receta no se lo gasta.
 - **Los guijarros no mueven nada**: salen solo en casillas que se quedarian
   vacias y con su propio hash, asi que ningun umbral ni ninguna otra feature
   cambia (reglas 2 y 3). Van **tumbados** en el suelo (`flatGeometry`), no en

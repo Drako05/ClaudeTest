@@ -920,6 +920,201 @@ async function resourcesPass(browser, baseUrl) {
   await page.close();
 }
 
+// ------------------------------------------------------------------ estaciones
+
+/**
+ * La tanda 2: mesa y horno, fundir, herramientas de metal y ropa, jugado con
+ * el raton y el panel. Decisiones del autor que se afirman: la estacion se
+ * coloca con USAR llevandola en la mano, USAR mirandola abre el panel con SUS
+ * recetas —que con E no salen—, el panel se cierra al alejarse, y la ropa se
+ * arrastra a su hueco y abre casillas. Los numeros —cuantos golpes, que pico
+ * mina que— los miden `tests/stations.test.ts`.
+ *
+ * Desde el nacimiento, que es un rellano llano (regla 22): la mesa va a la
+ * casilla de delante y el horno a la de al lado, sin talud que lo impida.
+ */
+async function stationsPass(browser, baseUrl) {
+  console.log('\n== estaciones (mesa, horno, metales, ropa) ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'estaciones');
+
+  // «Materiales de metal» del panel de desarrollo, y a jugar con el cursor.
+  await open(page, baseUrl, '&dev=1');
+  await page.click('[data-kit="metal"]');
+  await page.keyboard.press('F3');
+  await page.waitForTimeout(300);
+  await play(page);
+  const kit = await state(page);
+  check(kit.inventory[0] >= 12 && kit.inventory[7] >= 10, `«Materiales de metal» no dio lo suyo: ${JSON.stringify(kit.inventory)}`);
+
+  const center = async (sel) => {
+    const r = await page.locator(sel).boundingBox();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  };
+  const drag = async (from, to) => {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+  };
+  const tabs = () => page.evaluate(() => Array.from(document.querySelectorAll('#recipeTabs .slot:not(.off)')).map((t) => t.textContent));
+  const category = (name) =>
+    page.evaluate((n) => Array.from(document.querySelectorAll('#recipeTabs .slot')).find((t) => t.textContent === n)?.click(), name);
+  /** Mantener 1,9 s el resultado de la receta n de la lista. */
+  const craft = async (n) => {
+    const at = await center(`#recipeList .recipe:nth-child(${n}) .result`);
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.down();
+    await page.waitForTimeout(1900);
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+  };
+  /** A la cuarta casilla de la barra y a la mano, si no estaba en la barra. */
+  const toBar = async (item) => {
+    const slot = (await state(page)).slots.findIndex((x) => x.item === item);
+    if (slot >= 4) await drag(await center(`#invGrid .slot:nth-child(${slot + 1})`), await center('#hotbar .slot:nth-child(4)'));
+  };
+
+  // Con E, las recetas de mano: mesa y horno, sin fundir ni ropa.
+  await page.keyboard.press('KeyE');
+  await page.waitForTimeout(300);
+  const handTabs = await tabs();
+  console.log(`  con E: ${handTabs.join(', ')} («${await page.textContent('#recipeTitle')}»)`);
+  check((await state(page)).panelStation === 0, 'con E el panel no es el de mano');
+  check(handTabs.includes('Estaciones') && !handTabs.includes('Fundicion') && !handTabs.includes('Ropa'),
+    `con E salen recetas de estacion: ${handTabs}`);
+  await category('Estaciones');
+  await craft(1);
+  await craft(2);
+  const built = await state(page);
+  check(built.inventory[18] === 1 && built.inventory[19] === 1, `no se fabricaron la mesa y el horno: ${JSON.stringify(built.inventory)}`);
+  await toBar(18);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  await play(page);
+
+  // Mirando a lo largo de un eje, para que la mesa y el horno caigan en las
+  // casillas de delante y de detras, y andar contra el horno de frente: en
+  // diagonal el cuerpo resbala por la esquina y lo rodea.
+  const angle = async () => {
+    const a = (await state(page)).aim;
+    return Math.atan2(a[1], a[0]);
+  };
+  const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  const a0 = await angle();
+  const axis = Math.round(a0 / (Math.PI / 2)) * (Math.PI / 2);
+  await look(page, wrap(axis - a0) / 0.0025, 0);
+  await page.waitForTimeout(200);
+  // El signo del raton frente al angulo no importa: si giro al reves, se deshace.
+  if (Math.abs(wrap((await angle()) - axis)) > 0.05) await look(page, (-2 * wrap(axis - a0)) / 0.0025, 0);
+  await page.waitForTimeout(200);
+  check(Math.abs(wrap((await angle()) - axis)) < 0.05, 'no se pudo encarar la vista a un eje');
+
+  // Colocar: la mesa en la mano, mirando al suelo de delante, clic derecho.
+  await look(page, 0, 150);
+  await page.waitForTimeout(200);
+  await toHand(page, 18);
+  const before = await state(page);
+  await useClick(page);
+  await page.waitForTimeout(400);
+  const placed = await state(page);
+  console.log(`  colocar la mesa: mesas ${before.inventory[18]} -> ${placed.inventory[18]}, en ${JSON.stringify(placed.stationTiles)}, cajas dibujadas ${placed.stationsDrawn}`);
+  check(placed.inventory[18] === 0 && placed.stationTiles.some((t) => t.feature === 24), 'USAR con la mesa en la mano no la coloco');
+  check(placed.stationsDrawn > before.stationsDrawn, 'la mesa colocada no se dibujo');
+
+  // El horno, detras: media vuelta (0,0025 rad por pixel), lejos de la mesa.
+  await look(page, 1257, 0);
+  await page.waitForTimeout(200);
+  await toHand(page, 19);
+  await useClick(page);
+  await page.waitForTimeout(400);
+  const both = await state(page);
+  check(both.inventory[19] === 0 && both.stationTiles.some((t) => t.feature === 25), 'USAR con el horno en la mano no lo coloco');
+  await page.screenshot({ path: join(SHOTS, '3d-10-horno.png') });
+
+  // Abrir el horno mirandolo: su panel, con sus recetas. Fundir 5 de cobre.
+  await useClick(page);
+  await page.waitForTimeout(400);
+  const furnace = await state(page);
+  const furnaceTabs = await tabs();
+  console.log(`  usar el horno: panel ${furnace.inventoryOpen ? 'abierto' : 'cerrado'}, «${await page.textContent('#recipeTitle')}», ${furnaceTabs}`);
+  check(furnace.inventoryOpen && furnace.panelStation === 2, 'USAR mirando el horno no abrio su panel');
+  check(furnaceTabs.join() === 'Fundicion', `el horno ensena otras recetas: ${furnaceTabs}`);
+  for (let i = 0; i < 5; i++) await craft(1);
+  const smelted = await state(page);
+  console.log(`  fundir: lingotes de cobre ${smelted.inventory[12]}; registro ${JSON.stringify(smelted.feed)}`);
+  check(smelted.inventory[12] === 5, `no se fundieron 5 lingotes de cobre: ${smelted.inventory[12]}`);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  await play(page);
+
+  // Estorba: andar contra el horno no mete el cuerpo en su casilla.
+  await hold(page, 'KeyW', 900);
+  const pushed = await state(page);
+  const oven = both.stationTiles.find((t) => t.feature === 25);
+  if (oven) {
+    // El cuerpo mide 0,34 de radio: dentro de la casilla si esta a menos de
+    // 0,5 + 0,34 del centro en los dos ejes.
+    const gap = Math.max(Math.abs(pushed.x - (oven.x + 0.5)), Math.abs(pushed.y - (oven.y + 0.5)));
+    console.log(`  andar contra el horno: a ${gap.toFixed(2)} de su centro`);
+    check(gap > 0.83, `el cuerpo se metio en el horno: a ${gap.toFixed(2)} de su centro`);
+  }
+
+  // La mesa, a la espalda: pico de cobre y mochila.
+  await look(page, -1257, 0);
+  await page.waitForTimeout(200);
+  await useClick(page);
+  await page.waitForTimeout(400);
+  const bench = await state(page);
+  const benchTabs = await tabs();
+  console.log(`  usar la mesa: «${await page.textContent('#recipeTitle')}», ${benchTabs}`);
+  check(bench.inventoryOpen && bench.panelStation === 1, 'USAR mirando la mesa no abrio su panel');
+  check(benchTabs.join() === 'Herramientas,Ropa', `la mesa ensena otras recetas: ${benchTabs}`);
+  await craft(2);
+  await category('Ropa');
+  await craft(2);
+  const made = await state(page);
+  check(made.inventory[15] === 1, 'no se fabrico el pico de cobre en la mesa');
+  check(made.inventory[21] === 1, 'no se fabrico la mochila en la mesa');
+
+  // La mochila, arrastrada a su hueco: 22 casillas.
+  const bag = made.slots.findIndex((x) => x.item === 21);
+  if (bag >= 0) {
+    await drag(await center(`#invGrid .slot:nth-child(${bag + 1})`), await center('#charGrid [data-slot="1001"]'));
+    const dressed = await state(page);
+    const shown = await page.evaluate(() => Array.from(document.querySelectorAll('#invGrid .slot')).filter((el) => !el.hidden).length);
+    console.log(`  mochila puesta: ${dressed.worn}, casillas ${dressed.openSlots}, a la vista ${shown}`);
+    check(dressed.worn[1] === 21 && dressed.openSlots === 22, `la mochila no se equipo: ${JSON.stringify(dressed.worn)}, ${dressed.openSlots}`);
+    check(shown === 22, `la rejilla no ensena las casillas de la mochila: ${shown}`);
+    check(dressed.feed.every((t) => !t.includes('Mochila') || t.startsWith('+')), `equiparse la anoto como perdida: ${dressed.feed}`);
+    await page.screenshot({ path: join(SHOTS, '3d-11-panel-mesa.png') });
+  }
+
+  // Alejarse mas de 3 casillas cierra el panel de la mesa. De lado: detras
+  // esta el horno.
+  // El rellano del nacimiento es pequeno y lo rodean escalones: se prueba a
+  // cada lado, saltando, hasta pasar de 3 casillas.
+  const near = await state(page);
+  const bench0 = near.stationTiles.find((t) => t.feature === 24);
+  let away = near;
+  for (const key of ['KeyA', 'KeyD', 'KeyS']) {
+    await page.keyboard.down(key);
+    for (let i = 0; i < 6 && away.inventoryOpen; i++) {
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(400);
+      away = await state(page);
+    }
+    await page.keyboard.up(key);
+    if (!away.inventoryOpen) break;
+  }
+  if (bench0) console.log(`  a ${Math.hypot(away.x - bench0.x - 0.5, away.y - bench0.y - 0.5).toFixed(1)} de la mesa`);
+  console.log(`  alejarse ${Math.hypot(away.x - near.x, away.y - near.y).toFixed(1)} casillas: panel ${away.inventoryOpen ? 'abierto' : 'cerrado'}`);
+  check(!away.inventoryOpen && away.panelStation === 0, 'alejarse de la mesa no cerro su panel');
+
+  await page.close();
+}
+
 // ------------------------------------------------------------------------ movil
 
 async function mobilePass(browser, baseUrl) {
@@ -1580,7 +1775,7 @@ async function highRefreshPass(browser, baseUrl) {
 }
 
 const only = process.argv[2];
-const passes = { desktopPass, resourcesPass, mobilePass, devToolsPass, lifePass, reliefPass, highRefreshPass };
+const passes = { desktopPass, resourcesPass, stationsPass, mobilePass, devToolsPass, lifePass, reliefPass, highRefreshPass };
 try {
   // Pedir una pasada que no existe no puede salir en verde: con la CI
   // repartida en una casilla por pasada, una errata en el nombre seria una

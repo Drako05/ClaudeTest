@@ -37,13 +37,13 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Ley | Estado | Donde vive | Prueba |
 |---|---|---|---|
 | Pueden ser finitos, consumibles y renovables | **Cumplida** | La vida se repone via el ecosistema; roca y minerales son inertes y no vuelven | «el ecosistema repone lo recolectado», «la piedra es inerte: ni cuenta como vida ni se repone», «la piedra sigue siendo inerte y de cantidad fija» |
-| Todo recurso tiene origen, transformacion y destino | **Parcial** | Origen (worldgen), destino (inventario), un ciclo cerrado —recolectar deja semillas que se siembran y maduran— y la primera transformacion: fabricar (`tryCraft`) | «sembrar consume una semilla y el brote madura a adulto», «algunos recursos se combinan para crear cosas nuevas» — falta el procesado (fundir, tanda 2) |
+| Todo recurso tiene origen, transformacion y destino | **Cumplida** | Origen (worldgen), un ciclo cerrado —recolectar deja semillas que se siembran y maduran—, transformacion —fabricar (`tryCraft`) y fundir en el horno— y destino: desde la tanda 2 todo recurso se gasta en algo (la madera en la mesa y la mochila, el carbon y los minerales en el horno, los lingotes en herramientas) | «sembrar consume una semilla y el brote madura a adulto», «algunos recursos se combinan para crear cosas nuevas», «todo recurso tiene destino: se gasta en una receta o se usa» |
 | Los mas basicos se generan con el terreno | **Cumplida** | `sim/worldgen.ts` — `featureAt` decide segun el bioma | tests de `world-quality` |
 | Deben ser recolectados para usarlos | **Cumplida** | `sim/systems/gathering.ts` | «recolectar un arbol da madera y vacia el tile» |
-| En su mayoria requieren ser procesados | **Pendiente** | — | — |
+| En su mayoria requieren ser procesados | **Parcial** | Los minerales si: solo el horno los usa (`Station.Furnace` en `RECIPES`) y sus lingotes hacen las herramientas de metal. Madera, piedra, ramas y fibra se usan aun en bruto, asi que «la mayoria» todavia no | «los minerales requieren procesarse: solo el horno los usa…» |
 | Algunos podran combinarse para crear cosas nuevas | **Cumplida** | `RECIPES` en `shared` y `tryCraft` en `sim/systems/gathering.ts`: ramas, piedra y fibra hacen el hacha y el pico de piedra | «algunos recursos se combinan para crear cosas nuevas», `tests/crafting.test.ts` |
 | Categorias: minerales, quimicos, organicos | **Parcial** | Los minerales existen y viven donde deben: carbon, hierro y cobre solo en la montana. Faltan los quimicos y una taxonomia explicita | «solo aparecen sobre roca», «los tres existen y el carbon es el mas comun» |
-| Se requieren herramientas y experiencia | **Parcial** | Herramientas si: trabajo por golpes (`workOf`, `toolStats`), la roca y los minerales piden pico, un arbol sin hacha no cae, y el hierro pide un pico mejor. La experiencia sigue pendiente | «algunos recursos requieren herramientas para recolectarse», `tests/crafting.test.ts` |
+| Se requieren herramientas y experiencia | **Parcial** | Herramientas si: trabajo por golpes (`workOf`, `toolStats`), la roca y los minerales piden pico, un arbol sin hacha no cae, y el hierro pide un pico de cobre o mejor; las de metal piden mesa y lingotes. La experiencia sigue pendiente | «algunos recursos requieren herramientas para recolectarse», `tests/crafting.test.ts` |
 
 ## Capitulo III: La vida
 
@@ -109,9 +109,11 @@ siempre el del tile que se pisa.
 - **Causalidad rastreable** (Capitulo I) es la ley mas exigente del libro y hoy
   no existe nada de ella. Merece una decision de diseno propia: registrar cadenas
   causales tiene un coste de memoria que hay que acotar antes de empezar.
-- **La transformacion de recursos** (Capitulo II) ya tiene su primer paso:
-  ramas, piedra y fibra se fabrican en herramientas. Falta el procesado —fundir
-  en horno— y que la madera sirva para algo; las dos cosas son la tanda 2.
+- **La transformacion de recursos** (Capitulo II): ramas, piedra y fibra se
+  fabrican en herramientas, y desde la tanda 2 los minerales se funden en el
+  horno y la madera hace la mesa. Lo que queda para que «la mayoria requiera
+  procesarse» es que lo basico —madera, piedra— tambien pase por una estacion
+  antes de servir, y eso es decision de diseno del autor.
 - **La fauna** (Capitulos III y IV) no existe. El panel ya reserva su fila para
   dejar claro que falta. Las comunidades del Capitulo IV dependen de ella.
 - **Las especies** cubren bosque, pradera y tundra. La costa sigue sin vida
