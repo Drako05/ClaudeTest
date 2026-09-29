@@ -23,6 +23,7 @@ Formato (el escaner lo lee):
 - `preserveDrawingBuffer` — opcion de WebGL. En: `tools/slash.mjs`.
 - `pixi.js` — la biblioteca del isometrico, que se retiro. En: `docs/pendiente.md`.
 - `highRefresh` — prefijo de la pasada `highRefreshPass` del humo, como se escribe en la linea de ordenes. En: `CLAUDE.md`.
+- `devTools` — prefijo de la pasada `devToolsPass`, que es el nombre de su casilla en la matriz de CI. En: `CLAUDE.md`.
 
 ## Historia que se cuenta a proposito
 
