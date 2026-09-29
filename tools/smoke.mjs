@@ -488,7 +488,7 @@ async function desktopPass(browser, baseUrl) {
   const invOpen = await state(page);
   check(!invOpen.pointerLocked && !invOpen.paused, 'abrir el inventario no solto el cursor o pauso');
   check((await page.locator('#recipeList .recipe').count()) === 2, 'el recetario no lista las dos herramientas de piedra');
-  check((await page.locator('#equipLeft .slot, #equipRight .slot').count()) === 10, 'faltan las casillas de equipables');
+  check((await page.locator('#charGrid .slot.equip').count()) === 10, 'faltan las casillas de equipables');
   // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
   // no llevan numero, llevan desgaste).
   const hudTotal = await page.evaluate(() =>
@@ -750,13 +750,13 @@ async function resourcesPass(browser, baseUrl) {
     console.log(`  ${mineral.kind} en ${mineral.node.x},${mineral.node.y}; aparece en ${arrived.terrain} / ${arrived.biome}`);
     check(arrived.biome === 'Tierras altas', `el bioma no es el esperado: ${arrived.biome}`);
     const ores = (s) => s.inventory[5] + s.inventory[6] + s.inventory[7];
-    // A mano, un mineral no da nada y lo avisa.
+    // A mano, un mineral no da nada, y sin aviso: el autor quito todos los
+    // avisos en pantalla (2026-09-29).
     await strike(page);
     await page.waitForTimeout(300);
     const byHand = await state(page);
-    console.log(`  a mano: aviso «${byHand.toast}»`);
     check(ores(byHand) === 0, 'un mineral se saco a mano');
-    check(byHand.toast === 'Necesitas un pico', `a mano no se aviso de que falta el pico (${byHand.toast})`);
+    check((await page.locator('#toast').count()) === 0, 'sigue habiendo avisos en pantalla');
     // Fabricar el pico de piedra desde el panel.
     await page.click('[data-kit="piedra"]');
     await page.keyboard.press('KeyE');
@@ -798,7 +798,7 @@ async function resourcesPass(browser, baseUrl) {
     await page.waitForTimeout(400);
     const made = await state(page);
     const pickSlot = made.slots.findIndex((s) => s.item === 11);
-    console.log(`  pico fabricado en la casilla ${pickSlot + 1}, aviso «${made.toast}»`);
+    console.log(`  pico fabricado en la casilla ${pickSlot + 1}`);
     check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'mantener 1,5 s no fabrico');
     // La carga acaba en el borde derecho de los ingredientes, no en el del panel.
     const rowEdge = await page.evaluate(() => {
@@ -839,7 +839,7 @@ async function resourcesPass(browser, baseUrl) {
     // Con el pico, golpe a golpe: el hierro pide uno mejor, lo demas sale.
     const iron = mineral.kind.includes('hierro');
     let mined = await state(page);
-    for (let i = 0; i < 10 && ores(mined) === 0 && !(iron && mined.toast); i++) {
+    for (let i = 0; i < 10 && ores(mined) === 0; i++) {
       await strike(page);
       await page.waitForTimeout(260);
       mined = await state(page);
@@ -848,7 +848,7 @@ async function resourcesPass(browser, baseUrl) {
     const pickNow = mined.slots.findIndex((s) => s.item === 11);
     console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickNow]?.wear}, esquirlas ${mined.chipsDrawn}`);
     check(mined.chipsDrawn > 0, 'golpear sin romper no solto esquirlas');
-    if (iron) check(mined.toast === 'Necesitas un pico mejor', `el hierro no pidio un pico mejor (${mined.toast})`);
+    if (iron) check(ores(mined) === 0, 'el hierro salio con el pico de piedra');
     else check(ores(mined) > 0, `con pico no se saco ningun mineral: ${JSON.stringify(mined.inventory)}`);
     check(iron || (mined.slots[pickNow]?.wear ?? 40) < 40, 'el pico no se desgasto al minar');
     const walked = await bestWalk(page, mined);
@@ -968,6 +968,41 @@ async function mobilePass(browser, baseUrl) {
     pages.push((await state(page)).inventoryPage);
   }
   console.log(`  paginas del inventario: ${pages.join(' -> ')}`);
+  // La distribucion de cada pagina (pedido del autor, 2026-09-29): el contenido
+  // pegado a las pestanas, la zona de lo seleccionado fija y centrada abajo, a
+  // la misma altura en PERSONAJE e INVENTARIO, y nada que deslizar salvo la
+  // rejilla o la lista de recetas.
+  const layout = async (n) => {
+    await page.tap(`#invTabs button:nth-child(${n})`);
+    await page.waitForTimeout(100);
+    return page.evaluate(() => {
+      const r = (el) => (el ? el.getBoundingClientRect().toJSON() : null);
+      const panel = document.getElementById('invPanel');
+      const cur = panel.querySelector('.invPage.current');
+      return {
+        panel: r(panel), tabs: r(document.getElementById('invTabs')),
+        first: r(cur.querySelector('#charGrid, #invGrid, #recipeTabs')),
+        list: r(cur.querySelector('#charGrid, #invGrid, #recipeList')),
+        sel: r(cur.querySelector('.selected')),
+        overflow: getComputedStyle(panel).overflowY,
+        scrolls: panel.scrollHeight > panel.clientHeight + 1,
+      };
+    });
+  };
+  const [lp, li, lr] = [await layout(1), await layout(2), await layout(3)];
+  await page.tap('#invTabs button:nth-child(2)');
+  const midX = (b) => (b.left + b.right) / 2;
+  for (const [name, l] of [['personaje', lp], ['inventario', li], ['recetas', lr]]) {
+    check(l.overflow === 'hidden' && !l.scrolls, `la pagina ${name} desliza el panel entero`);
+    check(l.first.top - l.tabs.bottom < 16, `la pagina ${name} no arranca pegada a las pestanas: ${l.first.top - l.tabs.bottom}`);
+    check(Math.abs(midX(l.list) - midX(l.panel)) < 2, `lo de la pagina ${name} no esta centrado`);
+  }
+  for (const [name, l] of [['personaje', lp], ['inventario', li]]) {
+    check(Math.abs(l.panel.bottom - l.sel.bottom) < 16 && Math.abs(midX(l.sel) - midX(l.panel)) < 2,
+      `la zona de lo seleccionado de ${name} no va centrada al pie del panel`);
+  }
+  check(Math.abs(lp.sel.top - li.sel.top) < 1 && Math.abs(lp.sel.left - li.sel.left) < 1,
+    'la zona de descripcion de PERSONAJE no encaja con la de INVENTARIO');
   check(pages.join() === 'inventario,recetas,personaje,inventario', `las pestanas no recorren las paginas: ${pages}`);
   await page.tap('#invOpen');
   check(!(await page.isVisible('#invPanel')), 'tocar otra vez no cerro el inventario');

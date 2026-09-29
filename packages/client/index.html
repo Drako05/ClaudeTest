@@ -390,28 +390,51 @@
       .slot.dragging { opacity: .35; }
       .slot.drop { border-color: #ffe89a; }
       .slot.off { opacity: .4; cursor: default; }
+      /* Cada pagina es una columna: titulo, lo suyo y, pegada abajo, la zona
+         de lo seleccionado, que en PERSONAJE e INVENTARIO queda a la misma
+         altura (boceto del autor, 2026-09-29). */
+      .invPage { display: flex; flex-direction: column; align-items: center; min-height: 0; }
       #invGrid { max-height: calc(4 * 60px + 3 * 6px); overflow-y: auto; }
-      .selected { display: flex; gap: 8px; margin-top: 10px; align-items: stretch; }
-      #selDesc {
-        flex: 1; min-height: 60px; padding: 6px 8px; border-radius: 8px;
+      .selected {
+        display: flex; gap: 8px; margin-top: auto; padding-top: 10px; align-items: stretch;
+        width: calc(4 * 60px + 3 * 6px); height: calc(10px + 60px); flex: none;
+      }
+      /* Mide siempre lo mismo, para encajar entre paginas: una descripcion
+         larga se desliza dentro de su recuadro. */
+      .selDesc {
+        flex: 1; padding: 6px 8px; overflow-y: auto; border-radius: 8px;
         border: 1px solid rgba(140, 190, 255, 0.22); color: #b8c6dc; font-size: 11px;
       }
-      #selDesc b { display: block; color: #e8eef7; margin-bottom: 2px; }
-      .charBox { display: flex; gap: 8px; align-items: flex-start; }
-      .equipCol { display: grid; gap: 6px; }
+      .selDesc b { display: block; color: #e8eef7; margin-bottom: 2px; }
+      /* PERSONAJE: el personaje en medio, tres equipables a cada lado y cuatro
+         debajo (boceto del autor). El dibujo ocupa las dos columnas centrales
+         de las tres primeras filas; las casillas se colocan solas en el resto. */
+      #charGrid {
+        display: grid; grid-template-columns: repeat(4, 60px); grid-template-rows: repeat(4, 60px);
+        gap: 6px; flex: none;
+      }
       #charArt {
-        width: 150px; height: calc(5 * 60px + 4 * 6px); border-radius: 8px;
+        grid-column: 2 / 4; grid-row: 1 / 4; width: 100%; height: 100%; border-radius: 8px;
         border: 1px solid rgba(140, 190, 255, 0.22); image-rendering: pixelated;
         background: rgba(255, 255, 255, 0.04);
       }
-      #recipeTabs { display: flex; gap: 6px; margin-bottom: 8px; }
-      #recipeTabs .slot { width: 60px; height: 60px; padding: 4px 2px; font-size: 8px; letter-spacing: -.02em; }
-      #recipeList { display: grid; gap: 8px; max-height: calc(4 * 70px); overflow-y: auto; }
+      #recipeTabs { flex: none; }
+      /* Las categorias se quedan fijas; cuando sean mas, se deslizan a los
+         lados (pedido del autor). */
+      #recipeTabs {
+        display: flex; gap: 6px; margin-bottom: 8px; max-width: 100%;
+        overflow-x: auto; scrollbar-width: none;
+      }
+      #recipeTabs .slot { flex: none; width: 60px; height: 60px; padding: 4px 2px; font-size: 8px; letter-spacing: -.02em; }
+      #recipeList {
+        display: grid; gap: 8px; justify-items: center; align-content: start;
+        max-height: calc(4 * 70px); overflow-y: auto;
+      }
       /* La fila mide lo que su contenido, para que la carga acabe en el borde
          derecho de los ingredientes y no en el del panel (pedido del autor). */
       .recipe {
         position: relative; display: flex; gap: 8px; align-items: center;
-        width: max-content; justify-self: start;
+        width: max-content;
       }
       .recipe .ingredients {
         display: flex; gap: 4px; padding: 4px; border-radius: 8px;
@@ -475,16 +498,21 @@
         top: calc(74px + env(safe-area-inset-top));
         bottom: calc(10px + var(--atk) + 12px + 2 * var(--side) + 20px + env(safe-area-inset-bottom));
         transform: none; grid-template-columns: 1fr; justify-items: center;
-        overflow-y: auto; padding: 0 12px 12px; align-content: start;
+        display: flex; flex-direction: column; overflow: hidden; padding: 0 12px 12px; gap: 0;
       }
+      body.touch-active #invPanel[hidden] { display: none; }
+      /* Fijos: las pestanas arriba, la zona de lo seleccionado abajo y las
+         categorias de recetas. Solo se desliza la rejilla del inventario o la
+         lista de recetas (pedido del autor). */
       body.touch-active .invPage { display: none; }
-      body.touch-active .invPage.current { display: block; }
+      body.touch-active .invPage.current { display: flex; flex: 1; }
+      body.touch-active #invGrid, body.touch-active #recipeList { max-height: none; flex: 0 1 auto; min-height: 0; }
       /* Las pestanas sustituyen a los titulos: todo el ancho en tres celdas
          iguales, cada nombre centrado en la suya y en orden fijo. */
       body.touch-active .invPage h2 { display: none; }
       body.touch-active #invTabs {
-        display: grid; grid-template-columns: repeat(3, 1fr); justify-self: stretch;
-        margin: 0 -12px 12px; border-bottom: 1px solid rgba(140, 190, 255, 0.22);
+        display: grid; grid-template-columns: repeat(3, 1fr); flex: none;
+        margin: 0 -12px 10px; border-bottom: 1px solid rgba(140, 190, 255, 0.22);
       }
       #invTabs button {
         -webkit-appearance: none; appearance: none; padding: 14px 0 12px;
@@ -493,18 +521,8 @@
         text-align: center; color: rgba(232, 238, 247, .38); touch-action: manipulation;
       }
       #invTabs button.on { color: #8fc4ff; border-bottom-color: #8fc4ff; }
-      body.touch-active #charArt { width: 110px; }
       body.touch-active .recipe .ingredients .slot { width: 46px; height: 46px; font-size: 8px; }
 
-      #toast {
-        position: fixed; z-index: 16; left: 50%; transform: translateX(-50%);
-        bottom: calc(var(--vitals-h) + 80px + env(safe-area-inset-bottom));
-        padding: 7px 14px; border-radius: 8px; font-size: 13px;
-        background: rgba(8, 14, 28, 0.86); border: 1px solid rgba(255, 232, 154, 0.4);
-        color: #ffe89a; opacity: 0; pointer-events: none; transition: opacity .15s;
-      }
-      #toast.show { opacity: 1; }
-      body.touch-active #toast { bottom: auto; top: calc(80px + env(safe-area-inset-top)); }
       #invPanel h2 {
         margin: 0 0 6px; font-size: 11px; letter-spacing: .14em;
         text-transform: uppercase; color: #8fc4ff; font-weight: 600;
@@ -816,10 +834,12 @@
       </div>
       <section class="invPage" data-page="personaje">
         <h2>Personaje</h2>
-        <div class="charBox">
-          <div class="equipCol" id="equipLeft"></div>
-          <canvas id="charArt" width="75" height="162"></canvas>
-          <div class="equipCol" id="equipRight"></div>
+        <div id="charGrid">
+          <canvas id="charArt" width="252" height="384"></canvas>
+        </div>
+        <div class="selected">
+          <div id="charSelSlot" class="slot off"></div>
+          <div class="selDesc">Equipables: llegaran con la ropa.</div>
         </div>
       </section>
       <section class="invPage current" data-page="inventario">
@@ -827,7 +847,7 @@
         <div id="invGrid" class="slots"></div>
         <div class="selected">
           <div id="selSlot" class="slot"></div>
-          <div id="selDesc">Toca un objeto para verlo. Arrastralo para moverlo; fuera del panel, se tira.</div>
+          <div id="selDesc" class="selDesc">Toca un objeto para verlo; arrastralo para moverlo.</div>
         </div>
       </section>
       <section class="invPage" data-page="recetas">
@@ -856,7 +876,6 @@
       <button id="discardNo" type="button">Cancelar</button>
       <button id="discardYes" type="button">Tirar</button>
     </div>
-    <div id="toast" role="status"></div>
 
     <button id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"
             aria-label="Estado del entorno">&#127807;</button>

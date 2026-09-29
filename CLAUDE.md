@@ -825,7 +825,7 @@ barra de **70 a 120 grados** (fue de 50 a 100 hasta el 2026-09-29) que sale desd
 los grados a su izquierda; **70 por defecto**. Todo eso y como se abre y se
 cierra es del autor (2026-09-28), y **solo existe en primera persona**. En
 **PC** se abre al **pasar el raton** por el ojo, sin clic, y salir no la
-cierra; en el **movil**, con un **toque sostenido de mas de 1 s**, y al soltar
+cierra; en el **movil**, con un **toque sostenido de mas de 0,5 s** (fue 1 s hasta el 2026-09-29), y al soltar
 no cambia de vista. Un toque corto en el ojo cambia de vista como siempre y la
 cierra aunque estuviera abierta; cualquier accion —una tecla, la rueda, apoyar
 el raton o el dedo fuera de ella— tambien. Por eso al ojo no lo cierra su
@@ -946,7 +946,11 @@ Decisiones del autor, que no se tocan sin preguntarle:
 - **Fabricar es mantener pulsado 1,5 s** el resultado de la receta, con la fila
   llenandose de izquierda a derecha **hasta el borde derecho de los
   ingredientes** (la fila mide lo que su contenido); sin ingredientes se ve
-  apagada y no hace nada, y sin sitio avisa de inventario lleno.
+  apagada y no hace nada, y sin sitio tampoco.
+- **No hay avisos en pantalla** (decision del autor, 2026-09-29): ni «necesitas
+  un pico», ni «inventario lleno», ni «fabricado». El nucleo sigue dejando
+  `lastBlocked`, pero nadie lo pinta. Fabricar sin sitio se resolvera en otra
+  tanda, con objetos que se tiran al suelo.
 - **Al golpear algo que no se rompe salen esquirlas**, mas pequenas, poco
   saturadas y semitransparentes que los escombros de romperlo (`spawnChips`,
   con `state.lastHits` del nucleo), y **no hay barra de progreso**.
@@ -976,11 +980,17 @@ Lo que el codigo tiene que respetar:
   se captura con uno de los dos abierto, `pointer-lock.ts` lo suelta en el acto
   (sin eso, F3 y el panel seguidos lo dejaban abierto con el cursor capturado).
 - **El panel es `inventory-ui.ts`**, segun los bocetos: en PC tres columnas
-  —PERSONAJE con diez equipables (apagados hasta la ropa), INVENTARIO con el
-  objeto seleccionado y su descripcion, RECETAS por categorias—; en el movil,
-  una pagina a la vez, elegida con las pestanas **Personaje | Inventario |
-  Recetas**: todo el ancho en tres celdas iguales, la elegida iluminada y en
-  orden fijo.
+  —PERSONAJE, INVENTARIO y RECETAS—; en el movil, una pagina a la vez,
+  elegida con las pestanas **Personaje | Inventario | Recetas**: todo el ancho
+  en tres celdas iguales, la elegida iluminada y en orden fijo.
+  **PERSONAJE** es el segundo boceto del autor, en PC y en el movil: el dibujo
+  en medio, tres equipables a cada lado y cuatro debajo (apagados hasta la
+  ropa). **PERSONAJE e INVENTARIO** llevan abajo la zona de lo seleccionado y
+  su descripcion, del mismo tamano y a la misma altura. En el movil **no se
+  desliza el panel entero**: pestanas, zona de lo seleccionado y categorias
+  de recetas se quedan fijas, y solo se deslizan la rejilla del inventario o
+  la lista de recetas, centradas; las categorias, cuando sean mas, a los
+  lados. El humo lo mide pagina por pagina.
 - **Arrastrar se prueba con toques de verdad** (`tools/gestures.mjs`): dentro
   de la barra con el inventario cerrado (y al vacio, sin tirar), de casilla a
   casilla y de la rejilla a la barra, y mantener una receta 1,5 s. En PC lo

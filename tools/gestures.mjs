@@ -116,7 +116,7 @@ const stopped = await page.evaluate(() => window.__verdant);
 check(stopped.sent.harvest === released.sent.harvest, 'la accion siguio repitiendo tras soltar el dedo');
 
 // La barra del angulo de vision, con toques de verdad: sostener el ojo mas de
-// 1 s la abre SOLO en primera persona y al soltar no cambia de vista; un toque
+// 0,5 s la abre SOLO en primera persona y al soltar no cambia de vista; un toque
 // corto cambia de vista y la cierra; tocar en otro sitio la cierra.
 const center = (id) => page.evaluate((i) => {
   const r = document.getElementById(i).getBoundingClientRect();
@@ -157,19 +157,25 @@ for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) {
   await tapReal(eye);
 }
 check((await probe()).projection === 'primera', 'tocar el ojo no llevo a la primera persona');
-// 300 ms y no 500: a partir de 500 Chrome lo toma por pulsacion larga y no
-// manda el `click`, asi que medio segundo exacto caia a un lado u otro segun
-// la carga de la maquina (medido: con 750, falla siempre).
-const early = await holdEye(300);
+// Un toque corto: 100 ms y soltar ANTES de leer el estado. Con los 0,5 s que
+// abren la barra hay poco margen en headless, que va a ~5 FPS: un fotograma
+// retrasa el soltar hasta 200 ms, y leer el estado con el dedo puesto tarda
+// otro tanto. Con 300 ms caia a veces.
+await ensureOthers();
+await real('touchStart', [eye]);
+await page.waitForTimeout(100);
+await real('touchEnd', []);
+await page.waitForTimeout(300);
+const early = await probe();
 check(!early.fovPanel, 'un toque corto en el ojo ya abrio la barra');
-check((await probe()).projection === 'perspectiva', 'un toque corto en el ojo no cambio de vista');
+check(early.projection === 'perspectiva', 'un toque corto en el ojo no cambio de vista');
 for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) {
   await ensureOthers();
   await tapReal(eye);
 }
-const holding = await holdEye(1300);
+const holding = await holdEye(800);
 const afterHold = await probe();
-check(holding.fovPanel, 'sostener el ojo mas de 1 s en primera persona no abrio la barra');
+check(holding.fovPanel, 'sostener el ojo mas de 0,5 s en primera persona no abrio la barra');
 check(afterHold.fovPanel && afterHold.projection === 'primera',
   `al soltar el ojo la barra se cerro o cambio la vista (${afterHold.projection})`);
 // Arrastrar el pulgar de la barra hasta el extremo derecho.

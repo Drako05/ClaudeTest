@@ -522,7 +522,6 @@ function frame(now: number): void {
         camera.projection === 'primera' ? SLASH_FP_HALF_WIDTH : SLASH_HALF_WIDTH,
       );
     }
-    items.notice(state);
     // Lo golpeado que siguio en pie suelta esquirlas: mas pequenas, apagadas y
     // semitransparentes que los escombros de romper (decision del autor).
     for (const hit of state.lastHits) {
@@ -557,7 +556,7 @@ function frame(now: number): void {
   // pausar los congela y a 64x no inundan la pantalla.
   effects.advance(scaled);
   // El aviso se apaga solo y la barra de trabajo sigue a lo que se golpea.
-  items.frame(dt);
+  items.frame();
   // La camara va con ellos porque la cinta del barrido se orienta hacia el ojo:
   // tumbada en el suelo se veia de canto al bajar la elevacion. Se pasa la del
   // frame ANTERIOR —`camera.follow` es unas lineas mas abajo—, y eso no se nota:
@@ -752,9 +751,6 @@ Object.defineProperty(window, '__verdant', {
       inventoryPage: items.currentPage,
       discardAsk: items.askingDiscard,
       lastUsed: state.lastUsed,
-      toast: (document.getElementById('toast') as HTMLElement).classList.contains('show')
-        ? (document.getElementById('toast') as HTMLElement).textContent
-        : null,
       chunks: state.world.loadedChunkCount,
       tracked: state.world.trackedChunkCount,
       fps,

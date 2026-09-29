@@ -69,8 +69,8 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El arrastre empieza a los **6 px** | Inventario de los bocetos | un numero |
 | Esquirlas de golpe: saturacion al **40 %**, opacidad **45 %** (las **8** por golpe son tuyas) | Inventario de los bocetos | numeros en `effects*.ts` |
 | Las diez casillas de equipables se ven **apagadas** hasta la ropa | Inventario de los bocetos | CSS |
+| La zona de lo seleccionado mide siempre lo mismo (una descripcion larga se desliza dentro) y en PERSONAJE dice «Equipables: llegaran con la ropa» | Ajustes del inventario, 2.ª ronda | CSS y texto |
 | Usar mirando a algo (sin nada util en la mano) **aun no hace nada** | Inventario de los bocetos | llega con puertas y demas |
-| Sostener el ojo **entre 0,5 y 1 s** no hace nada: Chrome lo toma por pulsacion larga y no manda el toque, y la barra pide mas de 1 s. Lo destapo la prueba de gestos | Ajustes del inventario | bajar `HOLD_MS` a 0,5 s, si lo quieres |
 | Los **dibujos** de los iconos: mano abierta, espada y pico cruzados, mochila, tres barras | Ajustes del inventario | SVG en `index.html` |
 | Pestanas del movil en letra de **16 px**, subrayada la elegida | Ajustes del inventario | CSS |
 | Confirmar al tirar: «¿Tirar N × Objeto?» con **Cancelar** y **Tirar**; tocar fuera cancela; si la casilla cambio entretanto, no se tira nada | Ajustes del inventario | `inventory-ui.ts` |
@@ -301,6 +301,19 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Ajustes del inventario, 2.ª ronda — HECHO (2026-09-29)
+
+- Sostener el ojo **0,5 s** abre la barra del angulo (era 1 s). De paso
+  desaparece el tramo muerto: de 0,5 a 1 s Chrome ya no mandaba el toque.
+- Panel del movil: el contenido pegado a las pestanas; pestanas, zona de lo
+  seleccionado (fija y centrada abajo) y categorias de recetas **fijas**; solo
+  se deslizan la rejilla del inventario y la lista de recetas, centradas.
+- **PERSONAJE** con tu boceto nuevo (tres a cada lado, cuatro abajo) y su zona
+  de descripcion, que encaja con la de INVENTARIO. En PC tambien, como
+  pediste.
+- **Ningun aviso en pantalla.** Fabricar sin sitio queda para la tanda de
+  objetos que se tiran al suelo.
 
 ## Ajustes del inventario — HECHO (2026-09-29)
 

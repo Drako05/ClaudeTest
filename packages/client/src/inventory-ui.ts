@@ -30,10 +30,8 @@ import { makePlayerArt } from './art.js';
 export const CRAFT_HOLD_MS = 1500;
 /** Lo que hay que mover el puntero para que un toque sea un arrastre. **Propuesta mia.** */
 const DRAG_SLOP = 6;
-/** Cuanto dura un aviso en pantalla, en segundos. */
-const TOAST_SECONDS = 1.6;
-/** Casillas de equipables a cada lado del personaje (boceto del autor). */
-const EQUIP_PER_SIDE = 5;
+/** Casillas de equipables: tres a cada lado del personaje y cuatro debajo (boceto del autor). */
+const EQUIP_SLOTS = 10;
 /** Categorias del recetario que se dibujan (boceto: cinco). */
 const CATEGORY_SLOTS = 5;
 const PAGES = ['personaje', 'inventario', 'recetas'] as const;
@@ -65,12 +63,6 @@ const SHORT: Record<number, string> = {
   [Resource.StonePickaxe]: 'Pico piedra',
 };
 
-const BLOCKED_TEXT = {
-  full: 'Inventario lleno',
-  needPickaxe: 'Necesitas un pico',
-  needBetterPickaxe: 'Necesitas un pico mejor',
-} as const;
-
 export interface ItemRequests {
   select: number;
   craft: number;
@@ -100,14 +92,12 @@ export class InventoryUi {
   private readonly discardText = byId('discardText');
   private readonly others = byId('others');
   private readonly invOpen = byId('invOpen');
-  private readonly toast = byId('toast');
   private readonly ghost = byId('dragGhost');
 
   private pending: ItemRequests = InventoryUi.none();
   private page: Page = 'inventario';
   /** Casilla cuyo objeto se describe. */
   private picked = -1;
-  private toastLeft = 0;
   /** Lo que espera confirmacion para tirarse. */
   private asking: { slot: number; item: Resource } | null = null;
   /** El toque que cerro la confirmacion, que no empieza un arrastre. */
@@ -149,14 +139,13 @@ export class InventoryUi {
       this.grid.appendChild(b);
     }
     // Los equipables, apagados hasta que haya ropa (tanda 2).
-    for (const side of ['equipLeft', 'equipRight']) {
-      const col = byId(side);
-      for (let i = 0; i < EQUIP_PER_SIDE; i++) {
-        const b = document.createElement('div');
-        b.className = 'slot off';
-        b.title = 'Equipable (llegara con la ropa)';
-        col.appendChild(b);
-      }
+    // La rejilla los coloca alrededor del dibujo (CSS de `#charGrid`).
+    const charGrid = byId('charGrid');
+    for (let i = 0; i < EQUIP_SLOTS; i++) {
+      const b = document.createElement('div');
+      b.className = 'slot off equip';
+      b.title = 'Equipable (llegara con la ropa)';
+      charGrid.appendChild(b);
     }
     this.drawCharacter();
     this.buildRecipes();
@@ -264,25 +253,12 @@ export class InventoryUi {
     return out;
   }
 
-  /** Cuenta lo que paso en el ultimo tick: avisos de golpe, rotura y fabricado. */
-  notice(state: GameState): void {
-    if (state.lastBlocked) this.say(BLOCKED_TEXT[state.lastBlocked]);
-    if (state.lastBroke) this.say('Se rompio la herramienta');
-    if (state.lastCrafted >= 0) this.say(`Fabricado: ${RESOURCE_NAMES[RECIPES[state.lastCrafted].output]}`);
-  }
-
-  private say(text: string): void {
-    this.toast.textContent = text;
-    this.toast.classList.add('show');
-    this.toastLeft = TOAST_SECONDS;
-  }
-
-  /** Cada frame: el aviso se apaga solo y la receta mantenida se carga. */
-  frame(dt: number): void {
-    if (this.toastLeft > 0) {
-      this.toastLeft -= dt;
-      if (this.toastLeft <= 0) this.toast.classList.remove('show');
-    }
+  /**
+   * Cada frame, la receta mantenida se carga. No hay avisos en pantalla
+   * —«necesitas un pico», «inventario lleno», «fabricado»—: el autor los quito
+   * todos el 2026-09-29. Lo que no cabe se resolvera tirando objetos al suelo.
+   */
+  frame(): void {
     if (this.hold) {
       const t = Math.min(1, (performance.now() - this.hold.since) / CRAFT_HOLD_MS);
       (this.hold.row.querySelector('.charge') as HTMLElement).style.width = `${t * 100}%`;
@@ -463,9 +439,9 @@ export class InventoryUi {
   }
 
   /**
-   * Fabricar: mantener pulsado el resultado. Sin ingredientes no arranca; sin
-   * sitio avisa de inventario lleno y no fabrica (decision del autor). Soltar
-   * o salirse antes de tiempo lo cancela.
+   * Fabricar: mantener pulsado el resultado. Sin ingredientes o sin sitio no
+   * arranca, y sin aviso (decision del autor). Soltar o salirse antes de tiempo
+   * lo cancela.
    */
   private bindHold(el: HTMLElement, row: HTMLElement, recipe: number): void {
     el.addEventListener('pointerdown', (e) => {
@@ -473,10 +449,7 @@ export class InventoryUi {
       const inv = this.current().inventory;
       const r = RECIPES[recipe];
       if (r.inputs.some((input) => inv.count(input.item) < input.count)) return;
-      if (!inv.fits([{ item: r.output, count: r.count }], r.inputs)) {
-        this.say('Inventario lleno');
-        return;
-      }
+      if (!inv.fits([{ item: r.output, count: r.count }], r.inputs)) return;
       this.cancelHold();
       this.hold = { recipe, since: performance.now(), row };
     });

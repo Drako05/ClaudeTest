@@ -22,8 +22,12 @@
 
 import { FP_FOV, FP_FOV_MAX, FP_FOV_MIN, type OrbitCamera } from './camera.js';
 
-/** Lo que hay que sostener el ojo para abrir la barra: mas de 1 s, del autor. */
-export const HOLD_MS = 1000;
+/**
+ * Lo que hay que sostener el ojo para abrir la barra, del autor: 1 s el
+ * 2026-09-28, 0,5 s el 2026-09-29. Es tambien donde Chrome da un toque por
+ * pulsacion larga y deja de mandar el `click`: asi no queda un tramo muerto.
+ */
+export const HOLD_MS = 500;
 
 /** Donde se guarda el angulo elegido. Solo es comodidad de cada jugador. */
 export const FOV_STORAGE_KEY = 'verdant.fpFov';

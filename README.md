@@ -78,7 +78,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Barra de arriba | Tocar una casilla la pone en la mano; arrastrar las ordena |
 | Boton INVENTARIO | Inventario, con pestanas Personaje, Inventario y Recetas; como en PC, arrastrar y mantener |
 | Boton OTROS | Cambiar de vista (el ojo), el HUD y el panel del entorno |
-| Sostener el ojo mas de 1 s | En primera persona, barra del angulo de vision; tocar fuera la cierra |
+| Sostener el ojo mas de 0,5 s | En primera persona, barra del angulo de vision; tocar fuera la cierra |
 
 **La mirada es una sola** en las tres vistas: el centro de la pantalla es hacia
 donde mira el jugador. Se golpea con un sector plano de 2,5 bloques y 90 grados
