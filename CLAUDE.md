@@ -194,9 +194,11 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     salir contando con el salto—. Medido en nueve semillas, cuesta mover el
     nacimiento entre 8 y 15 casillas, que en un mundo infinito no es nada.
 
-    El rellano no es lujo: sin el, en terreno escalonado **la accion alcanza una
-    casilla de las tres**, porque solo llega a las de la altura propia, y el
-    juego empieza pareciendo roto.
+    El rellano nacio cuando la accion solo alcanzaba casillas a la altura
+    propia: en terreno escalonado llegaba a una de tres y el juego empezaba
+    pareciendo roto. Ese modelo ya no existe (regla 12), pero el rellano se
+    queda: nacer en llano, sin un escalon que corte el golpe por delante, sigue
+    siendo la mejor primera impresion.
 
     Y una cuarta condicion, que aparecio como efecto secundario de la tercera:
     el terreno tiene que **sostener vida**. En este mundo lo llano son las
@@ -314,8 +316,8 @@ dependa del ritmo de fotogramas hay que medirlo con el reloj fingido**, no con
 el que tenga el headless.
 
 Dos habitos del humo que conviene conservar. Lo que depende del paisaje se
-comprueba **desde el nacimiento**, que es un rellano llano (regla 22) con las
-tres casillas al alcance, o yendo a un sitio buscado a proposito con `?x=&y=`
+comprueba **desde el nacimiento**, que es un rellano llano (regla 22), o
+yendo a un sitio buscado a proposito con `?x=&y=`
 (`probes.ts`); una comprobacion que depende de donde quedo el jugador pasa o
 falla por suerte, y eso ya paso. Y que un boton **llega a la Intent** se mide
 con los contadores `sent` de la sonda, no con su efecto: que sembrar plante
@@ -389,7 +391,7 @@ Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
   pared el trazo se pega a el (`slashEdge` en `effects.ts`, puro). No se
   recalcula nada: es el mismo golpe que decidio la simulacion. Sale de los ojos
   en las tres vistas, siempre, haya algo que golpear o no —es el gesto, no el
-  resultado—, y se congela en el mundo al nacer. En primera persona, a 2
+  resultado—, y se congela en el mundo al nacer. En primera persona, a 2,5
   bloques de los ojos, lleva medio ancho 0,04 (deduccion mia); en tercera, 0,06:
   los 3 px del isometrico con la casilla a 32, redondeados al alza desde 0,094
   porque PixiJS suavizaba el trazo y este lienzo va sin antialias. Antes fue un
@@ -661,12 +663,12 @@ imprime. No vale el alto del lienzo ni el ancla: un arbol ocupa 39 px de un
 lienzo de 58 y lo que queda por encima del ancla es la cota superior. Estimando por el lienzo me sali
 con que un brote mediria 1,52 bloques y una roca 2,88; medidos son 0,88 y 1,09.
 
-Dos cosas arrastro el cambio y no eran opcionales: **`EYE` de la camara** paso de
-1.2 a 1.6, porque 1.2 le quedaba por encima de la cabeza al personaje viejo y por
-las rodillas al nuevo (el 1.6 es deduccion mia); y **los escombros** llevan el
-mismo `BASE`, porque son astillas de lo que se derriba y sin el pasaban de chinas
-a polvo. El **alto** del barrido sube tambien —es el pecho del personaje— pero su
-**ancho** no: ese marca las casillas que la accion afecta, o sea que es del tile.
+Dos cosas arrastro el cambio y no eran opcionales: **la altura de los ojos**
+subio con el personaje —1.2 le quedaba por las rodillas al nuevo; paso a 1.6 y
+hoy es `EYE_HEIGHT = 1,75`, la misma para las tres vistas y el golpe (deduccion
+mia)—; y **los escombros** llevan el mismo `BASE`, porque son astillas de lo que
+se derriba y sin el pasaban de chinas a polvo. El barrido ya no depende de
+esto: recorre el borde del sector del golpe (ver «Efectos visuales»).
 
 Y una consecuencia que es de juicio del autor, no medible: **el relieve se lee
 menos de la mitad de alto**. Una pared de un bloque pasa de llegar al pecho a
@@ -738,10 +740,12 @@ arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
 - **Una cruz en el centro de la pantalla**, en las tres vistas y en PC y
   movil: como las tres comparten la mirada, el centro es justo hacia donde se
   mira y se golpea.
-- El **inventario** (I) no suelta el cursor; el **panel de desarrollo** (F3) lo
-  suelta pero **no pausa**, porque tiene su propia pausa y sirve para ver pasar
-  el tiempo; con el panel abierto se sigue arrastrando para girar, como antes.
-  Al cerrarlo se intenta capturar otra vez (la tecla cuenta como gesto).
+- El **inventario** (E) y el **panel de desarrollo** (F3) sueltan el cursor
+  pero **no pausan**: abrir el inventario no pausa por decision del autor, y el
+  panel tiene su propia pausa y sirve para ver pasar el tiempo; con el panel
+  abierto se sigue arrastrando para girar, como antes. Al cerrarlos se intenta
+  capturar otra vez (la tecla cuenta como gesto; Esc, al cerrar el inventario,
+  tambien vale, ver arriba).
 - Solo con puntero fino y hasta el primer toque de verdad (`mouseMode`): el
   movil no cambia, y un portatil tactil jugado con el dedo no se congela.
 - Muerto, el cursor se suelta para poder pulsar «Reiniciar», y reiniciar lo

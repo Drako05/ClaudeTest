@@ -481,8 +481,8 @@ function frame(now: number): void {
   intent.moveY = fwd.y * -move.y + rgt.y * move.x;
   intent.run = controls.running;
   // La mirada es la de la camara, decision del autor: se acciona hacia donde se
-  // mira, con el rumbo real y su inclinacion, que decide la segunda altura del
-  // cono (regla 12).
+  // mira, con el rumbo real y su inclinacion, que inclinan el sector del golpe
+  // (regla 12).
   intent.aimX = fwd.x;
   intent.aimY = fwd.y;
   intent.aimZ = Math.sin(camera.lookPitch);
@@ -496,7 +496,7 @@ function frame(now: number): void {
   const scaled = paused ? 0 : dt * dev.timeScale;
   accumulator += scaled;
 
-  // Los pestillos (salto, accion, comer, sembrar) se recogen SOLO si este frame
+  // Los pestillos (salto, accion, usar) se recogen SOLO si este frame
   // corre algun tick. La simulacion va a 60 Hz y la pantalla a lo que de: a mas
   // de 60 Hz muchos frames no llevan tick, y recogerlos ahi los tiraba en
   // silencio —medido en un modelo del bucle, un 32 % de las pulsaciones a 90 Hz,

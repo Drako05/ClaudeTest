@@ -1,9 +1,10 @@
 /**
- * La interfaz sobre el mundo: la franja de salud y hambre, el HUD, el
- * inventario, el panel del entorno y el aviso de muerte.
+ * La interfaz sobre el mundo: la franja de salud y hambre, el HUD, el panel
+ * del entorno y el aviso de muerte. El inventario vive aparte, en
+ * `inventory-ui.ts`.
  *
- * Las barras se ven siempre. El HUD, el inventario y el panel del entorno se
- * abren y cierran con su boton, arrancan cerrados, y mientras estan cerrados no
+ * Las barras se ven siempre. El HUD y el panel del entorno se abren y cierran
+ * con su boton, arrancan cerrados, y mientras estan cerrados no
  * se escribe en ellos: el DOM se toca diez veces por segundo y no hay por que
  * pagarlo por lo que no se ve.
  *

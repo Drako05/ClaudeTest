@@ -40,6 +40,18 @@ comprobacion en la prueba de humo del 3D:
 | 13 | Panel de desarrollo | `devtools.ts` tal cual, cableado al bucle | desarrollo: pausa, +1 h exacta, congelar, 16x, registro, F3 |
 | 14 | Bordes de chunk y bioma | `overlays.ts`, `biome-edges.ts` en coordenadas de mundo | desarrollo: dibujan, sobreviven al cambio de chunk, cero fuera de sitio; `tests/biome-edges-3d.test.ts` |
 
+La tabla es la foto del traslado (2026-09-26). Lo que cambio despues, para no
+buscarlo donde ya no esta:
+- **1 y 2**: comer y sembrar ya no tienen tecla ni boton propios; son USAR (clic
+  derecho o boton) con la baya o la semilla en la mano, `intent.use`.
+- **6**: el inventario salio del HUD a `inventory-ui.ts`.
+- **9**: `spike3d.html` es hoy `packages/client/index.html`.
+- **11**: `actionReach` ya no son casillas alrededor: son los objetos que toca el
+  sector del golpe (regla 12).
+- **12**: + y - siguen; la rueda del raton dejo de hacer zoom y recorre la barra
+  de la mano.
+- **14**: el test es hoy `tests/biome-edges.test.ts`.
+
 Y lo que no estaba en la tabla y se encontro por el camino: la semilla al azar
 cuando la URL no dice nada (el 3D usaba siempre la misma), `?t=` y `?x=&y=` para
 abrir a una hora o en un sitio, y las sondas de la prueba de humo (`probes.ts`).

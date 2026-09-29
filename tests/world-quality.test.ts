@@ -76,8 +76,8 @@ describe('calidad del mundo generado', () => {
     const level = world.levelAt(sx, sy);
 
     // Un rellano: las ocho vecinas pisables y al mismo nivel. De ahi salen a la
-    // vez que se pueda andar en cualquier direccion y que las tres casillas del
-    // area de accion esten al alcance.
+    // vez que se pueda andar en cualquier direccion y que ningun escalon corte
+    // el golpe por delante.
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         expect(world.levelAt(sx + dx, sy + dy), `vecina ${dx},${dy} a otro nivel`).toBe(level);

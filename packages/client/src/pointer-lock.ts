@@ -10,8 +10,9 @@
  * - **Sin cursor capturado, el juego esta en pausa**, con el aviso en
  *   pantalla. Tambien al arrancar: el navegador exige un clic para capturar.
  * - **Un clic en la pantalla lo captura y reanuda**, y ese clic no golpea.
- * - El **panel de desarrollo** suelta el cursor pero **no pausa**: tiene su
- *   propia pausa y sirve para ver pasar el tiempo. El inventario ni lo suelta.
+ * - El **panel de desarrollo** y el **inventario** sueltan el cursor pero **no
+ *   pausan**: el primero tiene su propia pausa y sirve para ver pasar el
+ *   tiempo, y abrir el inventario no pausa por decision del autor.
  *
  * El movil no entra aqui: `mouseMode` exige un puntero fino y se apaga al
  * primer toque de verdad (`touch-active`), para que un portatil tactil jugado
@@ -51,9 +52,9 @@ export class MouseLook {
   ) {
     this.fine = window.matchMedia?.('(pointer: fine)').matches ?? false;
     // Capturar es asincrono: si entre pedirlo y conseguirlo se abrio un panel
-    // que quiere el cursor libre (desarrollo, fabricar), se suelta en el acto.
-    // Sin esto, pulsar F3 y C seguidos dejaba el panel abierto con el cursor
-    // capturado y sus botones sin poder pulsarse.
+    // que quiere el cursor libre (desarrollo, inventario), se suelta en el acto.
+    // Sin esto, abrir un panel justo tras pedir la captura lo dejaba abierto
+    // con el cursor capturado y sus botones sin poder pulsarse.
     document.addEventListener('pointerlockchange', () => {
       if (this.locked && this.devOpen()) document.exitPointerLock();
     });

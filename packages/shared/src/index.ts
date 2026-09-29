@@ -508,9 +508,8 @@ export interface Intent {
   aimY: number;
   /**
    * Componente vertical de la mirada: el seno de su inclinacion, negativo hacia
-   * abajo. Decide que segunda altura alcanza la accion —la de arriba, o la de
-   * abajo si se mira hacia abajo mas de 25 grados— (`levelStep` en `sim/aim.ts`).
-   * Sale de la camara, como `aimX`/`aimY`.
+   * abajo. Inclina el sector del golpe y decide donde toca el suelo para
+   * sembrar (regla 12, `sim/aim.ts`). Sale de la camara, como `aimX`/`aimY`.
    */
   aimZ: number;
   /** Casilla de la barra que se quiere en la mano, o -1 si no cambia. */

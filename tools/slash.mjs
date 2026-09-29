@@ -88,10 +88,12 @@ console.log(`nace en ${spawn.x.toFixed(1)}, ${spawn.y.toFixed(1)}`);
 // El boton de accion esta oculto hasta que haya un dedo de por medio, asi que se
 // da uno. Con el puntero fingido fino de arriba, esto mide exactamente la via del
 // primer toque: tiene que salir «oculto al cargar, visible tras tocar».
-const padBefore = await page.isVisible('#thumbPad');
+// Se mira el boton de accion, no `#thumbPad`: el contenedor mide 0x0 desde que
+// cada boton va fijado por su cuenta, y Playwright lo daba siempre por oculto.
+const padBefore = await page.isVisible('#action');
 await page.touchscreen.tap(WIDTH / 2, HEIGHT / 2);
 await page.waitForTimeout(300);
-const padAfter = await page.isVisible('#thumbPad');
+const padAfter = await page.isVisible('#action');
 console.log(`racimo del pulgar: ${padBefore ? 'visible' : 'oculto'} al cargar, ${padAfter ? 'visible' : 'oculto'} tras tocar`);
 if (!padAfter) {
   console.log('NO se revelan los botones al tocar; la medida no valdria');

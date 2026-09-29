@@ -32,7 +32,6 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | **El mundo es empinado**: de cuatro direcciones solo una lleva a alguna parte, y saltando | Fase 2 del relieve | calibracion del relieve (regla 14) |
 | El bonus de equilibrio **no lo cobra lo inerte** (piedra y minerales) | Cabos sueltos | una linea |
 | Como se agrupa un bioma: la conexion es por chunk y `isTracked` no caduca | Cabos sueltos | trabajo de verdad |
-| `EYE = 1.6` para la camara, al crecer el personaje | Proporciones nuevas | un numero |
 | **El relieve se lee menos de la mitad de alto** tras las proporciones | Proporciones nuevas | calibracion del relieve |
 | El grosor del barrido: 0,12 casillas, redondeado al alza por el antialias | El barrido del 3D | un numero |
 | Los ojos a **1,75** para las tres vistas y el golpe (la orbital miraba a 1,6) | Golpe por hitbox y una sola mirada | un numero en `sim/aim.ts` |
@@ -46,12 +45,10 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El cuarto de vuelta propio de cada aspa | Las features ya son aspas | un numero |
 | El tamano y la intensidad de la sombra tumbada | Las features ya son aspas | dos numeros |
 | El material de las aspas **no se ilumina**, para que el aspecto no cambiara | Las features ya son aspas | cambiar a Lambert, con pegas |
-| Comer y sembrar en el racimo del pulgar: a la izquierda de todo y los mas pequenos | El isometrico se retira | CSS |
 | La noche como **vela sobre la pantalla**, no bajando las luces | El isometrico se retira | trabajo de verdad si se quiere luz |
 | Sin `?seed` se juega un mundo al azar (el 3D usaba siempre el 12345) | El isometrico se retira | una linea |
 | Salud y hambre **apiladas** (salud arriba), la franja de 50 px y **sin numero** en las barras | La franja de salud y hambre | CSS |
-| La mochila del inventario y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y el muslo | La franja de salud y hambre | SVG |
-| Con el inventario abierto en el movil, el panel **tapa** comer, sembrar y correr hasta que se cierra | La franja de salud y hambre | CSS |
+| Los iconos de los botones y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y el muslo | La franja de salud y hambre | SVG |
 | El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `CLAUDE.md`, racimo del pulgar | un numero |
 | Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 70-120, 70 por defecto) | `CLAUDE.md`, las tres vistas | un numero en `camera.ts` |
 | Sensibilidad del raton capturado: **0,0025 rad por pixel** (unos 0,14 grados) | El raton lleva la mirada | un numero en `camera.ts` |
@@ -60,7 +57,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Un toque de verdad **apaga** el modo raton (portatil tactil), y ya no hay pausa por el cursor | El raton lleva la mirada | una linea |
 | Textos del aviso: «Haz clic para jugar» al arrancar y «Haz clic para continuar» despues | El raton lleva la mirada | HTML |
 | Casillas iniciales y tope: **16 y 100**, ya decididos por el autor (antes, 8 y 20 mios) | Recoleccion y fabricacion | — |
-| Lo que no cabe: el golpe **no completa** y el objeto se queda; tirar (soltar fuera del panel) lo **hace desaparecer** | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
+| Lo que no cabe: el golpe **no completa** y el objeto se queda, sin aviso; tirar (soltar fuera del panel y confirmar) lo **hace desaparecer**, hasta que haya objetos en el suelo | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
 | Las **descripciones** de los objetos (una frase cada uno) | Inventario de los bocetos | texto en `inventory-ui.ts` |
 | La **barrita de desgaste** en las herramientas (no estaba en el boceto) | Inventario de los bocetos | CSS |
 | OTROS se cierra tocando fuera; su columna va centrada bajo el, y el HUD se abre a su lado para no taparla | Inventario de los bocetos | CSS y una linea |
@@ -93,15 +90,14 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La barra del angulo: **180 px** de largo, paso de **1 grado**, se despliega en **150 ms** | Angulo de vision ajustable | CSS y un atributo |
 | En PC la abre solo el **raton** al pasar; un dedo que toca el ojo no cuenta como pasar por encima | Angulo de vision ajustable | una linea en `fov-panel.ts` |
 | **Cualquier tecla** la cierra, flechas incluidas (con la barra enfocada no la mueven: se anda) | Angulo de vision ajustable | una linea |
-| Los grados son **verticales**, como el 70 de siempre: a 100, un movil apaisado ve mas de 140 en horizontal | Angulo de vision ajustable | una conversion |
-| Con raton el catalejo vuelve **0,8 s** despues del ultimo giro de rueda (no hay «soltar») | `CLAUDE.md`, las tres vistas | un numero |
+| Los grados son **verticales**, como el 70 de siempre: a 120, un movil apaisado ve unos 150 en horizontal | Angulo de vision ajustable | una conversion |
+| Con teclado el catalejo vuelve **0,8 s** despues de la ultima pulsacion de + o - | `CLAUDE.md`, las tres vistas | un numero |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
-| Tronco = el tramo **desnudo** hasta la copa, y la copa **conserva su tamano** | Arboles altos | redibujar el arte |
+| Tronco = el tramo **desnudo** hasta la copa, que se apoya encima | Arboles altos | redibujar el arte |
 | El tronco desnudo **por especie** (μ ± σ): picea comun 2,5 ± 0,35, alerce 4 ± 0,5, roble 2,4 ± 0,3, cerezo 2,2 ± 0,2, picea negra 2,1 ± 0,1, picea azul 2,2 ± 0,2; **truncada** en `[max(2, μ−2σ), μ+2σ]` | Troncos por especie | numeros en `sim/trunk.ts` |
 | Grosor del tronco por especie (0,45; 0,40; **0,75**; 0,50; **0,22**; 0,40) y que crezca con `√(desnudo/μ)` | Troncos por especie | numeros en `sim/trunk.ts` |
 | **Casi todas las copas quedan justo sobre la cabeza** (el minimo es 2 y el jugador mide 1,93); solo el alerce las deja altas | Troncos por especie | las medias de la tabla |
 | El tronco va en escalones de **un cuarto de bloque** (13 alturas) | Arboles altos | un numero |
-| Coniferas, frondosos y los **raros** sacan el tronco de la misma normal | Arboles altos | un `if` |
 | El **alto de copa** de cada especie (5; 4,5; 3,5; 3; 5; 4,5) y el numero de pisos de las coniferas | Arboles con forma de su especie | numeros en `tree-shapes.ts` |
 | Los pisos de las coniferas con **base plana**, sin puntas caidas | Arboles con forma de su especie | una linea |
 | La punta engrosada de la picea negra: **tres pisos cortos que cierran en punta** desde el 62 % de la copa | Arboles con forma de su especie | numeros en `art.ts` |
@@ -112,6 +108,43 @@ Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
 al encadenarlos, pulsados en pleno vuelo. La causa esta localizada y el plan
 escrito, y el 2026-09-28 decidiste **seguir sin margen de espera ni coyote
 time** hasta ver si basta el arreglo de los pestillos (abajo).
+
+---
+
+## Auditoria antes de la tanda 2 (2026-09-29)
+
+A peticion tuya, antes de la tanda 2. No aparecio ningun fallo del juego; si
+restos de modelos ya sustituidos y tres comprobaciones rotas:
+
+- **Tres comprobaciones que no median lo que decian:**
+  - El humo daba por bueno un golpe solo hasta **2 bloques**: con el alcance
+    en 2,5, un golpe legitimo a 2,3 lo habria hecho fallar.
+  - El humo afirmaba que en PC **no** se ve `#thumbPad`, pero el contenedor
+    mide 0x0 desde que cada boton va fijado por su cuenta: esa comprobacion no
+    podia fallar. Ahora mira los cuatro botones.
+  - La hermana del mismo fallo: `npm run slash` miraba `#thumbPad` para saber
+    si el toque revelaba los botones, y como nunca «se veia», abortaba.
+- **`npm run shots` no funcionaba**: era de antes del cursor capturado, y su
+  primer arrastre capturaba el cursor. Ahora abre con el panel de desarrollo.
+  Ni `shots` ni `slash` corren en CI, por eso nadie lo vio.
+- **Restos de texto**:
+  - el cono, la «segunda altura» y las «tres casillas» en comentarios;
+  - la doc de `aimZ` citaba `levelStep`, que ya no existe;
+  - la rueda como zoom, en nombres de variable y comentarios;
+  - «el inventario no suelta el cursor»;
+  - `CLAUDE.md`, `README.md`, `docs/leyes.md` («el relieve no existe») y
+    `docs/isometrico.md`;
+  - aqui, filas de «Esperando tu juicio» de cosas que ya no existen, y notas
+    «*Luego*» en las secciones cuya historia cambio despues.
+- **Una regla CSS duplicada** (`#invPanel h2` pisaba a `.invPage h2`), fundida
+  en una con el mismo aspecto.
+
+Se dejo a proposito:
+- `lastBlocked`, `lastBroke` y `lastCrafted`: son resultado del nucleo y los
+  usan los tests, aunque nadie los pinte.
+- `main.ts`: es largo, pero lineal.
+
+Queda para ti meter `npm run gestures` en CI.
 
 ---
 
@@ -296,64 +329,69 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
 
 ### Lo que la migracion tenia que resolver
 
-1. **El terreno tapa al jugador** cuando la camara queda detras de una loma. En 3D
-   se resuelve con colision de camara o atenuando lo que se interpone; son
-   soluciones estandar, no otro callejon.
+1. ~~**El terreno tapa al jugador** cuando la camara queda detras de una loma.~~
+   **Hecho el 2026-09-28** con colision de camara (`camera-collision.ts`): se
+   para antes del terreno y de los troncos.
 2. **El personaje de frente y de espaldas**: un billboard plano se lee bien en un
    arbol y regular en un humanoide.
 3. **Agrupar los sprites.** Entre 100 y 300 draw calls segun el angulo, casi todos
    arboles sueltos. A 80 FPS no bloquea, pero es la primera optimizacion.
 4. ~~Que se retira del isometrico.~~ **Hecho el 2026-09-26**: se retiro entero
-   (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
+   (ver «El isometrico se retira»). Los puntos 2 y 3 siguen abiertos.
 
 ---
 
-## Ajustes del inventario, 3.ª ronda — HECHO (2026-09-29)
+## Ajustes del inventario, en tres rondas — HECHO (2026-09-29)
 
-- Otro dibujo para el ATAQUE (espada y pico cruzados).
+Probaste el inventario de los bocetos y pediste ajustes en tres rondas. Lo que
+quedo:
+
+**Pantalla del movil**
+- CORRER y SALTAR al borde derecho del ATAQUE; USAR a su borde de abajo.
+- OTROS despliega en columna debajo de el.
+- La barra de la mano, en el centro exacto de arriba.
+- **Solo iconos**, sin rotulos; el del ataque, redibujado en la tercera ronda.
+- USAR y SALTAR se encienden al tocarlos.
+
+**Panel del inventario**
+- Pestanas **Personaje | Inventario | Recetas** en lugar de las flechas, con
+  el contenido pegado a ellas.
+- Fijos: las pestanas, la zona de lo seleccionado (centrada abajo) y las
+  categorias de recetas. Solo se deslizan la rejilla y la lista de recetas.
+- **PERSONAJE** con tu segundo boceto (tres a cada lado, cuatro abajo), en PC
+  y en el movil, con su zona de descripcion encajada con la de INVENTARIO.
+- La descripcion se limpia al tocar una casilla vacia, y al abrir no hay
+  nada seleccionado.
+
+**Fabricar y mover**
+- Fabricar en **1,5 s**, con la carga hasta el borde de los ingredientes.
+- Arrastrar entre la rejilla y la barra con el inventario abierto, y dentro
+  de la barra con el cerrado.
+- Tirar pide confirmacion; desde la barra cerrada, soltar al vacio no tira.
+- **Ningun aviso en pantalla.** Fabricar sin sitio queda para la tanda de
+  objetos que se tiran al suelo.
+- **Registro de objetos** «+5 Madera / -1 Bayas»: bajo INVENTARIO en el movil,
+  abajo a la derecha en PC (tu eleccion), maximo cinco lineas.
+
+**Mandos y vista**
+- Alcance del golpe y de sembrar: **2,5**.
+- **8 esquirlas** por golpe.
+- Angulo de la primera persona de **70 a 120**, 70 por defecto (lo guardado
+  por debajo de 70 se lee como 70).
+- Sostener el ojo **0,5 s** abre la barra del angulo (era 1 s). De paso
+  desaparece el tramo muerto: de 0,5 a 1 s Chrome ya no mandaba el toque.
 - PC: la **rueda recorre la barra de la mano** y el zoom queda con + y -.
 - PC: **Esc cierra el inventario** sin pausar. En pausa, **solo el clic
   reanuda** (tu eleccion: Chrome no deja volver a capturar con Esc).
 - **Cruz en el centro** de la pantalla, en todas las vistas.
-- USAR y SALTAR se encienden al tocarlos.
-- La descripcion se limpia al tocar una casilla vacia, y al abrir el
-  inventario no hay nada seleccionado.
-- **Registro de objetos** «+5 Madera / -1 Bayas»: bajo INVENTARIO en el movil,
-  abajo a la derecha en PC (tu eleccion), maximo cinco lineas.
 
-## Ajustes del inventario, 2.ª ronda — HECHO (2026-09-29)
-
-- Sostener el ojo **0,5 s** abre la barra del angulo (era 1 s). De paso
-  desaparece el tramo muerto: de 0,5 a 1 s Chrome ya no mandaba el toque.
-- Panel del movil: el contenido pegado a las pestanas; pestanas, zona de lo
-  seleccionado (fija y centrada abajo) y categorias de recetas **fijas**; solo
-  se deslizan la rejilla del inventario y la lista de recetas, centradas.
-- **PERSONAJE** con tu boceto nuevo (tres a cada lado, cuatro abajo) y su zona
-  de descripcion, que encaja con la de INVENTARIO. En PC tambien, como
-  pediste.
-- **Ningun aviso en pantalla.** Fabricar sin sitio queda para la tanda de
-  objetos que se tiran al suelo.
-
-## Ajustes del inventario — HECHO (2026-09-29)
-
-Sobre la misma tanda:
-- Movil: CORRER y SALTAR al borde derecho del ATAQUE, USAR a su borde de
-  abajo; OTROS despliega en columna debajo; la barra, en el centro exacto de
-  arriba; **solo iconos**, sin rotulos.
-- Angulo de la primera persona de **70 a 120**, 70 por defecto (lo guardado
-  por debajo de 70 se lee como 70).
-- Fabricar en **1,5 s**, con la carga hasta el borde de los ingredientes.
-- Pestanas **Personaje | Inventario | Recetas** en lugar de las flechas.
-- Alcance del golpe y de sembrar: **2,5**.
-- **8 esquirlas** por golpe.
-- Arrastrar entre la rejilla y la barra con el inventario abierto, y dentro de
-  la barra con el cerrado; tirar pide confirmacion, y desde la barra cerrada
-  soltar al vacio no tira.
-
-Lo comprueban los tests del golpe (2,4 cae, 2,8 no; sembrar a 2,24 si, a 2,69
-no) y del angulo, el humo (alineaciones medidas, pestanas, iconos, confirmar,
-de la rejilla a la barra, 1,5 s) y los gestos con toques de verdad (la barra
-cerrada, de la rejilla a la barra, receta 1,5 s).
+Lo comprueban:
+- los tests del golpe (2,4 cae, 2,8 no; sembrar a 2,24 si, a 2,69 no), los del
+  angulo y los del registro (`tests/pickup-feed.test.ts`);
+- el humo: alineaciones medidas, pestanas, iconos, confirmar, de la rejilla a
+  la barra, 1,5 s, la rueda, Esc, la cruz, la descripcion y el registro;
+- los gestos con toques de verdad: la barra cerrada, de la rejilla a la barra,
+  receta 1,5 s, y USAR y SALTAR encendidos.
 
 ## Inventario de los bocetos, y usar con clic derecho — HECHO (2026-09-28)
 
@@ -367,10 +405,13 @@ Probaste la tanda 1 y pediste cambios, con dos bocetos:
   USAR y ATAQUE abajo, con CORRER y SALTAR encima.
 - **16 casillas** y pilas de **100**.
 - **Arrastrar** mueve, apila o intercambia, y soltar fuera tira.
-- **Fabricar es mantener 2 s**.
+- **Fabricar es mantener 2 s** (luego 1,5 s).
 - **Esquirlas** pequenas, semitransparentes y poco saturadas al golpear sin
   romper, y sin barra de progreso.
 - Sin iconos, y la cantidad solo como numero.
+
+Varias cosas de aqui cambiaron en los ajustes de arriba: pestanas en vez de
+flechas, iconos en los botones, 1,5 s para fabricar, confirmar al tirar.
 
 Lo que decidi yo esta arriba, en «Esperando tu juicio».
 
@@ -398,8 +439,8 @@ Lo que decidi yo, con cifras, esta arriba en «Esperando tu juicio».
 **Tanda 1, hecha**: etapas 1 a 3.
 - A mano: guijarros (piedra), arbustos (bayas y fibra), arboles (ramas).
 - Hacha y pico de piedra, fabricados a mano.
-- El hacha tala en 4 golpes. El pico saca roca, carbon y cobre; el hierro dice
-  «Necesitas un pico mejor».
+- El hacha tala en 4 golpes. El pico saca roca, carbon y cobre; el hierro pide
+  un pico mejor (lo decia un aviso, que retiraste el 2026-09-29 con los demas).
 
 Lo comprueban `tests/crafting.test.ts`, con una partida guionizada de las manos a
 los minerales, y el humo. El humo fabrica un pico desde el panel con los
@@ -410,6 +451,9 @@ pierda):
 
 - **Estaciones**, colocadas con F en la casilla que toca la mirada (sin estacion
   en la mano, F siembra). Estorban el paso y se recogen a mano con 3 golpes.
+  - **A decidir al empezar la tanda: F ya no existe** (el 2026-09-28 sembrar
+    paso a USAR con la semilla en la mano). Lo natural seria colocar tambien
+    con USAR, llevando la estacion en la mano; es decision tuya.
   - Mesa de trabajo = 8 madera: recetas de mesa a menos de 3 casillas.
   - Horno = 10 piedra + 2 carbon: fundir a menos de 3 casillas.
 - **Fundir**, instantaneo:
@@ -459,6 +503,9 @@ vista (Chrome manda un salto espurio al capturar que se descarta, y sin eso
 giraba 90 grados), el clic que reanuda no golpea, F3 suelta sin pausar e I no
 suelta. El movil no cambia: los gestos y el humo movil pasan igual.
 
+*Luego*: el inventario paso a la tecla E y **si** suelta el cursor, sin pausar;
+Esc lo cierra.
+
 ## Angulo de vision ajustable — HECHO (2026-09-28)
 
 Pediste poder cambiar el campo de vision de la primera persona dentro del juego.
@@ -475,6 +522,8 @@ Sostener el ojo abre la barra solo en primera persona, medio segundo no la
 abre, el dedo la arrastra de 70 a 100 y tocar el mundo la cierra. El toque
 corto cambia de vista y la cierra. Con el clic del toque sostenido sin tragar,
 la comprobacion cae.
+
+*Luego* (2026-09-29): la barra va de 70 a 120 y el toque sostenido es de 0,5 s.
 
 ## Golpe por hitbox y una sola mirada — HECHO (2026-09-28)
 
@@ -506,6 +555,9 @@ El tronco de cada arbol se mudo al nucleo (`sim/trunk.ts`): el que se dibuja y
 el que se golpea son el mismo numero. Medido: mirando arriba del todo, la camara
 queda a 0,46 de los ojos y 0,30 sobre el suelo; el barrido llega a pantalla en
 todas las vistas y rumbos. Lo que decidi yo, arriba en «Esperando tu juicio».
+
+*Luego* (2026-09-29): el alcance subio a **2,5**, tambien para sembrar, y
+basta mirar unos 35 grados hacia abajo, lo que da la camara de arranque.
 
 ## La accion es un cono — SUSTITUIDO (2026-09-28)
 
@@ -619,7 +671,10 @@ Una consecuencia a mirar: vista desde arriba, un bosque denso ahora **tapa mas
 al jugador**. Es el cabo de la camara que ya estaba en la lista («que el
 terreno tape al jugador sin perderlo de vista»), que ahora aprieta un poco mas.
 
-## La accion alcanza tambien la casilla que se pisa — HECHO
+## La accion alcanza tambien la casilla que se pisa — SUSTITUIDO
+
+Sustituido el 2026-09-28 por el cono y, el mismo dia, por el golpe por hitbox
+(arriba). Queda como historia.
 
 Pedido del autor: cuatro casillas en vez de tres, con su enunciado sobre una
 rejilla 1-9 (jugador en el 5; mirando a 2 → 1, 2, 3 y 5; mirando a 3 → 2, 3, 6
@@ -812,6 +867,12 @@ es una parabola simetrica con el **apice a una casilla exacta** y **alcance dos*
 - **La accion pasa a ser exclusivamente el clic derecho**; Espacio queda para el
   salto, y en movil se anade un boton de salto.
 
+*Luego*: las dos ultimas quedaron superadas. El golpe es el sector de la
+regla 12, que alcanza a cualquier altura mientras el terreno no lo corte, y
+desde el 2026-09-28 golpea el clic **izquierdo** y el derecho **usa**. Igual
+con `actionArea`, que ya no existe: `actionReach` son los objetos que toca el
+sector.
+
 ### Numeros
 
 | Constante | Valor | Origen |
@@ -975,10 +1036,9 @@ importa con fotogramas largos.
 ## Aparcado a proposito por el autor
 
 - **Las rampas**, a revisar al ver el relieve nuevo.
-- **El encuadre**: una cima de 40 niveles son 640 px y el zoom normal se queda
-  corto en el isometrico. Con la camara libre puede dejar de ser un problema.
-- La estetica del HUD, la fauna, el procesado de recursos y el crafteo, las
-  especies de costa, el subsuelo, y la construccion y destruccion del terreno.
+- La estetica del HUD, la fauna, las especies de costa, el subsuelo, y la
+  construccion y destruccion del terreno. (El encuadre de las cimas era cosa
+  del isometrico y se fue con el; el crafteo ya esta en marcha.)
 
 ---
 

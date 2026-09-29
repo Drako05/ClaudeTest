@@ -9,15 +9,16 @@
  *
  * Las teclas son las de siempre: WASD o flechas para andar, Espacio salta,
  * Shift enciende y apaga la carrera, E abre el inventario, 1-4 eligen la
- * mano, R empieza un mundo nuevo, + y - acercan y alejan, y P cambia de
- * proyeccion. Clic izquierdo golpea y clic derecho usa lo de la mano.
+ * mano, como la rueda del raton, R empieza un mundo nuevo, + y - acercan y
+ * alejan, y P cambia de proyeccion. Clic izquierdo golpea y clic derecho usa
+ * lo de la mano.
  */
 
 import { Gestures, STICK_RADIUS } from './gestures.js';
 import type { MouseLook } from './pointer-lock.js';
 
 /** Cuanto aguanta el catalejo tras la ultima pulsacion de + o -, en ms. */
-const WHEEL_HOLD_MS = 800;
+const ZOOM_HOLD_MS = 800;
 /**
  * Rueda que cuesta pasar una casilla de la barra con un trackpad, en pixeles;
  * una muesca de raton la supera siempre y pasa justo una. **Deduccion mia.**
@@ -97,13 +98,13 @@ export class Controls {
         // mano (pedido del autor). El paso es el de la rueda de antes: 1.25.
         case 'Equal':
         case 'NumpadAdd':
-          this.wheelZoom /= 1.25;
-          this.lastWheelAt = performance.now();
+          this.keyZoom /= 1.25;
+          this.lastZoomKeyAt = performance.now();
           break;
         case 'Minus':
         case 'NumpadSubtract':
-          this.wheelZoom *= 1.25;
-          this.lastWheelAt = performance.now();
+          this.keyZoom *= 1.25;
+          this.lastZoomKeyAt = performance.now();
           break;
         default:
           break;
@@ -195,11 +196,11 @@ export class Controls {
     canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
   }
 
-  private wheelZoom = 1;
+  private keyZoom = 1;
   /** Rueda acumulada que aun no llega a una casilla. */
   private wheelAcc = 0;
-  /** Ultima vez que se giro la rueda o se pulso + / -, en ms. */
-  private lastWheelAt = -Infinity;
+  /** Ultima vez que se pulso + o -, en ms. */
+  private lastZoomKeyAt = -Infinity;
   private jumpQueued = false;
   private useQueued = false;
   private runEl: HTMLElement | null = null;
@@ -415,18 +416,18 @@ export class Controls {
   }
 
   /**
-   * Si el zoom se esta sosteniendo: pinza apoyada, o rueda girada hace menos de
-   * `WHEEL_HOLD_MS`. Con raton no hay «soltar», asi que el catalejo de la
-   * primera persona vuelve cuando se deja de girar un momento (deduccion del
-   * agente, no del autor).
+   * Si el zoom se esta sosteniendo: pinza apoyada, o + / - pulsado hace menos
+   * de `ZOOM_HOLD_MS`. Una tecla no se «suelta» a efectos del catalejo, asi que
+   * el de la primera persona vuelve cuando se deja de pulsar un momento
+   * (deduccion del agente, no del autor).
    */
   get zoomHeld(): boolean {
-    return this.gestures.pinchHeld || performance.now() - this.lastWheelAt < WHEEL_HOLD_MS;
+    return this.gestures.pinchHeld || performance.now() - this.lastZoomKeyAt < ZOOM_HOLD_MS;
   }
 
   takeZoom(): number {
-    const out = this.gestures.takeZoom() * this.wheelZoom;
-    this.wheelZoom = 1;
+    const out = this.gestures.takeZoom() * this.keyZoom;
+    this.keyZoom = 1;
     return out;
   }
 }

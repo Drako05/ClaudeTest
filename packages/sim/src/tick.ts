@@ -153,7 +153,7 @@ export function step(state: GameState, intent: Intent): void {
     // raton se mira a donde apunta el cursor aunque se ande en otra direccion.
     // Sin apuntado la mirada sigue al movimiento, que es lo de siempre.
     // La mirada entra tal cual, sin encajarla en ocho direcciones: es el eje del
-    // cono de la accion (`sim/aim.ts`), y redondearla era justo lo que hacia que
+    // sector del golpe (`sim/aim.ts`), y redondearla era justo lo que hacia que
     // en primera persona se golpeara lo que no estaba delante de los ojos.
     const aimLen = Math.hypot(intent.aimX, intent.aimY);
     if (aimLen > 0) {

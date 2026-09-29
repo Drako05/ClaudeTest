@@ -106,7 +106,7 @@ export class OrbitCamera {
   camDistance = 0;
   /**
    * El catalejo: fraccion del campo de vision de la primera persona. Vale 1 sin
-   * catalejo; la pinza o la rueda lo bajan y `relaxSpyglass` lo devuelve.
+   * catalejo; la pinza o + y - lo bajan y `relaxSpyglass` lo devuelve.
    */
   fovZoom = 1;
   /** Campo de vision de la primera persona elegido en la barra, en grados. */
@@ -211,8 +211,8 @@ export class OrbitCamera {
    *
    * Temporal por decision del autor: al soltar la pinza vuelve al campo de
    * vision de siempre. Con una transicion corta y no de golpe, para que no
-   * parezca un corte. `held` lo decide el mando (pinza en curso, o rueda
-   * girada hace un momento).
+   * parezca un corte. `held` lo decide el mando (pinza en curso, o + / -
+   * pulsado hace un momento).
    */
   relaxSpyglass(dt: number, held: boolean): void {
     if (held || this.fovZoom === 1) return;

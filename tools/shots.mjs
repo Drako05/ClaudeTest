@@ -15,7 +15,10 @@ const problems = [];
 page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()); });
 page.on('pageerror', (e) => problems.push(String(e)));
 
-await page.goto(`http://127.0.0.1:${port}/?seed=12345`, { waitUntil: 'load' });
+// Con el panel de desarrollo abierto (`dev=1`): el cursor queda libre y sin
+// pausa, asi que arrastrar gira la camara y el ojo se puede pulsar. Sin el, el
+// primer clic captura el cursor (`pointer-lock.ts`) y el ojo ya no se alcanza.
+await page.goto(`http://127.0.0.1:${port}/?seed=12345&dev=1`, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 console.log('HUD:', await page.textContent('#hud'));
 
@@ -69,7 +72,7 @@ console.log('OJO:', await eye());
 await page.screenshot({ path: 'screenshots/05-orto.png' });
 await page.click('#proj');
 await page.waitForTimeout(700);
-console.log('OJO de vuelta:', await eye());
+console.log('OJO tras otro toque:', await eye());
 
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 await browser.close();

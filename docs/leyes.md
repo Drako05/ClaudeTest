@@ -109,12 +109,10 @@ siempre el del tile que se pisa.
 - **Causalidad rastreable** (Capitulo I) es la ley mas exigente del libro y hoy
   no existe nada de ella. Merece una decision de diseno propia: registrar cadenas
   causales tiene un coste de memoria que hay que acotar antes de empezar.
-- **La transformacion de recursos** (Capitulo II) sigue siendo el hueco mas
-  visible jugando: la madera todavia no sirve para nada. Las semillas cierran un
-  primer ciclo, pero falta el procesado y el crafteo.
+- **La transformacion de recursos** (Capitulo II) ya tiene su primer paso:
+  ramas, piedra y fibra se fabrican en herramientas. Falta el procesado —fundir
+  en horno— y que la madera sirva para algo; las dos cosas son la tanda 2.
 - **La fauna** (Capitulos III y IV) no existe. El panel ya reserva su fila para
   dejar claro que falta. Las comunidades del Capitulo IV dependen de ella.
 - **Las especies** cubren bosque, pradera y tundra. La costa sigue sin vida
   propia, y la montana es mineral a proposito.
-- **El relieve** no existe: las tierras altas se llaman asi pero estan al mismo
-  nivel que el resto. El autor dira mas adelante como se trabajan las alturas.

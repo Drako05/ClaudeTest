@@ -59,11 +59,11 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Clic derecho | Usar lo de la mano: una baya se come, una semilla se siembra donde mira la camara |
 | `Espacio` | Saltar |
 | `Shift` | Correr: interruptor, se queda encendido |
-| `E` | Inventario y recetas (no pausa): arrastrar mueve o apila, soltar fuera tira, mantener 2 s una receta la fabrica |
+| `E` | Inventario y recetas (no pausa): arrastrar mueve o apila, soltar fuera tira (pide confirmacion), mantener 1,5 s una receta la fabrica |
 | `1`-`4` | Elegir la casilla de la barra: lo que se lleva en la mano |
 | `R` | Mundo nuevo |
 | `P` | Vista: perspectiva → isometrica → primera persona |
-| Raton sobre el ojo (en pausa) | En primera persona, barra del angulo de vision (50-100°); cualquier accion la cierra |
+| Raton sobre el ojo (en pausa) | En primera persona, barra del angulo de vision (70-120°); cualquier accion la cierra |
 | `F3` | Panel de desarrollo |
 
 **Tactil** (aparece solo en dispositivos de puntero grueso, o al primer toque)
@@ -84,15 +84,17 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 **La mirada es una sola** en las tres vistas: el centro de la pantalla es hacia
 donde mira el jugador. Se golpea con un sector plano de 2,5 bloques y 90 grados
 que sale de sus ojos y solo cuenta si toca un objeto —de un arbol, su tronco—;
-el terreno lo tapa. Se siembra donde la mirada toca el suelo. La camara no
-atraviesa bloques ni troncos.
+el terreno lo tapa. Se siembra donde la mirada toca el suelo. Una cruz en el
+centro de la pantalla marca ese punto. La camara no atraviesa bloques ni
+troncos.
 
 **Recolectar y fabricar.** Se nace sin nada. A mano se cogen guijarros
 (piedra), fibra y bayas de los arbustos, y ramas de los arboles, que no caen
 sin hacha. Con eso se fabrican el hacha y el pico de piedra, que talan arboles
 y sacan piedra, carbon y cobre golpe a golpe; el hierro pide un pico mejor. Las
 herramientas se gastan y se rompen, y el inventario son dieciseis casillas con
-pilas de cien. Al golpear algo que no se rompe saltan esquirlas pequenas.
+pilas de cien. Al golpear algo que no se rompe saltan esquirlas pequenas, y lo
+que entra o sale del inventario se anota en letra pequena («+5 Madera»).
 
 **En los dos:** la salud (corazon) y el hambre (muslo) van siempre abajo. En
 PC, de borde a borde, con el **HUD** (hora, dia, semilla, posicion, FPS) arriba
@@ -171,8 +173,9 @@ no se entera de que existe una pantalla tactil. El vector de la `Intent` es
 joystick producen exactamente lo mismo: uno con teclas, el otro con un pulgar.
 
 **Una malla por chunk, no por tile.** El terreno de cada chunk es una sola
-geometria con color por vertice, y las sombras de sus elementos van en un
-`InstancedMesh`: el coste va por chunk, no por casilla.
+geometria con color por vertice, y las sombras de sus elementos van en otra
+malla por chunk, apoyada casilla a casilla en el suelo: el coste va por chunk,
+no por casilla.
 
 **Las mutaciones viven fuera del chunk.** Un chunk puede descartarse y
 regenerarse en cualquier momento, asi que lo que el jugador cambia se guarda en
@@ -198,14 +201,17 @@ Encima de eso, lo que vino despues:
   mesetas y acantilados; y desde la fase 2 hay gravedad, salto y caida, asi que
   ya no se cambia de nivel andando.
 - **Camara libre en 3D**, con los elementos como aspas de dos laminas,
-  proporciones al estilo Minecraft —el jugador dos bloques, y los
-  arboles con un tronco de 2 a 5 para ver por debajo de la copa—, dia
-  y noche, y los efectos reutilizando la fisica que ya existia.
+  proporciones al estilo Minecraft —el jugador dos bloques, y cada arbol
+  con la forma de una especie real y un tronco de al menos 2 para ver por
+  debajo de la copa—, dia y noche, y los efectos reutilizando la fisica que ya
+  existia. La camara choca con el terreno y los troncos.
+- **Recolectar y fabricar**: de las manos a las herramientas de piedra, con
+  inventario por casillas (tanda 1; la 2 —mesa, horno, metales y ropa— espera).
 
-**Antes del multijugador quedan cabos de la camara nueva:** que el terreno tape
-al jugador sin perderlo de vista, los sprites de varias direcciones para el
-personaje y agrupar las aspas para bajar las draw calls. Los cabos sueltos y las
-decisiones que esperan al autor estan en `docs/pendiente.md`.
+**Antes del multijugador quedan cabos de la camara nueva:** los sprites de
+varias direcciones para el personaje y agrupar las aspas para bajar las draw
+calls. Los cabos sueltos y las decisiones que esperan al autor estan en
+`docs/pendiente.md`.
 
 Despues, y en este orden:
 
@@ -215,6 +221,6 @@ Despues, y en este orden:
   partidas pequenas, no mundo persistente masivo: el coste de servidor es el
   verdadero limite comercial de este genero.
 - **M3 — Mundo vivo**: simulacion por niveles de detalle (los chunks cercanos
-  entidad por entidad, los lejanos de forma estadistica agregada), fauna, clima y
-  ciclo dia/noche.
+  entidad por entidad, los lejanos de forma estadistica agregada), fauna y clima
+  (el ciclo dia/noche ya existe).
 - **M4 — Comercial**: persistencia, contenido, pulido y empaquetado nativo.

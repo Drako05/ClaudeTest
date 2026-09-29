@@ -399,7 +399,7 @@ describe('Usar lo de la mano', () => {
     }
   });
 
-  it('fabricar sin sitio avisa de inventario lleno y no fabrica', () => {
+  it('fabricar sin sitio no fabrica, y el nucleo lo deja dicho en lastBlocked', () => {
     const { state } = atSpawn();
     const inv = state.inventory;
     // Materiales de sobra, asi que sus casillas no se vacian al gastarlos, y

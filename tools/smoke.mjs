@@ -7,7 +7,7 @@
  * lo juega leyendo el estado real por `window.__verdant` y guarda capturas.
  *
  * Es la heredera del humo del isometrico y se lleva todas sus comprobaciones que
- * son del JUEGO —andar, hambre, recolectar, semillas, cono de la accion,
+ * son del JUEGO —andar, hambre, recolectar, semillas, golpe (regla 12),
  * barrido y escombros, joystick, pinza, carrera, salto, paredes, cima, mineral,
  * panel de desarrollo— mas una por cada cosa que se traslado del isometrico:
  * comer, sembrar, mirada de la camara, muerte y reinicio, HUD, reloj, panel del
@@ -357,7 +357,12 @@ async function desktopPass(browser, baseUrl) {
     thick[0].especie.startsWith('Picea negra') && thick[5].especie.startsWith('Roble'),
     `grosores fuera de orden: ${thick.map((c) => `${c.especie.split(' (')[0]} ${c.grosor.toFixed(2)}`).join(', ')}`,
   );
-  check(!(await page.isVisible('#thumbPad')), 'los botones del pulgar se ven en PC');
+  // Se mira un BOTON y no `#thumbPad`: el contenedor mide 0x0 desde que cada
+  // boton va fijado por su cuenta, asi que «no se ve» era verdad siempre y la
+  // comprobacion no podia fallar.
+  for (const id of ['#action', '#use', '#jump', '#run']) {
+    check(!(await page.isVisible(id)), `el boton ${id} del pulgar se ve en PC`);
+  }
   check(await page.isVisible('#proj'), 'el ojo de la proyeccion no se ve');
   check(await page.isVisible('#help'), 'la ayuda de teclado no se ve en PC');
 
@@ -430,7 +435,7 @@ async function desktopPass(browser, baseUrl) {
   check(turned.sent.harvest === before.sent.harvest, 'mover el raton acciono');
 
   // Lo que el golpe alcanza (regla 12) esta delante y al alcance: todo objeto
-  // cuyo hitbox toca el sector cae en una casilla a menos de 2 bloques mas su
+  // cuyo hitbox toca el sector cae en una casilla a menos de 2,5 bloques mas su
   // media diagonal, hacia donde se mira. Los numeros exactos del sector los
   // miden los tests del nucleo; aqui, que el que llega al juego es ese. Y la
   // reticula marca exactamente eso.
@@ -438,7 +443,9 @@ async function desktopPass(browser, baseUrl) {
     const dx = tx + 0.5 - turned.x;
     const dy = ty + 0.5 - turned.y;
     const d = Math.hypot(dx, dy);
-    check(d <= 2 + Math.SQRT1_2 + 1e-6, `se alcanza la casilla ${tx},${ty}, a ${d.toFixed(2)}`);
+    // El alcance es el del nucleo (2,5 desde el 2026-09-29): con el 2 de antes
+    // esta comprobacion habria dado por malo un golpe legitimo a 2,3.
+    check(d <= 2.5 + Math.SQRT1_2 + 1e-6, `se alcanza la casilla ${tx},${ty}, a ${d.toFixed(2)}`);
     check(d < 0.8 || (dx * turned.aim[0] + dy * turned.aim[1]) / d > 0, `se alcanza la casilla ${tx},${ty}, que queda detras`);
   }
   check(
@@ -763,9 +770,10 @@ async function resourcesPass(browser, baseUrl) {
     const seeds = seeded.inventory[3] + seeded.inventory[4];
     console.log(`  semillas tras recolectar: ${seeds}`);
     let planted = seeded;
-    // Se siembra donde la mirada toca el suelo, a menos de 2 bloques (regla
-    // 12): con los ojos a 1,75 hay que mirar unos 41 grados hacia abajo, y la
-    // camara arranca a 35. Bajar el raton baja la mirada.
+    // Se siembra donde la mirada toca el suelo, a menos de 2,5 bloques en
+    // horizontal (regla 12): con los ojos a 1,75 hay que mirar unos 35 grados
+    // hacia abajo, justo lo que da la camara de arranque; se baja algo mas para
+    // sembrar con margen. Bajar el raton baja la mirada.
     await look(page, 0, 120);
     await page.waitForTimeout(300);
     // Sembrar es usar la semilla en la mano: clic derecho. F ya no hace nada.

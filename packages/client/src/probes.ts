@@ -116,10 +116,11 @@ export interface ReachSpot {
  *
  * Al sureste porque la mirada es la de la camara y la camara arranca mirando al
  * noroeste (`camera.ts`, rumbo de un octavo de vuelta): nada mas aparecer en el
- * centro del apoyo, esa casilla cae justo en el eje del cono de la accion (regla
+ * centro del apoyo, esa casilla cae justo en el eje del sector del golpe (regla
  * 12). La de apoyo tiene que ser pisable, estar despejada y a la MISMA altura,
- * que es la que el cono alcanza mire uno donde mire; y ninguna de las dos puede
- * ser talud, que es donde la altura de una casilla deja de ser un numero solo.
+ * para que ningun escalon corte el sector por delante; y ninguna de las dos
+ * puede ser talud, que es donde la altura de una casilla deja de ser un numero
+ * solo.
  */
 function reachSpot(
   state: GameState,

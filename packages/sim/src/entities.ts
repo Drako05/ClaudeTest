@@ -45,7 +45,7 @@ export class EntityStore {
   readonly takeoffVy: Float64Array;
   /**
    * Hacia donde mira, en el plano: la ultima direccion no nula de movimiento, o
-   * la mirada de la camara si la hay. Es el eje del cono de la accion, y va sin
+   * la mirada de la camara si la hay. Es el eje del sector del golpe, y va sin
    * redondear a ocho direcciones.
    */
   readonly facingX: Float32Array;

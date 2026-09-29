@@ -59,8 +59,6 @@ const SPAWN_MIN_ROOM = 100;
  * sale; esta, que se puede jugar desde el primer segundo. Sin ella la semilla
  * de prueba nacia en una escalera de escalones de dos: se salia de ahi, si,
  * pero saltando, y andando en cualquier direccion se topaba a media casilla.
- * Peor aun, la accion solo alcanza casillas a la altura propia, asi que de las
- * tres del area solo habia una util.
  *
  * Cuarenta es una plaza de 6x7 y **cuesta muy poco**: medido en siete semillas,
  * exigirlo mueve el nacimiento tres casillas como mucho, y en tres de ellas no
@@ -76,9 +74,11 @@ const SPAWN_ROOM_HALF = 24;
  *
  * Es lo que hace que el juego empiece pudiendo hacer algo, y no solo pudiendo
  * ir a alguna parte. Con las ocho vecinas al mismo nivel se anda en cualquier
- * direccion y **las tres casillas del area de accion estan al alcance**; sin
- * ello, en terreno escalonado la accion alcanza una de tres y la primera
- * impresion del juego es que nada responde.
+ * direccion y ningun escalon corta el golpe por delante (regla 12: el terreno
+ * corta el sector). Nacio cuando la accion solo alcanzaba casillas a la altura
+ * propia —en terreno escalonado llegaba a una de tres y el juego empezaba
+ * pareciendo roto—; ese modelo ya no existe, pero nacer en llano sigue siendo
+ * la mejor primera impresion.
  *
  * Medido en nueve semillas: exigirlo aleja el nacimiento entre 8 y 15 casillas
  * del origen. Es barato porque el mundo es infinito y el origen no significa
