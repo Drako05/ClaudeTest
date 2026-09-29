@@ -16,14 +16,29 @@
  *   soltar al vacio no hace nada.
  * - **Fabricar es mantener pulsado 1,5 s** el resultado de la receta, y la fila
  *   se llena de izquierda a derecha como una barra de carga.
+ * - **Cada estacion tiene sus recetas** (decision del autor, tanda 2): con E se
+ *   ven las de mano; al USAR una mesa o un horno se abre este mismo panel con
+ *   las suyas, bajo su nombre, y se cierra solo al alejarse a mas de 3
+ *   casillas (`stationNear`, la misma cuenta con que el nucleo acepta).
+ * - **La ropa** se arrastra a su hueco de PERSONAJE —la mochila en el centro
+ *   de la columna derecha, el cinturon abajo a la derecha— y abre sus casillas
+ *   en la rejilla; las de una prenda que no se lleva no se ven.
  *
  * Nada de esto toca el estado: lo que se pide —elegir casilla, mover, tirar,
  * fabricar— se guarda como peticion y el bucle lo mete en la `Intent` (regla
  * 5). Estas peticiones no se tiran en pausa, al reves que las del mundo.
  */
 
-import { HOTBAR_SLOTS, type GameState } from '@verdant/sim';
-import { RECIPES, RESOURCE_NAMES, Resource, toolStats } from '@verdant/shared';
+import { EQUIP_BACK, EQUIP_WAIST, HOTBAR_SLOTS, stationNear, type GameState } from '@verdant/sim';
+import {
+  RECIPES,
+  RESOURCE_NAMES,
+  Resource,
+  Station,
+  STATION_NAMES,
+  stackMax,
+  toolStats,
+} from '@verdant/shared';
 import { makePlayerArt } from './art.js';
 
 /** Lo que se tarda en fabricar manteniendo pulsado (decision del autor). */
@@ -32,6 +47,15 @@ export const CRAFT_HOLD_MS = 1500;
 const DRAG_SLOP = 6;
 /** Casillas de equipables: tres a cada lado del personaje y cuatro debajo (boceto del autor). */
 const EQUIP_SLOTS = 10;
+/**
+ * Los huecos de la ropa entre esos diez, por su orden en la rejilla (izquierda
+ * y derecha de cada fila, y luego los cuatro de abajo): la mochila en el
+ * centro de la derecha y el cinturon abajo a la derecha (decision del autor).
+ */
+const WORN_AT: Record<number, { slot: number; label: string }> = {
+  3: { slot: EQUIP_BACK, label: 'Espalda' },
+  5: { slot: EQUIP_WAIST, label: 'Cintura' },
+};
 /** Categorias del recetario que se dibujan (boceto: cinco). */
 const CATEGORY_SLOTS = 5;
 const PAGES = ['personaje', 'inventario', 'recetas'] as const;
@@ -45,12 +69,22 @@ const DESCRIPTIONS: Record<number, string> = {
   [Resource.TreeSeed]: 'En la mano, clic derecho (o USAR) mirando al suelo para sembrar un arbol.',
   [Resource.PlantSeed]: 'En la mano, clic derecho (o USAR) mirando al suelo para sembrar un arbusto.',
   [Resource.Coal]: 'Se mina con pico en la montana.',
-  [Resource.Iron]: 'Mineral: pide un pico mejor que el de piedra.',
-  [Resource.Copper]: 'Mineral: sale con el pico de piedra.',
+  [Resource.Iron]: 'Mineral: pide un pico de cobre o mejor. Se funde en el horno.',
+  [Resource.Copper]: 'Mineral: sale con el pico de piedra. Se funde en el horno.',
   [Resource.Branch]: 'Sale de los arboles golpeandolos sin hacha. Para fabricar.',
   [Resource.Fiber]: 'La sueltan los arbustos. Para fabricar.',
   [Resource.StoneAxe]: 'Tala arboles. Se gasta con cada golpe util.',
   [Resource.StonePickaxe]: 'Saca piedra, carbon y cobre. Se gasta con cada golpe util.',
+  [Resource.CopperIngot]: 'Del horno. Para herramientas y la mochila, en la mesa.',
+  [Resource.IronIngot]: 'Del horno. Para las herramientas de hierro, en la mesa.',
+  [Resource.CopperAxe]: 'Tala en dos golpes. Se gasta con cada golpe util.',
+  [Resource.CopperPickaxe]: 'Mina tambien el hierro. Se gasta con cada golpe util.',
+  [Resource.IronAxe]: 'Tala mas deprisa que ninguna. Se gasta con cada golpe util.',
+  [Resource.IronPickaxe]: 'El mejor pico. Se gasta con cada golpe util.',
+  [Resource.Workbench]: 'En la mano, clic derecho (o USAR) mirando al suelo para ponerla. Usala para ver sus recetas.',
+  [Resource.Furnace]: 'En la mano, clic derecho (o USAR) mirando al suelo para ponerlo. Usalo para fundir.',
+  [Resource.FiberBag]: 'Arrastrala a la cintura, en PERSONAJE: +2 casillas.',
+  [Resource.FrameBackpack]: 'Arrastrala a la espalda, en PERSONAJE: +6 casillas.',
 };
 
 /** Nombre corto para una casilla, que es estrecha. Sin iconos (decision del autor). */
@@ -61,6 +95,15 @@ const SHORT: Record<number, string> = {
   [Resource.Copper]: 'Min. cobre',
   [Resource.StoneAxe]: 'Hacha piedra',
   [Resource.StonePickaxe]: 'Pico piedra',
+  [Resource.CopperIngot]: 'Ling. cobre',
+  [Resource.IronIngot]: 'Ling. hierro',
+  [Resource.CopperAxe]: 'Hacha cobre',
+  [Resource.CopperPickaxe]: 'Pico cobre',
+  [Resource.IronAxe]: 'Hacha hierro',
+  [Resource.IronPickaxe]: 'Pico hierro',
+  [Resource.Workbench]: 'Mesa',
+  [Resource.FiberBag]: 'Bolsa',
+  [Resource.FrameBackpack]: 'Mochila',
 };
 
 export interface ItemRequests {
@@ -85,6 +128,11 @@ export class InventoryUi {
   private readonly grid = byId('invGrid');
   private readonly selSlot = byId('selSlot');
   private readonly selDesc = byId('selDesc');
+  private readonly charSelSlot = byId('charSelSlot');
+  private readonly charSelDesc = byId('charSelDesc');
+  private readonly recipeTitle = byId('recipeTitle');
+  /** Los dos huecos de ropa, con el indice de arrastre de cada uno. */
+  private readonly wornSlots: Array<{ el: HTMLElement; slot: number; label: string }> = [];
   private readonly recipeTabs = byId('recipeTabs');
   private readonly recipeList = byId('recipeList');
   private readonly tabs = byId('invTabs');
@@ -112,7 +160,9 @@ export class InventoryUi {
     over: HTMLElement | null;
   } | null = null;
   private hold: { recipe: number; since: number; row: HTMLElement } | null = null;
-  private category = RECIPES[0]?.category ?? '';
+  private category = '';
+  /** De donde son las recetas que se ven: a mano (E) o una estacion usada. */
+  private mode: Station = Station.Hand;
 
   /** Peticiones que salieron hacia la `Intent`, para el humo. */
   readonly sent = { select: 0, craft: 0, move: 0, discard: 0 };
@@ -138,13 +188,24 @@ export class InventoryUi {
       this.bindDrag(b, i, false);
       this.grid.appendChild(b);
     }
-    // Los equipables, apagados hasta que haya ropa (tanda 2).
-    // La rejilla los coloca alrededor del dibujo (CSS de `#charGrid`).
+    // Los equipables: la rejilla los coloca alrededor del dibujo (CSS de
+    // `#charGrid`). Los dos de la ropa se arrastran; los demas, apagados hasta
+    // que haya algo que ponerse ahi.
     const charGrid = byId('charGrid');
     for (let i = 0; i < EQUIP_SLOTS; i++) {
+      const worn = WORN_AT[i];
+      if (worn) {
+        const b = this.slotButton(worn.slot);
+        b.classList.add('equip');
+        b.dataset.equip = '1';
+        this.bindDrag(b, worn.slot, false);
+        this.wornSlots.push({ el: b, slot: worn.slot, label: worn.label });
+        charGrid.appendChild(b);
+        continue;
+      }
       const b = document.createElement('div');
       b.className = 'slot off equip';
-      b.title = 'Equipable (llegara con la ropa)';
+      b.title = 'Equipable (aun sin ropa para aqui)';
       charGrid.appendChild(b);
     }
     this.drawCharacter();
@@ -209,6 +270,8 @@ export class InventoryUi {
     // Al abrir no hay nada seleccionado, y la descripcion esta vacia (pedido
     // del autor).
     if (open) this.picked = -1;
+    // Cerrado, el panel vuelve a ser el de E: con las recetas de mano.
+    if (!open) this.setMode(Station.Hand);
     this.panel.hidden = !open;
     this.invOpen.classList.toggle('open', open);
     this.invOpen.setAttribute('aria-expanded', String(open));
@@ -218,6 +281,31 @@ export class InventoryUi {
     }
     this.onToggle?.(open);
     if (open) this.render(this.current());
+  }
+
+  /**
+   * Abre el panel con las recetas de la estacion que se acaba de usar, en la
+   * pagina de recetas (decision del autor: solo se ven al usarla).
+   */
+  openStation(station: Station): void {
+    this.setMode(station);
+    this.page = 'recetas';
+    this.renderPage();
+    if (this.panel.hidden) this.toggle();
+    else this.render(this.current());
+  }
+
+  /** De donde son las recetas que se ven ahora. */
+  get station(): Station {
+    return this.mode;
+  }
+
+  private setMode(station: Station): void {
+    if (station === this.mode && this.category) return;
+    this.mode = station;
+    this.cancelHold();
+    this.recipeTitle.textContent = station === Station.Hand ? 'Recetas' : STATION_NAMES[station];
+    this.buildRecipes();
   }
 
   private setOthers(open: boolean): void {
@@ -237,9 +325,10 @@ export class InventoryUi {
     const item = inv.itemAt(slot);
     if (item === null) return;
     this.asking = { slot, item };
-    this.discardText.textContent = toolStats(item)
-      ? `¿Tirar ${RESOURCE_NAMES[item]}?`
-      : `¿Tirar ${inv.counts[slot]} × ${RESOURCE_NAMES[item]}?`;
+    this.discardText.textContent =
+      stackMax(item) === 1
+        ? `¿Tirar ${RESOURCE_NAMES[item]}?`
+        : `¿Tirar ${inv.counts[slot]} × ${RESOURCE_NAMES[item]}?`;
     this.discardAsk.hidden = false;
   }
 
@@ -272,6 +361,13 @@ export class InventoryUi {
    * todos el 2026-09-29. Lo que no cabe se resolvera tirando objetos al suelo.
    */
   frame(): void {
+    // Lejos de su estacion, su panel se cierra solo (decision del autor), con
+    // la misma cuenta con que el nucleo decide si se puede fabricar ahi.
+    if (this.mode !== Station.Hand && this.open) {
+      const s = this.current();
+      const id = s.playerId;
+      if (!stationNear(s.world, s.entities.x[id], s.entities.y[id], this.mode)) this.toggle();
+    }
     if (this.hold) {
       const t = Math.min(1, (performance.now() - this.hold.since) / CRAFT_HOLD_MS);
       (this.hold.row.querySelector('.charge') as HTMLElement).style.width = `${t * 100}%`;
@@ -292,7 +388,10 @@ export class InventoryUi {
     return b;
   }
 
-  /** Pinta una casilla: nombre y, abajo a la izquierda, solo el numero. */
+  /**
+   * Pinta una casilla: nombre y, abajo a la izquierda, solo el numero; una
+   * herramienta, su desgaste; y una prenda, nada, porque va de una en una.
+   */
   private paint(el: HTMLElement, item: Resource | null, count: number, wear: number): void {
     el.replaceChildren();
     el.classList.toggle('empty', item === null);
@@ -309,7 +408,7 @@ export class InventoryUi {
       bar.className = 'wear';
       bar.style.width = `${(wear / tool.uses) * 100}%`;
       el.appendChild(bar);
-    } else {
+    } else if (stackMax(item) > 1) {
       const n = document.createElement('em');
       n.textContent = String(count);
       el.appendChild(n);
@@ -391,7 +490,8 @@ export class InventoryUi {
   /** La casilla de la rejilla o de la barra que hay bajo el puntero. */
   private slotAt(x: number, y: number): HTMLElement | null {
     const el = document.elementFromPoint(x, y)?.closest('.slot') as HTMLElement | null;
-    return el && (el.dataset.grid === '1' || el.dataset.bar === '1') ? el : null;
+    if (!el || el.hidden) return null;
+    return el.dataset.grid === '1' || el.dataset.bar === '1' || el.dataset.equip === '1' ? el : null;
   }
 
   private pick(slot: number): void {
@@ -401,8 +501,11 @@ export class InventoryUi {
 
   // ------------------------------------------------------------ recetas
 
+  /** Las categorias de las recetas del modo, y la lista de la primera. */
   private buildRecipes(): void {
-    const categories = [...new Set(RECIPES.map((r) => r.category))];
+    this.recipeTabs.replaceChildren();
+    const categories = [...new Set(RECIPES.filter((r) => r.station === this.mode).map((r) => r.category))];
+    this.category = categories[0] ?? '';
     for (let i = 0; i < CATEGORY_SLOTS; i++) {
       const tab = document.createElement('button');
       tab.type = 'button';
@@ -429,7 +532,7 @@ export class InventoryUi {
       tab.classList.toggle('on', tab.textContent === this.category),
     );
     RECIPES.forEach((recipe, i) => {
-      if (recipe.category !== this.category) return;
+      if (recipe.station !== this.mode || recipe.category !== this.category) return;
       const row = document.createElement('div');
       row.className = 'recipe';
       row.dataset.recipe = String(i);
@@ -520,22 +623,33 @@ export class InventoryUi {
     });
     if (this.panel.hidden) return;
 
+    // Las casillas de una prenda que no se lleva no existen, y no se ven.
     Array.from(this.grid.children).forEach((el, i) => {
+      (el as HTMLElement).hidden = !inv.isOpen(i);
       this.paint(el as HTMLElement, inv.itemAt(i), inv.counts[i], inv.wear[i]);
       el.classList.toggle('on', inv.selected === i);
       el.classList.toggle('picked', this.picked === i);
     });
-
-    const item = this.picked >= 0 ? inv.itemAt(this.picked) : null;
-    this.paint(this.selSlot, item, item === null ? 0 : inv.counts[this.picked], item === null ? 0 : inv.wear[this.picked]);
-    // Sin objeto —casilla vacia o nada elegido— la descripcion se limpia. Antes
-    // se quedaba la del ultimo objeto tocado.
-    this.selDesc.replaceChildren();
-    if (item !== null) {
-      const title = document.createElement('b');
-      title.textContent = RESOURCE_NAMES[item];
-      this.selDesc.append(title, DESCRIPTIONS[item] ?? '');
+    for (const worn of this.wornSlots) {
+      const item = inv.itemAt(worn.slot);
+      this.paint(worn.el, item, 1, 0);
+      worn.el.classList.toggle('picked', this.picked === worn.slot);
+      // Vacio, dice que va ahi.
+      if (item === null) {
+        const label = document.createElement('span');
+        label.className = 'hint';
+        label.textContent = worn.label;
+        worn.el.appendChild(label);
+        worn.el.title = worn.label;
+      }
     }
+
+    // Lo elegido se describe en su pagina: una prenda puesta en PERSONAJE, lo
+    // demas en INVENTARIO. La otra zona se queda vacia.
+    const onBody = this.wornSlots.some((w) => w.slot === this.picked);
+    const item = this.picked >= 0 ? inv.itemAt(this.picked) : null;
+    this.describe(this.selSlot, this.selDesc, onBody ? null : item, onBody ? 0 : this.picked);
+    this.describe(this.charSelSlot, this.charSelDesc, onBody ? item : null, this.picked);
 
     for (const row of Array.from(this.recipeList.children) as HTMLElement[]) {
       const r = RECIPES[Number(row.dataset.recipe)];
@@ -557,5 +671,20 @@ export class InventoryUi {
       });
       row.classList.toggle('missing', !ok);
     }
+  }
+
+  /**
+   * Pinta una zona de lo seleccionado. Sin objeto —casilla vacia o nada
+   * elegido— la descripcion se limpia; antes se quedaba la del ultimo tocado.
+   */
+  private describe(slotEl: HTMLElement, descEl: HTMLElement, item: Resource | null, slot: number): void {
+    const inv = this.current().inventory;
+    const count = item === null ? 0 : stackMax(item) === 1 ? 1 : inv.counts[slot];
+    this.paint(slotEl, item, count, item === null ? 0 : inv.wear[slot] ?? 0);
+    descEl.replaceChildren();
+    if (item === null) return;
+    const title = document.createElement('b');
+    title.textContent = RESOURCE_NAMES[item];
+    descEl.append(title, DESCRIPTIONS[item] ?? '');
   }
 }

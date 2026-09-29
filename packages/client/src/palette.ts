@@ -81,6 +81,16 @@ export const MINERAL_FACES: Partial<Record<Feature, readonly string[]>> = {
 /** Las tres caras de la roca, en el mismo orden en que se pintan. */
 export const ROCK_FACES: readonly string[] = ['#6f6f78', '#9a9aa4', '#b8b8c2'];
 
+/**
+ * Los colores de las estaciones, de oscuro a claro, y el de su detalle (la
+ * sierra de la mesa, la brasa del horno). De aqui salen su dibujo
+ * (`stations-view.ts`) y sus escombros, como con las especies. **Mios.**
+ */
+export const STATION_FACES: Partial<Record<Feature, readonly string[]>> = {
+  [Feature.Workbench]: ['#5a3a1e', '#8a5a30', '#b07a44', '#c9cdd2'],
+  [Feature.Furnace]: ['#55555e', '#7e7e88', '#a2a2ac', '#ff8a2a'],
+};
+
 function toHex(color: string): number {
   return Number.parseInt(color.slice(1), 16);
 }
@@ -94,7 +104,7 @@ function toHex(color: string): number {
  */
 export function debrisPalette(feature: Feature): number[] {
   if (feature === Feature.RockNode || feature === Feature.Pebbles) return ROCK_FACES.map(toHex);
-  const mineral = MINERAL_FACES[feature];
+  const mineral = MINERAL_FACES[feature] ?? STATION_FACES[feature];
   if (mineral) return mineral.map(toHex);
 
   const look = LOOKS[feature];

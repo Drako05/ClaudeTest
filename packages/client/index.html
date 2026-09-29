@@ -390,6 +390,9 @@
       .slot.dragging { opacity: .35; }
       .slot.drop { border-color: #ffe89a; }
       .slot.off { opacity: .4; cursor: default; }
+      .slot[hidden] { display: none; }
+      /* Un hueco de ropa vacio dice que va ahi. */
+      .slot .hint { color: #6f82a0; font-size: 9px; }
       /* Cada pagina es una columna: titulo, lo suyo y, pegada abajo, la zona
          de lo seleccionado, que en PERSONAJE e INVENTARIO queda a la misma
          altura (boceto del autor, 2026-09-29). */
@@ -873,8 +876,8 @@
           <canvas id="charArt" width="252" height="384"></canvas>
         </div>
         <div class="selected">
-          <div id="charSelSlot" class="slot off"></div>
-          <div class="selDesc">Equipables: llegaran con la ropa.</div>
+          <div id="charSelSlot" class="slot"></div>
+          <div id="charSelDesc" class="selDesc"></div>
         </div>
       </section>
       <section class="invPage current" data-page="inventario">
@@ -886,7 +889,7 @@
         </div>
       </section>
       <section class="invPage" data-page="recetas">
-        <h2>Recetas</h2>
+        <h2 id="recipeTitle">Recetas</h2>
         <div id="recipeTabs"></div>
         <div id="recipeList"></div>
       </section>

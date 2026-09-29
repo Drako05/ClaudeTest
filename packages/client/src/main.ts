@@ -31,6 +31,7 @@ import {
   BIOME_NAMES,
   CHUNK_SIZE,
   Feature,
+  isStation,
   Resource,
   TERRAIN_NAMES,
   TICK_DT,
@@ -56,6 +57,7 @@ import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
+import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
 import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
@@ -66,7 +68,15 @@ import { MouseLook } from './pointer-lock.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
 import { inventoryDelta, opacityOf, PickupFeed, riseOf } from './pickup-feed.js';
-import { berrySpot, cliffSpot, mineralSpot, peakSpot, reliefAround, stoneOreSpot } from './probes.js';
+import {
+  berrySpot,
+  cliffSpot,
+  mineralSpot,
+  peakSpot,
+  reliefAround,
+  stationTilesAround,
+  stoneOreSpot,
+} from './probes.js';
 import { skyTint, tintCss } from './sky.js';
 import { randomSeed, seedFromLocation, startGame, writeSeedToLocation } from './start.js';
 
@@ -226,11 +236,27 @@ const dev = new DevTools({
     // registrarlo como si el jugador hubiera recolectado o comido.
     dev.observe(state.inventory.totals(), state.entities.hunger[state.playerId], 0);
   },
-  // Lo justo para el hacha y el pico de piedra (propuesta mia).
-  onKit: () => {
-    state.inventory.add(Resource.Branch, 6);
-    state.inventory.add(Resource.Stone, 5);
-    state.inventory.add(Resource.Fiber, 4);
+  // Lo justo para el hacha y el pico de piedra, o para toda la tanda 2: mesa,
+  // horno, cinco lingotes de cobre, tres de hierro, un pico de cada metal, la
+  // bolsa y la mochila (propuesta mia).
+  onKit: (kit) => {
+    const bundle: Array<[Resource, number]> =
+      kit === 'metal'
+        ? [
+            [Resource.Wood, 12],
+            [Resource.Stone, 10],
+            [Resource.Coal, 13],
+            [Resource.Copper, 10],
+            [Resource.Iron, 6],
+            [Resource.Branch, 4],
+            [Resource.Fiber, 18],
+          ]
+        : [
+            [Resource.Branch, 6],
+            [Resource.Stone, 5],
+            [Resource.Fiber, 4],
+          ];
+    for (const [item, n] of bundle) state.inventory.add(item, n);
   },
 });
 
@@ -272,6 +298,7 @@ const pauseHint = document.getElementById('pauseHint') as HTMLElement;
 let everLocked = false;
 
 const billboards = new BillboardSet();
+const stations = new StationSet();
 const player = billboards.spawnPlayer();
 if (player) scene.add(player);
 
@@ -332,6 +359,16 @@ function buildChunk(cx: number, cy: number): ChunkView {
       const x = wx + 0.5;
       const y = wy + 0.5;
       const ground = state.world.groundHeightAt(x, y);
+      // Las estaciones son cajas, no aspas (decision del autor).
+      if (isStation(feature)) {
+        const box = stations.spawn(feature, wx, wy, ground, seed);
+        if (box) {
+          scene.add(box);
+          props.push(box);
+          spots.push({ x, z: y, width: stations.widthOf(feature) });
+        }
+        continue;
+      }
       const prop = billboards.spawn(feature, x, ground, y, seed);
       if (prop) {
         scene.add(prop);
@@ -551,6 +588,9 @@ function frame(now: number): void {
     if (intent.use) sent.use++;
     const pisabaAntes = state.entities.grounded[state.playerId];
     step(state, intent);
+    // Usar una estacion abre su panel: sus recetas solo se ven asi (decision
+    // del autor). Sale del nucleo, que es quien sabe que se miraba.
+    if (state.lastOpened) items.openStation(state.lastOpened.station);
     // Cuenta el despegue de verdad, no la tecla: saltar contra el techo de un
     // salto imposible no suma.
     if (pisabaAntes && !state.entities.grounded[state.playerId] && intent.jump) jumps++;
@@ -798,12 +838,26 @@ Object.defineProperty(window, '__verdant', {
       hudOpen: hud.hudOpen,
       inventoryOpen: items.open,
       inventory: state.inventory.totals(),
-      /** Las casillas: objeto (o -1), cuantos y usos que le quedan. */
+      /**
+       * Las casillas: objeto (o -1), cuantos, usos que le quedan y si existen
+       * ahora (las de una prenda que no se lleva, no).
+       */
       slots: Array.from(state.inventory.items).map((item, i) => ({
         item,
         count: state.inventory.counts[i],
         wear: state.inventory.wear[i],
+        open: state.inventory.isOpen(i),
       })),
+      /** Casillas abiertas: 16, y mas con la ropa. */
+      openSlots: state.inventory.openSlots(),
+      /** La prenda de cada hueco (cintura, espalda), o null. */
+      worn: [...state.inventory.worn],
+      /** De donde son las recetas que ensena el panel: 0 a mano, 1 mesa, 2 horno. */
+      panelStation: items.station,
+      /** Estaciones mandadas a la escena. Acumulado. */
+      stationsDrawn: stations.drawn,
+      /** Las estaciones a 5 casillas o menos del jugador: casilla y feature. */
+      stationTiles: stationTilesAround(state, 5),
       selectedSlot: state.inventory.selected,
       itemsSent: { ...items.sent },
       inventoryPage: items.currentPage,

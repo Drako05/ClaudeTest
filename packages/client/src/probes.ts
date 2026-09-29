@@ -13,6 +13,7 @@ import {
   Feature,
   harvestOf,
   isFeatureSolid,
+  isStation,
   isTerrainSolid,
   MINERAL_NODES,
   RESOURCE_NAMES,
@@ -186,4 +187,19 @@ export function berrySpot(state: GameState): ReachSpot | null {
     const h = harvestOf(f);
     return h !== null && h.resource === Resource.Berries;
   });
+}
+
+/** Las estaciones a `radius` casillas o menos del jugador, con su casilla. */
+export function stationTilesAround(state: GameState, radius: number): Array<{ x: number; y: number; feature: Feature }> {
+  const e = state.entities;
+  const px = Math.floor(e.x[state.playerId]);
+  const py = Math.floor(e.y[state.playerId]);
+  const out: Array<{ x: number; y: number; feature: Feature }> = [];
+  for (let y = py - radius; y <= py + radius; y++) {
+    for (let x = px - radius; x <= px + radius; x++) {
+      const feature = state.world.featureAt(x, y);
+      if (isStation(feature)) out.push({ x, y, feature });
+    }
+  }
+  return out;
 }
