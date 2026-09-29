@@ -4,7 +4,7 @@
  * Geometria pura: el suelo y los hitboxes entran como funciones, asi que se
  * mide en Node sin mundo. `systems/gathering.ts` le pone el mundo.
  *
- * **Regla 12, del autor (2026-09-28).** El golpe es un sector de **2 bloques**
+ * **Regla 12, del autor (2026-09-28).** El golpe es un sector de **2,5 bloques**
  * y **90 grados** (±45 alrededor de la mirada) **en el plano de la mirada**: el
  * que forman la direccion en que se mira —con su inclinacion— y la horizontal a
  * su derecha. Cuenta **solo si toca un hitbox**, y **el terreno lo corta**: no se
@@ -17,8 +17,8 @@
  *
  * El sector se recorre con **`STRIKE_RAYS` rayos** a lo ancho: cada uno se corta
  * donde entra en el terreno, y un objeto cae si algun rayo cruza su hitbox antes
- * de ese corte. Con 33 rayos, a 2 bloques queda un hueco de 0,1 entre dos
- * vecinos, menos que el tronco mas fino (0,22 el de la picea negra en el pie):
+ * de ese corte. Con 33 rayos, a 2,5 bloques queda un hueco de 0,12 entre dos
+ * vecinos, menos que el tronco mas fino (0,21 el de la picea negra mas baja):
  * nada que el sector toque se cuela entre rayos.
  *
  * Coordenadas del NUCLEO: `x`, `y` en el plano y `z` la altura.
@@ -56,8 +56,11 @@ export interface Hitbox {
  * **Deduccion mia** (la primera persona ya la usaba; la orbital, 1,6).
  */
 export const EYE_HEIGHT = 1.75;
-/** Alcance del golpe, en bloques. Del autor. */
-export const STRIKE_RANGE = 2;
+/**
+ * Alcance del golpe, en bloques, y el de sembrar (en horizontal). Del autor:
+ * 2 el 2026-09-28, 2,5 el 2026-09-29, los dos.
+ */
+export const STRIKE_RANGE = 2.5;
 /** Medio angulo del sector: 90 grados en total. Del autor. */
 export const STRIKE_HALF_ANGLE = Math.PI / 4;
 /** Rayos con los que se recorre el sector, de su borde derecho al izquierdo. */

@@ -6,12 +6,15 @@
  *   equipables, INVENTARIO con el objeto seleccionado y su descripcion, y
  *   RECETAS por categorias—. **No pausa**: suelta el cursor para poder usar el
  *   raton, y al cerrarlo lo vuelve a capturar (`main.ts`).
- * - **Movil**: el boton INVENTARIO abre una pagina a la vez, con flechas a
- *   PERSONAJE y RECETAS; y OTROS despliega el ojo, el HUD y el entorno.
+ * - **Movil**: el boton INVENTARIO abre una pagina a la vez, elegida con las
+ *   pestanas Personaje | Inventario | Recetas; y OTROS despliega el ojo, el
+ *   HUD y el entorno.
  * - **Se arrastra** para mover: el mismo objeto se apila y uno distinto se
- *   intercambia; **soltarlo fuera del panel lo tira**. La barra de la mano no
- *   se arrastra: se ordena en la primera fila del inventario.
- * - **Fabricar es mantener pulsado 2 s** el resultado de la receta, y la fila
+ *   intercambia. Con el inventario abierto, entre la rejilla y la barra de la
+ *   mano; cerrado, dentro de la barra. **Soltarlo fuera del panel lo tira**,
+ *   previa confirmacion, y solo con el panel abierto: desde la barra cerrada,
+ *   soltar al vacio no hace nada.
+ * - **Fabricar es mantener pulsado 1,5 s** el resultado de la receta, y la fila
  *   se llena de izquierda a derecha como una barra de carga.
  *
  * Nada de esto toca el estado: lo que se pide —elegir casilla, mover, tirar,
@@ -24,7 +27,7 @@ import { RECIPES, RESOURCE_NAMES, Resource, toolStats } from '@verdant/shared';
 import { makePlayerArt } from './art.js';
 
 /** Lo que se tarda en fabricar manteniendo pulsado (decision del autor). */
-export const CRAFT_HOLD_MS = 2000;
+export const CRAFT_HOLD_MS = 1500;
 /** Lo que hay que mover el puntero para que un toque sea un arrastre. **Propuesta mia.** */
 const DRAG_SLOP = 6;
 /** Cuanto dura un aviso en pantalla, en segundos. */
@@ -35,11 +38,6 @@ const EQUIP_PER_SIDE = 5;
 const CATEGORY_SLOTS = 5;
 const PAGES = ['personaje', 'inventario', 'recetas'] as const;
 type Page = (typeof PAGES)[number];
-const PAGE_NAMES: Record<Page, string> = {
-  personaje: 'Personaje',
-  inventario: 'Inventario',
-  recetas: 'Recetas',
-};
 
 /** Una frase por objeto, para el recuadro de la descripcion. **Texto mio.** */
 const DESCRIPTIONS: Record<number, string> = {
@@ -97,8 +95,9 @@ export class InventoryUi {
   private readonly selDesc = byId('selDesc');
   private readonly recipeTabs = byId('recipeTabs');
   private readonly recipeList = byId('recipeList');
-  private readonly prev = byId('pagePrev');
-  private readonly next = byId('pageNext');
+  private readonly tabs = byId('invTabs');
+  private readonly discardAsk = byId('discardAsk');
+  private readonly discardText = byId('discardText');
   private readonly others = byId('others');
   private readonly invOpen = byId('invOpen');
   private readonly toast = byId('toast');
@@ -109,8 +108,13 @@ export class InventoryUi {
   /** Casilla cuyo objeto se describe. */
   private picked = -1;
   private toastLeft = 0;
+  /** Lo que espera confirmacion para tirarse. */
+  private asking: { slot: number; item: Resource } | null = null;
+  /** El toque que cerro la confirmacion, que no empieza un arrastre. */
+  private dismissEvent: Event | null = null;
   private drag: {
     slot: number;
+    bar: boolean;
     x: number;
     y: number;
     moving: boolean;
@@ -130,19 +134,18 @@ export class InventoryUi {
   }
 
   constructor(private readonly current: () => GameState) {
-    // La barra de la mano: tocar elige. No se arrastra (decision del autor).
+    // La barra de la mano: tocar elige; arrastrar mueve (decision del autor).
     for (let i = 0; i < HOTBAR_SLOTS; i++) {
       const b = this.slotButton(i);
-      b.addEventListener('click', () => {
-        this.pending.select = i;
-      });
+      b.dataset.bar = '1';
+      this.bindDrag(b, i, true);
       this.hotbar.appendChild(b);
     }
     // La rejilla del inventario: tocar describe; arrastrar mueve o tira.
     for (let i = 0; i < this.current().inventory.size; i++) {
       const b = this.slotButton(i);
       b.dataset.grid = '1';
-      this.bindDrag(b, i);
+      this.bindDrag(b, i, false);
       this.grid.appendChild(b);
     }
     // Los equipables, apagados hasta que haya ropa (tanda 2).
@@ -158,8 +161,24 @@ export class InventoryUi {
     this.drawCharacter();
     this.buildRecipes();
 
-    this.prev.addEventListener('click', () => this.turn(-1));
-    this.next.addEventListener('click', () => this.turn(1));
+    for (const tab of Array.from(this.tabs.children) as HTMLElement[]) {
+      tab.addEventListener('click', () => {
+        this.page = tab.dataset.page as Page;
+        this.renderPage();
+      });
+    }
+    byId('discardYes').addEventListener('click', () => this.answer(true));
+    byId('discardNo').addEventListener('click', () => this.answer(false));
+    // Tocar fuera de la confirmacion la cancela (propuesta mia).
+    document.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (!this.asking || this.discardAsk.contains(e.target as Node | null)) return;
+        this.dismissEvent = e;
+        this.answer(false);
+      },
+      true,
+    );
     this.invOpen.addEventListener('click', () => this.toggle());
     this.others.addEventListener('click', () => this.setOthers(!document.body.classList.contains('others-open')));
     // OTROS se cierra tocando fuera de su fila (propuesta mia).
@@ -191,7 +210,10 @@ export class InventoryUi {
     this.panel.hidden = !open;
     this.invOpen.classList.toggle('open', open);
     this.invOpen.setAttribute('aria-expanded', String(open));
-    if (!open) this.cancelHold();
+    if (!open) {
+      this.cancelHold();
+      this.answer(false);
+    }
     this.onToggle?.(open);
     if (open) this.render(this.current());
   }
@@ -200,6 +222,35 @@ export class InventoryUi {
     document.body.classList.toggle('others-open', open);
     this.others.classList.toggle('open', open);
     this.others.setAttribute('aria-expanded', String(open));
+  }
+
+  /** Si hay una confirmacion de tirar a la vista. */
+  get askingDiscard(): boolean {
+    return this.asking !== null;
+  }
+
+  /** Pide confirmacion para tirar lo de esa casilla. */
+  private ask(slot: number): void {
+    const inv = this.current().inventory;
+    const item = inv.itemAt(slot);
+    if (item === null) return;
+    this.asking = { slot, item };
+    this.discardText.textContent = toolStats(item)
+      ? `¿Tirar ${RESOURCE_NAMES[item]}?`
+      : `¿Tirar ${inv.counts[slot]} × ${RESOURCE_NAMES[item]}?`;
+    this.discardAsk.hidden = false;
+  }
+
+  /**
+   * Responde a la confirmacion. Si entretanto la casilla cambio de objeto (se
+   * comio, se movio), no se tira nada: se confirmo tirar OTRA cosa.
+   */
+  private answer(yes: boolean): void {
+    const asked = this.asking;
+    if (!asked) return;
+    this.asking = null;
+    this.discardAsk.hidden = true;
+    if (yes && this.current().inventory.itemAt(asked.slot) === asked.item) this.pending.discard = asked.slot;
   }
 
   /** Las peticiones pendientes, que se vacian. Las recoge el bucle. */
@@ -279,14 +330,17 @@ export class InventoryUi {
 
   /**
    * Arrastrar con raton o dedo. Pasado `DRAG_SLOP`, la casilla se lleva como
-   * una etiqueta que sigue al puntero; al soltar, sobre otra casilla la mueve
-   * (apila o intercambia), fuera del panel la tira, y en cualquier otro sitio
-   * del panel no hace nada. Sin moverse, es un toque: describe el objeto.
+   * una etiqueta que sigue al puntero; al soltar, sobre otra casilla —de la
+   * rejilla o de la barra— la mueve (apila o intercambia); fuera del panel
+   * abierto pide confirmacion para tirarla; y en cualquier otro sitio no hace
+   * nada. Con el inventario cerrado solo esta la barra, y soltar al vacio no
+   * tira. Sin moverse es un toque: en la barra elige la mano, en la rejilla
+   * describe el objeto.
    */
-  private bindDrag(el: HTMLElement, slot: number): void {
+  private bindDrag(el: HTMLElement, slot: number, bar: boolean): void {
     el.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
-      this.drag = { slot, x: e.clientX, y: e.clientY, moving: false, el, over: null };
+      if (e.button !== 0 || this.asking || e === this.dismissEvent) return;
+      this.drag = { slot, bar, x: e.clientX, y: e.clientY, moving: false, el, over: null };
       try {
         el.setPointerCapture(e.pointerId);
       } catch {
@@ -307,7 +361,7 @@ export class InventoryUi {
       }
       this.ghost.style.left = `${e.clientX}px`;
       this.ghost.style.top = `${e.clientY}px`;
-      const over = this.gridSlotAt(e.clientX, e.clientY);
+      const over = this.slotAt(e.clientX, e.clientY);
       if (over !== d.over) {
         d.over?.classList.remove('drop');
         over?.classList.add('drop');
@@ -322,11 +376,13 @@ export class InventoryUi {
       d.over?.classList.remove('drop');
       this.ghost.style.display = 'none';
       if (!d.moving) {
-        if (!cancelled) this.pick(slot);
+        if (cancelled) return;
+        if (d.bar) this.pending.select = slot;
+        else this.pick(slot);
         return;
       }
       if (cancelled) return;
-      const target = this.gridSlotAt(e.clientX, e.clientY);
+      const target = this.slotAt(e.clientX, e.clientY);
       if (target) {
         const to = Number(target.dataset.slot);
         if (to !== slot) {
@@ -335,16 +391,18 @@ export class InventoryUi {
         }
         return;
       }
+      if (!this.open) return;
       const under = document.elementFromPoint(e.clientX, e.clientY);
-      if (!under || !this.panel.contains(under)) this.pending.discard = slot;
+      if (!under || !(this.panel.contains(under) || this.hotbar.contains(under))) this.ask(slot);
     };
     el.addEventListener('pointerup', (e) => end(e, false));
     el.addEventListener('pointercancel', (e) => end(e, true));
   }
 
-  private gridSlotAt(x: number, y: number): HTMLElement | null {
+  /** La casilla de la rejilla o de la barra que hay bajo el puntero. */
+  private slotAt(x: number, y: number): HTMLElement | null {
     const el = document.elementFromPoint(x, y)?.closest('.slot') as HTMLElement | null;
-    return el && el.dataset.grid === '1' ? el : null;
+    return el && (el.dataset.grid === '1' || el.dataset.bar === '1') ? el : null;
   }
 
   private pick(slot: number): void {
@@ -437,22 +495,16 @@ export class InventoryUi {
 
   // ------------------------------------------------------------ paginas del movil
 
-  private turn(step: number): void {
-    const i = PAGES.indexOf(this.page) + step;
-    if (i < 0 || i >= PAGES.length) return;
-    this.page = PAGES[i];
-    this.renderPage();
-  }
-
+  /** Muestra la pagina elegida e ilumina su pestana; las pestanas no se mueven. */
   private renderPage(): void {
     for (const section of Array.from(this.panel.querySelectorAll<HTMLElement>('.invPage'))) {
       section.classList.toggle('current', section.dataset.page === this.page);
     }
-    const i = PAGES.indexOf(this.page);
-    this.prev.hidden = i === 0;
-    this.next.hidden = i === PAGES.length - 1;
-    if (i > 0) (this.prev.querySelector('span') as HTMLElement).textContent = PAGE_NAMES[PAGES[i - 1]];
-    if (i < PAGES.length - 1) (this.next.querySelector('span') as HTMLElement).textContent = PAGE_NAMES[PAGES[i + 1]];
+    for (const tab of Array.from(this.tabs.children) as HTMLElement[]) {
+      const on = tab.dataset.page === this.page;
+      tab.classList.toggle('on', on);
+      tab.setAttribute('aria-selected', String(on));
+    }
   }
 
   get currentPage(): Page {

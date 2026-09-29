@@ -433,8 +433,8 @@ describe('Mirada y golpe', () => {
       { x: x + 1, y: y + 1 },
     ];
     for (const r of rocks) world.setFeature(r.x, r.y, Feature.RockNode);
-    // Y una fuera de alcance, a dos casillas en recto: no cae.
-    world.setFeature(x + 2, y, Feature.RockNode);
+    // Y una fuera de alcance, a tres casillas en recto: no cae.
+    world.setFeature(x + 3, y, Feature.RockNode);
 
     // La roca pide pico y tres golpes (trabajo por golpes): los dos primeros
     // solo acumulan dano en las tres a la vez.
@@ -447,7 +447,7 @@ describe('Mirada y golpe', () => {
 
     expect(results).toHaveLength(3);
     for (const r of rocks) expect(world.featureAt(r.x, r.y)).toBe(Feature.None);
-    expect(world.featureAt(x + 2, y)).toBe(Feature.RockNode);
+    expect(world.featureAt(x + 3, y)).toBe(Feature.RockNode);
     const reported = results.reduce((sum, r) => sum + r.amount + r.seeds, 0);
     expect(inventory.count(Resource.Stone)).toBe(reported);
     // Un uso por golpe util, alcance a una roca o a tres.

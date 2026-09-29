@@ -13,7 +13,7 @@ import {
 } from '@verdant/sim';
 
 /**
- * El golpe (regla 12): un sector plano de 2 bloques y 90 grados en el plano de
+ * El golpe (regla 12): un sector plano de 2,5 bloques y 90 grados en el plano de
  * la mirada, que cuenta solo si toca un hitbox y que el terreno corta. Numeros
  * del autor. Geometria pura: suelo y cajas de mentira.
  */
@@ -39,8 +39,8 @@ function hits(lookZ: number, ground: Ground, ...list: Hitbox[]): number {
 }
 
 describe('el golpe: numeros del autor', () => {
-  it('2 bloques y 90 grados', () => {
-    expect(STRIKE_RANGE).toBe(2);
+  it('2,5 bloques y 90 grados', () => {
+    expect(STRIKE_RANGE).toBe(2.5);
     expect(STRIKE_HALF_ANGLE).toBeCloseTo(Math.PI / 4, 12);
   });
 
@@ -68,9 +68,9 @@ describe('el golpe toca hitboxes', () => {
   // Un tronco alto y fino: se toca a la altura de los ojos mirando al frente.
   const trunk = (cx: number, cy: number) => box(cx, cy, 0.1, 0, 3);
 
-  it('a 1,9 bloques golpea; a 2,3, no', () => {
-    expect(hits(0, flat, trunk(2.5, 0.5))).toBe(1); // cara cercana a 1,9
-    expect(hits(0, flat, trunk(2.9, 0.5))).toBe(0); // cara cercana a 2,3
+  it('a 2,4 bloques golpea; a 2,8, no', () => {
+    expect(hits(0, flat, trunk(3.0, 0.5))).toBe(1); // cara cercana a 2,4
+    expect(hits(0, flat, trunk(3.4, 0.5))).toBe(0); // cara cercana a 2,8
   });
 
   it('dentro de los ±45 grados golpea; fuera, no', () => {
@@ -107,22 +107,24 @@ describe('el golpe toca hitboxes', () => {
   });
 
   it('los rayos que entran en el suelo se cortan donde entran', () => {
-    const { rays } = strike(EYE, 1, 0, down(60), flat, boxes());
+    const { rays } = strike(EYE, 1, 0, down(40), flat, boxes());
     const mid = rays[(STRIKE_RAYS - 1) / 2];
-    // A 60 grados hacia abajo desde 1,75 el suelo queda a 1,75 / sen 60 = 2,02:
-    // justo fuera; a 70, dentro.
-    expect(mid.length).toBeCloseTo(2, 6);
-    const steep = strike(EYE, 1, 0, down(70), flat, boxes()).rays[(STRIKE_RAYS - 1) / 2];
-    expect(steep.length).toBeCloseTo(EYE_HEIGHT / Math.sin((70 * Math.PI) / 180), 4);
+    // A 40 grados hacia abajo desde 1,75 el suelo queda a 1,75 / sen 40 = 2,72:
+    // fuera del alcance; a 45, a 2,47, dentro.
+    expect(mid.length).toBeCloseTo(STRIKE_RANGE, 6);
+    const steep = strike(EYE, 1, 0, down(45), flat, boxes()).rays[(STRIKE_RAYS - 1) / 2];
+    expect(steep.length).toBeCloseTo(EYE_HEIGHT / Math.sin((45 * Math.PI) / 180), 4);
   });
 });
 
 describe('donde se siembra', () => {
-  it('donde la mirada toca la cara de arriba del suelo, a menos de 2 en horizontal', () => {
+  it('donde la mirada toca la cara de arriba del suelo, a menos de 2,5 en horizontal', () => {
     // Mirando 50 grados abajo desde 1,75, el suelo queda a 1,47 en horizontal.
     expect(plantTile(EYE, 1, 0, down(50), flat)).toEqual({ x: 1, y: 0 });
-    // A 35 grados queda a 2,5: no llega.
-    expect(plantTile(EYE, 1, 0, down(35), flat)).toBeNull();
+    // A 38 grados queda a 2,24: llega, a la casilla siguiente.
+    expect(plantTile(EYE, 1, 0, down(38), flat)).toEqual({ x: 2, y: 0 });
+    // A 33 grados queda a 2,69: no llega.
+    expect(plantTile(EYE, 1, 0, down(33), flat)).toBeNull();
   });
 
   it('mirando al cielo, no', () => {

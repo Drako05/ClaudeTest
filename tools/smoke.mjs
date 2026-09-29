@@ -782,32 +782,56 @@ async function resourcesPass(browser, baseUrl) {
     await drag(await center('#invGrid .slot:nth-child(6)'), await center('#invGrid .slot:nth-child(2)'));
     const swapped = await state(page);
     check(swapped.slots[1].item === 8 && swapped.slots[5].item === 1, 'arrastrar sobre otro objeto no los intercambio');
-    // Fabricar: mantener 2 s el resultado. Soltar antes no fabrica.
+    // Fabricar: mantener 1,5 s el resultado. Soltar antes no fabrica.
     const pickRow = '#recipeList .recipe:nth-child(2) .result';
     const beforeCraft = await state(page);
     const at = await center(pickRow);
     await page.mouse.move(at.x, at.y);
     await page.mouse.down();
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(500);
     await page.mouse.up();
     await page.waitForTimeout(300);
-    check((await state(page)).itemsSent.craft === beforeCraft.itemsSent.craft, 'soltar antes de 2 s fabrico');
+    check((await state(page)).itemsSent.craft === beforeCraft.itemsSent.craft, 'soltar antes de 1,5 s fabrico');
     await page.mouse.down();
-    await page.waitForTimeout(2400);
+    await page.waitForTimeout(1900);
     await page.mouse.up();
     await page.waitForTimeout(400);
     const made = await state(page);
     const pickSlot = made.slots.findIndex((s) => s.item === 11);
     console.log(`  pico fabricado en la casilla ${pickSlot + 1}, aviso «${made.toast}»`);
-    check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'mantener 2 s no fabrico');
+    check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'mantener 1,5 s no fabrico');
+    // La carga acaba en el borde derecho de los ingredientes, no en el del panel.
+    const rowEdge = await page.evaluate(() => {
+      const row = document.querySelector('#recipeList .recipe:nth-child(2)');
+      return { row: row.getBoundingClientRect().right, ing: row.querySelector('.ingredients').getBoundingClientRect().right };
+    });
+    check(Math.abs(rowEdge.row - rowEdge.ing) < 1, `la fila de la receta no acaba en los ingredientes: ${JSON.stringify(rowEdge)}`);
     check(pickSlot >= 0, 'el pico no llego al inventario');
-    // Tirar: una piedra, arrastrada fuera del panel.
+    // Tirar: una piedra, arrastrada fuera del panel, pide confirmacion.
+    // Cancelar no tira; aceptar, si.
     const stoneSlot = made.slots.findIndex((s) => s.item === 1);
-    await drag(await center(`#invGrid .slot:nth-child(${stoneSlot + 1})`), { x: 30, y: 30 });
+    const stoneFrom = await center(`#invGrid .slot:nth-child(${stoneSlot + 1})`);
+    await drag(stoneFrom, { x: 30, y: 30 });
+    const asked = await state(page);
+    check(asked.discardAsk && (await page.isVisible('#discardAsk')), 'soltar fuera del panel no pidio confirmacion');
+    check(asked.inventory[1] > 0 && asked.itemsSent.discard === made.itemsSent.discard, 'se tiro antes de confirmar');
+    await page.click('#discardNo');
+    await page.waitForTimeout(250);
+    const kept = await state(page);
+    check(!kept.discardAsk && kept.inventory[1] > 0 && kept.itemsSent.discard === made.itemsSent.discard, 'cancelar tiro la piedra');
+    await drag(stoneFrom, { x: 30, y: 30 });
+    console.log(`  confirmar al tirar: «${await page.textContent('#discardText')}»`);
+    await page.click('#discardYes');
+    await page.waitForTimeout(300);
     const thrown = await state(page);
-    check(thrown.itemsSent.discard > made.itemsSent.discard && thrown.inventory[1] === 0, 'soltar fuera del panel no tiro la piedra');
-    // Al pico a la barra, si no cayo en ella.
-    if (pickSlot >= 4) await drag(await center(`#invGrid .slot:nth-child(${pickSlot + 1})`), await center('#invGrid .slot:nth-child(4)'));
+    check(thrown.itemsSent.discard > made.itemsSent.discard && thrown.inventory[1] === 0, 'confirmar no tiro la piedra');
+    // Con el inventario abierto, de la rejilla a la barra de la mano: el pico,
+    // a su cuarta casilla.
+    if (pickSlot !== 3) {
+      await drag(await center(`#invGrid .slot:nth-child(${pickSlot + 1})`), await center('#hotbar .slot:nth-child(4)'));
+      const toBar = await state(page);
+      check(toBar.slots[3].item === 11, `arrastrar a la barra no movio el pico: ${JSON.stringify(toBar.slots.slice(0, 4))}`);
+    }
     await page.screenshot({ path: join(SHOTS, '3d-03b-inventario-fabricar.png') });
     await page.keyboard.press('KeyE');
     await page.waitForTimeout(200);
@@ -871,6 +895,7 @@ async function mobilePass(browser, baseUrl) {
     `tocar la casilla 2 de la barra no la eligio (${tapped.selectedSlot})`);
   const bar = await page.evaluate(() => document.getElementById('hotbar').getBoundingClientRect().toJSON());
   check(bar.top < 100 && bar.left >= 0 && bar.right <= 390, `la barra del movil no cabe arriba: ${JSON.stringify(bar)}`);
+  check(Math.abs((bar.left + bar.right) / 2 - 390 / 2) <= 1, `la barra del movil no esta centrada: ${JSON.stringify(bar)}`);
   // El racimo cabe en la pantalla y queda ENTERO por encima de la franja de
   // salud y hambre, que llega hasta el borde derecho.
   const rect = (id) => page.evaluate((i) => document.getElementById(i).getBoundingClientRect().toJSON(), id);
@@ -879,7 +904,21 @@ async function mobilePass(browser, baseUrl) {
   );
   check(atk.right <= 390 && atk.bottom <= 844 && atk.right > 390 - 30, `el ataque no esta en la esquina: ${JSON.stringify(atk)}`);
   check(use.right <= atk.left, 'USAR no esta a la izquierda del ataque');
+  check(Math.abs(use.bottom - atk.bottom) < 1, `USAR no apoya en el borde de abajo del ataque: ${use.bottom} / ${atk.bottom}`);
   check(jump.bottom <= atk.top && run.bottom <= jump.top, 'correr y saltar no estan en columna encima del ataque');
+  check(Math.abs(jump.right - atk.right) < 1 && Math.abs(run.right - atk.right) < 1,
+    `correr y saltar no van al borde derecho del ataque: ${run.right} / ${jump.right} / ${atk.right}`);
+  check(bar.left >= others.right + 8 && bar.right <= invOpen.left - 8, 'la barra de la mano pisa OTROS o INVENTARIO');
+  // Solo iconos: ningun boton lleva rotulo, y cada uno lleva su nombre para
+  // el lector de pantalla.
+  const labels = await page.evaluate(() =>
+    ['action', 'use', 'jump', 'run', 'others', 'invOpen'].map((id) => {
+      const b = document.getElementById(id);
+      return { id, text: b.textContent.replace(/[\s\u00bb\u2191]/g, ''), label: b.getAttribute('aria-label'), svg: !!b.querySelector('svg') };
+    }),
+  );
+  check(labels.every((l) => l.text === '' && l.label), `hay botones con rotulo: ${JSON.stringify(labels)}`);
+  check(labels.filter((l) => l.svg).length === 4, 'USAR, ATAQUE, OTROS o INVENTARIO no llevan su icono');
   check(vitals.right <= use.left && vitals.left < 40, `la franja no va de la izquierda hasta USAR: ${JSON.stringify(vitals)}`);
   check(others.left < 40 && others.top < 40 && invOpen.right > 350 && invOpen.top < 40, 'OTROS o INVENTARIO no estan arriba en las esquinas');
 
@@ -889,26 +928,47 @@ async function mobilePass(browser, baseUrl) {
   await page.waitForTimeout(200);
   check(await page.isVisible('#proj') && await page.isVisible('#hudToggle') && await page.isVisible('#statsToggle'),
     'OTROS no desplego el ojo, el HUD y el entorno');
+  // En columna, debajo de el, y en ese orden.
+  const [eyeR, hudR, envR] = await Promise.all(['proj', 'hudToggle', 'statsToggle'].map(rect));
+  const mid = (r) => (r.left + r.right) / 2;
+  check(eyeR.top >= others.bottom && hudR.top >= eyeR.bottom && envR.top >= hudR.bottom,
+    'OTROS no despliega en columna debajo de el');
+  check([eyeR, hudR, envR].every((r) => Math.abs(mid(r) - mid(others)) < 2), 'la columna de OTROS no va alineada bajo el');
   await page.tap('#hudToggle');
   await page.waitForTimeout(200);
   check(await page.isVisible('#hud'), 'tocar el boton no abrio el HUD en el movil');
   check(await page.isVisible('.touch-only'), 'la pista de los gestos no se ve en el movil');
   await page.tap('#hudToggle');
-  // El inventario: se abre sin pausar, y sus flechas cambian de pagina.
+  // El inventario: se abre sin pausar, y sus pestanas cambian de pagina.
   await page.tap('#invOpen');
   await page.waitForTimeout(200);
   check(await page.isVisible('#invPanel'), 'tocar el boton no abrio el inventario en el movil');
   check(!(await state(page)).paused, 'abrir el inventario en el movil pauso');
   await page.screenshot({ path: join(SHOTS, '3d-04-movil.png') });
+  check((await page.locator('.pageNav').count()) === 0, 'siguen las flechas del inventario');
+  const tabsOf = () => page.evaluate(() =>
+    Array.from(document.querySelectorAll('#invTabs button')).map((b) => {
+      const r = b.getBoundingClientRect();
+      return { name: b.textContent, on: b.classList.contains('on'), left: r.left, right: r.right };
+    }),
+  );
+  const panelR = await rect('invPanel');
+  const tabs0 = await tabsOf();
+  check(tabs0.map((t) => t.name).join('|') === 'Personaje|Inventario|Recetas', `las pestanas no son las tres: ${JSON.stringify(tabs0)}`);
+  const widths = tabs0.map((t) => t.right - t.left);
+  check(Math.abs(tabs0[0].left - panelR.left) < 2 && Math.abs(tabs0[2].right - panelR.right) < 2 && Math.max(...widths) - Math.min(...widths) < 1,
+    `las pestanas no reparten el ancho del panel en tres: ${JSON.stringify({ panelR, tabs0 })}`);
   const pages = [(await state(page)).inventoryPage];
-  await page.tap('#pageNext');
-  pages.push((await state(page)).inventoryPage);
-  await page.tap('#pagePrev');
-  await page.tap('#pagePrev');
-  pages.push((await state(page)).inventoryPage);
-  await page.tap('#pageNext');
+  for (const n of [3, 1, 2]) {
+    await page.tap(`#invTabs button:nth-child(${n})`);
+    const now = await tabsOf();
+    const lit = now.filter((t) => t.on).map((t) => t.name);
+    check(lit.length === 1 && lit[0] === now[n - 1].name && now.map((t) => t.name).join() === tabs0.map((t) => t.name).join(),
+      `la pestana ${n} no se ilumino sola o se movieron: ${JSON.stringify(now)}`);
+    pages.push((await state(page)).inventoryPage);
+  }
   console.log(`  paginas del inventario: ${pages.join(' -> ')}`);
-  check(pages.join() === 'inventario,recetas,personaje', `las flechas no recorren las paginas: ${pages}`);
+  check(pages.join() === 'inventario,recetas,personaje,inventario', `las pestanas no recorren las paginas: ${pages}`);
   await page.tap('#invOpen');
   check(!(await page.isVisible('#invPanel')), 'tocar otra vez no cerro el inventario');
 

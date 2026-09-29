@@ -750,6 +750,7 @@ Object.defineProperty(window, '__verdant', {
       selectedSlot: state.inventory.selected,
       itemsSent: { ...items.sent },
       inventoryPage: items.currentPage,
+      discardAsk: items.askingDiscard,
       lastUsed: state.lastUsed,
       toast: (document.getElementById('toast') as HTMLElement).classList.contains('show')
         ? (document.getElementById('toast') as HTMLElement).textContent

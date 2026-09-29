@@ -199,11 +199,12 @@ describe('El catalejo de la primera persona', () => {
     expect(cam.fov).toBe(FP_FOV);
   });
 
-  it('el angulo de la barra va de 50 a 100, al grado, y arranca en 70', () => {
+  it('el angulo de la barra va de 70 a 120, al grado, y arranca en 70', () => {
     const cam = fp();
     expect(cam.fov).toBe(70);
-    cam.setFpFov(87.4);
-    expect(cam.fov).toBe(87);
+    expect([FP_FOV_MIN, FP_FOV_MAX]).toEqual([70, 120]);
+    cam.setFpFov(107.4);
+    expect(cam.fov).toBe(107);
     cam.setFpFov(10);
     expect(cam.fpFov).toBe(FP_FOV_MIN);
     cam.setFpFov(400);
@@ -214,21 +215,21 @@ describe('El catalejo de la primera persona', () => {
 
   it('el catalejo parte del angulo elegido, llega a 15 y vuelve a el', () => {
     const cam = fp();
-    cam.setFpFov(95);
+    cam.setFpFov(110);
     cam.zoom(0.5);
-    expect(cam.fov).toBeCloseTo(47.5, 9);
+    expect(cam.fov).toBeCloseTo(55, 9);
     cam.zoom(0.001);
     expect(cam.fov).toBeCloseTo(FP_MIN_FOV, 9);
     for (let i = 0; i < 60; i++) cam.relaxSpyglass(1 / 60, false);
-    expect(cam.fov).toBe(95);
+    expect(cam.fov).toBe(110);
     cam.resize(800, 600);
-    expect(cam.firstPerson.fov).toBe(95);
+    expect(cam.firstPerson.fov).toBe(110);
   });
 
   it('el angulo de la primera persona no toca la perspectiva', () => {
     const cam = new OrbitCamera();
     const fov = cam.fov;
-    cam.setFpFov(100);
+    cam.setFpFov(120);
     expect(cam.fov).toBe(fov);
   });
 

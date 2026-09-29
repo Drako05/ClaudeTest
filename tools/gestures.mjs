@@ -157,8 +157,11 @@ for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) {
   await tapReal(eye);
 }
 check((await probe()).projection === 'primera', 'tocar el ojo no llevo a la primera persona');
-const early = await holdEye(500);
-check(!early.fovPanel, 'medio segundo en el ojo ya abrio la barra');
+// 300 ms y no 500: a partir de 500 Chrome lo toma por pulsacion larga y no
+// manda el `click`, asi que medio segundo exacto caia a un lado u otro segun
+// la carga de la maquina (medido: con 750, falla siempre).
+const early = await holdEye(300);
+check(!early.fovPanel, 'un toque corto en el ojo ya abrio la barra');
 check((await probe()).projection === 'perspectiva', 'un toque corto en el ojo no cambio de vista');
 for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) {
   await ensureOthers();
@@ -192,43 +195,64 @@ check(tapped.projection === 'perspectiva' && !tapped.fovPanel,
   `un toque corto con la barra abierta no cambio de vista o no la cerro (${tapped.projection}, ${tapped.fovPanel})`);
 await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
 
-// El inventario con el dedo: arrastrar una casilla a otra, y mantener una
-// receta 2 s para fabricarla (decisiones del autor). Con materiales del panel
-// de desarrollo.
+// El inventario con el dedo: arrastrar dentro de la barra con el inventario
+// cerrado, arrastrar una casilla a otra y a la barra con el abierto, y mantener
+// una receta 1,5 s para fabricarla (decisiones del autor). Con materiales del
+// panel de desarrollo.
 await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904&dev=1`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__verdant && window.__verdant.tick > 0, null, { timeout: 30000 });
 await page.evaluate(() => document.querySelector('[data-kit="piedra"]').click());
 await page.waitForTimeout(300);
+const at = (sel) => page.evaluate((q) => {
+  const r = document.querySelector(q).getBoundingClientRect();
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+}, sel);
+async function dragReal(from, to) {
+  await real('touchStart', [from]);
+  for (let i = 1; i <= 10; i++) await real('touchMove', [{ x: from.x + ((to.x - from.x) * i) / 10, y: from.y + ((to.y - from.y) * i) / 10 }]);
+  await real('touchEnd', []);
+  await page.waitForTimeout(400);
+}
+const items = (p) => p.slots.map((s) => s.item);
+// Inventario cerrado: dentro de la barra se intercambia; al vacio, nada.
+const barStart = await probe();
+await dragReal(await at('#hotbar .slot:nth-child(1)'), await at('#hotbar .slot:nth-child(3)'));
+const barSwap = await probe();
+console.log(`  barra con el inventario cerrado: ${items(barStart).slice(0, 4)} -> ${items(barSwap).slice(0, 4)}`);
+check(!barSwap.inventoryOpen && barSwap.slots[2].item === barStart.slots[0].item && barSwap.slots[0].item === barStart.slots[2].item,
+  'arrastrar dentro de la barra con el inventario cerrado no intercambio');
+await dragReal(await at('#hotbar .slot:nth-child(1)'), { x: 195, y: 420 });
+const barVoid = await probe();
+check(items(barVoid).join() === items(barSwap).join() && !barVoid.discardAsk && barVoid.itemsSent.discard === barSwap.itemsSent.discard,
+  'soltar la barra al vacio con el inventario cerrado tiro algo o pidio confirmacion');
+// Inventario abierto: de una casilla a otra, y de la rejilla a la barra.
 const invBtn = await center('invOpen');
 await tapReal(invBtn);
-const slotAt = (n) => page.evaluate((k) => {
-  const r = document.querySelector(`#invGrid .slot:nth-child(${k})`).getBoundingClientRect();
-  return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-}, n);
-const s1 = await slotAt(1);
-const s7 = await slotAt(7);
+const slotAt = (n) => at(`#invGrid .slot:nth-child(${n})`);
 const beforeDrag = await probe();
-await real('touchStart', [s1]);
-for (let i = 1; i <= 10; i++) await real('touchMove', [{ x: s1.x + ((s7.x - s1.x) * i) / 10, y: s1.y + ((s7.y - s1.y) * i) / 10 }]);
-await real('touchEnd', []);
-await page.waitForTimeout(400);
+const moving = beforeDrag.slots[0].item;
+await dragReal(await slotAt(1), await slotAt(7));
 const afterDrag = await probe();
 console.log(`  arrastrar con el dedo: casilla 7 = ${afterDrag.slots[6].item}, movimientos ${beforeDrag.itemsSent.move} -> ${afterDrag.itemsSent.move}`);
-check(afterDrag.itemsSent.move > beforeDrag.itemsSent.move && afterDrag.slots[6].item === 8, 'arrastrar con el dedo no movio la rama');
-// A recetas y mantener el pico 2 s.
-await tapReal(await center('pageNext'));
+check(afterDrag.itemsSent.move > beforeDrag.itemsSent.move && afterDrag.slots[6].item === moving, 'arrastrar con el dedo no movio la casilla');
+await dragReal(await slotAt(7), await at('#hotbar .slot:nth-child(4)'));
+const toBar = await probe();
+check(toBar.slots[3].item === moving, `arrastrar de la rejilla a la barra no movio: ${items(toBar).slice(0, 8)}`);
+// A recetas, con su pestana, y mantener el pico 1,5 s.
+await tapReal(await at('#invTabs button:nth-child(3)'));
+check((await probe()).inventoryPage === 'recetas', 'la pestana Recetas no cambio de pagina');
 const result = await page.evaluate(() => {
   const r = document.querySelector('#recipeList .recipe:nth-child(2) .result').getBoundingClientRect();
   return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 });
 const beforeHold = await probe();
 await real('touchStart', [result]);
-await page.waitForTimeout(2500);
+await page.waitForTimeout(2000);
 await real('touchEnd', []);
 await page.waitForTimeout(400);
 const afterHold2 = await probe();
 console.log(`  fabricar manteniendo: ${beforeHold.inventory[11]} -> ${afterHold2.inventory[11]} picos`);
-check(afterHold2.inventory[11] === beforeHold.inventory[11] + 1, 'mantener la receta 2 s con el dedo no fabrico');
+check(afterHold2.inventory[11] === beforeHold.inventory[11] + 1, 'mantener la receta 1,5 s con el dedo no fabrico');
 await page.screenshot({ path: 'screenshots/movil-recetas.png' });
 
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });

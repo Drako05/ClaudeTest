@@ -12,8 +12,9 @@ describe('La barra del angulo de vision', () => {
 
   it('lo guardado se lee acotado y al grado', () => {
     expect(readStoredFov('90')).toBe(90);
-    expect(readStoredFov('63.6')).toBe(64);
-    expect(readStoredFov('20')).toBe(50);
-    expect(readStoredFov('150')).toBe(100);
+    expect(readStoredFov('103.6')).toBe(104);
+    // Lo guardado con el rango de antes (50-100) cae dentro del nuevo.
+    expect(readStoredFov('55')).toBe(70);
+    expect(readStoredFov('150')).toBe(120);
   });
 });

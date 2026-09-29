@@ -75,13 +75,13 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Boton ATAQUE | Golpear; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar el golpe |
 | Boton USAR | Usar lo de la mano: comer una baya, sembrar una semilla |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
-| Barra de arriba | Tocar una casilla la pone en la mano |
-| Boton INVENTARIO | Inventario, con flechas a PERSONAJE y RECETAS; como en PC, arrastrar y mantener |
+| Barra de arriba | Tocar una casilla la pone en la mano; arrastrar las ordena |
+| Boton INVENTARIO | Inventario, con pestanas Personaje, Inventario y Recetas; como en PC, arrastrar y mantener |
 | Boton OTROS | Cambiar de vista (el ojo), el HUD y el panel del entorno |
 | Sostener el ojo mas de 1 s | En primera persona, barra del angulo de vision; tocar fuera la cierra |
 
 **La mirada es una sola** en las tres vistas: el centro de la pantalla es hacia
-donde mira el jugador. Se golpea con un sector plano de 2 bloques y 90 grados
+donde mira el jugador. Se golpea con un sector plano de 2,5 bloques y 90 grados
 que sale de sus ojos y solo cuenta si toca un objeto —de un arbol, su tronco—;
 el terreno lo tapa. Se siembra donde la mirada toca el suelo. La camara no
 atraviesa bloques ni troncos.

@@ -102,16 +102,17 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
     que ningun test evidente lo delate.
 12. **El golpe es un SECTOR PLANO que sale de los ojos y cuenta solo si toca
-    un hitbox** (`sim/aim.ts`), decision del autor del 2026-09-28: **2 bloques
-    y 90 grados** (±45) en el plano de la mirada —la direccion en que se mira,
+    un hitbox** (`sim/aim.ts`), decision del autor del 2026-09-28: **2,5
+    bloques** (eran 2; los subio el 2026-09-29) **y 90 grados** (±45) en el plano de la mirada —la direccion en que se mira,
     con su inclinacion, y la horizontal a su derecha—, y **el terreno lo
     corta**: no se golpea a traves del suelo ni de una pared. Se recorre con 33
-    rayos (a 2 bloques, un hueco de 0,1, menos que el tronco mas fino), cada uno
+    rayos (a 2,5 bloques, un hueco de 0,12, menos que el tronco mas fino), cada uno
     cortado donde entra en el terreno; cae todo objeto cuyo hitbox cruce alguno.
     **Sembrar** va donde la mirada toca la cara de arriba del suelo, a menos de
-    2 bloques **en horizontal** (lo de horizontal es deduccion mia: a lo largo
-    de la mirada habria que mirar 61 grados abajo para sembrar en llano; asi,
-    41); ni en la cara de una pared ni mirando al cielo.
+    2,5 bloques **en horizontal** —el mismo alcance, decision del autor— (lo de
+    horizontal es deduccion mia: a lo largo de la mirada habria que mirar 44
+    grados abajo para sembrar en llano; asi, 35); ni en la cara de una pared ni
+    mirando al cielo.
 
     **Hitboxes** (`hitboxAt` en `systems/gathering.ts`): cajas verticales
     centradas en su casilla y apoyadas en su suelo. **El del arbol es solo su
@@ -760,11 +761,17 @@ boton, y un dedo sobre el mundo gira la camara y nada mas.
 
 **La pantalla del movil es la del boceto del autor (2026-09-28).** Abajo, el
 **ATAQUE**, el mas grande, en la esquina derecha, que es donde cae el pulgar en
-reposo; **USAR** a su izquierda; y **CORRER** y **SALTAR** en columna encima del
-ataque. La **franja de salud y hambre** va abajo a la izquierda, hasta USAR.
-Arriba, **OTROS** a la izquierda, la **barra de la mano** en medio e
-**INVENTARIO** a la derecha, los dos redondos; OTROS despliega en fila el ojo,
-el HUD y el entorno, y se cierra tocando fuera. Sustituyo al racimo en fila
+reposo; **USAR** a su izquierda, apoyado en su mismo borde de abajo; y
+**CORRER** y **SALTAR** en columna encima del ataque, alineados a su borde
+derecho. La **franja de salud y hambre** va abajo a la izquierda, hasta USAR.
+Arriba, **OTROS** a la izquierda, la **barra de la mano** en el centro exacto
+(sus casillas encogen en pantallas estrechas para no pisar a los redondos) e
+**INVENTARIO** a la derecha; OTROS despliega **en columna debajo de el** el
+ojo, el HUD y el entorno, y se cierra tocando fuera. **Los botones son solo
+iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
+USAR, espada y pico cruzados en ATAQUE, una mochila en INVENTARIO, tres barras
+en OTROS, y CORRER y SALTAR con su glifo; el nombre va en `aria-label`. Los
+dibujos son mios. Sustituyo al racimo en fila
 —accion, salto, carrera, comer y sembrar, ordenados por el borde— y a los
 botones de comer y sembrar, que ahora son USAR con la baya o la semilla en la
 mano. Los tamanos son mios.
@@ -814,7 +821,7 @@ estrecha el campo de vision y al soltar vuelve. En la interfaz la ortografica
 se llama «isometrica», que es como la llama el autor.
 
 **El angulo de vision de la primera persona se ajusta en el juego**, con una
-barra de **50 a 100 grados** que sale desde detras del ojo, una marca cada 10 y
+barra de **70 a 120 grados** (fue de 50 a 100 hasta el 2026-09-29) que sale desde detras del ojo, una marca cada 10 y
 los grados a su izquierda; **70 por defecto**. Todo eso y como se abre y se
 cierra es del autor (2026-09-28), y **solo existe en primera persona**. En
 **PC** se abre al **pasar el raton** por el ojo, sin clic, y salir no la
@@ -932,11 +939,14 @@ Decisiones del autor, que no se tocan sin preguntarle:
 - **Se desgastan y se rompen.**
 - **16 casillas con pilas de 100** (`sim/inventory.ts`), y la ropa las ampliara.
   **Arrastrar mueve**: el mismo objeto se apila y lo que sobra se queda; uno
-  distinto se intercambia (`Inventory.move`). **Soltarlo fuera del panel lo
-  tira.**
-- **Fabricar es mantener pulsado 2 s** el resultado de la receta, con la fila
-  llenandose de izquierda a derecha; sin ingredientes se ve apagada y no hace
-  nada, y sin sitio avisa de inventario lleno.
+  distinto se intercambia (`Inventory.move`). Con el inventario abierto se
+  arrastra entre la rejilla y la barra de la mano; **cerrado, dentro de la
+  barra**. **Soltarlo fuera del panel lo tira, previa confirmacion**; desde la
+  barra con el inventario cerrado, soltar al vacio no hace nada.
+- **Fabricar es mantener pulsado 1,5 s** el resultado de la receta, con la fila
+  llenandose de izquierda a derecha **hasta el borde derecho de los
+  ingredientes** (la fila mide lo que su contenido); sin ingredientes se ve
+  apagada y no hace nada, y sin sitio avisa de inventario lleno.
 - **Al golpear algo que no se rompe salen esquirlas**, mas pequenas, poco
   saturadas y semitransparentes que los escombros de romperlo (`spawnChips`,
   con `state.lastHits` del nucleo), y **no hay barra de progreso**.
@@ -968,11 +978,13 @@ Lo que el codigo tiene que respetar:
 - **El panel es `inventory-ui.ts`**, segun los bocetos: en PC tres columnas
   —PERSONAJE con diez equipables (apagados hasta la ropa), INVENTARIO con el
   objeto seleccionado y su descripcion, RECETAS por categorias—; en el movil,
-  una pagina y flechas. La barra de arriba del movil no se arrastra: se ordena
-  en la primera fila del inventario.
-- **Arrastrar se prueba con toques de verdad** (`tools/gestures.mjs`): arrastrar
-  una casilla con el dedo y mantener una receta 2 s. En PC lo hace el humo con
-  el raton.
+  una pagina a la vez, elegida con las pestanas **Personaje | Inventario |
+  Recetas**: todo el ancho en tres celdas iguales, la elegida iluminada y en
+  orden fijo.
+- **Arrastrar se prueba con toques de verdad** (`tools/gestures.mjs`): dentro
+  de la barra con el inventario cerrado (y al vacio, sin tirar), de casilla a
+  casilla y de la rejilla a la barra, y mantener una receta 1,5 s. En PC lo
+  hace el humo con el raton, confirmacion de tirar incluida.
 
 Para probar sin juntarlo todo a mano, el panel de desarrollo tiene
 **«Materiales de piedra»**: da materiales, no herramientas, para que fabricar

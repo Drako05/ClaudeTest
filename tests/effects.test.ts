@@ -180,7 +180,7 @@ describe('El slash de la accion', () => {
       expect(edge[i].y).toBeCloseTo(eye.z + ray.dir.z * ray.length, 9);
       expect(edge[i].z).toBeCloseTo(eye.y + ray.dir.y * ray.length, 9);
     });
-    // Los rayos que no tocan suelo llegan a los 2 bloques del alcance; los del
+    // Los rayos que no tocan suelo llegan a los 2,5 bloques del alcance; los del
     // lado del escalon se quedan antes.
     expect(Math.max(...hit.rays.map((r) => r.length))).toBeCloseTo(STRIKE_RANGE, 9);
     expect(Math.min(...hit.rays.map((r) => r.length))).toBeLessThan(STRIKE_RANGE);

@@ -63,8 +63,8 @@ export const DEBRIS_PER_BURST = 10;
  * la escena de cuadrados.
  */
 export const MAX_PARTICLES = 240;
-/** Esquirlas por golpe que no rompe. **Propuesta mia.** */
-export const CHIPS_PER_HIT = 4;
+/** Esquirlas por golpe que no rompe: el autor pidio el doble de las 4 que propuse. */
+export const CHIPS_PER_HIT = 8;
 /** Saturacion que conservan las esquirlas. **Propuesta mia.** */
 export const CHIP_SATURATION = 0.4;
 

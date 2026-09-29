@@ -37,10 +37,10 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El grosor del barrido: 0,12 casillas, redondeado al alza por el antialias | El barrido del 3D | un numero |
 | Los ojos a **1,75** para las tres vistas y el golpe (la orbital miraba a 1,6) | Golpe por hitbox y una sola mirada | un numero en `sim/aim.ts` |
 | Inclinacion de arranque **−0,62** tambien en primera persona (antes entraba a −0,2) y tope de **±83 grados** | Golpe por hitbox y una sola mirada | numeros en `camera.ts` |
-| Sembrar a menos de 2 bloques **en horizontal**, no a lo largo de la mirada (asi basta mirar 41 grados abajo, no 61) | Golpe por hitbox y una sola mirada | una linea |
+| Sembrar a menos de 2,5 bloques (el alcance es tuyo) **en horizontal**, no a lo largo de la mirada (asi basta mirar 35 grados abajo, no 44) | Golpe por hitbox y una sola mirada | una linea |
 | Hitboxes: arbusto 0,9 de ancho × 1,1, roca y minerales 0,9 × 1,0, brote 0,3 × 0,85 | Golpe por hitbox y una sola mirada | numeros en `gathering.ts` |
 | Colision de camara: se para **0,3** antes, la isometrica a **60** como mucho, y el jugador se oculta con la camara a menos de **1** | Golpe por hitbox y una sola mirada | numeros en `camera*.ts` |
-| Grosor del barrido en primera persona: medio ancho **0,04** a 2 bloques | Golpe por hitbox y una sola mirada | un numero en `effects.ts` |
+| Grosor del barrido en primera persona: medio ancho **0,04** a 2,5 bloques | Golpe por hitbox y una sola mirada | un numero en `effects.ts` |
 | El barrido se **congela en el mundo** al nacer: girar la camara despues no lo arrastra | La accion es un cono | una linea |
 | En tercera persona **el personaje tapa el centro de la pantalla**, que es hacia donde se golpea | Golpe por hitbox y una sola mirada | un encuadre por encima del hombro |
 | El cuarto de vuelta propio de cada aspa | Las features ya son aspas | un numero |
@@ -53,7 +53,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La mochila del inventario y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y el muslo | La franja de salud y hambre | SVG |
 | Con el inventario abierto en el movil, el panel **tapa** comer, sembrar y correr hasta que se cierra | La franja de salud y hambre | CSS |
 | El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `CLAUDE.md`, racimo del pulgar | un numero |
-| Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 50-100, 70 por defecto) | `CLAUDE.md`, las tres vistas | un numero en `camera.ts` |
+| Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 70-120, 70 por defecto) | `CLAUDE.md`, las tres vistas | un numero en `camera.ts` |
 | Sensibilidad del raton capturado: **0,0025 rad por pixel** (unos 0,14 grados) | El raton lleva la mirada | un numero en `camera.ts` |
 | Con el cursor capturado **un clic es un golpe** y mantener no repite | El raton lleva la mirada | un temporizador |
 | Al morir el cursor **se suelta** para pulsar «Reiniciar», y reiniciar lo vuelve a capturar | El raton lleva la mirada | una linea |
@@ -63,13 +63,18 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Lo que no cabe: el golpe **no completa** y el objeto se queda; tirar (soltar fuera del panel) lo **hace desaparecer** | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
 | Las **descripciones** de los objetos (una frase cada uno) | Inventario de los bocetos | texto en `inventory-ui.ts` |
 | La **barrita de desgaste** en las herramientas (no estaba en el boceto) | Inventario de los bocetos | CSS |
-| OTROS se despliega **en fila** a su derecha y se cierra tocando fuera | Inventario de los bocetos | CSS y una linea |
-| La barra del angulo en el movil **cae debajo del ojo** (dentro de OTROS no cabe al lado) | Inventario de los bocetos | una linea en `fov-panel.ts` |
-| Tamanos de la pantalla del movil (ataque 96, usar 64, correr y saltar 62) | Inventario de los bocetos | CSS |
+| OTROS se cierra tocando fuera; su columna va centrada bajo el, y el HUD se abre a su lado para no taparla | Inventario de los bocetos | CSS y una linea |
+| La barra del angulo en el movil sale **a la derecha del ojo**, que ahora esta en la columna de OTROS | Inventario de los bocetos | una linea en `fov-panel.ts` |
+| Tamanos de la pantalla del movil (ataque 96, usar 64, correr y saltar 62; la barra de arriba encoge hasta dejar 10 px a cada redondo) | Inventario de los bocetos | CSS |
 | El arrastre empieza a los **6 px** | Inventario de los bocetos | un numero |
-| Esquirlas de golpe: **4** por golpe, saturacion al **40 %**, opacidad **45 %** | Inventario de los bocetos | numeros en `effects*.ts` |
+| Esquirlas de golpe: saturacion al **40 %**, opacidad **45 %** (las **8** por golpe son tuyas) | Inventario de los bocetos | numeros en `effects*.ts` |
 | Las diez casillas de equipables se ven **apagadas** hasta la ropa | Inventario de los bocetos | CSS |
 | Usar mirando a algo (sin nada util en la mano) **aun no hace nada** | Inventario de los bocetos | llega con puertas y demas |
+| Sostener el ojo **entre 0,5 y 1 s** no hace nada: Chrome lo toma por pulsacion larga y no manda el toque, y la barra pide mas de 1 s. Lo destapo la prueba de gestos | Ajustes del inventario | bajar `HOLD_MS` a 0,5 s, si lo quieres |
+| Los **dibujos** de los iconos: mano abierta, espada y pico cruzados, mochila, tres barras | Ajustes del inventario | SVG en `index.html` |
+| Pestanas del movil en letra de **16 px**, subrayada la elegida | Ajustes del inventario | CSS |
+| Confirmar al tirar: «¿Tirar N × Objeto?» con **Cancelar** y **Tirar**; tocar fuera cancela; si la casilla cambio entretanto, no se tira nada | Ajustes del inventario | `inventory-ui.ts` |
+| En PC, con el cursor capturado la barra no se arrastra (el raton gira la vista): se arrastra con el cursor libre, o sea con E abierto | Ajustes del inventario | — |
 | Trabajos: arbol 4 golpes (raro 6), roca 3, carbon 4, cobre 5, hierro 6 con pico de nivel 2; arbusto y guijarros 1 | Recoleccion y fabricacion | `workOf` en `shared` |
 | Herramientas de piedra: poder 1, **40 usos**; hacha = 3 ramas + 2 piedras + 2 fibras, pico = 3 ramas + 3 piedras + 2 fibras | Recoleccion y fabricacion | `toolStats` y `RECIPES` |
 | Un uso por **golpe util**, alcance a uno o a varios; golpear con el hacha una roca no gasta | Recoleccion y fabricacion | una linea |
@@ -296,6 +301,27 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Ajustes del inventario — HECHO (2026-09-29)
+
+Sobre la misma tanda:
+- Movil: CORRER y SALTAR al borde derecho del ATAQUE, USAR a su borde de
+  abajo; OTROS despliega en columna debajo; la barra, en el centro exacto de
+  arriba; **solo iconos**, sin rotulos.
+- Angulo de la primera persona de **70 a 120**, 70 por defecto (lo guardado
+  por debajo de 70 se lee como 70).
+- Fabricar en **1,5 s**, con la carga hasta el borde de los ingredientes.
+- Pestanas **Personaje | Inventario | Recetas** en lugar de las flechas.
+- Alcance del golpe y de sembrar: **2,5**.
+- **8 esquirlas** por golpe.
+- Arrastrar entre la rejilla y la barra con el inventario abierto, y dentro de
+  la barra con el cerrado; tirar pide confirmacion, y desde la barra cerrada
+  soltar al vacio no tira.
+
+Lo comprueban los tests del golpe (2,4 cae, 2,8 no; sembrar a 2,24 si, a 2,69
+no) y del angulo, el humo (alineaciones medidas, pestanas, iconos, confirmar,
+de la rejilla a la barra, 1,5 s) y los gestos con toques de verdad (la barra
+cerrada, de la rejilla a la barra, receta 1,5 s).
 
 ## Inventario de los bocetos, y usar con clic derecho — HECHO (2026-09-28)
 

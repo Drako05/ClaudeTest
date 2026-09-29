@@ -74,11 +74,12 @@ export const HIDE_PLAYER_BELOW = 1;
 /**
  * Campo de vision de la primera persona por defecto: el de Minecraft. El
  * jugador lo cambia con la barra del ojo (`fov-panel.ts`), entre `FP_FOV_MIN` y
- * `FP_FOV_MAX`: rango y defecto son del autor. Grados verticales.
+ * `FP_FOV_MAX`: rango y defecto son del autor (50-100 el 2026-09-28, 70-120 el
+ * 2026-09-29). Grados verticales.
  */
 export const FP_FOV = 70;
-export const FP_FOV_MIN = 50;
-export const FP_FOV_MAX = 100;
+export const FP_FOV_MIN = 70;
+export const FP_FOV_MAX = 120;
 /** Lo mas que estrecha el catalejo. **Deduccion mia.** */
 export const FP_MIN_FOV = 15;
 /** Lo que tarda el catalejo en volver, como constante de tiempo (segundos). */
