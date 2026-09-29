@@ -533,7 +533,7 @@ function frame(now: number): void {
     }
 
     // Mantener el boton repite cuatro veces por segundo, que es la cadencia de
-    // siempre (`HARVEST_REPEAT_TICKS`, 15 ticks a 60 Hz). Se cuenta en TICKS y
+    // siempre (`ACTION_REPEAT_TICKS`, 15 ticks a 60 Hz). Se cuenta en TICKS y
     // no en tiempo real para que sea la misma con cualquier ritmo de fotograma.
     intent.harvest = action;
     action = false;

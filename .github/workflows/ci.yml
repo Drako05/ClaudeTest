@@ -25,6 +25,11 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           node tools/smoke.mjs
+      # Los gestos con dedos de verdad (CDP): arrastrar, sostener el ojo, la
+      # barra del angulo, el dedo de ATAQUE que gira. El humo usa toques
+      # sinteticos y no ve lo que el navegador decide sobre un dedo real.
+      - name: Gestos tactiles con toques de verdad
+        run: node tools/gestures.mjs
       - name: Guardar capturas
         if: always()
         uses: actions/upload-artifact@v4

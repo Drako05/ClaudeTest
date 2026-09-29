@@ -267,7 +267,8 @@ tocar la simulacion:
   `shared/ecology.ts`, y ahi esta codificado en la aritmetica: con densidad cero
   el crecimiento vale exactamente cero.
 - **«Segun su naturaleza, pueden ser finitos, consumibles y renovables»**: no
-  todo recurso vuelve. `regrowTicksOf` devuelve 0 para lo finito.
+  todo recurso vuelve. `lifeKindOf` devuelve `null` para lo inerte —roca y
+  minerales—, que asi queda fuera del paso de vida: ni crece ni se repone.
 
 ## Como trabajar sin quemar la ventana de uso
 
@@ -293,6 +294,15 @@ donde se fue el gasto.
 ```bash
 npm run typecheck && npm test && npm run smoke
 ```
+
+**Y al cerrar cada tanda, la auditoria**: la skill `auditoria`
+(`.claude/skills/auditoria/`, se invoca con `/auditoria`). Tiene un proceso fijo
+por fases, diez lentes, un escaner automatico con autoprueba y un **registro de
+escapes**. Parte del commit que marca «Ultima auditoria» en `docs/pendiente.md`.
+Cada fallo que aparezca despues y que una auditoria pudo ver se anade a ese
+registro, con el metodo que lo habria detectado, y ese metodo pasa al escaner o
+a una lente: asi la skill mejora con cada cosa que se le escapa. Vive en el repo
+a proposito: el contenedor muere con la sesion y la skill tiene que crecer.
 
 `npm run smoke` construye el cliente y lo juega en Chromium headless leyendo el
 estado real por `window.__verdant`. Los tests unitarios no detectan que el juego

@@ -220,7 +220,8 @@ describe('simulacion', () => {
  * contrario: que media deflexion del joystick recorria media distancia. El autor
  * lo cambio al pedir la carrera —«el mando apunta, el interruptor decide la
  * velocidad»—, asi que lo que antes era la regla es ahora el fallo, y se afirma
- * al reves. La zona muerta del joystick no vive aqui sino en `client/input.ts`:
+ * al reves. La zona muerta del joystick no vive aqui sino en el cliente
+ * (`STICK_DEAD` en `packages/client/src/gestures.ts`):
  * el nucleo solo ve direcciones.
  */
 describe('marcha y carrera', () => {

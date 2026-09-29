@@ -158,12 +158,13 @@ const there = await page.evaluate(() => window.__verdant);
 console.log(`camina hacia ${best.key} y acaba a ${walked.toFixed(1)} casillas del primer golpe, en ${there.x.toFixed(1)}, ${there.y.toFixed(1)}`);
 if (walked < 18) console.log('AVISO: no se ha alejado lo bastante; el recorte por frustum no queda probado');
 
-// 3. Y un sitio donde la accion alcance de verdad.
+// 3. Y un sitio donde el barrido se dibuje de verdad.
 //
-//    En terreno escalonado el area llega a UNA casilla de las tres —solo alcanza
-//    las de la altura propia—, y con una sola casilla no hay arco que trazar. Sin
-//    esta comprobacion la medida daria cero por el motivo equivocado, que es
-//    justo el error que este proyecto ya se comio una vez.
+//    Con el modelo de casillas, en terreno escalonado la accion llegaba a una
+//    sola y no habia arco que trazar: la medida daba cero por el motivo
+//    equivocado. Con el sector de la regla 12 el barrido sale siempre, asi que
+//    esto casi nunca tiene que buscar; se queda como guarda, porque una medida
+//    que puede dar cero por otra causa es justo el error que ya costo caro.
 let reaches = await probe();
 for (let tries = 0; tries < 8 && !reaches; tries++) {
   await push(['KeyD', 'KeyS', 'KeyA', 'KeyW'][tries % 4], 700);

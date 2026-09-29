@@ -7,6 +7,10 @@ deuda tecnica que ninguna sesion nueva podria reconstruir leyendo el codigo.
 Lo permanente del *como* esta en `CLAUDE.md`; las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
+**Ultima auditoria: commit `912c3d7`, 2026-09-29** (mas el escaner de la skill
+`auditoria`, que salio despues y encontro cuatro restos mas, corregidos en el
+commit que la crea). La proxima parte de aqui: ver `.claude/skills/auditoria/`.
+
 **Como leerlo.** Va de lo mas urgente a lo mas historico:
 
 1. **Esperando tu juicio** — la lista de abajo. Son decisiones que tomo el agente
@@ -144,7 +148,17 @@ Se dejo a proposito:
   usan los tests, aunque nadie los pinte.
 - `main.ts`: es largo, pero lineal.
 
-Queda para ti meter `npm run gestures` en CI.
+`npm run gestures` entro en la CI despues, a peticion tuya.
+
+**Y de aqui salio la skill `auditoria`** (`.claude/skills/auditoria/`). Al
+estrenarse, su escaner encontro cuatro restos mas que esta auditoria manual no
+vio:
+- `CLAUDE.md` citaba `regrowTicksOf`, que no existe;
+- un comentario de `main.ts` citaba una constante que no existe;
+- un test situaba la zona muerta en un fichero del isometrico;
+- `slash` razonaba con las «tres casillas».
+
+Estan en su registro de escapes.
 
 ---
 
