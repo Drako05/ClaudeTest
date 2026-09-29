@@ -89,8 +89,6 @@ export class Hud {
     hungerFill: byId('hungerFill'),
     hudToggle: byId('hudToggle'),
     hud: byId('hud'),
-    invToggle: byId('invToggle'),
-    invPanel: byId('invPanel'),
     statsToggle: byId('statsToggle'),
     statsPanel: byId('statsPanel'),
     biomeName: byId('biomeName'),
@@ -120,7 +118,6 @@ export class Hud {
     // Cada panel se despliega y repliega con su boton.
     this.el.statsToggle.addEventListener('click', () => this.toggleStats());
     this.el.hudToggle.addEventListener('click', () => this.toggleHud());
-    this.el.invToggle.addEventListener('click', () => this.toggleInventory());
   }
 
   /** Abre o cierra un panel y deja su boton diciendo como esta. */
@@ -143,24 +140,10 @@ export class Hud {
     if (open) this.updateInfo(this.current());
   }
 
-  /**
-   * El inventario: su boton o la tecla I. Sus casillas las pinta `items-ui.ts`;
-   * aqui solo se abre y se cierra, y se avisa para que las pinte en el acto.
-   */
-  toggleInventory(): void {
-    if (Hud.flip(this.el.invToggle, this.el.invPanel)) this.onInventoryOpen?.();
-  }
-
-  /** Se llama al abrir el inventario. */
-  onInventoryOpen: (() => void) | null = null;
-
   get hudOpen(): boolean {
     return !this.el.hud.hidden;
   }
 
-  get inventoryOpen(): boolean {
-    return !this.el.invPanel.hidden;
-  }
 
   /** Si el aviso de muerte esta a la vista. */
   get deadShown(): boolean {

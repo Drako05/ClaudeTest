@@ -8,8 +8,9 @@
  * regla no se comprueba jugando con dos pulgares en un headless.
  *
  * Las teclas son las de siempre: WASD o flechas para andar, Espacio salta,
- * Shift enciende y apaga la carrera, E come, F siembra, I abre el inventario,
- * R empieza un mundo nuevo, + y - acercan y alejan, y P cambia de proyeccion.
+ * Shift enciende y apaga la carrera, E abre el inventario, 1-4 eligen la
+ * mano, R empieza un mundo nuevo, + y - acercan y alejan, y P cambia de
+ * proyeccion. Clic izquierdo golpea y clic derecho usa lo de la mano.
  */
 
 import { Gestures, STICK_RADIUS } from './gestures.js';
@@ -74,15 +75,10 @@ export class Controls {
         case 'KeyP':
           this.onToggleProjection?.();
           break;
+        // E abre y cierra el inventario con el recetario (decision del autor).
+        // Comer y sembrar ya no tienen tecla: se hacen con clic derecho,
+        // llevando la baya o la semilla en la mano.
         case 'KeyE':
-          this.eatQueued = true;
-          break;
-        case 'KeyF':
-          this.plantQueued = true;
-          break;
-        // El inventario tiene tecla; el HUD no, solo su boton (decision del
-        // autor).
-        case 'KeyI':
           this.onToggleInventory?.();
           break;
         case 'KeyR':
@@ -127,6 +123,7 @@ export class Controls {
       const mouse = this.mouseLook?.pointerDown(e) ?? null;
       if (mouse) {
         if (mouse === 'strike') this.actionQueued = true;
+        if (mouse === 'use') this.useQueued = true;
         return;
       }
 
@@ -153,14 +150,11 @@ export class Controls {
         // boton. Se decide al soltar porque hasta entonces no se sabe cual de
         // las dos era. En tactil no: ahi acciona el boton, y un dedo sobre el
         // mundo gira la camara y nada mas.
-        if (
-          type === 'pointerup' &&
-          released &&
-          !released.isTouch &&
-          released.tap &&
-          (e as PointerEvent).button === 0
-        ) {
-          this.actionQueued = true;
+        if (type === 'pointerup' && released && !released.isTouch && released.tap) {
+          // Izquierdo golpea; derecho usa (decision del autor).
+          const button = (e as PointerEvent).button;
+          if (button === 0) this.actionQueued = true;
+          if (button === 2) this.useQueued = true;
         }
         this.drawStick();
       });
@@ -184,8 +178,7 @@ export class Controls {
   /** Ultima vez que se giro la rueda o se pulso + / -, en ms. */
   private lastWheelAt = -Infinity;
   private jumpQueued = false;
-  private eatQueued = false;
-  private plantQueued = false;
+  private useQueued = false;
   private runEl: HTMLElement | null = null;
 
   /** Accion pedida de un clic o de un toque. Se consume una vez. */
@@ -320,30 +313,19 @@ export class Controls {
     });
   }
 
-  /** Consume la comida pedida, si la hubo. Un toque es un bocado. */
-  takeEat(): boolean {
-    const out = this.eatQueued;
-    this.eatQueued = false;
-    return out;
-  }
-
-  /** Consume la siembra pedida, si la hubo. */
-  takePlant(): boolean {
-    const out = this.plantQueued;
-    this.plantQueued = false;
+  /** Consume el «usar» pedido (clic derecho o boton USAR), si lo hubo. */
+  takeUse(): boolean {
+    const out = this.useQueued;
+    this.useQueued = false;
     return out;
   }
 
   /**
-   * Comer y sembrar del movil: de un solo toque, no repiten al mantener. Van
-   * aparte del lienzo por lo mismo que el salto.
+   * El boton USAR del movil, junto al de accion: de un solo toque, no repite al
+   * mantener. Sustituye a los de comer y sembrar (decision del autor).
    */
-  bindEatButton(el: HTMLElement | null): void {
-    this.bindTap(el, () => (this.eatQueued = true));
-  }
-
-  bindPlantButton(el: HTMLElement | null): void {
-    this.bindTap(el, () => (this.plantQueued = true));
+  bindUseButton(el: HTMLElement | null): void {
+    this.bindTap(el, () => (this.useQueued = true));
   }
 
   private bindTap(el: HTMLElement | null, run: () => void): void {

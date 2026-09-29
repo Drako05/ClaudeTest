@@ -59,9 +59,17 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Al morir el cursor **se suelta** para pulsar «Reiniciar», y reiniciar lo vuelve a capturar | El raton lleva la mirada | una linea |
 | Un toque de verdad **apaga** el modo raton (portatil tactil), y ya no hay pausa por el cursor | El raton lleva la mirada | una linea |
 | Textos del aviso: «Haz clic para jugar» al arrancar y «Haz clic para continuar» despues | El raton lleva la mirada | HTML |
-| Inventario de **8 casillas** con pilas de **20**. Ojo: en la tanda 1 ya hay 12 objetos distintos, y un jugador que junta de todo **llena las 8** antes de minar (el test guionizado tiene que tirar cosas); la ropa de la tanda 2 es la que lo alivia | Recoleccion y fabricacion | un numero en `sim/inventory.ts` |
-| Lo que no cabe: el golpe **no completa** y el objeto se queda; tirar una casilla la **hace desaparecer** | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
-| Barra de la mano: casillas 1-4, **abajo al centro en PC y arriba al centro en el movil** (abajo estan el joystick y el racimo) | Recoleccion y fabricacion | CSS |
+| Casillas iniciales y tope: **16 y 100**, ya decididos por el autor (antes, 8 y 20 mios) | Recoleccion y fabricacion | — |
+| Lo que no cabe: el golpe **no completa** y el objeto se queda; tirar (soltar fuera del panel) lo **hace desaparecer** | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
+| Las **descripciones** de los objetos (una frase cada uno) | Inventario de los bocetos | texto en `inventory-ui.ts` |
+| La **barrita de desgaste** en las herramientas (no estaba en el boceto) | Inventario de los bocetos | CSS |
+| OTROS se despliega **en fila** a su derecha y se cierra tocando fuera | Inventario de los bocetos | CSS y una linea |
+| La barra del angulo en el movil **cae debajo del ojo** (dentro de OTROS no cabe al lado) | Inventario de los bocetos | una linea en `fov-panel.ts` |
+| Tamanos de la pantalla del movil (ataque 96, usar 64, correr y saltar 62) | Inventario de los bocetos | CSS |
+| El arrastre empieza a los **6 px** | Inventario de los bocetos | un numero |
+| Esquirlas de golpe: **4** por golpe, saturacion al **40 %**, opacidad **45 %** | Inventario de los bocetos | numeros en `effects*.ts` |
+| Las diez casillas de equipables se ven **apagadas** hasta la ropa | Inventario de los bocetos | CSS |
+| Usar mirando a algo (sin nada util en la mano) **aun no hace nada** | Inventario de los bocetos | llega con puertas y demas |
 | Trabajos: arbol 4 golpes (raro 6), roca 3, carbon 4, cobre 5, hierro 6 con pico de nivel 2; arbusto y guijarros 1 | Recoleccion y fabricacion | `workOf` en `shared` |
 | Herramientas de piedra: poder 1, **40 usos**; hacha = 3 ramas + 2 piedras + 2 fibras, pico = 3 ramas + 3 piedras + 2 fibras | Recoleccion y fabricacion | `toolStats` y `RECIPES` |
 | Un uso por **golpe util**, alcance a uno o a varios; golpear con el hacha una roca no gasta | Recoleccion y fabricacion | una linea |
@@ -69,7 +77,6 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Ramas a mano: 1 por golpe, **3 por arbol**, se reponen en **1 dia de juego**; talar da ademas 1 rama | Recoleccion y fabricacion | numeros en `gathering.ts` |
 | Fibra: **1-2** por arbusto; el bono del 30 % no se aplica a ramas ni fibra | Recoleccion y fabricacion | numeros en `gathering.ts` |
 | Guijarros: 1 piedra, **2 %** de las casillas vacias de tierra y **6 %** en roca; tumbados en el suelo, 0,6 de ancho y 0,2 de alto | Recoleccion y fabricacion | `worldgen.ts` y `gathering.ts` |
-| Fabricar es **instantaneo**; la tecla **C** y el boton del martillo; el panel **suelta el cursor sin pausar** | Recoleccion y fabricacion | una linea |
 | Las peticiones del inventario **no se tiran en pausa**: se aplican al reanudar | Recoleccion y fabricacion | una linea en `main.ts` |
 | «Materiales de piedra» en el panel de desarrollo | Recoleccion y fabricacion | quitarlo |
 | La barra del angulo: **180 px** de largo, paso de **1 grado**, se despliega en **150 ms** | Angulo de vision ajustable | CSS y un atributo |
@@ -289,6 +296,30 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Inventario de los bocetos, y usar con clic derecho — HECHO (2026-09-28)
+
+Probaste la tanda 1 y pediste cambios, con dos bocetos:
+- **Clic izquierdo** golpea con lo que se lleva en la mano.
+- **Clic derecho** (USAR en el movil) usa lo de la mano. Se van E=comer,
+  F=sembrar, I, C y el boton COMER.
+- **E** abre inventario y recetas juntos, sin pausar: PERSONAJE, INVENTARIO y
+  RECETAS como en el boceto.
+- En el movil, la pantalla del boceto: OTROS · barra · INVENTARIO arriba; salud,
+  USAR y ATAQUE abajo, con CORRER y SALTAR encima.
+- **16 casillas** y pilas de **100**.
+- **Arrastrar** mueve, apila o intercambia, y soltar fuera tira.
+- **Fabricar es mantener 2 s**.
+- **Esquirlas** pequenas, semitransparentes y poco saturadas al golpear sin
+  romper, y sin barra de progreso.
+- Sin iconos, y la cantidad solo como numero.
+
+Lo que decidi yo esta arriba, en «Esperando tu juicio».
+
+Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
+golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
+derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
+con toques de verdad (arrastrar una casilla y mantener una receta).
 
 ## Recoleccion y fabricacion — tanda 1 HECHA, tanda 2 ESPERANDO (2026-09-28)
 

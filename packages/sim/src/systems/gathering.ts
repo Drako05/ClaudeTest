@@ -207,8 +207,21 @@ export function targetTile(world: World, store: EntityStore, id: number): Offset
   );
 }
 
+/** Un objeto golpeado que no se rompio: da sus particulas pequenas. */
+export interface Hit {
+  x: number;
+  y: number;
+  feature: Feature;
+}
+
 export interface Swing {
   results: HarvestResult[];
+  /**
+   * Lo golpeado que siguio en pie: dañado, del que salio una rama, o que pedia
+   * otra herramienta. El cliente suelta ahi las particulas de golpe, mas
+   * pequenas que las de romper (decision del autor).
+   */
+  hits: Hit[];
   /** Por que algo no salio, si es que no salio. */
   blocked: Blocked | null;
   /** True si la herramienta de la mano se rompio con este golpe. */
@@ -235,7 +248,7 @@ export function tryHarvestArea(
   tick: number,
   work: WorkState,
 ): Swing {
-  const swing: Swing = { results: [], blocked: null, broke: false };
+  const swing: Swing = { results: [], hits: [], blocked: null, broke: false };
   const held = inventory.held();
   const stats = held === null ? null : toolStats(held);
   let useful = false;
@@ -253,6 +266,7 @@ export function tryHarvestArea(
     }
 
     if (power === 0) {
+      swing.hits.push({ x, y, feature });
       if (lifeKindOf(feature) === LifeKind.Tree) {
         const branch = tryBranch(world, x, y, inventory, tick, work);
         if (branch === 'full') swing.blocked = 'full';
@@ -268,10 +282,12 @@ export function tryHarvestArea(
     const done = damageAt(work, world, x, y, tick) + power;
     if (done < need.work) {
       work.damage.set(key, { feature, work: done, tick });
+      swing.hits.push({ x, y, feature });
       continue;
     }
     const result = harvestTile(world, x, y, inventory, tick);
     if (!result) {
+      swing.hits.push({ x, y, feature });
       // No cabe: el objeto se queda y su dano tambien, asi el siguiente golpe
       // lo termina en cuanto haya sitio.
       work.damage.set(key, { feature, work: need.work, tick });
@@ -394,14 +410,33 @@ export function harvestTile(
  * fabrica a mano en cualquier sitio (decision del autor); es instantaneo
  * (propuesta mia). Devuelve true si fabrico.
  */
-export function tryCraft(inventory: Inventory, recipe: number): boolean {
+export function tryCraft(inventory: Inventory, recipe: number): 'ok' | 'missing' | 'full' {
   const r = RECIPES[recipe];
-  if (!r || r.station !== Station.Hand) return false;
-  for (const input of r.inputs) if (inventory.count(input.item) < input.count) return false;
-  if (!inventory.fits([{ item: r.output, count: r.count }], r.inputs)) return false;
+  if (!r || r.station !== Station.Hand) return 'missing';
+  for (const input of r.inputs) if (inventory.count(input.item) < input.count) return 'missing';
+  if (!inventory.fits([{ item: r.output, count: r.count }], r.inputs)) return 'full';
   for (const input of r.inputs) inventory.remove(input.item, input.count);
   inventory.add(r.output, r.count);
-  return true;
+  return 'ok';
+}
+
+/**
+ * Usar lo que se lleva en la mano (clic derecho, boton USAR), decision del
+ * autor: una baya se come, una semilla se siembra —esa semilla, donde la
+ * mirada toca el suelo—. Lo que se mira (puertas y demas) llegara despues.
+ */
+export function tryUse(
+  world: World,
+  store: EntityStore,
+  id: number,
+  inventory: Inventory,
+): 'ate' | 'planted' | null {
+  const item = inventory.inHand();
+  if (item === Resource.Berries) return tryEat(store, id, inventory) ? 'ate' : null;
+  if (item === Resource.TreeSeed || item === Resource.PlantSeed) {
+    return tryPlant(world, store, id, inventory, item) ? 'planted' : null;
+  }
+  return null;
 }
 
 /**
@@ -415,6 +450,7 @@ export function tryPlant(
   store: EntityStore,
   id: number,
   inventory: Inventory,
+  only: Resource | null = null,
 ): Feature | null {
   // Se siembra donde la mirada toca la cara de arriba del suelo, a menos del
   // alcance (decision del autor); si no llega, o da en una pared, no se siembra.
@@ -431,6 +467,8 @@ export function tryPlant(
     if (densityOfKind(terrain, kind) <= 0) continue;
     const seed = seedFor(kind);
     if (seed === null || inventory.count(seed) <= 0) continue;
+    // Con una semilla concreta en la mano, solo esa.
+    if (only !== null && seed !== only) continue;
 
     const sapling = saplingOf(speciesFor(biome, kind));
     if (sapling === Feature.None) continue;

@@ -39,6 +39,9 @@ import {
 } from 'three';
 import type { Effects, Particle, Slash } from './effects.js';
 import { MAX_PARTICLES, progressOf } from './effects.js';
+
+/** Opacidad de las esquirlas de golpe. **Propuesta mia.** */
+const CHIP_OPACITY = 0.45;
 import type { World } from '@verdant/sim';
 
 /** Pixeles por casilla del arte isometrico, de donde vienen los tamanos. */
@@ -65,6 +68,7 @@ const SLASH_POOL = 8;
 export class EffectsView {
   private readonly slashes: Mesh[] = [];
   private readonly debris: InstancedMesh;
+  private readonly chips: InstancedMesh;
   private readonly scratch = new Object3D();
   private readonly color = new Color();
 
@@ -84,6 +88,8 @@ export class EffectsView {
    */
   slashesDrawn = 0;
   debrisDrawn = 0;
+  /** Esquirlas de golpe trazadas, acumulado maximo: gemelo de `debrisDrawn`. */
+  chipsDrawn = 0;
 
   constructor(scene: Scene) {
     for (let i = 0; i < SLASH_POOL; i++) {
@@ -135,6 +141,17 @@ export class EffectsView {
     // Se recolocan cada frame; sin esto three.js los daria por inmoviles.
     this.debris.frustumCulled = false;
     scene.add(this.debris);
+
+    // Las esquirlas de golpe, aparte porque son semitransparentes y un
+    // `InstancedMesh` comparte material (decision del autor; el 45 % es mio).
+    this.chips = new InstancedMesh(
+      new BoxGeometry(1, 1, 1),
+      new MeshLambertMaterial({ transparent: true, opacity: CHIP_OPACITY, depthWrite: false }),
+      MAX_PARTICLES,
+    );
+    this.chips.count = 0;
+    this.chips.frustumCulled = false;
+    scene.add(this.chips);
   }
 
   /**
@@ -145,7 +162,8 @@ export class EffectsView {
    */
   update(effects: Effects, world: World, eye: Vector3): void {
     this.drawSlashes(effects.slashes, world, eye);
-    this.drawDebris(effects.particles);
+    this.drawDebris(effects.particles.filter((p) => !p.chip), this.debris, false);
+    this.drawDebris(effects.particles.filter((p) => p.chip), this.chips, true);
   }
 
   private drawSlashes(slashes: readonly Slash[], world: World, eye: Vector3): void {
@@ -184,7 +202,7 @@ export class EffectsView {
     }
   }
 
-  private drawDebris(particles: readonly Particle[]): void {
+  private drawDebris(particles: readonly Particle[], mesh: InstancedMesh, chips: boolean): void {
     const count = Math.min(particles.length, MAX_PARTICLES);
     for (let i = 0; i < count; i++) {
       const p = particles[i];
@@ -196,15 +214,17 @@ export class EffectsView {
       this.scratch.scale.set(side, side, side);
       this.scratch.rotation.set(0, 0, 0);
       this.scratch.updateMatrix();
-      this.debris.setMatrixAt(i, this.scratch.matrix);
-      this.debris.setColorAt(i, this.color.setHex(p.color));
+      mesh.setMatrixAt(i, this.scratch.matrix);
+      mesh.setColorAt(i, this.color.setHex(p.color));
     }
-    this.debris.count = count;
-    if (count > this.debrisDrawn) this.debrisDrawn = count;
-    this.debris.instanceMatrix.needsUpdate = true;
+    mesh.count = count;
+    if (chips) {
+      if (count > this.chipsDrawn) this.chipsDrawn = count;
+    } else if (count > this.debrisDrawn) this.debrisDrawn = count;
+    mesh.instanceMatrix.needsUpdate = true;
     // `setColorAt` no crea el atributo hasta la primera llamada, de ahi la
     // comprobacion: sin ningun escombro todavia no existe.
-    if (this.debris.instanceColor) this.debris.instanceColor.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
 }
 

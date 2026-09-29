@@ -8,6 +8,8 @@ import {
   progressOf,
   SLASH_SECONDS,
   slashEdge,
+  CHIPS_PER_HIT,
+  desaturate,
 } from '../packages/client/src/effects.js';
 import { debrisPalette, LOOKS, ROCK_FACES } from '../packages/client/src/palette.js';
 
@@ -283,5 +285,25 @@ describe('La paleta sale del mismo sitio que el dibujo', () => {
   it('lo que no se puede recolectar no tiene escombros', () => {
     expect(debrisPalette(Feature.None)).toHaveLength(0);
     expect(debrisPalette(Feature.ForestTreeSapling)).toHaveLength(0);
+  });
+});
+
+describe('Las esquirlas de un golpe que no rompe', () => {
+  it('son menos, mas pequenas y mas apagadas que los escombros de romper', () => {
+    const fx = new Effects();
+    fx.spawnDebris(0, 0, [0xff0000]);
+    fx.spawnChips(0, 0, [0xff0000]);
+    const debris = fx.particles.filter((p) => !p.chip);
+    const chips = fx.particles.filter((p) => p.chip);
+    expect(debris).toHaveLength(DEBRIS_PER_BURST);
+    expect(chips).toHaveLength(CHIPS_PER_HIT);
+    expect(CHIPS_PER_HIT).toBeLessThan(DEBRIS_PER_BURST);
+    expect(Math.max(...chips.map((p) => p.size))).toBeLessThan(Math.min(...debris.map((p) => p.size)));
+    // El rojo puro, apagado: menos distancia entre canales.
+    const c = chips[0].color;
+    const spread = ((c >> 16) & 0xff) - (c & 0xff);
+    expect(spread).toBeLessThan(255);
+    expect(spread).toBeGreaterThan(0);
+    expect(desaturate(0x808080, 0.4)).toBe(0x808080);
   });
 });

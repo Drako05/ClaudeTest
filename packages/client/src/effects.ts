@@ -63,6 +63,20 @@ export const DEBRIS_PER_BURST = 10;
  * la escena de cuadrados.
  */
 export const MAX_PARTICLES = 240;
+/** Esquirlas por golpe que no rompe. **Propuesta mia.** */
+export const CHIPS_PER_HIT = 4;
+/** Saturacion que conservan las esquirlas. **Propuesta mia.** */
+export const CHIP_SATURATION = 0.4;
+
+/** Un color con su saturacion multiplicada por `keep`, hacia su gris. */
+export function desaturate(color: number, keep: number): number {
+  const r = (color >> 16) & 0xff;
+  const g = (color >> 8) & 0xff;
+  const b = color & 0xff;
+  const grey = 0.299 * r + 0.587 * g + 0.114 * b;
+  const mix = (c: number) => Math.round(grey + (c - grey) * keep);
+  return (mix(r) << 16) | (mix(g) << 8) | mix(b);
+}
 
 /**
  * Gravedad en NIVELES por segundo al cuadrado.
@@ -96,6 +110,11 @@ export interface Particle {
   ttl: number;
   /** True hasta el primer `advance`; ver la regla del fotograma alli. */
   fresh: boolean;
+  /**
+   * True si es una esquirla de golpe y no un escombro de derribo: mas pequena,
+   * poco saturada y semitransparente (decision del autor).
+   */
+  chip: boolean;
 }
 
 /** Un punto del mundo en coordenadas de three.js: `y` es la altura. */
@@ -198,6 +217,39 @@ export class Effects {
         age: 0,
         ttl: DEBRIS_SECONDS * (0.7 + random() * 0.6),
         fresh: true,
+        chip: false,
+      });
+    }
+  }
+
+  /**
+   * Las esquirlas de un golpe que no rompe (decision del autor): con o sin la
+   * herramienta correcta, algo salta. Mas pequenas y menos que las de un
+   * derribo, con los colores del objeto apagados a un 40 % de saturacion; la
+   * transparencia la pone el dibujado. Cantidades y colores, **propuesta mia**.
+   */
+  spawnChips(tileX: number, tileY: number, colors: readonly number[], floor = 0, height = 1): void {
+    if (colors.length === 0) return;
+    const random = mulberry32(this.seed);
+    this.seed = (this.seed + 0x6d2b79f5) >>> 0;
+    for (let i = 0; i < CHIPS_PER_HIT; i++) {
+      if (this.live.length >= MAX_PARTICLES) this.live.shift();
+      const angle = random() * Math.PI * 2;
+      const speed = SPREAD * 0.5 * (0.35 + random() * 0.65);
+      this.live.push({
+        x: tileX + 0.3 + random() * 0.4,
+        y: tileY + 0.3 + random() * 0.4,
+        z: floor + Math.min(height, 1.6) * (0.4 + random() * 0.5),
+        floor,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        vz: RISE * (0.3 + random() * 0.5),
+        size: 1 + random() * 1.5,
+        color: desaturate(colors[Math.floor(random() * colors.length) % colors.length], CHIP_SATURATION),
+        age: 0,
+        ttl: DEBRIS_SECONDS * (0.45 + random() * 0.3),
+        fresh: true,
+        chip: true,
       });
     }
   }

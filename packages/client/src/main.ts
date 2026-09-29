@@ -61,7 +61,7 @@ import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
 import { chunkMesh, cornerHeight } from './terrain-mesh.js';
 import { FovPanel } from './fov-panel.js';
-import { ItemsUi } from './items-ui.js';
+import { InventoryUi } from './inventory-ui.js';
 import { MouseLook } from './pointer-lock.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
@@ -164,10 +164,9 @@ controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));
 controls.bindRunButton(document.getElementById('run'));
 controls.bindActionButton(document.getElementById('action'));
-controls.bindEatButton(document.getElementById('eat'));
-controls.bindPlantButton(document.getElementById('plant'));
+controls.bindUseButton(document.getElementById('use'));
 controls.onRestart = restart;
-controls.onToggleInventory = () => hud.toggleInventory();
+controls.onToggleInventory = () => items.toggle();
 document.getElementById('restart')?.addEventListener('click', restart);
 
 // El barrido y los escombros. El movimiento sale de `effects.ts`, que es puro y
@@ -197,32 +196,27 @@ const dev = new DevTools({
 });
 
 /**
- * El raton de PC lleva la mirada y soltarlo pausa (`pointer-lock.ts`). El panel
- * de desarrollo suelta el cursor sin pausar; al cerrarlo se intenta capturar de
- * nuevo, porque la tecla cuenta como gesto del usuario.
+ * El inventario con su recetario y la barra de la mano (`inventory-ui.ts`),
+ * segun los bocetos del autor. Sus peticiones viajan en la `Intent` como todo
+ * lo demas.
  */
-/**
- * La barra de la mano, el inventario por casillas y el panel de fabricar
- * (`items-ui.ts`). Sus peticiones viajan en la `Intent` como todo lo demas.
- */
-const items = new ItemsUi(() => state);
-hud.onInventoryOpen = () => items.render(state);
+const items = new InventoryUi(() => state);
 
 /**
  * El raton de PC lleva la mirada y soltarlo pausa (`pointer-lock.ts`). El panel
  * de desarrollo suelta el cursor sin pausar; al cerrarlo se intenta capturar de
- * nuevo, porque la tecla cuenta como gesto del usuario. El panel de fabricar
- * hace lo mismo: sus botones piden cursor, y fabricar no es parar el juego
- * (propuesta mia).
+ * nuevo, porque la tecla cuenta como gesto del usuario. El inventario (E) hace
+ * lo mismo: **abrirlo no pausa** (decision del autor), y sus casillas y
+ * recetas piden cursor.
  */
-const mouseLook = new MouseLook(canvas, () => dev.active || items.craftOpen);
+const mouseLook = new MouseLook(canvas, () => dev.active || items.open);
 controls.mouseLook = mouseLook;
 window.addEventListener('keydown', (e) => {
   if (e.code !== 'F3') return;
   if (dev.active) mouseLook.release();
-  else if (!items.craftOpen) mouseLook.capture();
+  else if (!items.open) mouseLook.capture();
 });
-items.onCraftToggle = (open) => {
+items.onToggle = (open) => {
   if (open) mouseLook.release();
   else if (!dev.active) mouseLook.capture();
 };
@@ -396,7 +390,7 @@ let airPeak = 0;
  * una casilla que lo admita, y eso ya lo miden los tests del nucleo. Aqui se
  * mide la otra mitad, que el toque llega.
  */
-const sent = { harvest: 0, jump: 0, eat: 0, plant: 0 };
+const sent = { harvest: 0, jump: 0, use: 0 };
 
 /** Ticks desde la ultima accion, para repetir al mantener pulsado. */
 let actionTicks = 0;
@@ -466,8 +460,7 @@ function frame(now: number): void {
   // salto entre todos encadenaria saltos en el aire.
   let jump = collect && controls.takeJump();
   let action = collect && controls.takeAction();
-  let eat = collect && controls.takeEat();
-  let plant = collect && controls.takePlant();
+  let use = collect && controls.takeUse();
   // Las peticiones del inventario (mano, intercambiar, tirar, fabricar) no se
   // tiran en pausa: esperan al primer frame con tick.
   let asked = accumulator >= TICK_DT ? items.take() : null;
@@ -476,19 +469,17 @@ function frame(now: number): void {
   while (accumulator >= TICK_DT) {
     intent.jump = jump;
     jump = false;
-    intent.eat = eat;
-    eat = false;
-    intent.plant = plant;
-    plant = false;
+    intent.use = use;
+    use = false;
     if (asked) {
       intent.select = asked.select;
       intent.craft = asked.craft;
-      intent.swapA = asked.swapA;
-      intent.swapB = asked.swapB;
+      intent.moveFrom = asked.moveFrom;
+      intent.moveTo = asked.moveTo;
       intent.discard = asked.discard;
       asked = null;
     } else {
-      intent.select = intent.craft = intent.swapA = intent.swapB = intent.discard = -1;
+      intent.select = intent.craft = intent.moveFrom = intent.moveTo = intent.discard = -1;
     }
 
     // Mantener el boton repite cuatro veces por segundo, que es la cadencia de
@@ -507,8 +498,7 @@ function frame(now: number): void {
     const accionando = intent.harvest;
     if (intent.harvest) sent.harvest++;
     if (intent.jump) sent.jump++;
-    if (intent.eat) sent.eat++;
-    if (intent.plant) sent.plant++;
+    if (intent.use) sent.use++;
     const pisabaAntes = state.entities.grounded[state.playerId];
     step(state, intent);
     // Cuenta el despegue de verdad, no la tecla: saltar contra el techo de un
@@ -533,7 +523,21 @@ function frame(now: number): void {
       );
     }
     items.notice(state);
+    // Lo golpeado que siguio en pie suelta esquirlas: mas pequenas, apagadas y
+    // semitransparentes que los escombros de romper (decision del autor).
+    for (const hit of state.lastHits) {
+      const box = hitboxAt(state.world, hit.x, hit.y);
+      effects.spawnChips(
+        hit.x,
+        hit.y,
+        debrisPalette(hit.feature),
+        state.world.levelAt(hit.x, hit.y),
+        box ? box.z1 - box.z0 : 1,
+      );
+    }
     for (const hit of state.lastHarvest) {
+      // La rama de un arbol a mano no lo derriba: sus esquirlas ya salieron.
+      if (!hit.felled) continue;
       gathered += hit.amount + hit.seeds;
       // Los escombros se posan en la cima del tile del que salieron, no en el
       // plano cero: talar en una meseta no puede tirar la madera al mar.
@@ -553,7 +557,7 @@ function frame(now: number): void {
   // pausar los congela y a 64x no inundan la pantalla.
   effects.advance(scaled);
   // El aviso se apaga solo y la barra de trabajo sigue a lo que se golpea.
-  items.frame(state, dt);
+  items.frame(dt);
   // La camara va con ellos porque la cinta del barrido se orienta hacia el ojo:
   // tumbada en el suelo se veia de canto al bajar la elevacion. Se pasa la del
   // frame ANTERIOR —`camera.follow` es unas lineas mas abajo—, y eso no se nota:
@@ -696,6 +700,7 @@ Object.defineProperty(window, '__verdant', {
       /** Barridos y escombros DIBUJADOS, acumulados. Ver `EffectsView`. */
       slashesDrawn: effectsView.slashesDrawn,
       debrisDrawn: effectsView.debrisDrawn,
+      chipsDrawn: effectsView.chipsDrawn,
       effects: effects.tally,
       /** Lo que mide cada cosa en BLOQUES, medido del dibujo. Ver `BillboardSet`. */
       sizes: billboards.sizes,
@@ -734,7 +739,7 @@ Object.defineProperty(window, '__verdant', {
       alive: e.alive[id] === 1,
       deadShown: hud.deadShown,
       hudOpen: hud.hudOpen,
-      inventoryOpen: hud.inventoryOpen,
+      inventoryOpen: items.open,
       inventory: state.inventory.totals(),
       /** Las casillas: objeto (o -1), cuantos y usos que le quedan. */
       slots: Array.from(state.inventory.items).map((item, i) => ({
@@ -744,6 +749,8 @@ Object.defineProperty(window, '__verdant', {
       })),
       selectedSlot: state.inventory.selected,
       itemsSent: { ...items.sent },
+      inventoryPage: items.currentPage,
+      lastUsed: state.lastUsed,
       toast: (document.getElementById('toast') as HTMLElement).classList.contains('show')
         ? (document.getElementById('toast') as HTMLElement).textContent
         : null,

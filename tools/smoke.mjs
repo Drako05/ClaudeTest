@@ -124,6 +124,28 @@ async function strike(page) {
   });
 }
 
+/**
+ * Usar lo de la mano: clic derecho. Capturado, a mano al lienzo, por lo mismo
+ * que `strike`.
+ */
+async function useClick(page) {
+  if (!(await state(page)).pointerLocked) return page.mouse.click(CLICK.x, CLICK.y, { button: 'right' });
+  await page.evaluate(() => {
+    const canvas = document.getElementById('view');
+    for (const type of ['pointerdown', 'pointerup']) {
+      canvas.dispatchEvent(new PointerEvent(type, { pointerId: 1, pointerType: 'mouse', button: 2, bubbles: true }));
+    }
+  });
+}
+
+/** Pone en la mano la casilla con ese objeto, si esta en la barra. */
+async function toHand(page, item) {
+  const slot = (await state(page)).slots.findIndex((s) => s.item === item);
+  if (slot >= 0 && slot < 4) await page.keyboard.press(`Digit${slot + 1}`);
+  await page.waitForTimeout(200);
+  return slot;
+}
+
 async function release(page) {
   await page.evaluate(() => document.exitPointerLock());
   await page.waitForFunction(() => window.__verdant.paused, null, { timeout: 5000 });
@@ -342,7 +364,8 @@ async function desktopPass(browser, baseUrl) {
   // La franja de salud y hambre se ve siempre; HUD e inventario arrancan
   // cerrados (decision del autor) y se abren con su boton.
   check(await page.isVisible('#vitals'), 'la franja de salud y hambre no se ve');
-  check(await page.isVisible('#invToggle') && await page.isVisible('#hudToggle'), 'faltan los botones del inventario o del HUD');
+  check(await page.isVisible('#hudToggle'), 'falta el boton del HUD');
+  check(!(await page.isVisible('#invOpen')) && !(await page.isVisible('#others')), 'en PC se ven los botones del movil');
   check(!spawn.hudOpen && !(await page.isVisible('#hud')), 'el HUD no arranca cerrado');
   check(!spawn.inventoryOpen && !(await page.isVisible('#invPanel')), 'el inventario no arranca cerrado');
   const vit = await page.evaluate(() => ({
@@ -457,10 +480,15 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  inventario tras recolectar: ${JSON.stringify(gathered.inventory)}`);
   check(sum(gathered.inventory) > 0, 'accionar no recolecto nada');
   check(gathered.debrisDrawn > 0, 'derribar no dibujo ningun escombro');
-  // El inventario, con su tecla: I lo abre, muestra lo del juego, e I lo cierra.
-  await page.keyboard.press('KeyI');
+  // El inventario, con su tecla: E lo abre, muestra lo del juego, y E lo
+  // cierra. Abrirlo suelta el cursor y NO pausa (decision del autor).
+  await page.keyboard.press('KeyE');
   await page.waitForTimeout(250);
-  check(await page.isVisible('#invPanel'), 'I no abrio el inventario');
+  check(await page.isVisible('#invPanel'), 'E no abrio el inventario');
+  const invOpen = await state(page);
+  check(!invOpen.pointerLocked && !invOpen.paused, 'abrir el inventario no solto el cursor o pauso');
+  check((await page.locator('#recipeList .recipe').count()) === 2, 'el recetario no lista las dos herramientas de piedra');
+  check((await page.locator('#equipLeft .slot, #equipRight .slot').count()) === 10, 'faltan las casillas de equipables');
   // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
   // no llevan numero, llevan desgaste).
   const hudTotal = await page.evaluate(() =>
@@ -473,9 +501,9 @@ async function desktopPass(browser, baseUrl) {
   check(hudTotal === nowTotal, `el inventario en pantalla (${hudTotal}) no es el del juego (${nowTotal})`);
   check(sum(gathered.inventory.slice(0, 10)) > 0 && gathered.inventory[9] > 0, 'un arbusto no dio fibra');
   await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
-  await page.keyboard.press('KeyI');
+  await page.keyboard.press('KeyE');
   await page.waitForTimeout(150);
-  check(!(await page.isVisible('#invPanel')), 'I no volvio a cerrar el inventario');
+  check(!(await page.isVisible('#invPanel')), 'E no volvio a cerrar el inventario');
   // Y los efectos se apagan solos.
   await page.waitForTimeout(1800);
   const settled = await state(page);
@@ -526,19 +554,6 @@ async function desktopPass(browser, baseUrl) {
   check(selected.itemsSent.select > beforeSelect.itemsSent.select, 'la tecla 3 no llego a la Intent');
   check(selected.selectedSlot === 2, `la tecla 3 no eligio la casilla 3 (${selected.selectedSlot})`);
   await page.keyboard.press('Digit1');
-  // C abre el panel de fabricar, que suelta el cursor SIN pausar, y lo cierra.
-  await page.keyboard.press('KeyC');
-  await page.waitForTimeout(250);
-  const crafting = await state(page);
-  check(await page.isVisible('#craftPanel'), 'C no abrio el panel de fabricar');
-  check(!crafting.pointerLocked && !crafting.paused, 'el panel de fabricar no solto el cursor o pauso');
-  check((await page.locator('#craftList .recipe').count()) === 2, 'el panel no lista las dos herramientas de piedra');
-  await page.keyboard.press('KeyC');
-  await page.waitForTimeout(250);
-  const crafted = await state(page);
-  check(!(await page.isVisible('#craftPanel')), 'C no cerro el panel de fabricar');
-  check(crafted.pointerLocked || crafted.paused, 'al cerrar el panel ni se capturo el cursor ni se pauso');
-  if (crafted.paused) await play(page);
 
   // La carrera, con su estado en la ayuda.
   await page.keyboard.press('ShiftLeft');
@@ -552,12 +567,13 @@ async function desktopPass(browser, baseUrl) {
   // Soltar el cursor pone el juego en pausa (decision del autor). Esc lo
   // suelta en un navegador de verdad; en headless se suelta a mano.
   const inGame = await state(page);
-  await page.keyboard.press('KeyI');
+  await page.keyboard.press('KeyE');
   await page.waitForTimeout(250);
-  const inv = await state(page);
-  check(inv.pointerLocked && !inv.paused, 'abrir el inventario solto el cursor o pauso');
-  check(await page.isVisible('#invPanel'), 'la I no abrio el inventario');
-  await page.keyboard.press('KeyI');
+  await page.keyboard.press('KeyE');
+  await page.waitForTimeout(250);
+  const closed = await state(page);
+  check(closed.pointerLocked || closed.paused, 'al cerrar el inventario ni se capturo el cursor ni se pauso');
+  if (closed.paused) await play(page);
   await release(page);
   const esc = await state(page);
   await page.waitForTimeout(500);
@@ -618,7 +634,7 @@ async function desktopPass(browser, baseUrl) {
   await page.mouse.move(CLICK.x, CLICK.y);
   await page.waitForTimeout(250);
   check(await fovShown(), 'la barra se cerro al sacar el raton del ojo');
-  await page.keyboard.press('KeyE');
+  await page.keyboard.press('KeyQ');
   await page.waitForTimeout(250);
   check(!(await fovShown()), 'una tecla no cerro la barra del angulo');
   await page.hover('#proj');
@@ -676,11 +692,13 @@ async function resourcesPass(browser, baseUrl) {
     console.log(`  mata en ${berry.node.x},${berry.node.y}: ${withBerries.inventory[2]} bayas`);
     check(withBerries.inventory[2] > 0, 'golpear la mata no dio bayas');
     check(withBerries.hunger < 100, 'el hambre no habia bajado, y con ella llena no se come');
-    await page.keyboard.press('KeyE');
+    // Comer es usar la baya en la mano: clic derecho (decision del autor).
+    await toHand(page, 2);
+    await useClick(page);
     await page.waitForTimeout(300);
     const fed = await state(page);
     console.log(`  comer: bayas ${withBerries.inventory[2]} -> ${fed.inventory[2]}, hambre ${withBerries.hunger.toFixed(2)} -> ${fed.hunger.toFixed(2)}`);
-    check(fed.sent.eat > withBerries.sent.eat, 'E no llego a la Intent');
+    check(fed.sent.use > withBerries.sent.use, 'el clic derecho no llego a la Intent');
     check(fed.inventory[2] < withBerries.inventory[2], 'comer no gasto ninguna baya');
     check(fed.hunger > withBerries.hunger, 'comer no lleno el hambre');
 
@@ -699,8 +717,14 @@ async function resourcesPass(browser, baseUrl) {
     // camara arranca a 35. Bajar el raton baja la mirada.
     await look(page, 0, 120);
     await page.waitForTimeout(300);
+    // Sembrar es usar la semilla en la mano: clic derecho. F ya no hace nada.
+    const beforeF = await state(page);
+    await page.keyboard.press('KeyF');
+    await page.waitForTimeout(250);
+    check((await state(page)).sent.use === beforeF.sent.use, 'la tecla F sigue haciendo algo');
+    await toHand(page, seeded.inventory[3] > 0 ? 3 : 4);
     for (let i = 0; i < 8; i++) {
-      await page.keyboard.press('KeyF');
+      await useClick(page);
       await page.waitForTimeout(250);
       planted = await state(page);
       if (seeds === 0 || planted.inventory[3] + planted.inventory[4] < seeds) break;
@@ -708,7 +732,7 @@ async function resourcesPass(browser, baseUrl) {
       await orbit(page, 120);
       await hold(page, 'KeyW', 150);
     }
-    check(planted.sent.plant > seeded.sent.plant, 'F no llego a la Intent');
+    check(planted.sent.use > seeded.sent.use, 'el clic derecho no llego a la Intent');
     if (seeds > 0) {
       check(planted.inventory[3] + planted.inventory[4] < seeds, 'sembrar no consumio ninguna semilla');
     }
@@ -735,19 +759,59 @@ async function resourcesPass(browser, baseUrl) {
     check(byHand.toast === 'Necesitas un pico', `a mano no se aviso de que falta el pico (${byHand.toast})`);
     // Fabricar el pico de piedra desde el panel.
     await page.click('[data-kit="piedra"]');
-    await page.keyboard.press('KeyC');
-    await page.waitForTimeout(250);
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(300);
+    // Arrastrar mueve: la rama de la casilla 1 a la 6.
+    const center = async (sel) => {
+      const r = await page.locator(sel).boundingBox();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    };
+    const drag = async (from, to, steps = 8) => {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(to.x, to.y, { steps });
+      await page.mouse.up();
+      await page.waitForTimeout(300);
+    };
+    const kit = await state(page);
+    await drag(await center('#invGrid .slot:nth-child(1)'), await center('#invGrid .slot:nth-child(6)'));
+    const moved = await state(page);
+    check(moved.itemsSent.move > kit.itemsSent.move, 'arrastrar no llego a la Intent');
+    check(moved.slots[5].item === 8 && moved.slots[0].item === -1, `arrastrar no movio la rama: ${JSON.stringify(moved.slots.slice(0, 6))}`);
+    // Y de vuelta sobre la piedra: distintos, se intercambian.
+    await drag(await center('#invGrid .slot:nth-child(6)'), await center('#invGrid .slot:nth-child(2)'));
+    const swapped = await state(page);
+    check(swapped.slots[1].item === 8 && swapped.slots[5].item === 1, 'arrastrar sobre otro objeto no los intercambio');
+    // Fabricar: mantener 2 s el resultado. Soltar antes no fabrica.
+    const pickRow = '#recipeList .recipe:nth-child(2) .result';
     const beforeCraft = await state(page);
-    await page.locator('#craftList .recipe').nth(1).locator('button').click();
+    const at = await center(pickRow);
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    check((await state(page)).itemsSent.craft === beforeCraft.itemsSent.craft, 'soltar antes de 2 s fabrico');
+    await page.mouse.down();
+    await page.waitForTimeout(2400);
+    await page.mouse.up();
     await page.waitForTimeout(400);
     const made = await state(page);
     const pickSlot = made.slots.findIndex((s) => s.item === 11);
     console.log(`  pico fabricado en la casilla ${pickSlot + 1}, aviso «${made.toast}»`);
-    check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'Fabricar no llego a la Intent');
-    check(pickSlot >= 0 && pickSlot < 4, `el pico no quedo en la barra (${pickSlot})`);
-    await page.keyboard.press('KeyC');
-    if (pickSlot >= 0) await page.keyboard.press(`Digit${pickSlot + 1}`);
-    await page.waitForTimeout(250);
+    check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'mantener 2 s no fabrico');
+    check(pickSlot >= 0, 'el pico no llego al inventario');
+    // Tirar: una piedra, arrastrada fuera del panel.
+    const stoneSlot = made.slots.findIndex((s) => s.item === 1);
+    await drag(await center(`#invGrid .slot:nth-child(${stoneSlot + 1})`), { x: 30, y: 30 });
+    const thrown = await state(page);
+    check(thrown.itemsSent.discard > made.itemsSent.discard && thrown.inventory[1] === 0, 'soltar fuera del panel no tiro la piedra');
+    // Al pico a la barra, si no cayo en ella.
+    if (pickSlot >= 4) await drag(await center(`#invGrid .slot:nth-child(${pickSlot + 1})`), await center('#invGrid .slot:nth-child(4)'));
+    await page.screenshot({ path: join(SHOTS, '3d-03b-inventario-fabricar.png') });
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(200);
+    await toHand(page, 11);
     // Con el pico, golpe a golpe: el hierro pide uno mejor, lo demas sale.
     const iron = mineral.kind.includes('hierro');
     let mined = await state(page);
@@ -757,10 +821,12 @@ async function resourcesPass(browser, baseUrl) {
       mined = await state(page);
     }
     await page.screenshot({ path: join(SHOTS, '3d-03-montana.png') });
-    console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickSlot]?.wear}`);
+    const pickNow = mined.slots.findIndex((s) => s.item === 11);
+    console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickNow]?.wear}, esquirlas ${mined.chipsDrawn}`);
+    check(mined.chipsDrawn > 0, 'golpear sin romper no solto esquirlas');
     if (iron) check(mined.toast === 'Necesitas un pico mejor', `el hierro no pidio un pico mejor (${mined.toast})`);
     else check(ores(mined) > 0, `con pico no se saco ningun mineral: ${JSON.stringify(mined.inventory)}`);
-    check(iron || (mined.slots[pickSlot]?.wear ?? 40) < 40, 'el pico no se desgasto al minar');
+    check(iron || (mined.slots[pickNow]?.wear ?? 40) < 40, 'el pico no se desgasto al minar');
     const walked = await bestWalk(page, mined);
     check(walked > 1, 'el jugador no pudo caminar dentro de la montana');
   }
@@ -785,11 +851,15 @@ async function mobilePass(browser, baseUrl) {
   // El movil no entra en el raton capturado: ni modo raton ni pausa.
   check(!spawn.mouseMode && !spawn.paused && !(await page.isVisible('#pause')), 'el movil arranco en pausa');
   check(await page.evaluate(() => document.body.classList.contains('touch-active')), 'el body no entro en modo tactil');
-  for (const id of ['#action', '#jump', '#run', '#eat', '#plant', '#proj']) {
+  // El boceto del autor: arriba OTROS, la barra e INVENTARIO; abajo USAR y el
+  // ATAQUE, con CORRER y SALTAR encima. Ni COMER ni SEMBRAR.
+  for (const id of ['#action', '#jump', '#run', '#use', '#others', '#invOpen']) {
     check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);
   }
+  check((await page.locator('#eat, #plant').count()) === 0, 'siguen los botones de comer o sembrar');
+  check(!(await page.isVisible('#proj')) && !(await page.isVisible('#hudToggle')), 'el ojo o el HUD se ven sin abrir OTROS');
   check(!(await page.isVisible('#help')), 'la ayuda de teclado se ve en el movil');
-  for (const id of ['#vitals', '#invToggle', '#hudToggle', '#craftToggle', '#hotbar']) {
+  for (const id of ['#vitals', '#hotbar']) {
     check(await page.isVisible(id), `${id} no se ve en el movil`);
   }
   // La barra de la mano, arriba en el movil: tocar una casilla la elige.
@@ -803,28 +873,43 @@ async function mobilePass(browser, baseUrl) {
   check(bar.top < 100 && bar.left >= 0 && bar.right <= 390, `la barra del movil no cabe arriba: ${JSON.stringify(bar)}`);
   // El racimo cabe en la pantalla y queda ENTERO por encima de la franja de
   // salud y hambre, que llega hasta el borde derecho.
-  const layout = await page.evaluate(() => ({
-    pad: document.getElementById('thumbPad').getBoundingClientRect().toJSON(),
-    vitals: document.getElementById('vitals').getBoundingClientRect().toJSON(),
-    inv: document.getElementById('invToggle').getBoundingClientRect().toJSON(),
-  }));
-  const { pad, vitals, inv } = layout;
-  check(pad.left > 0 && pad.right <= 390, `el racimo se sale de la pantalla: ${JSON.stringify(pad)}`);
-  check(pad.bottom <= vitals.top, `el racimo pisa la franja: ${pad.bottom} > ${vitals.top}`);
-  check(vitals.right > 390 - 30 && vitals.bottom <= 844, `la franja no llega al borde derecho: ${JSON.stringify(vitals)}`);
-  check(inv.left < 40 && inv.top >= vitals.top - 1, `el boton del inventario no esta en la esquina: ${JSON.stringify(inv)}`);
+  const rect = (id) => page.evaluate((i) => document.getElementById(i).getBoundingClientRect().toJSON(), id);
+  const [atk, use, jump, run, vitals, others, invOpen] = await Promise.all(
+    ['action', 'use', 'jump', 'run', 'vitals', 'others', 'invOpen'].map(rect),
+  );
+  check(atk.right <= 390 && atk.bottom <= 844 && atk.right > 390 - 30, `el ataque no esta en la esquina: ${JSON.stringify(atk)}`);
+  check(use.right <= atk.left, 'USAR no esta a la izquierda del ataque');
+  check(jump.bottom <= atk.top && run.bottom <= jump.top, 'correr y saltar no estan en columna encima del ataque');
+  check(vitals.right <= use.left && vitals.left < 40, `la franja no va de la izquierda hasta USAR: ${JSON.stringify(vitals)}`);
+  check(others.left < 40 && others.top < 40 && invOpen.right > 350 && invOpen.top < 40, 'OTROS o INVENTARIO no estan arriba en las esquinas');
 
-  // Los dos paneles, al tacto. La pista de los gestos vive en el HUD.
+  // OTROS despliega el ojo, el HUD y el entorno. La pista de los gestos vive
+  // en el HUD.
+  await page.tap('#others');
+  await page.waitForTimeout(200);
+  check(await page.isVisible('#proj') && await page.isVisible('#hudToggle') && await page.isVisible('#statsToggle'),
+    'OTROS no desplego el ojo, el HUD y el entorno');
   await page.tap('#hudToggle');
   await page.waitForTimeout(200);
   check(await page.isVisible('#hud'), 'tocar el boton no abrio el HUD en el movil');
   check(await page.isVisible('.touch-only'), 'la pista de los gestos no se ve en el movil');
   await page.tap('#hudToggle');
-  await page.tap('#invToggle');
+  // El inventario: se abre sin pausar, y sus flechas cambian de pagina.
+  await page.tap('#invOpen');
   await page.waitForTimeout(200);
   check(await page.isVisible('#invPanel'), 'tocar el boton no abrio el inventario en el movil');
+  check(!(await state(page)).paused, 'abrir el inventario en el movil pauso');
   await page.screenshot({ path: join(SHOTS, '3d-04-movil.png') });
-  await page.tap('#invToggle');
+  const pages = [(await state(page)).inventoryPage];
+  await page.tap('#pageNext');
+  pages.push((await state(page)).inventoryPage);
+  await page.tap('#pagePrev');
+  await page.tap('#pagePrev');
+  pages.push((await state(page)).inventoryPage);
+  await page.tap('#pageNext');
+  console.log(`  paginas del inventario: ${pages.join(' -> ')}`);
+  check(pages.join() === 'inventario,recetas,personaje', `las flechas no recorren las paginas: ${pages}`);
+  await page.tap('#invOpen');
   check(!(await page.isVisible('#invPanel')), 'tocar otra vez no cerro el inventario');
 
   // Un dedo a la derecha gira la camara: ni joystick ni movimiento.
@@ -868,6 +953,7 @@ async function mobilePass(browser, baseUrl) {
   // En primera persona la pinza es un catalejo: estrecha mientras dura y, al
   // soltar, vuelve (decision del autor). Se mide el campo de vision durante y
   // despues, con los dedos todavia apoyados en el primer caso.
+  await page.tap('#others');
   await page.tap('#proj');
   await page.tap('#proj');
   await page.waitForTimeout(300);
@@ -894,6 +980,8 @@ async function mobilePass(browser, baseUrl) {
   console.log(`  catalejo: ${fov0} -> ${fovHeld.toFixed(1)} (apoyado) -> ${fovAfter.toFixed(1)} (soltado)`);
   check(fovHeld < fov0, 'en primera persona la pinza no estrecho el campo de vision');
   check(fovAfter === fov0, `al soltar la pinza el catalejo no volvio (${fovAfter})`);
+  // La pinza toco fuera de OTROS y lo cerro: se vuelve a abrir.
+  if (!(await page.isVisible('#proj'))) await page.tap('#others');
   await page.tap('#proj');
 
   // El joystick, abajo a la izquierda: aparece, mueve y desaparece.
@@ -932,19 +1020,16 @@ async function mobilePass(browser, baseUrl) {
   check(on.running === true && lit, 'el boton de correr no la encendio o no lo muestra');
   check(off.running === false, 'el boton de correr no la apago al segundo toque');
 
-  // Saltar, comer y sembrar: el toque llega a la Intent.
+  // Saltar y usar: el toque llega a la Intent.
   const b = await state(page);
   await tap(page, '#jump');
   await page.waitForTimeout(250);
-  await tap(page, '#eat');
-  await page.waitForTimeout(250);
-  await tap(page, '#plant');
+  await tap(page, '#use');
   await page.waitForTimeout(250);
   const a = await state(page);
   console.log(`  intents: ${JSON.stringify(b.sent)} -> ${JSON.stringify(a.sent)}`);
   check(a.sent.jump > b.sent.jump, 'el boton de saltar no llego a la Intent');
-  check(a.sent.eat > b.sent.eat, 'el boton de comer no llego a la Intent');
-  check(a.sent.plant > b.sent.plant, 'el boton de sembrar no llego a la Intent');
+  check(a.sent.use > b.sent.use, 'el boton de usar no llego a la Intent');
 
   // La accion: mantener repite, cuatro por segundo. Desde el nacimiento, que es
   // un rellano llano (regla 22): ahi todo el cono esta al alcance, sin depender
@@ -970,7 +1055,8 @@ async function mobilePass(browser, baseUrl) {
   check(whileTurning > 0, 'la accion dejo de repetir mientras se arrastraba el dedo');
   check(draggedHold.distance === holding.distance, 'arrastrar el dedo de la accion cambio el zoom');
 
-  // El panel del entorno, al tacto.
+  // El panel del entorno, al tacto, desde OTROS.
+  if (!(await page.isVisible('#statsToggle'))) await page.tap('#others');
   await page.tap('#statsToggle');
   check(await page.isVisible('#statsPanel'), 'el panel no se abrio al tocarlo en movil');
   await page.screenshot({ path: join(SHOTS, '3d-05-movil-panel.png') });

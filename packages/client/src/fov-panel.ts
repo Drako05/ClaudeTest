@@ -136,6 +136,26 @@ export class FovPanel {
   show(): void {
     if (this.shown) return;
     this.shown = true;
+    // Sale desde detras del ojo hacia el lado donde hay sitio: a la izquierda
+    // si el ojo esta a la derecha (PC), y a la derecha si esta a la izquierda
+    // (en el movil vive en el menu OTROS). Propuesta mia.
+    const eye = this.eye.getBoundingClientRect();
+    const mid = eye.left + eye.width / 2;
+    // Con el ojo pegado al borde derecho (PC), sale hacia la izquierda como
+    // siempre; con el ojo en otro sitio, hacia la derecha si cabe.
+    const fromLeft = eye.right < window.innerWidth - 80;
+    // Y si hacia la derecha no cabe (un telefono estrecho con el ojo en medio
+    // de la fila de OTROS), cae justo debajo del ojo, dentro de la pantalla.
+    const width = this.panel.offsetWidth;
+    const below = fromLeft && mid + width > window.innerWidth - 8;
+    this.panel.classList.toggle('fromLeft', fromLeft && !below);
+    this.panel.classList.toggle('below', below);
+    this.panel.style.top = `${below ? eye.bottom + 8 : eye.top}px`;
+    this.panel.style.left = below
+      ? `${Math.max(8, Math.min(window.innerWidth - width - 8, mid - width / 2))}px`
+      : fromLeft
+        ? `${mid}px`
+        : '';
     this.panel.classList.add('open');
     this.panel.setAttribute('aria-hidden', 'false');
     this.range.tabIndex = 0;

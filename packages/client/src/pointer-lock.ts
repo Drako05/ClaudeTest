@@ -82,12 +82,13 @@ export class MouseLook {
    * Un `pointerdown` de raton en el lienzo, antes que los gestos. Devuelve lo
    * que fue: `'capture'` si captura el cursor (y no golpea), `'strike'` si con
    * el cursor capturado es un golpe —en el acto, porque ya no hay arrastre que
-   * distinguir—, o `null` si no es cosa suya (sin modo raton, o con el panel de
+   * distinguir—, `'use'` si es el derecho, o `null` si no es cosa suya (sin modo raton, o con el panel de
    * desarrollo abierto, donde se sigue arrastrando para girar).
    */
-  pointerDown(e: PointerEvent): 'capture' | 'strike' | null {
+  pointerDown(e: PointerEvent): 'capture' | 'strike' | 'use' | null {
     if (e.pointerType !== 'mouse' || !this.mouseMode || this.devOpen()) return null;
-    if (this.locked) return e.button === 0 ? 'strike' : 'capture';
+    // Capturado: el izquierdo golpea y el derecho usa (decision del autor).
+    if (this.locked) return e.button === 0 ? 'strike' : e.button === 2 ? 'use' : 'capture';
     this.capture();
     return 'capture';
   }

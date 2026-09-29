@@ -14,12 +14,12 @@ import { applyVertical, takeOff } from './systems/jump.js';
 import { updateSurvival } from './systems/survival.js';
 import {
   tryCraft,
-  tryEat,
   tryHarvestArea,
-  tryPlant,
+  tryUse,
   WorkState,
   type Blocked,
   type HarvestResult,
+  type Hit,
 } from './systems/gathering.js';
 import { Inventory } from './inventory.js';
 import { toChunkCoord, World } from './world.js';
@@ -41,6 +41,10 @@ export interface GameState {
   tick: number;
   /** Lo recolectado en el ultimo tick, una entrada por casilla. Efimero. */
   lastHarvest: HarvestResult[];
+  /** Lo golpeado en el ultimo tick que siguio en pie. Efimero. */
+  lastHits: Hit[];
+  /** Que hizo el ultimo `use`: comer, sembrar o nada. Efimero. */
+  lastUsed: 'ate' | 'planted' | null;
   /** Por que el ultimo golpe no hizo algo (inventario lleno, falta pico). Efimero. */
   lastBlocked: Blocked | null;
   /** True si en el ultimo tick se rompio la herramienta de la mano. Efimero. */
@@ -87,6 +91,8 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     work: new WorkState(),
     tick: Math.max(0, Math.floor(startTick)),
     lastHarvest: [],
+    lastHits: [],
+    lastUsed: null,
     lastBlocked: null,
     lastBroke: false,
     lastCrafted: -1,
@@ -119,6 +125,8 @@ function streamChunks(state: GameState): void {
 export function step(state: GameState, intent: Intent): void {
   const { entities, playerId, world, inventory } = state;
   state.lastHarvest = [];
+  state.lastHits = [];
+  state.lastUsed = null;
   state.lastBlocked = null;
   state.lastBroke = false;
   state.lastCrafted = -1;
@@ -157,22 +165,22 @@ export function step(state: GameState, intent: Intent): void {
     // El inventario antes que el golpe: elegir la herramienta y golpear en el
     // mismo tick golpea ya con ella.
     if (intent.select >= 0) inventory.select(intent.select);
-    if (intent.swapA >= 0 && intent.swapB >= 0) inventory.swap(intent.swapA, intent.swapB);
+    if (intent.moveFrom >= 0 && intent.moveTo >= 0) inventory.move(intent.moveFrom, intent.moveTo);
     if (intent.discard >= 0) inventory.discard(intent.discard);
-    if (intent.craft >= 0 && tryCraft(inventory, intent.craft)) state.lastCrafted = intent.craft;
+    if (intent.craft >= 0) {
+      const crafted = tryCraft(inventory, intent.craft);
+      if (crafted === 'ok') state.lastCrafted = intent.craft;
+      else if (crafted === 'full') state.lastBlocked = 'full';
+    }
 
     if (intent.harvest) {
       const swing = tryHarvestArea(world, entities, playerId, inventory, state.tick, state.work);
       state.lastHarvest = swing.results;
+      state.lastHits = swing.hits;
       state.lastBlocked = swing.blocked;
       state.lastBroke = swing.broke;
     }
-    if (intent.plant) {
-      tryPlant(world, entities, playerId, inventory);
-    }
-    if (intent.eat) {
-      tryEat(entities, playerId, inventory);
-    }
+    if (intent.use) state.lastUsed = tryUse(world, entities, playerId, inventory);
     if (!state.survivalFrozen) updateSurvival(entities, playerId, TICK_DT);
   }
 

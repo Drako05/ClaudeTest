@@ -123,8 +123,20 @@ const center = (id) => page.evaluate((i) => {
   return { x: r.x + r.width / 2, y: r.y + r.height / 2, left: r.x, right: r.x + r.width };
 }, id);
 const probe = () => page.evaluate(() => window.__verdant);
+// En el movil el ojo vive en el menu OTROS (boceto del autor): se abre antes de
+// cada toque al ojo, porque tocar el mundo lo cierra.
+async function ensureOthers() {
+  const open = await page.evaluate(() => document.body.classList.contains('others-open'));
+  if (open) return;
+  const o = await center('others');
+  await real('touchStart', [o]);
+  await real('touchEnd', []);
+  await page.waitForTimeout(250);
+}
+await ensureOthers();
 const eye = await center('proj');
 async function holdEye(ms) {
+  await ensureOthers();
   await real('touchStart', [eye]);
   await page.waitForTimeout(ms);
   const during = await probe();
@@ -140,12 +152,18 @@ async function tapReal(p) {
 const offFp = await holdEye(1300);
 check(offFp.projection !== 'primera' && !offFp.fovPanel, 'sostener el ojo fuera de la primera persona abrio la barra');
 check(!(await probe()).fovPanel, 'la barra quedo abierta fuera de la primera persona');
-for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) await tapReal(eye);
+for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) {
+  await ensureOthers();
+  await tapReal(eye);
+}
 check((await probe()).projection === 'primera', 'tocar el ojo no llevo a la primera persona');
 const early = await holdEye(500);
 check(!early.fovPanel, 'medio segundo en el ojo ya abrio la barra');
 check((await probe()).projection === 'perspectiva', 'un toque corto en el ojo no cambio de vista');
-for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) await tapReal(eye);
+for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) {
+  await ensureOthers();
+  await tapReal(eye);
+}
 const holding = await holdEye(1300);
 const afterHold = await probe();
 check(holding.fovPanel, 'sostener el ojo mas de 1 s en primera persona no abrio la barra');
@@ -167,11 +185,51 @@ await tapReal({ x: 200, y: 420 });
 check(!(await probe()).fovPanel, 'tocar el mundo no cerro la barra');
 await holdEye(1300);
 check((await probe()).fovPanel, 'la barra no volvio a abrirse');
+await ensureOthers();
 await tapReal(eye);
 const tapped = await probe();
 check(tapped.projection === 'perspectiva' && !tapped.fovPanel,
   `un toque corto con la barra abierta no cambio de vista o no la cerro (${tapped.projection}, ${tapped.fovPanel})`);
 await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
+
+// El inventario con el dedo: arrastrar una casilla a otra, y mantener una
+// receta 2 s para fabricarla (decisiones del autor). Con materiales del panel
+// de desarrollo.
+await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904&dev=1`, { waitUntil: 'load' });
+await page.waitForFunction(() => window.__verdant && window.__verdant.tick > 0, null, { timeout: 30000 });
+await page.evaluate(() => document.querySelector('[data-kit="piedra"]').click());
+await page.waitForTimeout(300);
+const invBtn = await center('invOpen');
+await tapReal(invBtn);
+const slotAt = (n) => page.evaluate((k) => {
+  const r = document.querySelector(`#invGrid .slot:nth-child(${k})`).getBoundingClientRect();
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+}, n);
+const s1 = await slotAt(1);
+const s7 = await slotAt(7);
+const beforeDrag = await probe();
+await real('touchStart', [s1]);
+for (let i = 1; i <= 10; i++) await real('touchMove', [{ x: s1.x + ((s7.x - s1.x) * i) / 10, y: s1.y + ((s7.y - s1.y) * i) / 10 }]);
+await real('touchEnd', []);
+await page.waitForTimeout(400);
+const afterDrag = await probe();
+console.log(`  arrastrar con el dedo: casilla 7 = ${afterDrag.slots[6].item}, movimientos ${beforeDrag.itemsSent.move} -> ${afterDrag.itemsSent.move}`);
+check(afterDrag.itemsSent.move > beforeDrag.itemsSent.move && afterDrag.slots[6].item === 8, 'arrastrar con el dedo no movio la rama');
+// A recetas y mantener el pico 2 s.
+await tapReal(await center('pageNext'));
+const result = await page.evaluate(() => {
+  const r = document.querySelector('#recipeList .recipe:nth-child(2) .result').getBoundingClientRect();
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+});
+const beforeHold = await probe();
+await real('touchStart', [result]);
+await page.waitForTimeout(2500);
+await real('touchEnd', []);
+await page.waitForTimeout(400);
+const afterHold2 = await probe();
+console.log(`  fabricar manteniendo: ${beforeHold.inventory[11]} -> ${afterHold2.inventory[11]} picos`);
+check(afterHold2.inventory[11] === beforeHold.inventory[11] + 1, 'mantener la receta 2 s con el dedo no fabrico');
+await page.screenshot({ path: 'screenshots/movil-recetas.png' });
 
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();

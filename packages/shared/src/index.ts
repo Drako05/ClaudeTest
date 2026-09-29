@@ -303,9 +303,9 @@ export function toolStats(item: Resource): ToolStats | null {
   }
 }
 
-/** Cuantos caben en una casilla: uno si es herramienta, veinte si no. */
+/** Cuantos caben en una casilla: uno si es herramienta, cien si no (el autor). */
 export function stackMax(item: Resource): number {
-  return toolStats(item) ? 1 : 20;
+  return toolStats(item) ? 1 : 100;
 }
 
 export interface Work {
@@ -355,6 +355,8 @@ export enum Station {
 }
 
 export interface Recipe {
+  /** Categoria del recetario (decision del autor: hoy, «Herramientas»). */
+  category: string;
   output: Resource;
   count: number;
   inputs: readonly { item: Resource; count: number }[];
@@ -367,6 +369,7 @@ export interface Recipe {
  */
 export const RECIPES: readonly Recipe[] = [
   {
+    category: 'Herramientas',
     output: Resource.StoneAxe,
     count: 1,
     inputs: [
@@ -377,6 +380,7 @@ export const RECIPES: readonly Recipe[] = [
     station: Station.Hand,
   },
   {
+    category: 'Herramientas',
     output: Resource.StonePickaxe,
     count: 1,
     inputs: [
@@ -469,9 +473,12 @@ export interface Intent {
   moveX: number;
   moveY: number;
   harvest: boolean;
-  eat: boolean;
-  /** Sembrar en el tile mirado. */
-  plant: boolean;
+  /**
+   * Usar o interactuar (clic derecho, boton USAR): con lo que se lleva en la
+   * mano —una baya se come, una semilla se siembra— o, en el futuro, con lo
+   * que se mira. Decision del autor: sustituye a comer y sembrar por tecla.
+   */
+  use: boolean;
   /**
    * Saltar. Solo hace algo con los pies en el suelo.
    *
@@ -510,9 +517,12 @@ export interface Intent {
   select: number;
   /** Receta que se quiere fabricar (indice en `RECIPES`), o -1. */
   craft: number;
-  /** Intercambiar dos casillas del inventario; -1 si no. */
-  swapA: number;
-  swapB: number;
+  /**
+   * Mover lo de una casilla a otra (arrastrar): el mismo objeto se apila y uno
+   * distinto se intercambia. -1 si no.
+   */
+  moveFrom: number;
+  moveTo: number;
   /** Casilla que se tira, o -1. */
   discard: number;
 }
@@ -522,8 +532,7 @@ export function emptyIntent(): Intent {
     moveX: 0,
     moveY: 0,
     harvest: false,
-    eat: false,
-    plant: false,
+    use: false,
     jump: false,
     run: false,
     aimX: 0,
@@ -531,8 +540,8 @@ export function emptyIntent(): Intent {
     aimZ: 0,
     select: -1,
     craft: -1,
-    swapA: -1,
-    swapB: -1,
+    moveFrom: -1,
+    moveTo: -1,
     discard: -1,
   };
 }

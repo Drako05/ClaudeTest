@@ -13,8 +13,8 @@
 
 import { RESOURCE_COUNT, stackMax, toolStats, type Resource } from '@verdant/shared';
 
-/** Casillas con que se empieza. **Propuesta mia** (plan de la tanda 1). */
-export const START_SLOTS = 8;
+/** Casillas con que se empieza: 16, decision del autor. */
+export const START_SLOTS = 16;
 /** Las primeras casillas forman la barra de la mano. */
 export const HOTBAR_SLOTS = 4;
 
@@ -83,6 +83,11 @@ export class Inventory {
     return true;
   }
 
+  /** Lo que haya en la casilla de la mano, sea herramienta o no. */
+  inHand(): Resource | null {
+    return this.itemAt(this.selected);
+  }
+
   /** La herramienta que se tiene en la mano, o `null` si son las manos. */
   held(): Resource | null {
     const item = this.itemAt(this.selected);
@@ -104,6 +109,26 @@ export class Inventory {
 
   select(slot: number): void {
     if (slot >= 0 && slot < HOTBAR_SLOTS) this.selected = slot;
+  }
+
+  /**
+   * Arrastrar una casilla a otra (decision del autor): el mismo objeto se apila
+   * hasta el tope y lo que sobra se queda en el origen; uno distinto, o una
+   * herramienta, se intercambia.
+   */
+  move(from: number, to: number): void {
+    if (from < 0 || to < 0 || from >= this.size || to >= this.size || from === to) return;
+    const item = this.items[from];
+    if (item === EMPTY) return;
+    if (this.items[to] === item && !toolStats(item as Resource)) {
+      const room = stackMax(item as Resource) - this.counts[to];
+      const n = Math.min(room, this.counts[from]);
+      this.counts[to] += n;
+      this.counts[from] -= n;
+      if (this.counts[from] === 0) this.clear(from);
+      return;
+    }
+    this.swap(from, to);
   }
 
   swap(a: number, b: number): void {

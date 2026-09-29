@@ -54,14 +54,12 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Raton | Mirar: la vista va con el cursor, tambien arriba y abajo (en tercera persona se puede mirar al cielo) |
 | `Esc` | Soltar el cursor y **pausar**; con el cursor suelto se pulsan los botones |
 | Rueda, `+` / `-` | Zoom; en primera persona, catalejo que vuelve al dejar de girar |
-| Clic izquierdo | Golpear hacia donde mira la camara |
+| Clic izquierdo | Golpear hacia donde mira la camara, con lo que se lleve en la mano |
+| Clic derecho | Usar lo de la mano: una baya se come, una semilla se siembra donde mira la camara |
 | `Espacio` | Saltar |
 | `Shift` | Correr: interruptor, se queda encendido |
-| `E` | Comer bayas |
-| `F` | Sembrar |
+| `E` | Inventario y recetas (no pausa): arrastrar mueve o apila, soltar fuera tira, mantener 2 s una receta la fabrica |
 | `1`-`4` | Elegir la casilla de la barra: lo que se lleva en la mano |
-| `C` | Fabricar (suelta el cursor sin pausar) |
-| `I` | Inventario |
 | `R` | Mundo nuevo |
 | `P` | Vista: perspectiva → isometrica → primera persona |
 | Raton sobre el ojo (en pausa) | En primera persona, barra del angulo de vision (50-100°); cualquier accion la cierra |
@@ -74,11 +72,12 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Pulgar en el cuadrante inferior izquierdo | Joystick flotante: apunta, no dosifica |
 | Un dedo en el resto de la pantalla | Girar la camara |
 | Dos dedos de camara | Zoom; en primera persona, catalejo que vuelve al soltar |
-| Boton ACCION | Accionar; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar la accion |
+| Boton ATAQUE | Golpear; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar el golpe |
+| Boton USAR | Usar lo de la mano: comer una baya, sembrar una semilla |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
-| Botones COMER y SEMBRAR | Comer bayas y sembrar |
 | Barra de arriba | Tocar una casilla la pone en la mano |
-| Boton del martillo, junto al inventario | Fabricar |
+| Boton INVENTARIO | Inventario, con flechas a PERSONAJE y RECETAS; como en PC, arrastrar y mantener |
+| Boton OTROS | Cambiar de vista (el ojo), el HUD y el panel del entorno |
 | Sostener el ojo mas de 1 s | En primera persona, barra del angulo de vision; tocar fuera la cierra |
 
 **La mirada es una sola** en las tres vistas: el centro de la pantalla es hacia
@@ -91,18 +90,18 @@ atraviesa bloques ni troncos.
 (piedra), fibra y bayas de los arbustos, y ramas de los arboles, que no caen
 sin hacha. Con eso se fabrican el hacha y el pico de piedra, que talan arboles
 y sacan piedra, carbon y cobre golpe a golpe; el hierro pide un pico mejor. Las
-herramientas se gastan y se rompen, y el inventario son ocho casillas con pilas
-de veinte.
+herramientas se gastan y se rompen, y el inventario son dieciseis casillas con
+pilas de cien. Al golpear algo que no se rompe saltan esquirlas pequenas.
 
-**En los dos:** la salud (corazon) y el hambre (muslo) van siempre abajo, de
-borde a borde, con el boton del **inventario** en la esquina inferior izquierda.
-El boton de arriba a la izquierda abre el **HUD** (hora, dia, semilla, posicion,
-FPS) y el de la hoja, bajo el ojo, el **panel del entorno**. Los tres paneles
-arrancan cerrados.
+**En los dos:** la salud (corazon) y el hambre (muslo) van siempre abajo. En
+PC, de borde a borde, con el **HUD** (hora, dia, semilla, posicion, FPS) arriba
+a la izquierda y el **panel del entorno** (la hoja) bajo el ojo; en el movil,
+esos dos y el ojo viven en OTROS. Los paneles arrancan cerrados.
 
-La accion es el boton mas grande y el mas pegado al borde derecho, donde cae el
-pulgar; los demas se apartan a su izquierda, mas pequenos cuanto menos se usan.
-En PC esos botones no se ven: el teclado ya hace lo mismo.
+En el movil, el ATAQUE es el boton mas grande, en la esquina de abajo a la
+derecha, con USAR a su izquierda y CORRER y SALTAR encima: la distribucion del
+boceto del autor. En PC esos botones no se ven: el teclado y el raton ya hacen
+lo mismo.
 
 El joystick **apunta, no dosifica**: cruzada la zona muerta se anda a velocidad
 de marcha entera, se haya desplazado el pulgar poco o mucho. La velocidad la

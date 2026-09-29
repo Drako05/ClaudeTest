@@ -69,11 +69,11 @@ function slotOf(inv: Inventory, item: Resource): number {
 }
 
 describe('El inventario por casillas', () => {
-  it('apila hasta 20, una herramienta por casilla y con sus usos', () => {
+  it('apila hasta 100, una herramienta por casilla y con sus usos', () => {
     const inv = new Inventory();
-    expect(inv.size).toBe(START_SLOTS);
-    expect(inv.add(Resource.Wood, 45)).toBe(true);
-    expect([inv.counts[0], inv.counts[1], inv.counts[2]]).toEqual([20, 20, 5]);
+    expect(inv.size).toBe(16);
+    expect(inv.add(Resource.Wood, 205)).toBe(true);
+    expect([inv.counts[0], inv.counts[1], inv.counts[2]]).toEqual([100, 100, 5]);
     expect(inv.add(Resource.StoneAxe, 2)).toBe(true);
     expect(inv.itemAt(3)).toBe(Resource.StoneAxe);
     expect(inv.itemAt(4)).toBe(Resource.StoneAxe);
@@ -82,7 +82,7 @@ describe('El inventario por casillas', () => {
 
   it('lo que no cabe entero no entra, y no se toca nada', () => {
     const inv = new Inventory();
-    expect(inv.add(Resource.Wood, 20 * START_SLOTS - 3)).toBe(true);
+    expect(inv.add(Resource.Wood, 100 * START_SLOTS - 3)).toBe(true);
     const before = inv.totals();
     expect(inv.add(Resource.Wood, 4)).toBe(false);
     expect(inv.add(Resource.Stone, 1)).toBe(false);
@@ -103,6 +103,28 @@ describe('El inventario por casillas', () => {
     expect(inv.itemAt(0)).toBeNull();
     inv.discard(5);
     expect(inv.count(Resource.Wood)).toBe(0);
+  });
+
+  it('arrastrar apila el mismo objeto hasta el tope e intercambia los distintos', () => {
+    const inv = new Inventory();
+    inv.add(Resource.Wood, 100);
+    inv.add(Resource.Stone, 1);
+    inv.add(Resource.Wood, 60); // completa nada: la 0 esta llena, va a la 2
+    expect(inv.itemAt(2)).toBe(Resource.Wood);
+    inv.discard(0);
+    inv.add(Resource.Wood, 70); // a la 2 (60+40=100) y el resto a la 0
+    expect([inv.counts[0], inv.counts[2]]).toEqual([30, 100]);
+    // 30 sobre 100: no cabe nada, todo se queda.
+    inv.move(0, 2);
+    expect([inv.counts[0], inv.counts[2]]).toEqual([30, 100]);
+    // Al reves con hueco: 100 sobre 30 llena la 0 y deja 30 en la 2.
+    inv.move(2, 0);
+    expect([inv.counts[0], inv.counts[2]]).toEqual([100, 30]);
+    // Distintos se intercambian.
+    inv.move(1, 0);
+    expect(inv.itemAt(0)).toBe(Resource.Stone);
+    expect(inv.itemAt(1)).toBe(Resource.Wood);
+    expect(inv.counts[1]).toBe(100);
   });
 });
 
@@ -200,7 +222,7 @@ describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {
     // A la mano: si no quedaron en la barra, se llevan a ella.
     const toHand = (item: Resource, slot: number) => {
       const at = slotOf(inv, item);
-      if (at !== slot) act(state, { swapA: at, swapB: slot });
+      if (at !== slot) act(state, { moveFrom: at, moveTo: slot });
       act(state, { select: slot });
       expect(inv.held()).toBe(item);
     };
@@ -226,11 +248,6 @@ describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {
 
     // 4. El pico: roca en 3, carbon en 4, cobre en 5; el hierro pide uno mejor.
     toHand(Resource.StonePickaxe, 1);
-    // Ocho casillas se llenan pronto (bayas, fibra, dos semillas, madera, rama,
-    // piedra y las dos herramientas son nueve): se tira lo que sobra.
-    for (const item of [Resource.Berries, Resource.PlantSeed, Resource.TreeSeed, Resource.Fiber]) {
-      while (slotOf(inv, item) >= 0) act(state, { discard: slotOf(inv, item) });
-    }
     const mine = (f: Feature, hits: number, item: Resource) => {
       w.setFeature(tx + 1, ty, f);
       const before = inv.count(item);
@@ -261,7 +278,7 @@ describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {
 
   it('con el inventario lleno el golpe no completa y el objeto se queda', () => {
     const { state, tx, ty } = atSpawn();
-    state.inventory.add(Resource.Wood, 20 * START_SLOTS);
+    state.inventory.add(Resource.Wood, 100 * START_SLOTS);
     state.world.setFeature(tx + 1, ty, Feature.MeadowPlant);
     const { results, blocked } = swing(state, 1, 0, 40);
     expect(results).toHaveLength(0);
@@ -347,5 +364,70 @@ describe('Los guijarros en el mundo', () => {
       // Hacen falta cinco para el hacha y el pico.
       expect(near, `semilla ${seed}`).toBeGreaterThanOrEqual(5);
     }
+  });
+});
+
+describe('Usar lo de la mano', () => {
+  it('con bayas en la mano se come; con la mano vacia no pasa nada', () => {
+    const { state } = atSpawn();
+    const e = state.entities;
+    e.hunger[state.playerId] = 50;
+    act(state, { use: true });
+    expect(state.lastUsed).toBeNull();
+    state.inventory.add(Resource.Berries, 3);
+    act(state, { select: slotOf(state.inventory, Resource.Berries) });
+    act(state, { use: true });
+    expect(state.lastUsed).toBe('ate');
+    expect(state.inventory.count(Resource.Berries)).toBe(2);
+    expect(e.hunger[state.playerId]).toBeGreaterThan(50);
+  });
+
+  it('con una semilla en la mano se siembra esa, donde toca la mirada', () => {
+    const { state, tx, ty } = atSpawn();
+    state.inventory.add(Resource.TreeSeed, 2);
+    state.inventory.add(Resource.PlantSeed, 2);
+    const kind = state.world.featureAt(tx + 1, ty);
+    expect(kind).toBe(Feature.None);
+    act(state, { select: slotOf(state.inventory, Resource.PlantSeed) });
+    act(state, { use: true, aimX: 1, aimY: 0, aimZ: Math.sin((-50 * Math.PI) / 180) });
+    // Puede que el suelo no sostenga plantas; si siembra, es con la de la mano.
+    if (state.lastUsed === 'planted') {
+      expect(state.inventory.count(Resource.PlantSeed)).toBe(1);
+      expect(state.inventory.count(Resource.TreeSeed)).toBe(2);
+    } else {
+      expect(state.inventory.count(Resource.PlantSeed)).toBe(2);
+    }
+  });
+
+  it('fabricar sin sitio avisa de inventario lleno y no fabrica', () => {
+    const { state } = atSpawn();
+    const inv = state.inventory;
+    // Materiales de sobra, asi que sus casillas no se vacian al gastarlos, y
+    // las otras trece llenas de herramientas: el hacha no tiene donde ir.
+    inv.add(Resource.Branch, 10);
+    inv.add(Resource.Stone, 10);
+    inv.add(Resource.Fiber, 10);
+    for (let i = 0; i < 13; i++) inv.add(Resource.StonePickaxe, 1);
+    act(state, { craft: AXE });
+    expect(state.lastCrafted).toBe(-1);
+    expect(state.lastBlocked).toBe('full');
+    expect(inv.count(Resource.Branch)).toBe(10);
+    // Con los materiales justos, sus casillas se vacian y si cabe.
+    inv.remove(Resource.Branch, 7);
+    inv.remove(Resource.Stone, 8);
+    inv.remove(Resource.Fiber, 8);
+    act(state, { craft: AXE });
+    expect(state.lastCrafted).toBe(AXE);
+  });
+
+  it('un golpe que no rompe deja su golpe para las particulas', () => {
+    const { state, tx, ty } = atSpawn();
+    state.world.setFeature(tx + 1, ty, Feature.RockNode);
+    swing(state, 1, 0, 30);
+    expect(state.lastHits).toEqual([{ x: tx + 1, y: ty, feature: Feature.RockNode }]);
+    state.world.setFeature(tx + 1, ty, Feature.Pebbles);
+    swing(state, 1, 0, 60);
+    expect(state.lastHits).toHaveLength(0);
+    expect(state.lastHarvest).toHaveLength(1);
   });
 });

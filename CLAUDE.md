@@ -693,10 +693,13 @@ altitud si se recalibraron, pero **sumando** reglas a las viejas en vez de
 sustituirlas, para no mover el mundo llano ni un tile.
 
 Las teclas: WASD o flechas andan, **Espacio salta** (decision del autor en la
-fase 2), Shift enciende la carrera, **E come** y **F siembra**, R empieza un
-mundo nuevo, + y - acercan y alejan, y P cambia de proyeccion. La camara se gira
-arrastrando. Las letras de comer y sembrar vienen del isometrico, y cambiar una
-tecla que funciona para meter otra no es decision del agente.
+fase 2), Shift enciende la carrera, **E abre el inventario**, 1-4 eligen lo
+que se lleva en la mano, R empieza un mundo nuevo, + y - acercan y alejan, y P
+cambia de proyeccion. **Clic izquierdo golpea y clic derecho usa** lo que se
+lleva en la mano: una baya se come, una semilla se siembra. Comer (E), sembrar
+(F), el inventario (I) y fabricar (C) tuvieron tecla propia hasta el 2026-09-28,
+cuando el autor lo cambio a esto; cambiar una tecla que funciona para meter
+otra no es decision del agente.
 
 **Correr es un INTERRUPTOR**, tambien decision suya: se enciende con Shift o con
 el boton del movil y se queda encendido hasta que se vuelva a pulsar. No es una
@@ -755,30 +758,28 @@ siga contando como arrastre. La regla vive en `gestures.ts`, que es puro,
 y `tests/gestures.test.ts` la afirma. En tactil no hay tal conflicto: acciona el
 boton, y un dedo sobre el mundo gira la camara y nada mas.
 
-El racimo de botones del movil lo ordeno el autor: **la accion es la mas grande y
-la mas pegada al borde derecho**, que es donde cae el pulgar en reposo, y salto y
-carrera se apartan a su izquierda y van mas pequenos. En fila y no en columna,
-para que sea el borde —y no la altura— lo que ordene la importancia.
+**La pantalla del movil es la del boceto del autor (2026-09-28).** Abajo, el
+**ATAQUE**, el mas grande, en la esquina derecha, que es donde cae el pulgar en
+reposo; **USAR** a su izquierda; y **CORRER** y **SALTAR** en columna encima del
+ataque. La **franja de salud y hambre** va abajo a la izquierda, hasta USAR.
+Arriba, **OTROS** a la izquierda, la **barra de la mano** en medio e
+**INVENTARIO** a la derecha, los dos redondos; OTROS despliega en fila el ojo,
+el HUD y el entorno, y se cierra tocando fuera. Sustituyo al racimo en fila
+—accion, salto, carrera, comer y sembrar, ordenados por el borde— y a los
+botones de comer y sembrar, que ahora son USAR con la baya o la semilla en la
+mano. Los tamanos son mios.
 
-Comer y sembrar llegaron despues, al retirar el isometrico, y se colocaron
-**siguiendo esa misma regla**: a la izquierda de todo y los mas pequenos, porque
-se usan menos que moverse y accionar. En un telefono estrecho los cinco se
-aprietan y la accion conserva su primacia. **La colocacion es deduccion mia**
-desde la regla del autor, no una decision suya: puede corregirla.
-
-**Debajo del racimo, lo mas bajo de la pantalla, va la franja de salud y hambre**,
-decision del autor: siempre a la vista, en PC y en movil, sin rotulos —un corazon
-y un muslo de pollo en SVG, del color de su barra—, con el **boton del inventario
-en la esquina inferior izquierda** y las barras desde poco despues de el hasta el
-borde derecho. Todo lo que vive abajo (racimo, ayuda, panel de desarrollo,
-inventario) se apoya encima con la variable CSS `--above-vitals`, y el humo
-afirma que el racimo no pisa la franja.
+**La franja de salud y hambre** es decision del autor: siempre a la vista, sin
+rotulos —un corazon y un muslo de pollo en SVG, del color de su barra—; en PC,
+de borde a borde. Lo que vive abajo en PC (ayuda, panel de desarrollo) se apoya
+encima con la variable CSS `--above-vitals`.
 
 **El HUD y el inventario arrancan cerrados**, tambien decision suya. El HUD
-(hora, dia, semilla, posicion, FPS) se abre con su boton de arriba a la izquierda
-—espejo del del bioma— y **no tiene tecla**; el inventario, con su boton o con
-**I**. Cerrados no se escriben: el DOM se refresca diez veces por segundo y no
-hay por que pagarlo por lo que no se ve.
+(hora, dia, semilla, posicion, FPS) se abre con su boton —arriba a la izquierda
+en PC, dentro de OTROS en el movil— y **no tiene tecla**; el inventario, con
+**E** en PC y con el boton INVENTARIO en el movil. Cerrados no se escriben: el
+DOM se refresca diez veces por segundo y no hay por que pagarlo por lo que no
+se ve.
 
 **Y ese racimo no se ve en PC**, tambien decision suya: son controles de pulgar y
 con teclado sobran, porque Shift, Espacio y el clic izquierdo ya hacen lo mismo.
@@ -789,9 +790,12 @@ Playwright ya hace que Chromium declare puntero grueso, medirla obliga a fingir
 uno fino (`tools/slash.mjs` lo hace, y afirma «oculto al cargar, visible
 tras tocar»).
 
-La excepcion es **el ojo de la esquina superior derecha**, que cambia de
-proyeccion y se ve siempre: nacio siendo el unico control sin tecla anunciada, y
-en el movil sigue sin tenerla (en PC la ayuda ya anuncia la P). Va en SVG y no en emoji —`👁` se pinta a color y distinto en cada
+La excepcion es **el ojo**, que cambia de proyeccion y en PC se ve siempre,
+arriba a la derecha: nacio siendo el unico control sin tecla anunciada (en PC la
+ayuda ya anuncia la P). En el movil vive dentro de OTROS, y su barra del angulo
+sale hacia donde hay sitio: hacia la izquierda con el ojo pegado al borde
+derecho, hacia la derecha si cabe, y si no, justo debajo del ojo (deduccion mia;
+dentro de OTROS se abria encima del propio ojo y el dedo lo pisaba). Va en SVG y no en emoji —`👁` se pinta a color y distinto en cada
 sistema— y **dice cual esta activa con su propia forma**: abierto en perspectiva,
 que tiene fuga, y entrecerrado en ortografica, que lo aplana todo. Lo eligio asi
 el autor entre tres opciones; el simbolo cuenta la diferencia en vez de limitarse
@@ -918,11 +922,24 @@ Decisiones del autor, que no se tocan sin preguntarle:
   suma el poder de lo que se lleva en la mano (`toolStats`); a mano, algunas
   cosas no se completan. Un arbol sin hacha no cae: suelta ramas. Roca y
   minerales piden pico, y el hierro uno mejor.
-- **Se equipa una herramienta**: las casillas 1-4 son la barra y la elegida es
-  la mano. La eleccion viaja en la `Intent` (`select`), como fabricar
-  (`craft`), intercambiar (`swapA`/`swapB`) y tirar (`discard`): regla 5.
+- **Se equipa una herramienta**: las casillas 1-4 (la primera fila del
+  inventario) son la barra y la elegida es la mano. La eleccion viaja en la
+  `Intent` (`select`), como fabricar (`craft`), mover (`moveFrom`/`moveTo`),
+  tirar (`discard`) y usar (`use`): regla 5.
+- **Usar** (clic derecho, boton USAR) es con lo de la mano: bayas se comen, una
+  semilla se siembra —esa, no otra— donde toca la mirada (`tryUse`). Lo que se
+  mira (puertas y demas) llegara despues.
 - **Se desgastan y se rompen.**
-- **Casillas con pilas** (`sim/inventory.ts`), y la ropa las ampliara.
+- **16 casillas con pilas de 100** (`sim/inventory.ts`), y la ropa las ampliara.
+  **Arrastrar mueve**: el mismo objeto se apila y lo que sobra se queda; uno
+  distinto se intercambia (`Inventory.move`). **Soltarlo fuera del panel lo
+  tira.**
+- **Fabricar es mantener pulsado 2 s** el resultado de la receta, con la fila
+  llenandose de izquierda a derecha; sin ingredientes se ve apagada y no hace
+  nada, y sin sitio avisa de inventario lleno.
+- **Al golpear algo que no se rompe salen esquirlas**, mas pequenas, poco
+  saturadas y semitransparentes que los escombros de romperlo (`spawnChips`,
+  con `state.lastHits` del nucleo), y **no hay barra de progreso**.
 - **La roca a mano no da nada**: la primera piedra son **guijarros** sueltos
   en el suelo, una feature inerte y finita que no estorba el paso.
 - Lo basico se fabrica a mano en cualquier sitio; lo mejor pedira mesa u horno.
@@ -944,10 +961,18 @@ Lo que el codigo tiene que respetar:
   aspa: vistos desde arriba, dos laminas cruzadas se leian como una helice.
 - **Las peticiones del inventario no se tiran en pausa**, al reves que salto y
   accion: son orden, no acciones en el mundo, y esperan al primer tick.
-- **El panel de fabricar (C) suelta el cursor sin pausar**, como el de
-  desarrollo, y capturar es asincrono: si el cursor se captura con uno de los
-  dos abierto, `pointer-lock.ts` lo suelta en el acto (sin eso, F3 y C
-  seguidos dejaban el panel abierto con el cursor capturado).
+- **El inventario (E) suelta el cursor sin pausar** (decision del autor: abrirlo
+  no pausa), como el panel de desarrollo, y capturar es asincrono: si el cursor
+  se captura con uno de los dos abierto, `pointer-lock.ts` lo suelta en el acto
+  (sin eso, F3 y el panel seguidos lo dejaban abierto con el cursor capturado).
+- **El panel es `inventory-ui.ts`**, segun los bocetos: en PC tres columnas
+  —PERSONAJE con diez equipables (apagados hasta la ropa), INVENTARIO con el
+  objeto seleccionado y su descripcion, RECETAS por categorias—; en el movil,
+  una pagina y flechas. La barra de arriba del movil no se arrastra: se ordena
+  en la primera fila del inventario.
+- **Arrastrar se prueba con toques de verdad** (`tools/gestures.mjs`): arrastrar
+  una casilla con el dedo y mantener una receta 2 s. En PC lo hace el humo con
+  el raton.
 
 Para probar sin juntarlo todo a mano, el panel de desarrollo tiene
 **«Materiales de piedra»**: da materiales, no herramientas, para que fabricar

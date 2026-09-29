@@ -615,10 +615,10 @@ describe('Capitulo II: combinar y herramientas', () => {
     inv.add(Resource.Stone, 2);
     inv.add(Resource.Fiber, 2);
     const axe = RECIPES.findIndex((r) => r.output === Resource.StoneAxe);
-    expect(tryCraft(inv, axe)).toBe(true);
+    expect(tryCraft(inv, axe)).toBe('ok');
     expect(inv.count(Resource.StoneAxe)).toBe(1);
     expect(inv.count(Resource.Branch) + inv.count(Resource.Stone) + inv.count(Resource.Fiber)).toBe(0);
-    expect(tryCraft(inv, axe)).toBe(false);
+    expect(tryCraft(inv, axe)).toBe('missing');
   });
 
   it('algunos recursos requieren herramientas para recolectarse', () => {
