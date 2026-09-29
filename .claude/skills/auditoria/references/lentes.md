@@ -173,5 +173,8 @@ el codigo delante.
 - Toda **deduccion del agente** de la tanda (numeros, tiempos, textos, iconos)
   esta en «Esperando tu juicio» de `docs/pendiente.md`, y nada del autor esta
   marcado como deduccion.
+- La CI corre **todas** las pasadas del humo: la matriz de `ci.yml` tiene una
+  casilla por pasada de `tools/smoke.mjs` mas los gestos (el escaner lo
+  cruza), y el humo sale en rojo si se le pide una pasada que no existe.
 - La CI sigue validando lo que dice que valida: el YAML parsea y cada paso
   apunta a un fichero que existe (el escaner mira lo segundo).

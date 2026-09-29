@@ -5,8 +5,12 @@ on:
     branches: ['**']
   pull_request:
 
+# Repartida para que no tarde: el nucleo por un lado y cada pasada del
+# navegador en su propia maquina, todas a la vez. Antes era una sola cola de
+# ~19 minutos (16 de humo); ahora tarda lo que la pasada mas larga.
 jobs:
-  check:
+  nucleo:
+    name: Typecheck y tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,21 +23,64 @@ jobs:
         run: npm run typecheck
       - name: Tests del nucleo
         run: npm test
+
+  navegador:
+    name: ${{ matrix.pasada }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Un fallo no cancela las demas: se ve de una vez todo lo que falla.
+      fail-fast: false
+      matrix:
+        # Una casilla por pasada de `tools/smoke.mjs` (se lanza por el prefijo
+        # de su nombre) y los gestos con toques de verdad. Si se anade una
+        # pasada al humo, va aqui tambien: el escaner de la auditoria lo cruza.
+        pasada: [desktop, resources, mobile, devTools, life, relief, highRefresh, gestures]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Cache de Chromium
+        id: chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Instalar Chromium
+        if: steps.chromium.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Librerias del sistema para Chromium
+        if: steps.chromium.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
       - name: Build del cliente
         run: npm run build
-      - name: Prueba de humo en navegador
-        run: |
-          npx playwright install --with-deps chromium
-          node tools/smoke.mjs
+      - name: Prueba de humo, pasada ${{ matrix.pasada }}
+        if: matrix.pasada != 'gestures'
+        run: node tools/smoke.mjs ${{ matrix.pasada }}
       # Los gestos con dedos de verdad (CDP): arrastrar, sostener el ojo, la
       # barra del angulo, el dedo de ATAQUE que gira. El humo usa toques
       # sinteticos y no ve lo que el navegador decide sobre un dedo real.
       - name: Gestos tactiles con toques de verdad
+        if: matrix.pasada == 'gestures'
         run: node tools/gestures.mjs
       - name: Guardar capturas
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: screenshots
+          name: screenshots-${{ matrix.pasada }}
           path: screenshots/
           if-no-files-found: ignore
+
+  # Un unico estado para todo el conjunto: verde solo si todo lo es.
+  todo:
+    name: CI completa
+    runs-on: ubuntu-latest
+    needs: [nucleo, navegador]
+    if: always()
+    steps:
+      - name: Comprobar que todo paso
+        run: |
+          test "${{ needs.nucleo.result }}" = success
+          test "${{ needs.navegador.result }}" = success

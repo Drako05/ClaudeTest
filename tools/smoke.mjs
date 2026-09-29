@@ -1582,6 +1582,12 @@ async function highRefreshPass(browser, baseUrl) {
 const only = process.argv[2];
 const passes = { desktopPass, resourcesPass, mobilePass, devToolsPass, lifePass, reliefPass, highRefreshPass };
 try {
+  // Pedir una pasada que no existe no puede salir en verde: con la CI
+  // repartida en una casilla por pasada, una errata en el nombre seria una
+  // casilla verde que no prueba nada.
+  if (only && !Object.keys(passes).some((name) => name.startsWith(only))) {
+    failures.push(`no hay ninguna pasada que empiece por «${only}»; las hay: ${Object.keys(passes).join(', ')}`);
+  }
   for (const [name, pass] of Object.entries(passes)) {
     if (only && !name.startsWith(only)) continue;
     await pass(browser, baseUrl);

@@ -295,6 +295,24 @@ donde se fue el gasto.
 npm run typecheck && npm test && npm run smoke
 ```
 
+**La CI confirma, pero no se espera** (decision del autor, 2026-09-29). Lo que
+valida un cambio son estas pruebas en local, antes de empujar. Tras empujar se
+informa al autor en el acto, diciendo que la CI esta en marcha, y la CI se mira
+**al empezar el siguiente turno de trabajo**: si salio en rojo, se dice y se
+arregla antes que nada. Esperarla costaba ~19 minutos de conversacion parada en
+cada entrega. La skill `auditoria` si la espera, porque cierra una tanda.
+
+**La CI va repartida** (`.github/workflows/ci.yml`): un trabajo para typecheck
+y tests, y una **matriz con una maquina por pasada del humo** —`desktop`,
+`resources`, `mobile`, `devTools`, `life`, `relief`, `highRefresh`— mas otra
+para los gestos, todas a la vez; y un trabajo final, «CI completa», que solo sale
+verde si todo lo esta. Cada pasada se lanza por el prefijo de su nombre
+(`node tools/smoke.mjs life`). **Si anades una pasada al humo, anadela a la
+matriz**, o no correra nunca en CI: el escaner de la auditoria lo cruza. Y el
+humo sale en rojo si se le pide una pasada que no existe, para que una errata
+en la matriz no sea una casilla verde que no prueba nada. Una casilla que falle
+se relanza sola desde GitHub («Re-run failed jobs»).
+
 **Y al cerrar cada tanda, la auditoria**: la skill `auditoria`
 (`.claude/skills/auditoria/`, se invoca con `/auditoria`). Tiene un proceso fijo
 por fases, diez lentes, un escaner automatico con autoprueba y un **registro de

@@ -129,7 +129,10 @@ until grep -q '^fin:' LOG; do sleep 10; done
 
 ## Fase 5 — Cierre
 
-1. **Commit y push** de las correcciones, con un mensaje que las cuente.
+1. **Commit y push** de las correcciones, con un mensaje que las cuente. Aqui
+   **si se espera la CI** hasta verla en verde, al reves que en el trabajo
+   diario (`CLAUDE.md`): la auditoria cierra una tanda y no se da por cerrada
+   con la CI en marcha.
 2. En `docs/pendiente.md`:
    - actualiza **«Ultima auditoria: commit `<hash auditado>`, fecha»**, que
      es el punto de partida de la siguiente;

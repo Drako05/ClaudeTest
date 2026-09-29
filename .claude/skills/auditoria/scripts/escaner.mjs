@@ -127,6 +127,7 @@ export function scan(root) {
     retirados: [],
     scripts: [],
     fueraDeCi: [],
+    matriz: [],
   };
 
   // 1. Rutas citadas entre comillas invertidas que no existen.
@@ -262,6 +263,22 @@ export function scan(root) {
     if (!ciText.includes(f)) report.fueraDeCi.push(f);
   }
 
+  // 9. Pasadas del humo sin casilla en la matriz de la CI, y casillas sin
+  // pasada. La CI lanza cada pasada por el prefijo de su nombre; una pasada
+  // nueva que no se anade a la matriz no corre nunca en CI, y nadie se entera.
+  const smoke = text.get('tools/smoke.mjs');
+  const matrix = /pasada:\s*\[([^\]]*)\]/.exec(ciText);
+  if (smoke && matrix) {
+    const passes = [...(/const passes = \{([^}]*)\}/.exec(smoke)?.[1] ?? '').matchAll(/(\w+)/g)].map((m) => m[1]);
+    const cells = matrix[1].split(',').map((s) => s.trim().replace(/['"]/g, '')).filter(Boolean);
+    for (const p of passes) {
+      if (!cells.some((c) => p.startsWith(c))) report.matriz.push(`tools/smoke.mjs  ${p} no tiene casilla en la matriz de CI`);
+    }
+    for (const c of cells) {
+      if (c !== 'gestures' && !passes.some((p) => p.startsWith(c))) report.matriz.push(`CI  la casilla «${c}» no coincide con ninguna pasada`);
+    }
+  }
+
   return report;
 }
 
@@ -289,6 +306,7 @@ const TITLES = {
   retirados: 'Terminos retirados (ver references/retirados.md)',
   scripts: 'Scripts y pasos de CI que apuntan a ficheros inexistentes',
   fueraDeCi: 'Herramientas que la CI no ejecuta: correrlas a mano (lente C)',
+  matriz: 'Pasadas del humo y casillas de la matriz de CI que no casan',
 };
 
 function print(report) {
@@ -316,7 +334,8 @@ function selfTest() {
   };
   put('package.json', JSON.stringify({ scripts: { roto: 'node tools/no-existe.mjs', bien: 'node tools/bien.mjs' } }));
   put('tools/bien.mjs', 'export {};\n');
-  put('.github/workflows/ci.yml', 'steps:\n  - run: node tools/bien.mjs\n');
+  put('.github/workflows/ci.yml', 'matrix:\n  pasada: [alfa, fantasma, gestures]\nsteps:\n  - run: node tools/bien.mjs\n  - run: node tools/smoke.mjs\n');
+  put('tools/smoke.mjs', 'const passes = { alfaPass, betaPass };\n');
   put('packages/client/index.html',
     '<style>#vivo { color: #fff; } #muerto { top: 0; } .viva { x: 1; } .clase-sin-uso { x: 2.5; }</style>\n' +
     '<div id="vivo" class="viva"></div>\n');
@@ -345,6 +364,8 @@ function selfTest() {
     ['ids', (r) => r.ids.length === 1 && r.ids[0].includes('#fantasma')],
     ['exports', (r) => r.exports.length === 1 && r.exports[0].includes('huerfana')],
     ['scripts', (r) => r.scripts.length === 1 && r.scripts[0].includes('no-existe')],
+    ['matriz', (r) => r.matriz.length === 2 && r.matriz.some((x) => x.includes('betaPass')) &&
+      r.matriz.some((x) => x.includes('fantasma'))],
     ['retirados', (r) => r.retirados.some((x) => !x.startsWith('[historia]') && x.includes('zoom.ts')) &&
       r.retirados.some((x) => x.startsWith('[historia]') && x.includes('notas.md'))],
     ['ignorados con ambito', (r) => r.identificadores.some((x) => x.includes('zoom.ts') && x.includes('nombreJuzgado')) &&
