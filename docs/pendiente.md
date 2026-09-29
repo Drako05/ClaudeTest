@@ -73,6 +73,12 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Usar mirando a algo (sin nada util en la mano) **aun no hace nada** | Inventario de los bocetos | llega con puertas y demas |
 | Los **dibujos** de los iconos: mano abierta, espada y pico cruzados, mochila, tres barras | Ajustes del inventario | SVG en `index.html` |
 | Pestanas del movil en letra de **16 px**, subrayada la elegida | Ajustes del inventario | CSS |
+| El **dibujo nuevo del ataque**: espada con hoja de contorno, guarda y pomo, y pico en media luna; el mango se corta bajo la hoja | Ajustes, 3.ª ronda | SVG en `index.html` |
+| La rueda: **hacia abajo, la siguiente**; **una muesca, una casilla**; un trackpad acumula **50 px** por casilla; da la vuelta | Ajustes, 3.ª ronda | numeros en `controls.ts` |
+| La cruz: **14 px**, blanca con contorno oscuro; se oculta al morir | Ajustes, 3.ª ronda | CSS |
+| USAR y SALTAR encendidos al menos **150 ms** | Ajustes, 3.ª ronda | un numero en `controls.ts` |
+| El registro de objetos: **3 s** de vida, sube **18 px**, entero el primer 40 % y luego se desvanece; la vieja se va en **0,3 s** al llegar la quinta; letra de **11 px**, ganancias en verde claro y perdidas en rojo claro | Ajustes, 3.ª ronda | numeros en `pickup-feed.ts` y CSS |
+| Sin nada seleccionado, la descripcion queda **vacia**, sin texto de ayuda | Ajustes, 3.ª ronda | una linea |
 | Confirmar al tirar: «¿Tirar N × Objeto?» con **Cancelar** y **Tirar**; tocar fuera cancela; si la casilla cambio entretanto, no se tira nada | Ajustes del inventario | `inventory-ui.ts` |
 | En PC, con el cursor capturado la barra no se arrastra (el raton gira la vista): se arrastra con el cursor libre, o sea con E abierto | Ajustes del inventario | — |
 | Trabajos: arbol 4 golpes (raro 6), roca 3, carbon 4, cobre 5, hierro 6 con pico de nivel 2; arbusto y guijarros 1 | Recoleccion y fabricacion | `workOf` en `shared` |
@@ -301,6 +307,19 @@ cualquier punto de una casilla: eso ya es la descripcion de una malla.
    (ver «El isometrico se retira»). Los puntos 1 a 3 siguen abiertos.
 
 ---
+
+## Ajustes del inventario, 3.ª ronda — HECHO (2026-09-29)
+
+- Otro dibujo para el ATAQUE (espada y pico cruzados).
+- PC: la **rueda recorre la barra de la mano** y el zoom queda con + y -.
+- PC: **Esc cierra el inventario** sin pausar. En pausa, **solo el clic
+  reanuda** (tu eleccion: Chrome no deja volver a capturar con Esc).
+- **Cruz en el centro** de la pantalla, en todas las vistas.
+- USAR y SALTAR se encienden al tocarlos.
+- La descripcion se limpia al tocar una casilla vacia, y al abrir el
+  inventario no hay nada seleccionado.
+- **Registro de objetos** «+5 Madera / -1 Bayas»: bajo INVENTARIO en el movil,
+  abajo a la derecha en PC (tu eleccion), maximo cinco lineas.
 
 ## Ajustes del inventario, 2.ª ronda — HECHO (2026-09-29)
 

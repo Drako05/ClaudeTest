@@ -201,6 +201,20 @@ check(tapped.projection === 'perspectiva' && !tapped.fovPanel,
   `un toque corto con la barra abierta no cambio de vista o no la cerro (${tapped.projection}, ${tapped.fovPanel})`);
 await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
 
+// USAR y SALTAR se encienden mientras el dedo esta puesto y se apagan al
+// soltar (pedido del autor), con toques de verdad.
+for (const id of ['use', 'jump']) {
+  const at = await center(id);
+  await real('touchStart', [at]);
+  await page.waitForTimeout(80);
+  const lit = await page.evaluate((i) => document.getElementById(i).classList.contains('on'), id);
+  await real('touchEnd', []);
+  await page.waitForTimeout(400);
+  const off = await page.evaluate((i) => !document.getElementById(i).classList.contains('on'), id);
+  console.log(`  ${id}: encendido al tocar ${lit}, apagado al soltar ${off}`);
+  check(lit && off, `el boton ${id} no se enciende al tocarlo o no se apaga al soltar`);
+}
+
 // El inventario con el dedo: arrastrar dentro de la barra con el inventario
 // cerrado, arrastrar una casilla a otra y a la barra con el abierto, y mantener
 // una receta 1,5 s para fabricarla (decisiones del autor). Con materiales del

@@ -695,8 +695,11 @@ sustituirlas, para no mover el mundo llano ni un tile.
 
 Las teclas: WASD o flechas andan, **Espacio salta** (decision del autor en la
 fase 2), Shift enciende la carrera, **E abre el inventario**, 1-4 eligen lo
-que se lleva en la mano, R empieza un mundo nuevo, + y - acercan y alejan, y P
-cambia de proyeccion. **Clic izquierdo golpea y clic derecho usa** lo que se
+que se lleva en la mano, y tambien la **rueda del raton**, que la recorre (hacia
+abajo, la siguiente; da la vuelta), R empieza un mundo nuevo, **+ y - acercan y
+alejan** —solo ellas: la rueda dejo de hacer zoom el 2026-09-29, decision del
+autor—, y P cambia de proyeccion. **Esc con el inventario abierto lo cierra**
+sin pausar. **Clic izquierdo golpea y clic derecho usa** lo que se
 lleva en la mano: una baya se come, una semilla se siembra. Comer (E), sembrar
 (F), el inventario (I) y fabricar (C) tuvieron tecla propia hasta el 2026-09-28,
 cuando el autor lo cambio a esto; cambiar una tecla que funciona para meter
@@ -725,7 +728,16 @@ arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
   pulsan los botones (ojo, HUD, inventario, barra del angulo).
 - **Un clic en la pantalla captura y reanuda, y ese clic no golpea.** Ya
   capturado, el clic izquierdo golpea en el acto, al apoyar: no hay arrastre
-  que distinguir.
+  que distinguir. **Esc no reanuda**, y no por gusto: Chrome no cuenta Esc
+  como gesto para volver a capturar el cursor, porque es la salida de
+  emergencia del jugador. El autor eligio que solo el clic reanude.
+- **Esc con el inventario abierto lo cierra y vuelve a capturar sin pausar.**
+  Ahi si se puede: el cursor lo solto el juego al abrir, no el jugador, y en
+  ese caso Chrome deja volver a capturarlo sin gesto. Si algun navegador no lo
+  dejara, queda la pausa de siempre y basta un clic.
+- **Una cruz en el centro de la pantalla**, en las tres vistas y en PC y
+  movil: como las tres comparten la mirada, el centro es justo hacia donde se
+  mira y se golpea.
 - El **inventario** (I) no suelta el cursor; el **panel de desarrollo** (F3) lo
   suelta pero **no pausa**, porque tiene su propia pausa y sirve para ver pasar
   el tiempo; con el panel abierto se sigue arrastrando para girar, como antes.
@@ -951,6 +963,18 @@ Decisiones del autor, que no se tocan sin preguntarle:
   un pico», ni «inventario lleno», ni «fabricado». El nucleo sigue dejando
   `lastBlocked`, pero nadie lo pinta. Fabricar sin sitio se resolvera en otra
   tanda, con objetos que se tiran al suelo.
+- **Lo que entra y sale del inventario sale escrito**: «+5 Madera», «-1
+  Bayas», en letra pequena debajo del boton INVENTARIO en el movil y abajo a la
+  derecha en PC. Cada linea sube despacio mientras se desvanece, las nuevas
+  van debajo y **nunca hay mas de cinco**: al llegar la quinta, la mas vieja se
+  apaga deprisa (todo eso, del autor; tiempos y medidas, mios). La logica es
+  pura (`pickup-feed.ts`, con sus tests) y sale de **comparar los totales**
+  frame a frame, la misma cuenta que el registro del panel de desarrollo, que
+  ahora la comparte: mover de casilla no escribe nada, y reiniciar no escribe
+  «-N». La descripcion del inventario se vacia al tocar una casilla vacia, y al
+  abrirlo no hay nada seleccionado.
+- **USAR y SALTAR se encienden mientras se tocan**, como el ataque mantenido,
+  y al menos 150 ms para que un toque rapido se vea.
 - **Al golpear algo que no se rompe salen esquirlas**, mas pequenas, poco
   saturadas y semitransparentes que los escombros de romperlo (`spawnChips`,
   con `state.lastHits` del nucleo), y **no hay barra de progreso**.

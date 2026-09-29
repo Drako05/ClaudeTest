@@ -10,7 +10,8 @@
  * aqui es depuracion, no interfaz de juego.
  */
 
-import { BIOME_NAMES, DAY_TICKS, RESOURCE_NAMES } from '@verdant/shared';
+import { BIOME_NAMES, DAY_TICKS } from '@verdant/shared';
+import { deltaText, inventoryDelta } from './pickup-feed.js';
 
 /** Multiplicadores de velocidad del tiempo. */
 const SPEEDS: readonly number[] = [0.25, 1, 4, 16, 64];
@@ -128,10 +129,8 @@ export class DevTools {
     }
 
     if (this.lastInventory) {
-      for (let r = 0; r < inventory.length; r++) {
-        const delta = inventory[r] - this.lastInventory[r];
-        if (delta !== 0) this.push(`${delta > 0 ? '+' : ''}${delta} ${RESOURCE_NAMES[r]}`);
-      }
+      // La misma cuenta que el registro de objetos de la pantalla.
+      for (const d of inventoryDelta(this.lastInventory, inventory)) this.push(deltaText(d));
       // El hambre baja de forma continua; solo interesa cuando pega un salto,
       // que es lo que delata haber comido.
       const hungerDelta = hunger - this.lastHunger;

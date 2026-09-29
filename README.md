@@ -52,8 +52,9 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | `WASD` / flechas | Moverse, relativo a la camara |
 | Clic en la pantalla | Capturar el cursor y jugar (el juego arranca en pausa) |
 | Raton | Mirar: la vista va con el cursor, tambien arriba y abajo (en tercera persona se puede mirar al cielo) |
-| `Esc` | Soltar el cursor y **pausar**; con el cursor suelto se pulsan los botones |
-| Rueda, `+` / `-` | Zoom; en primera persona, catalejo que vuelve al dejar de girar |
+| `Esc` | Soltar el cursor y **pausar**; con el cursor suelto se pulsan los botones. Con el inventario abierto, lo cierra sin pausar |
+| Rueda | Recorrer la barra de la mano |
+| `+` / `-` | Zoom; en primera persona, catalejo que vuelve al dejar de pulsar |
 | Clic izquierdo | Golpear hacia donde mira la camara, con lo que se lleve en la mano |
 | Clic derecho | Usar lo de la mano: una baya se come, una semilla se siembra donde mira la camara |
 | `Espacio` | Saltar |

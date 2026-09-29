@@ -65,6 +65,7 @@ import { InventoryUi } from './inventory-ui.js';
 import { MouseLook } from './pointer-lock.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
+import { inventoryDelta, opacityOf, PickupFeed, riseOf } from './pickup-feed.js';
 import { berrySpot, cliffSpot, mineralSpot, peakSpot, reliefAround, stoneOreSpot } from './probes.js';
 import { skyTint, tintCss } from './sky.js';
 import { randomSeed, seedFromLocation, startGame, writeSeedToLocation } from './start.js';
@@ -167,6 +168,7 @@ controls.bindActionButton(document.getElementById('action'));
 controls.bindUseButton(document.getElementById('use'));
 controls.onRestart = restart;
 controls.onToggleInventory = () => items.toggle();
+controls.onHotbarStep = (delta) => items.step(delta);
 document.getElementById('restart')?.addEventListener('click', restart);
 
 // El barrido y los escombros. El movimiento sale de `effects.ts`, que es puro y
@@ -174,6 +176,43 @@ document.getElementById('restart')?.addEventListener('click', restart);
 const effects = new Effects();
 const effectsView = new EffectsView(scene);
 const overlays = new Overlays(scene);
+
+/**
+ * El registro de objetos, «+5 Madera» y «-1 Bayas» (pedido del autor): sale de
+ * comparar los totales del inventario frame a frame, y se pinta debajo del
+ * boton INVENTARIO en el movil y abajo a la derecha en PC. La logica es pura
+ * (`pickup-feed.ts`); aqui solo se pinta.
+ */
+const feed = new PickupFeed();
+const feedEl = document.getElementById('pickupFeed') as HTMLElement;
+const feedEls = new Map<number, HTMLElement>();
+let feedBase = state.inventory.totals();
+
+function drawFeed(): void {
+  // En el movil cuelga del boton INVENTARIO y sube hacia el; en PC se apoya
+  // en la franja de salud y hambre y sube desde ahi.
+  const fromTop = document.body.classList.contains('touch-active');
+  const alive = new Set<number>();
+  for (const line of feed.lines) {
+    alive.add(line.id);
+    let el = feedEls.get(line.id);
+    if (!el) {
+      el = document.createElement('div');
+      el.className = line.gain ? 'gain' : 'loss';
+      el.textContent = line.text;
+      feedEl.appendChild(el);
+      feedEls.set(line.id, el);
+    }
+    const y = fromTop ? line.fromTop - riseOf(line) : -(line.fromBottom + riseOf(line));
+    el.style.transform = `translateY(${y.toFixed(1)}px)`;
+    el.style.opacity = opacityOf(line).toFixed(3);
+  }
+  for (const [id, el] of feedEls) {
+    if (alive.has(id)) continue;
+    el.remove();
+    feedEls.delete(id);
+  }
+}
 
 /**
  * El panel de desarrollo (F3 o `?dev=1`): pausa, velocidades, saltos de tiempo,
@@ -212,6 +251,14 @@ const items = new InventoryUi(() => state);
 const mouseLook = new MouseLook(canvas, () => dev.active || items.open);
 controls.mouseLook = mouseLook;
 window.addEventListener('keydown', (e) => {
+  // Esc con el inventario abierto lo cierra, sin pausar (pedido del autor): al
+  // cerrar se vuelve a capturar el cursor. Chrome lo deja sin gesto porque lo
+  // solto el juego al abrir, no el jugador; si aun asi lo rechazara, queda la
+  // pausa de siempre y basta un clic.
+  if (e.code === 'Escape' && items.open) {
+    items.toggle();
+    return;
+  }
   if (e.code !== 'F3') return;
   if (dev.active) mouseLook.release();
   else if (!items.open) mouseLook.capture();
@@ -356,6 +403,9 @@ function restart(): void {
   effects.clear();
   overlays.reset();
   state = startGame(seed, false, RADIUS);
+  // Un mundo nuevo empieza sin nada: eso no es perder lo que se llevaba.
+  feed.clear();
+  feedBase = state.inventory.totals();
   gathered = 0;
   jumps = 0;
   airPeak = 0;
@@ -555,8 +605,15 @@ function frame(now: number): void {
   // maquina lenta cabria entero entre dos fotogramas. Con el tiempo ESCALADO:
   // pausar los congela y a 64x no inundan la pantalla.
   effects.advance(scaled);
-  // El aviso se apaga solo y la barra de trabajo sigue a lo que se golpea.
+  // La receta mantenida se carga.
   items.frame();
+  // Lo que entro o salio del inventario este frame, al registro. Con tiempo
+  // real: es interfaz, y en pausa no cambia nada que registrar.
+  const totals = state.inventory.totals();
+  feed.pushDeltas(inventoryDelta(feedBase, totals));
+  feedBase = totals;
+  feed.advance(dt);
+  drawFeed();
   // La camara va con ellos porque la cinta del barrido se orienta hacia el ojo:
   // tumbada en el suelo se veia de canto al bajar la elevacion. Se pasa la del
   // frame ANTERIOR —`camera.follow` es unas lineas mas abajo—, y eso no se nota:
@@ -621,6 +678,7 @@ function frame(now: number): void {
   if (dead) mouseLook.release();
   if (mouseLook.locked) everLocked = true;
   pauseEl.classList.toggle('show', paused && !dead);
+  document.body.classList.toggle('dead', dead);
   const hint = everLocked ? 'Haz clic para continuar' : 'Haz clic para jugar';
   if (pauseHint.textContent !== hint) pauseHint.textContent = hint;
 
@@ -749,6 +807,8 @@ Object.defineProperty(window, '__verdant', {
       selectedSlot: state.inventory.selected,
       itemsSent: { ...items.sent },
       inventoryPage: items.currentPage,
+      /** Lo que dice el registro de objetos, de la mas vieja a la mas nueva. */
+      feed: feed.lines.map((l) => l.text),
       discardAsk: items.askingDiscard,
       lastUsed: state.lastUsed,
       chunks: state.world.loadedChunkCount,

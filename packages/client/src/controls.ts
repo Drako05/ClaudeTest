@@ -16,8 +16,15 @@
 import { Gestures, STICK_RADIUS } from './gestures.js';
 import type { MouseLook } from './pointer-lock.js';
 
-/** Cuanto aguanta el catalejo tras el ultimo giro de rueda, en ms. */
+/** Cuanto aguanta el catalejo tras la ultima pulsacion de + o -, en ms. */
 const WHEEL_HOLD_MS = 800;
+/**
+ * Rueda que cuesta pasar una casilla de la barra con un trackpad, en pixeles;
+ * una muesca de raton la supera siempre y pasa justo una. **Deduccion mia.**
+ */
+const WHEEL_STEP = 50;
+/** Lo minimo que se ve encendido un boton tocado (USAR, SALTAR). **Deduccion mia.** */
+const FLASH_MS = 150;
 
 export interface Move {
   /** Vector en el plano de la PANTALLA, sin rotar. Lo rota la camara. */
@@ -31,6 +38,8 @@ export class Controls {
   onToggleProjection: (() => void) | null = null;
   onRestart: (() => void) | null = null;
   onToggleInventory: (() => void) | null = null;
+  /** La rueda recorre la barra de la mano: `+1` la siguiente, `-1` la anterior. */
+  onHotbarStep: ((delta: number) => void) | null = null;
   /** El raton capturado de PC, si lo hay: decide los clics antes que los gestos. */
   mouseLook: MouseLook | null = null;
 
@@ -84,7 +93,8 @@ export class Controls {
         case 'KeyR':
           this.onRestart?.();
           break;
-        // El mismo paso que la rueda del isometrico: 1.25 por pulsacion.
+        // El zoom es solo con + y - desde que la rueda recorre la barra de la
+        // mano (pedido del autor). El paso es el de la rueda de antes: 1.25.
         case 'Equal':
         case 'NumpadAdd':
           this.wheelZoom /= 1.25;
@@ -164,8 +174,19 @@ export class Controls {
       'wheel',
       (e) => {
         e.preventDefault();
-        this.wheelZoom *= e.deltaY > 0 ? 1.1 : 1 / 1.1;
-        this.lastWheelAt = performance.now();
+        // La rueda ya no acerca: recorre la barra de la mano (pedido del
+        // autor). Hacia abajo, la siguiente. Una muesca es UNA casilla, mida lo
+        // que mida (Chrome manda unos 100 px, otros 120 o 3 lineas); un
+        // trackpad, que manda muchos saltos pequenos, acumula hasta
+        // `WHEEL_STEP` antes de pasar una. Cambiar de sentido empieza de cero.
+        const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? WHEEL_STEP : 1);
+        if (dy === 0) return;
+        if (Math.sign(dy) !== Math.sign(this.wheelAcc)) this.wheelAcc = 0;
+        this.wheelAcc += dy;
+        if (Math.abs(this.wheelAcc) >= WHEEL_STEP) {
+          this.onHotbarStep?.(Math.sign(this.wheelAcc));
+          this.wheelAcc = 0;
+        }
       },
       { passive: false },
     );
@@ -175,6 +196,8 @@ export class Controls {
   }
 
   private wheelZoom = 1;
+  /** Rueda acumulada que aun no llega a una casilla. */
+  private wheelAcc = 0;
   /** Ultima vez que se giro la rueda o se pulso + / -, en ms. */
   private lastWheelAt = -Infinity;
   private jumpQueued = false;
@@ -303,14 +326,7 @@ export class Controls {
    */
   bindJumpButton(el: HTMLElement | null): void {
     if (!el) return;
-    const press = (e: Event) => {
-      e.preventDefault();
-      this.jumpQueued = true;
-    };
-    el.addEventListener('touchstart', press, { passive: false });
-    el.addEventListener('pointerdown', (e) => {
-      if ((e as PointerEvent).pointerType !== 'touch') press(e);
-    });
+    this.bindTap(el, () => (this.jumpQueued = true));
   }
 
   /** Consume el «usar» pedido (clic derecho o boton USAR), si lo hubo. */
@@ -328,16 +344,37 @@ export class Controls {
     this.bindTap(el, () => (this.useQueued = true));
   }
 
+  /**
+   * Un boton de un solo toque. Mientras el dedo esta puesto se ve encendido,
+   * como el ataque mantenido (pedido del autor), y al soltar se apaga, pero no
+   * antes de `FLASH_MS`: un toque rapido tambien tiene que verse.
+   */
   private bindTap(el: HTMLElement | null, run: () => void): void {
     if (!el) return;
+    let since = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
     const press = (e: Event) => {
       e.preventDefault();
       run();
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+      since = performance.now();
+      el.classList.add('on');
+    };
+    const release = () => {
+      if (!el.classList.contains('on') || timer !== null) return;
+      timer = setTimeout(() => {
+        timer = null;
+        el.classList.remove('on');
+      }, Math.max(0, FLASH_MS - (performance.now() - since)));
     };
     el.addEventListener('touchstart', press, { passive: false });
     el.addEventListener('pointerdown', (e) => {
       if ((e as PointerEvent).pointerType !== 'touch') press(e);
     });
+    for (const type of ['touchend', 'touchcancel', 'pointerup', 'pointercancel']) {
+      el.addEventListener(type, release);
+    }
   }
 
   /** Pinta el joystick flotante donde nacio el pulgar, si hay alguno. */

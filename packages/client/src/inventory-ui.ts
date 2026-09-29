@@ -194,8 +194,21 @@ export class InventoryUi {
     return !this.panel.hidden;
   }
 
+  /**
+   * La casilla siguiente (`+1`) o la anterior (`-1`) de la barra, dando la
+   * vuelta: la rueda del raton en PC (pedido del autor). Varios pasos en un
+   * mismo frame se encadenan sobre lo ya pedido.
+   */
+  step(delta: number): void {
+    const from = this.pending.select >= 0 ? this.pending.select : this.current().inventory.selected;
+    this.pending.select = (((from + delta) % HOTBAR_SLOTS) + HOTBAR_SLOTS) % HOTBAR_SLOTS;
+  }
+
   toggle(): void {
     const open = this.panel.hidden;
+    // Al abrir no hay nada seleccionado, y la descripcion esta vacia (pedido
+    // del autor).
+    if (open) this.picked = -1;
     this.panel.hidden = !open;
     this.invOpen.classList.toggle('open', open);
     this.invOpen.setAttribute('aria-expanded', String(open));
@@ -515,8 +528,10 @@ export class InventoryUi {
 
     const item = this.picked >= 0 ? inv.itemAt(this.picked) : null;
     this.paint(this.selSlot, item, item === null ? 0 : inv.counts[this.picked], item === null ? 0 : inv.wear[this.picked]);
+    // Sin objeto —casilla vacia o nada elegido— la descripcion se limpia. Antes
+    // se quedaba la del ultimo objeto tocado.
+    this.selDesc.replaceChildren();
     if (item !== null) {
-      this.selDesc.replaceChildren();
       const title = document.createElement('b');
       title.textContent = RESOURCE_NAMES[item];
       this.selDesc.append(title, DESCRIPTIONS[item] ?? '');

@@ -480,6 +480,32 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  inventario tras recolectar: ${JSON.stringify(gathered.inventory)}`);
   check(sum(gathered.inventory) > 0, 'accionar no recolecto nada');
   check(gathered.debrisDrawn > 0, 'derribar no dibujo ningun escombro');
+  // El registro de objetos anota lo que entro, y nunca mas de cinco lineas.
+  console.log(`  registro de objetos: ${JSON.stringify(gathered.feed)}`);
+  check(gathered.feed.length > 0 && gathered.feed.length <= 5 && gathered.feed.every((t) => /^[+-]\d+ \S/.test(t)),
+    `el registro de objetos no anoto lo recolectado: ${JSON.stringify(gathered.feed)}`);
+  // Lo que dice y lo que se pinta, leidos a la vez: una linea vive 3 s.
+  const painted = await page.evaluate(() => [window.__verdant.feed.length, document.querySelectorAll('#pickupFeed div').length]);
+  check(painted[0] === painted[1], `el registro no se pinta: ${painted}`);
+  // La cruz, en el centro exacto de la pantalla.
+  const cross = await page.evaluate(() => document.getElementById('crosshair').getBoundingClientRect().toJSON());
+  check(await page.isVisible('#crosshair') && Math.abs(cross.x + cross.width / 2 - 640) <= 1 && Math.abs(cross.y + cross.height / 2 - 360) <= 1,
+    `la cruz no esta en el centro: ${JSON.stringify(cross)}`);
+  // La rueda recorre la barra de la mano y ya no hace zoom; da la vuelta.
+  const wheel = (dy) => page.evaluate((d) => document.getElementById('view').dispatchEvent(
+    new WheelEvent('wheel', { deltaY: d, deltaMode: 0, bubbles: true, cancelable: true })), dy);
+  const w0 = await state(page);
+  await wheel(100);
+  await page.waitForTimeout(200);
+  const w1 = await state(page);
+  await wheel(-100);
+  await wheel(-100);
+  await page.waitForTimeout(200);
+  const w2 = await state(page);
+  console.log(`  rueda: casilla ${w0.selectedSlot + 1} -> ${w1.selectedSlot + 1} -> ${w2.selectedSlot + 1}`);
+  check(w1.selectedSlot === (w0.selectedSlot + 1) % 4 && w2.selectedSlot === (w0.selectedSlot + 3) % 4,
+    'la rueda no recorre la barra de la mano');
+  check(w2.distance === w0.distance, 'la rueda sigue haciendo zoom');
   // El inventario, con su tecla: E lo abre, muestra lo del juego, y E lo
   // cierra. Abrirlo suelta el cursor y NO pausa (decision del autor).
   await page.keyboard.press('KeyE');
@@ -500,7 +526,32 @@ async function desktopPass(browser, baseUrl) {
   const nowTotal = sum(nowSlots.filter((s) => s.item >= 0 && s.item < 10).map((s) => s.count));
   check(hudTotal === nowTotal, `el inventario en pantalla (${hudTotal}) no es el del juego (${nowTotal})`);
   check(sum(gathered.inventory.slice(0, 10)) > 0 && gathered.inventory[9] > 0, 'un arbusto no dio fibra');
+  // La descripcion: tocar un objeto la muestra y tocar una casilla vacia la
+  // limpia.
+  const desc = () => page.evaluate(() => document.getElementById('selDesc').textContent.trim());
+  check((await desc()) === '' && (await page.locator('#invGrid .slot.picked').count()) === 0,
+    'al abrir el inventario ya habia algo seleccionado');
+  const full = nowSlots.findIndex((s) => s.item >= 0);
+  const empty = nowSlots.findIndex((s) => s.item < 0);
+  await page.click(`#invGrid .slot:nth-child(${full + 1})`);
+  await page.waitForTimeout(200);
+  const shown = await desc();
+  await page.click(`#invGrid .slot:nth-child(${empty + 1})`);
+  await page.waitForTimeout(200);
+  console.log(`  descripcion: «${shown.slice(0, 30)}…» -> «${await desc()}»`);
+  check(shown !== '' && (await desc()) === '', 'tocar una casilla vacia no limpio la descripcion');
   await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
+  // Esc lo cierra sin pausar.
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  const escClosed = await state(page);
+  check(!(await page.isVisible('#invPanel')), 'Esc no cerro el inventario');
+  check(!escClosed.paused, 'cerrar el inventario con Esc pauso el juego');
+  // Y al reabrirlo no queda nada seleccionado.
+  await page.keyboard.press('KeyE');
+  await page.waitForTimeout(250);
+  check((await desc()) === '' && (await page.locator('#invGrid .slot.picked').count()) === 0,
+    'al reabrir el inventario seguia seleccionada la casilla de antes');
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(150);
   check(!(await page.isVisible('#invPanel')), 'E no volvio a cerrar el inventario');
@@ -798,7 +849,10 @@ async function resourcesPass(browser, baseUrl) {
     await page.waitForTimeout(400);
     const made = await state(page);
     const pickSlot = made.slots.findIndex((s) => s.item === 11);
-    console.log(`  pico fabricado en la casilla ${pickSlot + 1}`);
+    console.log(`  pico fabricado en la casilla ${pickSlot + 1}; registro ${JSON.stringify(made.feed)}`);
+    check(made.feed.includes('+1 Pico de piedra') && made.feed.some((t) => t.startsWith('-')),
+      `el registro no anoto lo fabricado y lo gastado: ${JSON.stringify(made.feed)}`);
+    check(made.feed.length <= 5, 'el registro paso de cinco lineas');
     check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'mantener 1,5 s no fabrico');
     // La carga acaba en el borde derecho de los ingredientes, no en el del panel.
     const rowEdge = await page.evaluate(() => {
@@ -919,6 +973,11 @@ async function mobilePass(browser, baseUrl) {
   );
   check(labels.every((l) => l.text === '' && l.label), `hay botones con rotulo: ${JSON.stringify(labels)}`);
   check(labels.filter((l) => l.svg).length === 4, 'USAR, ATAQUE, OTROS o INVENTARIO no llevan su icono');
+  // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
+  check(await page.isVisible('#crosshair'), 'la cruz no se ve en el movil');
+  const feedR = await rect('pickupFeed');
+  check(feedR.top >= invOpen.bottom && feedR.top - invOpen.bottom < 16 && Math.abs(feedR.right - invOpen.right) < 1,
+    `el registro no va justo debajo de INVENTARIO: ${JSON.stringify(feedR)}`);
   check(vitals.right <= use.left && vitals.left < 40, `la franja no va de la izquierda hasta USAR: ${JSON.stringify(vitals)}`);
   check(others.left < 40 && others.top < 40 && invOpen.right > 350 && invOpen.top < 40, 'OTROS o INVENTARIO no estan arriba en las esquinas');
 

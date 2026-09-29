@@ -557,6 +557,42 @@
         font: 600 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       }
       #pause.show { display: block; }
+
+      /* La cruz del centro (pedido del autor): las tres vistas comparten la
+         mirada y la camara mira a lo largo de ella, asi que el centro de la
+         pantalla es exactamente hacia donde se mira y se golpea. El contorno
+         va en un filtro del conjunto y no en cada trazo, para que la sombra de
+         uno no manche al otro en el cruce. Medidas mias. */
+      #crosshair {
+        position: fixed; left: 50%; top: 50%; z-index: 9; width: 14px; height: 14px;
+        transform: translate(-50%, -50%); pointer-events: none;
+        filter: drop-shadow(0 0 1px rgba(0, 0, 0, .95));
+      }
+      #crosshair::before, #crosshair::after {
+        content: ''; position: absolute; background: rgba(255, 255, 255, .92);
+      }
+      #crosshair::before { left: 6px; top: 0; width: 2px; height: 14px; }
+      #crosshair::after { left: 0; top: 6px; width: 14px; height: 2px; }
+      body.dead #crosshair { display: none; }
+
+      /* El registro de objetos («+5 Madera»), pintado por `main.ts` con la
+         logica de `pickup-feed.ts`. En PC abajo a la derecha, sobre la franja
+         de salud y hambre (decision del autor); en el movil, colgando del boton
+         INVENTARIO. Letra pequena para no estorbar la vista (pedido del autor);
+         tamano y colores, mios. */
+      #pickupFeed {
+        position: fixed; z-index: 16; width: 0; height: 0; pointer-events: none;
+        right: calc(12px + env(safe-area-inset-right)); bottom: var(--above-vitals);
+      }
+      #pickupFeed div {
+        position: absolute; right: 0; bottom: 0; white-space: nowrap;
+        font: 600 11px/15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        text-shadow: 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, .9), 0 0 4px rgba(0, 0, 0, .6);
+      }
+      #pickupFeed .gain { color: #c9f2cf; }
+      #pickupFeed .loss { color: #f5c6c6; }
+      body.touch-active #pickupFeed { top: calc(72px + env(safe-area-inset-top)); bottom: auto; }
+      body.touch-active #pickupFeed div { top: 0; bottom: auto; }
       #pause p { margin: 0 0 4px; font-size: 20px; letter-spacing: .12em; text-transform: uppercase; }
       #pause span { color: #8fc4ff; }
       #dead p { margin: 0; font-size: 26px; letter-spacing: .1em; color: #ff8080; }
@@ -740,12 +776,15 @@
           <path d="M8 12.5V5.8a1.5 1.5 0 0 1 3 0v5.7M11 11V4.3a1.5 1.5 0 0 1 3 0V11M14 11V5.3a1.5 1.5 0 0 1 3 0v6.2M17 11.5V8.3a1.5 1.5 0 0 1 3 0v6.2c0 4.1-2.9 7.2-6.8 7.2h-1.4c-2.1 0-3.5-.9-4.6-2.5l-3.3-4.9a1.5 1.5 0 0 1 2.4-1.8L8 14.3" />
         </svg>
       </button>
-      <!-- Una espada y un pico cruzados. -->
+      <!-- Una espada y un pico cruzados. El mango del pico se corta donde lo
+           cruza la hoja, para que la espada quede delante. -->
       <button id="action" type="button" aria-label="Ataque">
         <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20.5 3.5 9.8 14.2M17.3 3.5h3.2v3.2M7.3 11.7l5 5M9.8 14.2l-4.3 4.3" />
-          <circle cx="4.6" cy="19.4" r="1.2" />
-          <path d="M19.5 19.5 6.8 6.8M2.8 10.8C3.4 6.4 6.4 3.4 10.8 2.8" />
+          <path d="M20 20l-6.4-6.4M10.4 10.4 5.2 5.2" />
+          <path d="M2.4 10.4Q3.2 3.2 10.4 2.4" stroke-width="2.6" />
+          <path d="M21 3l-.5 2.2-10.2 10.2-1.7-1.7L18.8 3.5z" />
+          <path d="M6.85 11.95l5.2 5.2M9.45 14.55 5.8 18.2" />
+          <circle cx="5" cy="19" r="1.1" />
         </svg>
       </button>
     </div>
@@ -797,7 +836,7 @@
       <kbd id="kbdRun">Shift</kbd> <span id="runState">correr</span> &nbsp;
       <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic izq.</kbd> golpear &nbsp; <kbd>raton</kbd> mirar &nbsp; <kbd>Esc</kbd> pausa<br />
       <kbd>clic der.</kbd> usar lo de la mano &nbsp; <kbd>1</kbd>-<kbd>4</kbd> mano &nbsp; <kbd>E</kbd> inventario &nbsp;
-      <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom &nbsp; <kbd>P</kbd> vista
+      <kbd>rueda</kbd> mano &nbsp; <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom &nbsp; <kbd>P</kbd> vista
     </div>
 
     <!-- La franja inferior: el inventario en la esquina y, a su derecha, salud y
@@ -847,7 +886,7 @@
         <div id="invGrid" class="slots"></div>
         <div class="selected">
           <div id="selSlot" class="slot"></div>
-          <div id="selDesc" class="selDesc">Toca un objeto para verlo; arrastralo para moverlo.</div>
+          <div id="selDesc" class="selDesc"></div>
         </div>
       </section>
       <section class="invPage" data-page="recetas">
@@ -894,6 +933,8 @@
       </div>
     </div>
 
+    <div id="crosshair" aria-hidden="true"></div>
+    <div id="pickupFeed" aria-live="polite"></div>
     <div id="pause" role="status">
       <p>Juego en pausa</p>
       <span id="pauseHint">Haz clic para jugar</span>
