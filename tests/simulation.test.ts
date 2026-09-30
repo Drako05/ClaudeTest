@@ -5,6 +5,7 @@ import {
   EntityKind,
   EntityStore,
   HUNGER_DECAY_PER_SEC,
+  JUMP_HUNGER,
   hitboxAt,
   Inventory,
   targetTile,
@@ -103,15 +104,16 @@ describe('simulacion', () => {
 
   it('sin comer, el hambre llega a cero y entonces cae la salud', () => {
     const state = createGame(42);
-    // Suficientes ticks para vaciar el hambre y empezar a pasar hambre de verdad.
-    runTicks(state, TICK_HZ * 260, intent());
+    // Un dia vacia el hambre; veinte segundos mas, y se pasa hambre de verdad.
+    runTicks(state, DAY_TICKS + TICK_HZ * 20, intent());
     expect(state.entities.hunger[state.playerId]).toBe(0);
     expect(state.entities.health[state.playerId]).toBeLessThan(100);
   });
 
   it('el jugador muere si la salud llega a cero', () => {
     const state = createGame(42);
-    runTicks(state, TICK_HZ * 400, intent());
+    // Un dia para vaciar el hambre y 50 s de hambre para vaciar la salud.
+    runTicks(state, DAY_TICKS + TICK_HZ * 60, intent());
     expect(state.entities.health[state.playerId]).toBe(0);
     expect(state.entities.alive[state.playerId]).toBe(0);
   });
@@ -279,7 +281,7 @@ describe('marcha y carrera', () => {
  * El interruptor de supervivencia de las herramientas de desarrollo.
  *
  * Sin el, las herramientas no sirven para lo que se hicieron: saltar un dia son
- * ocho minutos de mundo, o sea 264 puntos de hambre, y el personaje muere antes
+ * ocho minutos de mundo, o sea el hambre entera, y el personaje muere poco despues
  * de que se pueda observar nada del ecosistema.
  */
 describe('Congelar la supervivencia', () => {
@@ -298,9 +300,9 @@ describe('Congelar la supervivencia', () => {
     expect(state.tick).toBe(createGame(31337).tick + DAY_TICKS);
   });
 
-  it('sin congelar, ese mismo salto sigue matando de hambre', () => {
+  it('sin congelar, saltar dos dias mata de hambre', () => {
     const state = createGame(31337);
-    skipTime(state, DAY_TICKS);
+    skipTime(state, 2 * DAY_TICKS);
 
     // Es justo el comportamiento que hacia inservible el boton de +1 dia.
     expect(state.entities.hunger[state.playerId]).toBe(0);
@@ -329,9 +331,94 @@ describe('Congelar la supervivencia', () => {
     for (let t = 0; t < TICK_HZ * 10; t++) step(state, idle);
 
     const lost = before - state.entities.hunger[state.playerId];
-    // Con dos decimales: el hambre vive en un Float32Array y 600 restas de
-    // 0.55/60 acumulan unas milesimas de error.
+    // Con dos decimales: el hambre vive en un Float32Array y 600 restas
+    // acumulan unas milesimas de error.
     expect(lost).toBeCloseTo(HUNGER_DECAY_PER_SEC * 10, 2);
+  });
+});
+
+/**
+ * El hambre gasta segun el esfuerzo (decision del autor, 2026-09-30): quieto o
+ * andando se vacia en un dia de juego; corriendo y avanzando, por el mismo
+ * factor que la velocidad; y cada salto que despega cuesta un 1 %.
+ */
+describe('El hambre segun el esfuerzo', () => {
+  /**
+   * Hambre perdida en `n` ticks con esa Intent, empezando llena y en una zona
+   * llana y despejada: correr contra una pared o un talud no es avanzar, y la
+   * cuenta mediria contra que se choca.
+   */
+  function lost(seed: number, n: number, i: Intent): number {
+    const state = createGame(seed);
+    placeOnFlat(state);
+    const before = state.entities.hunger[state.playerId];
+    runTicks(state, n, i);
+    return before - state.entities.hunger[state.playerId];
+  }
+
+  function placeOnFlat(state: ReturnType<typeof createGame>): void {
+    const spot = flatOpenSpot(state.world);
+    state.entities.x[state.playerId] = spot.x;
+    state.entities.y[state.playerId] = spot.y;
+    state.entities.z[state.playerId] = state.world.groundHeightAt(spot.x, spot.y);
+  }
+
+  it('quieto, el hambre llena se vacia en un dia de juego', () => {
+    // Se deriva de la duracion del dia: si cambia, el hambre la sigue.
+    expect(HUNGER_DECAY_PER_SEC * DAY_TICKS * TICK_DT).toBeCloseTo(100, 9);
+    const state = createGame(42);
+    runTicks(state, DAY_TICKS - TICK_HZ, intent());
+    // A un segundo del final queda justo un segundo de hambre.
+    expect(state.entities.hunger[state.playerId]).toBeCloseTo(HUNGER_DECAY_PER_SEC, 1);
+    // Y al acabar el dia, nada (con la deriva de 28.800 restas en float32).
+    runTicks(state, TICK_HZ, intent());
+    expect(state.entities.hunger[state.playerId]).toBeLessThan(0.05);
+  });
+
+  it('andando se gasta como quieto', () => {
+    const quieto = lost(42, 30, intent());
+    const andando = lost(42, 30, intent({ moveX: 1 }));
+    expect(andando).toBeCloseTo(quieto, 3);
+  });
+
+  it('corriendo y avanzando se gasta por el factor de la carrera', () => {
+    // 20 ticks a la carrera son 1,4 casillas: caben en la zona despejada.
+    const quieto = lost(42, 20, intent());
+    const corriendo = lost(42, 20, intent({ moveX: 1, run: true }));
+    expect(corriendo / quieto).toBeCloseTo(RUN_MULTIPLIER, 2);
+  });
+
+  it('con la carrera encendida pero quieto se gasta como quieto', () => {
+    const quieto = lost(42, TICK_HZ * 10, intent());
+    const encendida = lost(42, TICK_HZ * 10, intent({ run: true }));
+    expect(encendida).toBeCloseTo(quieto, 5);
+  });
+
+  it('cada salto que despega cuesta un 1 % del hambre', () => {
+    const state = createGame(42);
+    const before = state.entities.hunger[state.playerId];
+    step(state, intent({ jump: true }));
+    const drain = HUNGER_DECAY_PER_SEC * TICK_DT;
+    expect(before - state.entities.hunger[state.playerId]).toBeCloseTo(JUMP_HUNGER + drain, 4);
+    expect(JUMP_HUNGER).toBe(1);
+  });
+
+  it('pulsar saltar en el aire no cobra nada', () => {
+    const state = createGame(42);
+    step(state, intent({ jump: true }));
+    expect(state.entities.grounded[state.playerId]).toBe(0);
+    const before = state.entities.hunger[state.playerId];
+    step(state, intent({ jump: true }));
+    const drain = HUNGER_DECAY_PER_SEC * TICK_DT;
+    expect(before - state.entities.hunger[state.playerId]).toBeCloseTo(drain, 4);
+  });
+
+  it('con la supervivencia congelada, ni correr ni saltar gastan', () => {
+    const state = createGame(42);
+    state.survivalFrozen = true;
+    const before = state.entities.hunger[state.playerId];
+    runTicks(state, TICK_HZ * 3, intent({ moveX: 1, run: true, jump: true }));
+    expect(state.entities.hunger[state.playerId]).toBe(before);
   });
 });
 

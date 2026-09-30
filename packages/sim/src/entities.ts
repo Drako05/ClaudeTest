@@ -35,15 +35,6 @@ export class EntityStore {
   /** 1 si los pies tocan el suelo. En el aire manda la gravedad. */
   readonly grounded: Uint8Array;
   /**
-   * Velocidad horizontal en el instante del despegue.
-   *
-   * Se guarda porque el control en el aire es un **tope de desviacion** sobre
-   * ella, no una velocidad nueva: sin recordar de que impulso se salio no hay
-   * con que medir cuanto se ha desviado.
-   */
-  readonly takeoffVx: Float64Array;
-  readonly takeoffVy: Float64Array;
-  /**
    * Hacia donde mira, en el plano: la ultima direccion no nula de movimiento, o
    * la mirada de la camara si la hay. Es el eje del sector del golpe, y va sin
    * redondear a ocho direcciones.
@@ -66,8 +57,6 @@ export class EntityStore {
     this.z = new Float64Array(capacity);
     this.vz = new Float64Array(capacity);
     this.grounded = new Uint8Array(capacity);
-    this.takeoffVx = new Float64Array(capacity);
-    this.takeoffVy = new Float64Array(capacity);
     this.facingX = new Float32Array(capacity);
     this.facingY = new Float32Array(capacity);
     this.lookZ = new Float32Array(capacity);
@@ -89,8 +78,6 @@ export class EntityStore {
     this.z[id] = 0;
     this.vz[id] = 0;
     this.grounded[id] = 1;
-    this.takeoffVx[id] = 0;
-    this.takeoffVy[id] = 0;
     this.facingX[id] = 0;
     this.facingY[id] = 1;
     this.lookZ[id] = 0;

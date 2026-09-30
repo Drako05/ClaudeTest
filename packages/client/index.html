@@ -978,11 +978,19 @@
             <circle class="track" cx="24" cy="24" r="20" />
             <circle class="fill" id="hungerArc" cx="24" cy="24" r="20" />
           </svg>
-          <!-- Cuchara y tenedor cruzados, como en el boceto. -->
+          <!-- Cuchara y tenedor cruzados, como en el boceto. La cuchara va 3,2 a
+               la izquierda y el tenedor 1,5 a la derecha, para que ninguna cabeza
+               pise el otro trazo (pedido del autor): asi se ve el cuello de la
+               cuchara antes del cruce. Las puas, a 3,2 de eje a eje, dejan una
+               unidad de aire entre ellas con el trazo de 2,2. -->
           <svg class="ringIcon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 20l-8.4-8.4" />
-            <ellipse cx="8.6" cy="8.6" rx="2.8" ry="4.3" transform="rotate(-45 8.6 8.6)" />
-            <path d="M4 20l10-10M12.5 8.5l3 3M12.5 8.5l4-4M14 10l4-4M15.5 11.5l4-4" />
+            <g transform="translate(-3.2 0)">
+              <path d="M20 20l-8.4-8.4" />
+              <ellipse cx="8.6" cy="8.6" rx="2.8" ry="4.3" transform="rotate(-45 8.6 8.6)" />
+            </g>
+            <g transform="translate(1.5 0)">
+              <path d="M4 20l10-10M11.74 7.74l4.52 4.52M11.74 7.74l3.8-3.8M14 10l3.8-3.8M16.26 12.26l3.8-3.8" />
+            </g>
           </svg>
         </div>
         <!-- La barra de la mano: las casillas 1 a 4. -->

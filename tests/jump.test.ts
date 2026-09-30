@@ -19,7 +19,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyIntent, TICK_DT } from '@verdant/shared';
 import {
-  AIR_CONTROL,
   applyVertical,
   createGame,
   EntityKind,
@@ -75,7 +74,7 @@ interface Run {
 
 /**
  * Corre la simulacion del cuerpo unos ticks, con la misma bifurcacion que
- * `tick.ts`: en el suelo se anda, en el aire se corrige.
+ * `tick.ts`: en el suelo y en el aire se anda, con su margen de subida.
  */
 function run(
   world: World,
@@ -239,7 +238,7 @@ describe('Ya no se cambia de nivel andando', () => {
   });
 });
 
-describe('El impulso y el control en el aire', () => {
+describe('En el aire se anda como en el suelo', () => {
   const llano = heightField(() => 0);
 
   it('a paso completo el alcance son unas dos casillas', () => {
@@ -250,11 +249,8 @@ describe('El impulso y el control en el aire', () => {
   });
 
   it('corriendo se llega mas lejos, andando sale el alcance de diseno', () => {
-    // El autor dijo «a paso completo llega a 2 casillas; a paso lento, menos»,
-    // y el paso lento era el joystick a medias. Al pedir la carrera lo sustituyo
-    // por dos velocidades, asi que el impulso conservado se nota ahora entre
-    // ANDAR y CORRER. Lo importante es que su caso sigue saliendo exacto al
-    // andar: el salto de diseno es el de marcha.
+    // El salto de diseno es el de marcha: en el aire se va a la velocidad de
+    // andar, y su caso sale exacto. Corriendo, el aire va a la de correr.
     const andando = run(llano, { x: 0.5, y: 0.5 }, { moveX: 1, jump: true, ticks: HASTA_QUE_CAIGA });
     const corriendo = run(llano, { x: 0.5, y: 0.5 }, {
       moveX: 1,
@@ -269,75 +265,72 @@ describe('El impulso y el control en el aire', () => {
     expect((corriendo.x - 0.5) / (andando.x - 0.5)).toBeCloseTo(RUN_MULTIPLIER, 2);
   });
 
-  it('soltar el mando en el aire no frena: el impulso se conserva', () => {
-    // Deduccion del agente, marcada como tal en `docs/pendiente.md`: el autor
-    // dijo «impulso conservado» y «en el aire, correccion parcial». Tratar «no
-    // pido nada» como «quiero pararme» convertiria soltar el mando en un freno
-    // del 30 %, que es una correccion que nadie ha pedido.
-    const sujeto = run(llano, { x: 0.5, y: 0.5 }, { moveX: 1, jump: true, ticks: HASTA_QUE_CAIGA });
-
+  it('el salto solo empuja hacia arriba: soltar el mando en el aire deja de avanzar', () => {
+    // Decision del autor (2026-09-30): el salto no conserva el impulso del
+    // suelo; en el aire se anda como en el suelo, y sin mando no se avanza.
     const store = new EntityStore(4);
     const id = store.spawn(EntityKind.Player, 0.5, 0.5);
     store.z[id] = 0;
     moveEntity(llano, store, id, 1, 0, TICK_DT);
-    takeOff(store, id);
-    // El tick del despegue cierra con su vertical, igual que en `run`: sin esto
-    // se cuela un paso horizontal de mas y la comparacion mide otra cosa.
+    expect(takeOff(store, id)).toBe(true);
     applyVertical(llano, store, id, TICK_DT);
+    const alDespegar = store.x[id];
     for (let t = 0; t < HASTA_QUE_CAIGA && !store.grounded[id]; t++) {
       moveAirborne(llano, store, id, 0, 0, TICK_DT);
       applyVertical(llano, store, id, TICK_DT);
     }
 
-    expect(store.x[id]).toBeCloseTo(sujeto.x, 6);
+    expect(store.grounded[id]).toBe(1);
+    expect(store.x[id]).toBe(alDespegar);
+    expect(store.vx[id]).toBe(0);
   });
 
-  it('parado se salta en vertical, sin desplazarse apenas', () => {
+  it('en el aire se va a la velocidad de andar o de correr, como en el suelo', () => {
+    for (const running of [false, true]) {
+      const store = new EntityStore(4);
+      const id = store.spawn(EntityKind.Player, 0.5, 0.5);
+      store.z[id] = 0;
+      takeOff(store, id);
+      applyVertical(llano, store, id, TICK_DT);
+      const x0 = store.x[id];
+      moveAirborne(llano, store, id, 1, 0, TICK_DT, running);
+      expect(store.x[id] - x0).toBeCloseTo((running ? WALK_SPEED * RUN_MULTIPLIER : WALK_SPEED) * TICK_DT, 9);
+    }
+  });
+
+  it('parado se salta en vertical, sin desplazarse', () => {
     const out = run(llano, { x: 0.5, y: 0.5 }, { jump: true, ticks: HASTA_QUE_CAIGA });
     expect(Math.abs(out.x - 0.5)).toBeLessThan(1e-9);
     expect(out.peak).toBeGreaterThan(1);
   });
 
-  it('en el aire no se puede dar media vuelta', () => {
-    // Despega hacia el este a paso completo y pide ir al oeste todo el vuelo.
+  it('en el aire se puede dar media vuelta', () => {
+    // Despega hacia el este a paso completo y pide ir al oeste todo el vuelo:
+    // va al oeste a paso completo desde el primer tick en el aire.
     const store = new EntityStore(4);
     const id = store.spawn(EntityKind.Player, 0.5, 0.5);
     store.z[id] = 0;
     moveEntity(llano, store, id, 1, 0, TICK_DT);
     takeOff(store, id);
-
-    const despegue = store.vx[id];
-    let peor = 0;
+    applyVertical(llano, store, id, TICK_DT);
+    const alDespegar = store.x[id];
     for (let t = 0; t < HASTA_QUE_CAIGA && !store.grounded[id]; t++) {
       moveAirborne(llano, store, id, -1, 0, TICK_DT);
       applyVertical(llano, store, id, TICK_DT);
-      const desvio = Math.hypot(store.vx[id] - despegue, store.vy[id]);
-      if (desvio > peor) peor = desvio;
+      expect(store.vx[id]).toBe(-WALK_SPEED);
     }
-
-    // La desviacion nunca pasa del tope acordado...
-    expect(peor).toBeLessThanOrEqual(AIR_CONTROL * WALK_SPEED + 1e-9);
-    // ...y por tanto sigue avanzando hacia el este pese a pedir el oeste.
-    expect(store.vx[id]).toBeGreaterThan(0);
-    expect(store.x[id]).toBeGreaterThan(0.5);
+    expect(store.x[id]).toBeLessThan(alDespegar - 1.5);
   });
 
-  it('desviarse un poco si se puede', () => {
-    const recto = run(llano, { x: 0.5, y: 0.5 }, { moveX: 1, jump: true, ticks: HASTA_QUE_CAIGA });
-    // Despega al este y en el aire pide noreste.
+  it('en el aire no se salta otra vez', () => {
     const store = new EntityStore(4);
     const id = store.spawn(EntityKind.Player, 0.5, 0.5);
     store.z[id] = 0;
-    moveEntity(llano, store, id, 1, 0, TICK_DT);
-    takeOff(store, id);
-    for (let t = 0; t < HASTA_QUE_CAIGA && !store.grounded[id]; t++) {
-      moveAirborne(llano, store, id, 1, -1, TICK_DT);
-      applyVertical(llano, store, id, TICK_DT);
-    }
-
-    expect(store.y[id]).toBeLessThan(0.5);
-    // Pero sin dejar de ser el mismo salto: el alcance apenas cambia.
-    expect(Math.abs(store.x[id] - recto.x)).toBeLessThan(0.6);
+    expect(takeOff(store, id)).toBe(true);
+    applyVertical(llano, store, id, TICK_DT);
+    const vz = store.vz[id];
+    expect(takeOff(store, id)).toBe(false);
+    expect(store.vz[id]).toBe(vz);
   });
 });
 

@@ -48,6 +48,24 @@ describe('Cada dedo elige dueno al nacer', () => {
     expect(g.roleFor(LOOK_SPOT.x, LOOK_SPOT.y, true)).toBe('look');
   });
 
+  it('con la zona medida, el joystick es solo su rincon', () => {
+    // La del movil (2026-09-30): hasta el borde derecho del anillo de salud y
+    // desde abajo hasta la mitad de CORRER. Unas cifras de un 390x844.
+    const g = fresh();
+    g.setStickZone({ right: 182, top: 625 });
+    expect(g.roleFor(100, 800, true)).toBe('stick');
+    expect(g.roleFor(181, 626, true)).toBe('stick');
+    // Justo fuera, a la derecha y por encima: camara, aunque sea el cuadrante
+    // de antes.
+    expect(g.roleFor(183, 800, true)).toBe('look');
+    expect(g.roleFor(100, 624, true)).toBe('look');
+    expect(g.roleFor(STICK_SPOT.x, STICK_SPOT.y, true)).toBe('stick');
+    expect(g.roleFor(150, 500, true)).toBe('look');
+    // Sin medir, el cuadrante de siempre.
+    g.setStickZone(null);
+    expect(g.roleFor(150, 500, true)).toBe('stick');
+  });
+
   it('con raton todo es camara: para andar ya esta el teclado', () => {
     const g = fresh();
     expect(g.roleFor(STICK_SPOT.x, STICK_SPOT.y, false)).toBe('look');

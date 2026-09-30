@@ -61,6 +61,20 @@ export class Controls {
     document.body.classList.add('touch-active');
   }
 
+  /**
+   * La zona del joystick, medida en la pantalla de ahora: hasta el borde
+   * derecho del anillo de salud y desde abajo hasta la mitad de CORRER
+   * (decision del autor, 2026-09-30). Se mide en cada toque, asi que sigue a
+   * cualquier giro o cambio de tamano sin escuchar nada mas. Si alguno no se
+   * ve, `null`, y los gestos vuelven al cuadrante.
+   */
+  private static stickZone(): { right: number; top: number } | null {
+    const ring = document.getElementById('healthRing')?.getBoundingClientRect();
+    const run = document.getElementById('run')?.getBoundingClientRect();
+    if (!ring || !run || ring.width === 0 || run.height === 0) return null;
+    return { right: ring.right, top: run.top + run.height / 2 };
+  }
+
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly stickEl: HTMLElement | null = null,
@@ -163,6 +177,7 @@ export class Controls {
       } catch {
         // Ignorado a proposito: sin captura el gesto sigue funcionando.
       }
+      if (e.pointerType === 'touch') this.gestures.setStickZone(Controls.stickZone());
       this.gestures.down(e.pointerId, e.clientX, e.clientY, e.pointerType === 'touch');
       this.drawStick();
     });

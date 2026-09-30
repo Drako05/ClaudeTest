@@ -12,8 +12,9 @@
  * cambiaba el zoom sin que nadie lo pidiera.
  *
  * La regla, que es la de Genshin y la de casi cualquier tercera persona en
- * movil: **cada dedo elige dueno al nacer y no lo cambia nunca**. El cuadrante
- * inferior izquierdo es del joystick; el resto de la pantalla, de la camara. Y
+ * movil: **cada dedo elige dueno al nacer y no lo cambia nunca**. Un rincon de
+ * abajo a la izquierda es del joystick (`setStickZone`); el resto de la
+ * pantalla, de la camara. Y
  * una pinza solo existe si sus DOS dedos son de la camara.
  *
  * Y un tercer dueno, que no nace en el lienzo: **el dedo del boton de accion**
@@ -92,11 +93,23 @@ export class Gestures {
   }
 
   /**
+   * La zona del joystick, medida de la pantalla por quien la conoce: desde el
+   * borde izquierdo hasta `right` y desde el de abajo hasta `top`. En el movil
+   * es hasta el borde derecho del anillo de salud y la mitad de la altura de
+   * CORRER (decision del autor, 2026-09-30). Sin medir, el cuadrante.
+   */
+  private stickZone: { right: number; top: number } | null = null;
+
+  setStickZone(zone: { right: number; top: number } | null): void {
+    this.stickZone = zone;
+  }
+
+  /**
    * A quien pertenece un toque que nace en `(x, y)`.
    *
-   * El cuadrante inferior izquierdo es el del joystick, y no la mitad izquierda
-   * entera: reservando media pantalla te quedas sin sitio para girar la camara a
-   * ese lado. Arriba a la izquierda sigue siendo camara.
+   * La zona del joystick (`setStickZone`) es un rincon de abajo a la
+   * izquierda: el resto de la pantalla gira la camara. Sin zona medida, el
+   * cuadrante inferior izquierdo, que fue la zona hasta el 2026-09-30.
    *
    * Con raton siempre es camara: para andar ya esta WASD, y un raton no tiene
    * dos punteros con los que pellizcar.
@@ -105,7 +118,8 @@ export class Gestures {
     if (!isTouch) return 'look';
     // Solo un dedo puede llevar el joystick; el segundo en la zona mira.
     if (this.hasStick()) return 'look';
-    return x < this.width / 2 && y > this.height / 2 ? 'stick' : 'look';
+    const zone = this.stickZone ?? { right: this.width / 2, top: this.height / 2 };
+    return x < zone.right && y > zone.top ? 'stick' : 'look';
   }
 
   down(id: number, x: number, y: number, isTouch: boolean): void {

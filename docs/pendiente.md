@@ -31,7 +31,6 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
 | `GRAVITY = 62` y `JUMP_SPEED = 12`, deducidos de tu enunciado del salto | Fase 2 del relieve | dos numeros |
-| Soltar el mando en el aire **conserva** el impulso, no frena | Fase 2 del relieve | un `if` |
 | Los arboles siguen frenando tambien en el aire | Fase 2 del relieve | una linea |
 | **El mundo es empinado**: de cuatro direcciones solo una lleva a alguna parte, y saltando | Fase 2 del relieve | calibracion del relieve (regla 14) |
 | El bonus de equilibrio **no lo cobra lo inerte** (piedra y minerales) | Cabos sueltos | una linea |
@@ -80,6 +79,12 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Los dibujos del **tajo** y la **mirilla**; los anillos de PC de **56 px** y trazo 5 | Ajustes de la tanda 2 | SVG y CSS en `index.html` |
 | La **mochila** redibujada como tu adjunto, casi cuadrada, a **34 px** en el boton (antes 28) | Ajustes de la tanda 2, 2.ª ronda | SVG y CSS en `index.html` |
 | MODO en el movil de **44 px**, a 72 px (en cada eje) del centro del ataque | Ajustes de la tanda 2 | CSS |
+| En el aire, **sin mando no se avanza**: es «como en el suelo» | Ajustes de la tanda 2, 3.ª ronda | una linea en `movement.ts` |
+| Correr gasta mas hambre solo si **de verdad se avanza** en el tick: empujando contra una pared con la carrera encendida se gasta como andando | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
+| El salto cobra su 1 % **al despegar**, no al pulsar: pulsar en el aire no cobra | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
+| Saltar el tiempo (`skipTime`) gasta hambre **como quieto** | Ajustes de la tanda 2, 3.ª ronda | — |
+| Zona del joystick **sin medir** (antes de que aparezcan los botones tactiles): el cuadrante de antes | Ajustes de la tanda 2, 3.ª ronda | una linea en `gestures.ts` |
+| Cubiertos: la cuchara **3,2** a la izquierda y el tenedor **1,5** a la derecha; puas a **3,2** de eje a eje | Ajustes de la tanda 2, 3.ª ronda | SVG en `index.html` |
 | La **estocada** nace en el punto de pantalla **(0,55; −0,55)** —abajo a la derecha, en coordenadas normalizadas— a la **profundidad de los ojos** (al menos 1 delante de la camara) | Ajustes de la tanda 2, 2.ª ronda | `STAB_SCREEN` en `effects.ts` |
 | Anillos del movil de **80 px** (USAR 64, ATAQUE 96), con un **disco oscuro** detras, **hambre primero** como en PC, a 12 px del borde y 10 entre ellos | Ajustes de la tanda 2, 2.ª ronda | CSS en `index.html` |
 | **TAB** tambien enciende el boton MODO de PC; la luz dura lo que el toque y **al menos 150 ms**, como USAR y SALTAR | Ajustes de la tanda 2, 2.ª ronda | una linea en `controls.ts` |
@@ -456,6 +461,29 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Ajustes de la tanda 2, 3.ª ronda — HECHO (2026-09-30)
+
+La CI de la 2.ª ronda (`5b3a3f6`) salio en verde. Lo que pediste:
+- **Cubiertos**: la cuchara corrida a la izquierda y el tenedor a la derecha;
+  ya se ve el cuello de la cuchara antes del cruce, y las puas del tenedor
+  tienen aire entre ellas.
+- **El salto solo empuja hacia arriba.** En el aire se anda como en el suelo,
+  a la velocidad de andar o de correr, y se puede girar o dar media vuelta; sin
+  mando no se avanza. Se retiraron el impulso del despegue y el 30 % de
+  desviacion. Tu caso del salto sigue igual andando (alcance 2, apice 1,16).
+- **La zona del joystick en el movil** es ahora el rincon que va del borde
+  izquierdo al borde derecho del anillo de salud, y de abajo a la mitad de
+  CORRER. Fuera, aunque sea el cuadrante de antes, un dedo gira la camara.
+- **El hambre gasta segun el esfuerzo**:
+  - quieto o andando se vacia en **un dia de juego** (`HUNGER_EMPTY_DAYS = 1`,
+    derivado de `DAY_TICKS`: si el dia cambia, el hambre lo sigue). Hasta ahora
+    se vaciaba en unos 3 minutos; ahora en 8;
+  - corriendo y avanzando, **×1,6**, el mismo factor que la velocidad; con la
+    carrera encendida y quieto, como quieto;
+  - **cada salto, un 1 %** del hambre total.
+
+Lo que decidi yo va arriba, en «Esperando tu juicio».
 
 ## Ajustes de la tanda 2, 2.ª ronda — HECHO (2026-09-30)
 
@@ -942,7 +970,8 @@ corregir**, y debajo lo que aparecio al construirlo.
 
 - **`GRAVITY = 62` y `JUMP_SPEED = 12` siguen siendo deduccion mia.** Salen de tu
   caso, y la tabla de arriba dice exactamente que producen.
-- **Soltar el mando en el aire conserva el impulso, no frena.** Tambien
+- ~~**Soltar el mando en el aire conserva el impulso, no frena.**~~ *Ya no
+  aplica: desde el 2026-09-30 en el aire se anda como en el suelo.* Tambien
   deduccion mia. Dijiste «impulso conservado» y «en el aire, correccion
   parcial»; leer «no pido nada» como «quiero pararme» convertiria soltar el
   mando en un freno del 30 % del alcance, y eso es una correccion que nadie
@@ -981,10 +1010,13 @@ moviendose al norte, se sube al bloque 2 en altura 2; pero al bloque 3 en altura
 no se llega — se estampa contra su cara y aterriza en el bloque 2, altura 1». Eso
 es una parabola simetrica con el **apice a una casilla exacta** y **alcance dos**.
 
-- **Impulso conservado**: a paso completo llega a 2 casillas; a paso lento, menos.
-- **En el aire, correccion parcial**: se puede desviar, no dar media vuelta.
-- **Caer es caer**: salir de un borde describe un arco con la misma gravedad,
-  conservando el impulso. **Sin dano por caida.**
+- ~~**Impulso conservado**: a paso completo llega a 2 casillas; a paso lento, menos.~~
+- ~~**En el aire, correccion parcial**: se puede desviar, no dar media vuelta.~~
+  *Las dos las cambiaste el 2026-09-30: el salto **solo empuja hacia arriba**
+  y en el aire se anda **como en el suelo**, a la velocidad de andar o de
+  correr. Ver «Ajustes de la tanda 2, 3.ª ronda».*
+- **Caer es caer**: salir de un borde describe un arco con la misma gravedad.
+  **Sin dano por caida.**
 - **El agua es muro tambien en el aire.** Un salto que acabe sobre agua choca con
   su borde y cae en la orilla de la que salio. Provisional, dicho por el autor: se
   revisara al ampliar las mecanicas de exploracion.
@@ -1003,7 +1035,7 @@ sector.
 
 | Constante | Valor | Origen |
 |---|---|---|
-| `AIR_CONTROL` | 0.30 | autor («correccion parcial») |
+| ~~`AIR_CONTROL`~~ | ~~0.30~~ | autor; **retirado el 2026-09-30**: en el aire se anda como en el suelo |
 | `JUMP_SPEED` | 12 niveles/s | **deduccion del agente**, ver abajo |
 | `GRAVITY` | 62 niveles/s² | **deduccion del agente**, ver abajo |
 

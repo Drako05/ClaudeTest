@@ -21,7 +21,6 @@
 
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
-import { WALK_SPEED } from './movement.js';
 
 /**
  * Gravedad, en niveles por segundo al cuadrado.
@@ -40,15 +39,6 @@ export const GRAVITY = 62;
 
 /** Impulso vertical del salto, en niveles por segundo. Misma deduccion. */
 export const JUMP_SPEED = 12;
-
-/**
- * Cuanto puede desviarse en el aire, como fraccion de la velocidad de paso.
- *
- * Numero del autor: «en el aire, correccion parcial — se puede desviar, no dar
- * media vuelta». Se implementa como **tope de desviacion** respecto a la
- * velocidad del despegue, que es medible en un test y no una sensacion.
- */
-export const AIR_CONTROL = 0.3;
 
 /**
  * Desnivel que se sube andando. Por encima, hay que saltar.
@@ -72,15 +62,19 @@ export const STEP_UP = 0.5;
 export const SNAP_DOWN = 0.5;
 
 /**
- * Despegue. Conserva el impulso que se llevaba, que es lo que hace que a paso
- * completo se lleguen a 2 casillas y a paso lento, menos.
+ * Despegue. **Solo empuja hacia arriba** (decision del autor, 2026-09-30): lo
+ * horizontal lo sigue poniendo el mando, en el aire como en el suelo
+ * (`moveAirborne`). Hasta entonces conservaba el impulso del suelo y en el aire
+ * solo admitia un 30 % de desviacion.
+ *
+ * Devuelve si ha despegado de verdad: en el aire no se salta, y un salto que no
+ * ocurre no cuesta hambre.
  */
-export function takeOff(store: EntityStore, id: number): void {
-  if (!store.grounded[id]) return;
+export function takeOff(store: EntityStore, id: number): boolean {
+  if (!store.grounded[id]) return false;
   store.grounded[id] = 0;
   store.vz[id] = JUMP_SPEED;
-  store.takeoffVx[id] = store.vx[id];
-  store.takeoffVy[id] = store.vy[id];
+  return true;
 }
 
 /**
@@ -93,7 +87,7 @@ export function takeOff(store: EntityStore, id: number): void {
  * comparacion mirada desde los dos lados: en el aire se aterriza cuando los pies
  * alcanzan el suelo, y en el suelo se cae cuando el suelo se aleja de los pies.
  * **Caer es caer**: salir de un borde no es un estado distinto de saltar, es la
- * misma parabola con `vz = 0` y el impulso que se llevaba.
+ * misma parabola con `vz = 0`.
  */
 export function applyVertical(world: World, store: EntityStore, id: number, dt: number): void {
   // Lo que se pisa, estaciones incluidas: encima de una mesa se esta de pie, y
@@ -106,12 +100,10 @@ export function applyVertical(world: World, store: EntityStore, id: number, dt: 
       store.z[id] = ground;
       return;
     }
-    // Se ha salido por un borde. Sin impulso vertical y con el horizontal
-    // intacto, que es exactamente lo que pidio el autor.
+    // Se ha salido por un borde: se cae sin impulso vertical, y lo horizontal
+    // lo sigue poniendo el mando, como en un salto.
     store.grounded[id] = 0;
     store.vz[id] = 0;
-    store.takeoffVx[id] = store.vx[id];
-    store.takeoffVy[id] = store.vy[id];
   }
 
   // Integracion por el promedio de las dos velocidades. Con aceleracion
@@ -132,26 +124,4 @@ export function applyVertical(world: World, store: EntityStore, id: number, dt: 
     store.vz[id] = 0;
     store.grounded[id] = 1;
   }
-}
-
-/**
- * La velocidad horizontal permitida en el aire.
- *
- * El tope es de **desviacion**, no de velocidad: se parte de la del despegue y
- * se admite alejarse de ella hasta `AIR_CONTROL · WALK_SPEED`. Asi desviarse un
- * poco cuesta lo mismo hacia donde sea, y dar media vuelta es imposible.
- */
-export function airVelocity(
-  takeoffVx: number,
-  takeoffVy: number,
-  wantVx: number,
-  wantVy: number,
-): { x: number; y: number } {
-  const dx = wantVx - takeoffVx;
-  const dy = wantVy - takeoffVy;
-  const drift = Math.hypot(dx, dy);
-  const limit = AIR_CONTROL * WALK_SPEED;
-  if (drift <= limit) return { x: wantVx, y: wantVy };
-  const k = limit / drift;
-  return { x: takeoffVx + dx * k, y: takeoffVy + dy * k };
 }

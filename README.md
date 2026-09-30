@@ -72,7 +72,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 
 | Gesto | Accion |
 |---|---|
-| Pulgar en el cuadrante inferior izquierdo | Joystick flotante: apunta, no dosifica |
+| Pulgar abajo a la izquierda, hasta el anillo de salud y la mitad de CORRER | Joystick flotante: apunta, no dosifica |
 | Un dedo en el resto de la pantalla | Girar la camara |
 | Dos dedos de camara | Zoom; en primera persona, catalejo que vuelve al soltar |
 | Boton ATAQUE | Golpear; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar el golpe |

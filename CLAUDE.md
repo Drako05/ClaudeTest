@@ -537,9 +537,9 @@ marcaba tambien los objetos que el golpe alcanzaba; el autor lo quito.
 
 La congelacion empieza puesta al abrir el panel y solo se aplica con el panel
 abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
-herramientas no sirven para lo que se hicieron: a 64x se pierden unos 35 puntos
-de hambre por segundo real y saltar un dia son 264, asi que el boton mas util del
-panel era el que mataba.
+herramientas no sirven para lo que se hicieron: a 64x se pierden unos 13 puntos
+de hambre por segundo real y saltar un dia vacia el hambre entera, asi que el
+boton mas util del panel era el que mataba.
 
 ## Las features son aspas; el jugador, no
 
@@ -882,7 +882,11 @@ y **los anillos, los mismos elementos**, en la esquina de abajo a la izquierda.
 2026-09-30; antes, una franja de barras): uno al lado del otro, pegados a la
 esquina de abajo a la izquierda y apoyados en el borde de abajo de ATAQUE y
 USAR, de 80 px, entre los dos de tamano. No cogen dedos, porque esa esquina es
-la del joystick. Siempre a la vista y sin rotulos: un corazon y unos cubiertos
+la del joystick. **La zona del joystick** es ese rincon (decision del autor,
+2026-09-30): del borde izquierdo al derecho del anillo de salud, y de abajo a
+la mitad de la altura de CORRER; fuera, un dedo gira la camara. `controls.ts`
+la mide en cada toque y `gestures.ts` decide con ella; sin medir, el
+cuadrante inferior izquierdo de antes. Siempre a la vista y sin rotulos: un corazon y unos cubiertos
 —fueron un muslo de pollo hasta que el autor dibujo cubiertos—. Lo que vive
 abajo (el registro, el panel de desarrollo) se apoya encima con la variable
 CSS `--above-vitals`.
@@ -1013,12 +1017,26 @@ de salientes y la ganancia de cordillera, en cambio, son calibraciones: se elige
 midiendo (regla 14).
 
 El salto, ya implementado: parabola simetrica con el apice **a una casilla
-exacta** y alcance dos, conserva el impulso que se llevaba, admite un 30 % de
-desviacion en el aire, y el agua es muro tambien volando. Medido con la
+exacta** y alcance dos andando, y el agua es muro tambien volando. **El salto
+solo empuja hacia arriba y en el aire se anda como en el suelo** (decision del
+autor, 2026-09-30): a la velocidad de andar o de correr, girando lo que se
+quiera, y sin mando no se avanza. Hasta entonces conservaba el impulso del
+despegue y admitia un 30 % de desviacion. Andar y volar solo se distinguen
+en el margen de subida (regla 21). Medido con la
 integracion exacta: apice 1.160 niveles contra 1.161 en papel, alcance 2.17
 casillas a paso completo, vuelo 0.400 s. `GRAVITY = 62` y `JUMP_SPEED = 12` son
 **deduccion del agente** a partir del caso que describio el autor, no numeros
 suyos: puede corregirlos, y `tests/jump.test.ts` afirma la relacion que los ata.
+
+**El hambre gasta segun el esfuerzo** (decision del autor, 2026-09-30;
+`systems/survival.ts`): quieto o andando se vacia en `HUNGER_EMPTY_DAYS` dias
+de juego —uno—, y el ritmo **se deriva de `DAY_TICKS`**, para que si el dia
+cambia de duracion el hambre lo siga; corriendo y avanzando, por
+`RUN_MULTIPLIER`, el mismo factor que la velocidad, y con la carrera encendida
+pero quieto, como quieto; y cada salto que despega cuesta `JUMP_HUNGER`, un 1 %.
+Lo de «avanzando» se mide en el tick comparando la posicion antes y despues de
+moverse (deduccion mia: empujar contra una pared no es correr). Todo respeta
+`survivalFrozen`, y `skipTime` gasta como quieto.
 
 ## Recoleccion y fabricacion
 

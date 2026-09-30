@@ -19,7 +19,7 @@
 
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
-import { airVelocity, STEP_UP } from './jump.js';
+import { STEP_UP } from './jump.js';
 
 /** Medio ancho del cuerpo del jugador, en tiles. */
 export const BODY_RADIUS = 0.34;
@@ -114,8 +114,7 @@ function slide(
  * Movimiento en el suelo.
  *
  * Deja tambien `vx`/`vy` puestas aunque la posicion la escriba directamente:
- * son el impulso con el que se despega, y es lo que hace que a paso completo un
- * salto llegue a dos casillas y a paso lento, menos.
+ * son la velocidad que se lleva, y quien dibuja o mide la lee de ahi.
  */
 export function moveEntity(
   world: World,
@@ -125,6 +124,42 @@ export function moveEntity(
   moveY: number,
   dt: number,
   running = false,
+): void {
+  walk(world, store, id, moveX, moveY, dt, running, STEP_UP);
+}
+
+/**
+ * Movimiento en el aire: **igual que en el suelo** (decision del autor,
+ * 2026-09-30). El salto solo empuja hacia arriba, y lo horizontal lo pone el
+ * mando a la velocidad de andar o de correr; sin mando no se avanza. Hasta
+ * entonces se conservaba el impulso del despegue y solo se admitia un 30 % de
+ * desviacion.
+ *
+ * Lo unico que cambia es que va **sin margen de subida**, que es lo que
+ * convierte la cara de un bloque en una pared contra la que estamparse: por
+ * debajo de su altura no se entra, y por encima si.
+ */
+export function moveAirborne(
+  world: World,
+  store: EntityStore,
+  id: number,
+  moveX: number,
+  moveY: number,
+  dt: number,
+  running = false,
+): void {
+  walk(world, store, id, moveX, moveY, dt, running, 0);
+}
+
+function walk(
+  world: World,
+  store: EntityStore,
+  id: number,
+  moveX: number,
+  moveY: number,
+  dt: number,
+  running: boolean,
+  margin: number,
 ): void {
   const len = Math.hypot(moveX, moveY);
   if (len <= 1e-6) {
@@ -144,47 +179,5 @@ export function moveEntity(
   store.vx[id] = dirX * speed;
   store.vy[id] = dirY * speed;
 
-  slide(world, store, id, dirX * speed * dt, dirY * speed * dt, STEP_UP);
-}
-
-/**
- * Movimiento en el aire.
- *
- * Ni acelera ni frena: la velocidad es la del despegue mas la desviacion que
- * permita `AIR_CONTROL`. Y **sin margen de subida**, que es lo que convierte la
- * cara de un bloque en una pared contra la que estamparse: por debajo de su
- * altura no se entra, y por encima si.
- */
-export function moveAirborne(
-  world: World,
-  store: EntityStore,
-  id: number,
-  moveX: number,
-  moveY: number,
-  dt: number,
-  running = false,
-): void {
-  const len = Math.hypot(moveX, moveY);
-
-  // Sin mando no hay correccion, y por tanto se conserva el impulso tal cual.
-  // Tratar «nada» como «querer velocidad cero» seria pedir una desviacion hacia
-  // el reposo, y soltar el mando en pleno vuelo frenaria un 30 % el salto. El
-  // autor dijo «impulso conservado»; la correccion es algo que se HACE.
-  let v = { x: store.takeoffVx[id], y: store.takeoffVy[id] };
-  if (len > 1e-6) {
-    const speed = speedOf(running);
-    store.facingX[id] = moveX / len;
-    store.facingY[id] = moveY / len;
-    v = airVelocity(
-      store.takeoffVx[id],
-      store.takeoffVy[id],
-      (moveX / len) * speed,
-      (moveY / len) * speed,
-    );
-  }
-
-  store.vx[id] = v.x;
-  store.vy[id] = v.y;
-
-  slide(world, store, id, v.x * dt, v.y * dt, 0);
+  slide(world, store, id, dirX * speed * dt, dirY * speed * dt, margin);
 }

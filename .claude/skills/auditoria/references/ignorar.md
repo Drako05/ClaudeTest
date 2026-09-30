@@ -27,6 +27,7 @@ Formato (el escaner lo lee):
 
 ## Historia que se cuenta a proposito
 
+- `AIR_CONTROL` — la desviacion en el aire del salto, retirada el 2026-09-30 y tachada en su tabla de numeros. En: `docs/pendiente.md`.
 - `effectLayer` — la capa de pantalla del isometrico, que explica por que el barrido va encima. En: `CLAUDE.md`, `packages/client/src/effects-view.ts`.
 - `fpPitch` — la inclinacion aparte de la primera persona, antes de compartir la mirada. En: `CLAUDE.md`.
 - `levelStep` — la auditoria del 2026-09-29 lo cita como resto retirado. En: `docs/pendiente.md`.

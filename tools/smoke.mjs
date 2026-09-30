@@ -1438,8 +1438,33 @@ async function mobilePass(browser, baseUrl) {
   if (!(await page.isVisible('#proj'))) await page.tap('#others');
   await page.tap('#proj');
 
-  // El joystick, abajo a la izquierda: aparece, mueve y desaparece.
-  const stick = { x: 90, y: 700 };
+  // La zona del joystick (decision del autor, 2026-09-30): desde el borde
+  // izquierdo hasta el derecho del anillo de salud, y desde abajo hasta la
+  // mitad de CORRER. Se mide de la pagina, y fuera de ella —aunque sea el
+  // cuadrante de antes— un dedo gira la camara y no saca el joystick.
+  const zone = await page.evaluate(() => {
+    const ring = document.getElementById('healthRing').getBoundingClientRect();
+    const run = document.getElementById('run').getBoundingClientRect();
+    return { right: ring.right, top: run.top + run.height / 2, w: innerWidth, h: innerHeight };
+  });
+  console.log(`  zona del joystick: x < ${zone.right.toFixed(0)}, y > ${zone.top.toFixed(0)}`);
+  const outside = [
+    { x: zone.right + 6, y: zone.h - 40 },
+    { x: 40, y: zone.top - 6 },
+  ];
+  check(outside.every((p) => p.x < zone.w / 2 && p.y > zone.h / 2),
+    `los puntos de fuera no caen en el cuadrante de antes: ${JSON.stringify(outside)}`);
+  for (const p of outside) {
+    await pointers(page, [{ type: 'pointerdown', id: 1, ...p }]);
+    await pointers(page, [{ type: 'pointermove', id: 1, x: p.x + 26, y: p.y - 26 }]);
+    await page.waitForTimeout(200);
+    const shown = await page.isVisible('#stick.on');
+    await pointers(page, [{ type: 'pointerup', id: 1, x: p.x + 26, y: p.y - 26 }]);
+    check(!shown, `el joystick salio fuera de su zona, en ${p.x.toFixed(0)},${p.y.toFixed(0)}`);
+  }
+
+  // El joystick, dentro de su zona: aparece, mueve y desaparece.
+  const stick = { x: Math.round(zone.right / 2), y: Math.round((zone.top + zone.h) / 2) };
   const beforeStick = await state(page);
   await pointers(page, [{ type: 'pointerdown', id: 1, ...stick }]);
   await pointers(page, [{ type: 'pointermove', id: 1, x: stick.x + 26, y: stick.y - 26 }]);

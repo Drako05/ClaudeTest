@@ -9,9 +9,9 @@
 
 import { CHUNK_SIZE, DAY_TICKS, TICK_DT, type Intent } from '@verdant/shared';
 import { EntityKind, EntityStore } from './entities.js';
-import { moveAirborne, moveEntity } from './systems/movement.js';
+import { moveAirborne, moveEntity, RUN_MULTIPLIER } from './systems/movement.js';
 import { applyVertical, takeOff } from './systems/jump.js';
-import { updateSurvival } from './systems/survival.js';
+import { spendJump, updateSurvival } from './systems/survival.js';
 import {
   craftNear,
   tryHarvestArea,
@@ -153,18 +153,24 @@ export function step(state: GameState, intent: Intent): void {
   world.setNow(state.tick);
 
   if (entities.alive[playerId]) {
-    // Andar y volar son dos leyes distintas, y por eso se bifurca aqui y no
-    // dentro: en el suelo se manda sobre la velocidad, en el aire solo se
-    // corrige la que ya se llevaba. El eje vertical va DESPUES de los dos,
-    // porque la altura del suelo que decide todo es la del sitio al que se ha
-    // llegado, no la del que se salio.
+    // En el suelo y en el aire se anda igual; lo unico que cambia es el margen
+    // de subida, y por eso se bifurca aqui. El eje vertical va DESPUES de los
+    // dos, porque la altura del suelo que decide todo es la del sitio al que se
+    // ha llegado, no la del que se salio.
+    const fromX = entities.x[playerId];
+    const fromY = entities.y[playerId];
+    let jumped = false;
     if (entities.grounded[playerId]) {
       moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT, intent.run);
-      if (intent.jump) takeOff(entities, playerId);
+      if (intent.jump) jumped = takeOff(entities, playerId);
     } else {
       moveAirborne(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT, intent.run);
     }
     applyVertical(world, entities, playerId, TICK_DT);
+    // Correr gasta mas hambre solo si de verdad se avanza: con la carrera
+    // encendida y quieto, o empujando contra una pared, se gasta como andando.
+    const advanced = entities.x[playerId] !== fromX || entities.y[playerId] !== fromY;
+    const effort = intent.run && advanced ? RUN_MULTIPLIER : 1;
 
     // El apuntado manda sobre la mirada que acaba de fijar el movimiento: con
     // raton se mira a donde apunta el cursor aunque se ande en otra direccion.
@@ -211,7 +217,10 @@ export function step(state: GameState, intent: Intent): void {
         placed: (p) => (state.lastPlaced = p),
       });
     }
-    if (!state.survivalFrozen) updateSurvival(entities, playerId, TICK_DT);
+    if (!state.survivalFrozen) {
+      if (jumped) spendJump(entities, playerId);
+      updateSurvival(entities, playerId, TICK_DT, effort);
+    }
   }
 
   streamChunks(state);
