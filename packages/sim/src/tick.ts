@@ -21,6 +21,7 @@ import {
   type HarvestResult,
   type Hit,
   type Opened,
+  type Placed,
   type Used,
 } from './systems/gathering.js';
 import { Inventory } from './inventory.js';
@@ -52,6 +53,11 @@ export interface GameState {
    * panel al verlo (decision del autor: sus recetas solo se ven al usarla).
    */
   lastOpened: Opened | null;
+  /**
+   * La estacion que coloco el ultimo `use`, con la altura a la que la tocaba la
+   * mirada, o `null`. Efimero: el cliente la deja caer desde ahi.
+   */
+  lastPlaced: Placed | null;
   /** Por que el ultimo golpe no hizo algo (inventario lleno, falta pico). Efimero. */
   lastBlocked: Blocked | null;
   /** True si en el ultimo tick se rompio la herramienta de la mano. Efimero. */
@@ -101,6 +107,7 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     lastHits: [],
     lastUsed: null,
     lastOpened: null,
+    lastPlaced: null,
     lastBlocked: null,
     lastBroke: false,
     lastCrafted: -1,
@@ -136,6 +143,7 @@ export function step(state: GameState, intent: Intent): void {
   state.lastHits = [];
   state.lastUsed = null;
   state.lastOpened = null;
+  state.lastPlaced = null;
   state.lastBlocked = null;
   state.lastBroke = false;
   state.lastCrafted = -1;
@@ -183,14 +191,25 @@ export function step(state: GameState, intent: Intent): void {
     }
 
     if (intent.harvest) {
-      const swing = tryHarvestArea(world, entities, playerId, inventory, state.tick, state.work);
+      const swing = tryHarvestArea(
+        world,
+        entities,
+        playerId,
+        inventory,
+        state.tick,
+        state.work,
+        intent.precise,
+      );
       state.lastHarvest = swing.results;
       state.lastHits = swing.hits;
       state.lastBlocked = swing.blocked;
       state.lastBroke = swing.broke;
     }
     if (intent.use) {
-      state.lastUsed = tryUse(world, entities, playerId, inventory, (o) => (state.lastOpened = o));
+      state.lastUsed = tryUse(world, entities, playerId, inventory, {
+        opened: (o) => (state.lastOpened = o),
+        placed: (p) => (state.lastPlaced = p),
+      });
     }
     if (!state.survivalFrozen) updateSurvival(entities, playerId, TICK_DT);
   }

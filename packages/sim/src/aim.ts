@@ -232,27 +232,57 @@ export function gazeTarget(
   lookZ: number,
   ground: Ground,
   boxAt: (tx: number, ty: number) => Hitbox | null,
-): Offset | null {
+): (Offset & { t: number }) | null {
   const dir = lookVector(fx, fy, lookZ);
   const hit = groundHit(origin, dir, STRIKE_RANGE, ground);
   const length = hit ? hit.t : STRIKE_RANGE;
   const reach = Math.ceil(STRIKE_RANGE) + 1;
   const cx = Math.floor(origin.x);
   const cy = Math.floor(origin.y);
-  let best: Offset | null = null;
-  let bestT = Infinity;
+  let best: (Offset & { t: number }) | null = null;
   for (let ty = cy - reach; ty <= cy + reach; ty++) {
     for (let tx = cx - reach; tx <= cx + reach; tx++) {
       const box = boxAt(tx, ty);
       if (!box) continue;
       const t = rayBox(origin, dir, box, length);
-      if (t !== null && t < bestT) {
-        bestT = t;
-        best = { x: tx, y: ty };
-      }
+      if (t !== null && (best === null || t < best.t)) best = { x: tx, y: ty, t };
     }
   }
   return best;
+}
+
+/**
+ * Donde toca la mirada el terreno, a menos del alcance en horizontal (el de
+ * sembrar): la casilla, el punto, y si es la **cara de arriba** o un
+ * **costado**. En un costado, `front` es la casilla de este lado de la pared,
+ * donde se pone lo que se coloca mirandola (decision del autor, 2026-09-30:
+ * aparece junto a la pared y cae al suelo). `null` si no llega o mira al cielo.
+ */
+export interface Surface {
+  /** La casilla del terreno tocado: la de arriba, o la de la pared. */
+  tile: Offset;
+  /** La casilla de delante de la pared; en la cara de arriba, la misma. */
+  front: Offset;
+  /** El punto tocado. */
+  point: Vec3;
+  top: boolean;
+}
+
+export function aimSurface(origin: Vec3, fx: number, fy: number, lookZ: number, ground: Ground): Surface | null {
+  const dir = lookVector(fx, fy, lookZ);
+  const flat = Math.hypot(dir.x, dir.y);
+  const hit = groundHit(origin, dir, Math.min(STRIKE_RANGE / Math.max(flat, 1e-3), 8), ground);
+  if (!hit) return null;
+  // Un pelo mas alla de la entrada cae dentro de lo tocado; un pelo antes, en la
+  // casilla de este lado.
+  const at = (t: number): Offset => ({
+    x: Math.floor(origin.x + dir.x * t),
+    y: Math.floor(origin.y + dir.y * t),
+  });
+  const point = { x: origin.x + dir.x * hit.t, y: origin.y + dir.y * hit.t, z: origin.z + dir.z * hit.t };
+  const tile = at(hit.t + 1e-6);
+  if (hit.top) return { tile, front: tile, point, top: true };
+  return { tile, front: at(Math.max(0, hit.t - 1e-6)), point, top: false };
 }
 
 /**

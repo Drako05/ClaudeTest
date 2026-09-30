@@ -30,6 +30,7 @@ import {
   LIFE_STEP_TICKS,
   lifeSlot,
   LifeKind,
+  stationHeight,
   lifeKindOf,
   LIVING_BIOMES,
   LIVING_KINDS,
@@ -307,6 +308,15 @@ export class World {
     const tx = Math.floor(wx);
     const ty = Math.floor(wy);
     return groundHeight(this.levelAt(tx, ty), this.rampDirAt(tx, ty), wx - tx, wy - ty);
+  }
+
+  /**
+   * Lo que se pisa en un punto: el suelo y, encima, la estacion que haya en su
+   * casilla. Es la vara del cuerpo —chocar (regla 21), caer y aterrizar—; el
+   * terreno que se dibuja, el golpe y sembrar siguen con `groundHeightAt`.
+   */
+  floorHeightAt(wx: number, wy: number): number {
+    return this.groundHeightAt(wx, wy) + stationHeight(this.featureAt(Math.floor(wx), Math.floor(wy)));
   }
 
   /** Lo que hay realmente en un tile. Unica fuente de verdad. */

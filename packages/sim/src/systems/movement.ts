@@ -82,7 +82,9 @@ function collides(world: World, cx: number, cy: number): boolean {
  */
 function blocked(world: World, cx: number, cy: number, feet: number, margin: number): boolean {
   if (collides(world, cx, cy)) return true;
-  return world.groundHeightAt(cx, cy) > feet + margin;
+  // El suelo con sus estaciones: una mesa estorba de lado como una pared de un
+  // bloque y se sube saltando (decision del autor, 2026-09-30).
+  return world.floorHeightAt(cx, cy) > feet + margin;
 }
 
 /**

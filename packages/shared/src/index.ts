@@ -234,15 +234,33 @@ export function isTerrainSolid(t: Terrain): boolean {
   return t === Terrain.DeepWater || t === Terrain.Water;
 }
 
-/** Features que bloquean el paso. Los brotes no estorban: aun son pequenos. */
+/**
+ * Features que bloquean el paso de arriba abajo. Los brotes no estorban: aun
+ * son pequenos. Las estaciones tampoco estan aqui: no son un muro sino suelo
+ * que se pisa (`stationHeight`), y estorban de lado por la regla 21, como una
+ * pared de terreno.
+ */
 export function isFeatureSolid(f: Feature): boolean {
   if (isSapling(f) || f === Feature.Pebbles) return false;
-  return isInert(f) || isStation(f) || lifeKindOf(f) === LifeKind.Tree;
+  return isInert(f) || lifeKindOf(f) === LifeKind.Tree;
 }
 
 /** True si es una estacion de fabricacion puesta por el jugador. */
 export function isStation(f: Feature): boolean {
   return f === Feature.Workbench || f === Feature.Furnace;
+}
+
+/**
+ * Lo que mide de alto una estacion, o 0 si no lo es. **Es suelo que se pisa**
+ * (decision del autor, 2026-09-30: fisica como un bloque, se choca de lado y se
+ * sube encima), asi que entra en `World.floorHeightAt`. El horno mide mas que el
+ * salto a proposito: «que haya bloques de diferente altura sera una de las
+ * caracteristicas del juego». Las medidas son propuesta mia.
+ */
+export function stationHeight(f: Feature): number {
+  if (f === Feature.Workbench) return 1;
+  if (f === Feature.Furnace) return 1.25;
+  return 0;
 }
 
 export enum Resource {
@@ -711,6 +729,13 @@ export interface Intent {
    */
   run: boolean;
   /**
+   * Golpe en **modo preciso**: solo el primer objetivo del centro de la mira.
+   * Apagado, el barrido de siempre (regla 12). Es un ESTADO, como `run`: viaja
+   * puesto cada tick mientras el modo este elegido (decision del autor,
+   * 2026-09-30: TAB o el boton MODO).
+   */
+  precise: boolean;
+  /**
    * Direccion a la que se quiere mirar, independiente de hacia donde se anda.
    *
    * En (0,0) no hay apuntado y la mirada sigue al movimiento, que es como se
@@ -750,6 +775,7 @@ export function emptyIntent(): Intent {
     use: false,
     jump: false,
     run: false,
+    precise: false,
     aimX: 0,
     aimY: 0,
     aimZ: 0,

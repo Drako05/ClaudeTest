@@ -25,9 +25,9 @@ export class EntityStore {
   /**
    * Altura de los pies, en NIVELES, con decimales.
    *
-   * La misma vara que `World.groundHeightAt`, y a proposito: pisar suelo es
-   * exactamente `z === groundHeightAt(x, y)`, sin conversiones ni casos
-   * especiales para los taludes.
+   * La misma vara que `World.floorHeightAt`, y a proposito: pisar suelo es
+   * exactamente `z === floorHeightAt(x, y)` —el terreno y, encima, la estacion
+   * de esa casilla—, sin conversiones ni casos especiales para los taludes.
    */
   readonly z: Float64Array;
   /** Velocidad vertical, en niveles por segundo. */

@@ -79,16 +79,55 @@ describe('Colocar una estacion', () => {
     expect(state.inventory.count(Resource.Workbench)).toBe(0);
   });
 
-  it('estorba el paso', () => {
-    expect(isFeatureSolid(Feature.Workbench)).toBe(true);
-    expect(isFeatureSolid(Feature.Furnace)).toBe(true);
+  it('estorba de lado, como una pared de su altura', () => {
+    // No es un muro de arriba abajo: es suelo que se pisa (decision del autor,
+    // 2026-09-30), y de lado estorba por la regla 21.
+    expect(isFeatureSolid(Feature.Workbench)).toBe(false);
+    expect(isFeatureSolid(Feature.Furnace)).toBe(false);
     const { state, tx, ty } = atSpawn();
     placeWorkbench(state);
     const id = state.playerId;
     for (let i = 0; i < 60; i++) act(state, { moveX: 1 });
-    // El cuerpo se para contra la cara de la mesa, sin entrar en su casilla.
+    // Los pies se paran en el borde de la mesa, sin entrar en su casilla.
     expect(state.entities.x[id]).toBeLessThan(tx + 1);
+    expect(state.entities.x[id]).toBeGreaterThan(tx + 0.9);
     expect(Math.floor(state.entities.y[id])).toBe(ty);
+    expect(state.entities.z[id]).toBeCloseTo(state.world.groundHeightAt(tx + 0.5, ty + 0.5));
+  });
+
+  it('a la mesa se sube de un salto y se esta de pie encima', () => {
+    const { state, tx, ty } = atSpawn();
+    placeWorkbench(state);
+    const id = state.playerId;
+    const ground = state.world.groundHeightAt(tx + 0.5, ty + 0.5);
+    // Pegado a su borde, salto en el sitio y, en el aire, un poco hacia ella:
+    // a paso completo el salto pasaria por encima y caeria al otro lado.
+    for (let i = 0; i < 20; i++) act(state, { moveX: 1 });
+    act(state, { jump: true });
+    for (let i = 0; i < 12; i++) act(state, { moveX: 1 });
+    for (let i = 0; i < 40; i++) act(state, {});
+    expect(Math.floor(state.entities.x[id])).toBe(tx + 1);
+    expect(state.entities.grounded[id]).toBe(1);
+    expect(state.entities.z[id]).toBeCloseTo(ground + 1);
+
+    // Y si se desmonta la mesa que se pisa, se cae al suelo.
+    state.world.setFeature(tx + 1, ty, Feature.None);
+    for (let i = 0; i < 60; i++) act(state, {});
+    expect(state.entities.z[id]).toBeCloseTo(ground);
+  });
+
+  it('al horno no se sube desde su mismo nivel: mide 1,25 y el salto llega a 1,16', () => {
+    const { state, tx, ty } = atSpawn();
+    state.inventory.add(Resource.Furnace, 1);
+    use(state, 1, 0, 60);
+    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.Furnace);
+    const id = state.playerId;
+    for (let i = 0; i < 20; i++) act(state, { moveX: 1 });
+    for (let k = 0; k < 5; k++) {
+      act(state, { moveX: 1, jump: true });
+      for (let i = 0; i < 40; i++) act(state, { moveX: 1 });
+    }
+    expect(state.entities.x[id]).toBeLessThan(tx + 1);
   });
 
   it('no se coloca en una casilla ocupada ni sobre el propio cuerpo', () => {
@@ -104,6 +143,40 @@ describe('Colocar una estacion', () => {
     use(state, 1, 0, 89);
     expect(state.world.featureAt(tx, ty)).toBe(Feature.None);
     expect(state.inventory.count(Resource.Workbench)).toBe(1);
+  });
+
+  it('mirando a una pared, aparece delante de ella y se posa en su suelo', () => {
+    // Un llano de dos casillas al pie de una pared de dos o mas bloques, hacia +x.
+    for (const seed of [12345, 999, 4242, 31337, 7]) {
+      const state = createGame(seed);
+      const w = state.world;
+      const id = state.playerId;
+      const sx = Math.floor(state.entities.x[id]);
+      const sy = Math.floor(state.entities.y[id]);
+      for (let dy = -30; dy <= 30; dy++) {
+        for (let dx = -30; dx <= 30; dx++) {
+          const x = sx + dx;
+          const y = sy + dy;
+          const level = w.levelAt(x, y);
+          if (level < 0 || w.levelAt(x + 1, y) !== level || w.levelAt(x + 2, y) < level + 2) continue;
+          if (w.rampDirAt(x, y) >= 0 || w.rampDirAt(x + 1, y) >= 0) continue;
+          w.setFeature(x, y, Feature.None);
+          w.setFeature(x + 1, y, Feature.None);
+          state.entities.x[id] = x + 0.5;
+          state.entities.y[id] = y + 0.5;
+          state.entities.z[id] = w.groundHeightAt(x + 0.5, y + 0.5);
+          state.inventory.add(Resource.Workbench, 1);
+          // Mirando casi de frente: la mirada toca la pared, no el suelo.
+          use(state, 1, 0, 5);
+          expect(state.lastUsed).toBe('placed');
+          expect(w.featureAt(x + 1, y)).toBe(Feature.Workbench);
+          // La mirada la toco en alto, y el cliente la deja caer desde ahi.
+          expect(state.lastPlaced!.z).toBeGreaterThan(w.groundHeightAt(x + 1.5, y + 0.5) + 0.5);
+          return;
+        }
+      }
+    }
+    throw new Error('ninguna semilla tiene una pared de dos bloques cerca del nacimiento');
   });
 
   it('no se coloca en el agua', () => {

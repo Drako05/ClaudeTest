@@ -596,7 +596,7 @@ function frame(now: number): void {
     if (pisabaAntes && !state.entities.grounded[state.playerId] && intent.jump) jumps++;
     const gap =
       state.entities.z[state.playerId] -
-      state.world.groundHeightAt(state.entities.x[state.playerId], state.entities.y[state.playerId]);
+      state.world.floorHeightAt(state.entities.x[state.playerId], state.entities.y[state.playerId]);
     if (gap > airPeak) airPeak = gap;
     if (accionando) {
       // El barrido recorre el BORDE CURVO DEL AREA REAL del golpe, pedido del

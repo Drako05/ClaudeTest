@@ -96,7 +96,9 @@ export function takeOff(store: EntityStore, id: number): void {
  * misma parabola con `vz = 0` y el impulso que se llevaba.
  */
 export function applyVertical(world: World, store: EntityStore, id: number, dt: number): void {
-  const ground = world.groundHeightAt(store.x[id], store.y[id]);
+  // Lo que se pisa, estaciones incluidas: encima de una mesa se esta de pie, y
+  // si se desmonta, se cae.
+  const ground = world.floorHeightAt(store.x[id], store.y[id]);
 
   if (store.grounded[id]) {
     if (store.z[id] <= ground + SNAP_DOWN) {

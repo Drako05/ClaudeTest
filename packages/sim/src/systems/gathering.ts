@@ -28,6 +28,7 @@ import {
   seedFor,
   speciesFor,
   Station,
+  stationHeight,
   stationOfFeature,
   TICK_HZ,
   ToolKind,
@@ -35,6 +36,7 @@ import {
   workOf,
 } from '@verdant/shared';
 import {
+  aimSurface,
   EYE_HEIGHT,
   gazeTarget,
   plantTile,
@@ -147,12 +149,12 @@ const SAPLING_BOX = { half: 0.15, height: 0.85 };
  */
 const PEBBLES_BOX = { half: 0.3, height: 0.2 };
 /**
- * Las estaciones ocupan su casilla entera: la mesa, un bloque; el horno, un
- * cuarto mas alto. **Propuesta mia**, y es tambien lo que se dibuja.
+ * Las estaciones ocupan su casilla entera, con el alto de `stationHeight`: lo
+ * que se pisa, lo que se golpea y lo que se dibuja son el mismo numero.
  */
 export const STATION_BOXES: Readonly<Record<Station.Workbench | Station.Furnace, { half: number; height: number }>> = {
-  [Station.Workbench]: { half: 0.5, height: 1 },
-  [Station.Furnace]: { half: 0.5, height: 1.25 },
+  [Station.Workbench]: { half: 0.5, height: stationHeight(Feature.Workbench) },
+  [Station.Furnace]: { half: 0.5, height: stationHeight(Feature.Furnace) },
 };
 
 /**
@@ -219,6 +221,29 @@ export function actionReach(world: World, store: EntityStore, id: number): Offse
 }
 
 /**
+ * El golpe en **modo preciso** (decision del autor, 2026-09-30): solo el primer
+ * objetivo que cruza el centro de la mira, cortado por el terreno y a menos del
+ * alcance; ninguno si el terreno esta antes. Con su distancia desde los ojos,
+ * que es donde acaba la estocada que lo dibuja.
+ */
+export function preciseTarget(world: World, store: EntityStore, id: number): (Offset & { t: number }) | null {
+  return gazeTarget(
+    eyeOf(store, id),
+    store.facingX[id],
+    store.facingY[id],
+    store.lookZ[id],
+    (x, y) => world.groundHeightAt(x, y),
+    (tx, ty) => hitboxAt(world, tx, ty),
+  );
+}
+
+/** Las casillas que alcanza el golpe preciso: una o ninguna. */
+export function preciseReach(world: World, store: EntityStore, id: number): Offset[] {
+  const t = preciseTarget(world, store, id);
+  return t ? [{ x: t.x, y: t.y }] : [];
+}
+
+/**
  * Donde se siembra: la casilla en que la mirada toca la cara de arriba del
  * suelo, a menos del alcance, o `null`. Decision del autor.
  */
@@ -272,13 +297,14 @@ export function tryHarvestArea(
   inventory: Inventory,
   tick: number,
   work: WorkState,
+  precise = false,
 ): Swing {
   const swing: Swing = { results: [], hits: [], blocked: null, broke: false };
   const held = inventory.held();
   const stats = held === null ? null : toolStats(held);
   let useful = false;
 
-  for (const { x, y } of actionReach(world, store, id)) {
+  for (const { x, y } of precise ? preciseReach(world, store, id) : actionReach(world, store, id)) {
     const feature = world.featureAt(x, y);
     const need = workOf(feature);
     if (!need) continue;
@@ -464,17 +490,27 @@ export interface Opened {
 }
 
 /**
+ * La estacion que se acaba de colocar: su casilla y la altura a la que la tocaba
+ * la mirada. Contra una pared es mas alta que su suelo, y el cliente la deja
+ * caer desde ahi (decision del autor: todo tiene gravedad).
+ */
+export interface Placed {
+  x: number;
+  y: number;
+  z: number;
+}
+
+/** Lo que dejo un `use` ademas de su resultado. */
+export interface UseOut {
+  opened?: (o: Opened) => void;
+  placed?: (p: Placed) => void;
+}
+
+/**
  * Lo que mira el centro de la mirada, si es una estacion: su casilla, o `null`.
  */
 export function stationInSight(world: World, store: EntityStore, id: number): Opened | null {
-  const at = gazeTarget(
-    eyeOf(store, id),
-    store.facingX[id],
-    store.facingY[id],
-    store.lookZ[id],
-    (x, y) => world.groundHeightAt(x, y),
-    (tx, ty) => hitboxAt(world, tx, ty),
-  );
+  const at = preciseTarget(world, store, id);
   if (!at) return null;
   const station = stationOfFeature(world.featureAt(at.x, at.y));
   return station === null ? null : { station, x: at.x, y: at.y };
@@ -494,11 +530,11 @@ export function tryUse(
   store: EntityStore,
   id: number,
   inventory: Inventory,
-  opened?: (o: Opened) => void,
+  out: UseOut = {},
 ): Used | null {
   const sight = stationInSight(world, store, id);
   if (sight) {
-    opened?.(sight);
+    out.opened?.(sight);
     return 'opened';
   }
   const item = inventory.inHand();
@@ -507,29 +543,49 @@ export function tryUse(
     return tryPlant(world, store, id, inventory, item) ? 'planted' : null;
   }
   if (item !== null && placedFeatureOf(item) !== Feature.None) {
-    return tryPlace(world, store, id, inventory) ? 'placed' : null;
+    const placed = tryPlace(world, store, id, inventory);
+    if (placed) out.placed?.(placed);
+    return placed ? 'placed' : null;
   }
   return null;
 }
 
 /**
- * Coloca la estacion de la mano donde la mirada toca el suelo, a menos del
- * alcance, como una semilla (decision del autor). Hace falta una casilla
- * vacia, sin agua, **sin talud** —una caja sobre una rampa quedaria colgando
- * por un lado— y que no pise el cuerpo del jugador, que se quedaria dentro de
- * algo que estorba (las dos, propuesta mia).
+ * Donde se colocaria algo: la casilla en que la mirada toca el suelo, o, si
+ * toca un costado del terreno, **la de delante de esa pared** (decision del
+ * autor, 2026-09-30: aparece junto a la pared y cae hasta el suelo). A menos
+ * del alcance en horizontal, como sembrar.
  */
-export function tryPlace(world: World, store: EntityStore, id: number, inventory: Inventory): boolean {
+export function placeTarget(world: World, store: EntityStore, id: number): Placed | null {
+  const surface = aimSurface(
+    eyeOf(store, id),
+    store.facingX[id],
+    store.facingY[id],
+    store.lookZ[id],
+    (x, y) => world.groundHeightAt(x, y),
+  );
+  if (!surface) return null;
+  return { x: surface.front.x, y: surface.front.y, z: surface.point.z };
+}
+
+/**
+ * Coloca la estacion de la mano donde la mirada toca el suelo, o delante de la
+ * pared que mira, a menos del alcance (decisiones del autor). Hace falta una
+ * casilla vacia, sin agua, **sin talud** —una caja sobre una rampa quedaria
+ * colgando por un lado— y que no pise el cuerpo del jugador, que quedaria
+ * dentro de ella (las dos, propuesta mia). Devuelve donde, o `null`.
+ */
+export function tryPlace(world: World, store: EntityStore, id: number, inventory: Inventory): Placed | null {
   const item = inventory.inHand();
-  if (item === null) return false;
+  if (item === null) return null;
   const feature = placedFeatureOf(item);
-  if (feature === Feature.None) return false;
-  const at = targetTile(world, store, id);
-  if (!at) return false;
+  if (feature === Feature.None) return null;
+  const at = placeTarget(world, store, id);
+  if (!at) return null;
   const { x, y } = at;
-  if (world.featureAt(x, y) !== Feature.None) return false;
-  if (isTerrainSolid(world.terrainAt(x, y))) return false;
-  if (world.rampDirAt(x, y) !== NO_RAMP) return false;
+  if (world.featureAt(x, y) !== Feature.None) return null;
+  if (isTerrainSolid(world.terrainAt(x, y))) return null;
+  if (world.rampDirAt(x, y) !== NO_RAMP) return null;
   const px = store.x[id];
   const py = store.y[id];
   const touches =
@@ -537,10 +593,10 @@ export function tryPlace(world: World, store: EntityStore, id: number, inventory
     x <= Math.floor(px + BODY_RADIUS) &&
     y >= Math.floor(py - BODY_RADIUS) &&
     y <= Math.floor(py + BODY_RADIUS);
-  if (touches) return false;
+  if (touches) return null;
   inventory.spendInHand();
   world.setFeature(x, y, feature);
-  return true;
+  return { x, y, z: Math.max(at.z, world.groundHeightAt(x + 0.5, y + 0.5)) };
 }
 
 /** `tryCraft` con las estaciones que hay alrededor de la entidad. */

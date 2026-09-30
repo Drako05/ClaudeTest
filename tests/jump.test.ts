@@ -41,20 +41,24 @@ import {
  * Un mundo de alturas escrito a mano.
  *
  * Solo implementa lo que miran el movimiento y la vertical: la altura del suelo
- * y si un tile es solido. Se pasa como `World` porque es todo lo que necesitan;
- * si algun dia miran algo mas, esto dejara de compilar y sera el aviso.
+ * —sin estaciones, asi que lo que se pisa es el terreno— y si un tile es
+ * solido. Se pasa como `World` a la fuerza, asi que si algun dia miran algo
+ * mas NO dejara de compilar: fallara en ejecucion diciendo que falta, que es
+ * como aviso cuando las estaciones pasaron a ser suelo (`floorHeightAt`).
  */
 function heightField(
   levelAt: (x: number, y: number) => number,
   rampAt: (x: number, y: number) => number = () => -1,
 ): World {
+  const groundHeightAt = (wx: number, wy: number) => {
+    const tx = Math.floor(wx);
+    const ty = Math.floor(wy);
+    return groundHeight(levelAt(tx, ty), rampAt(tx, ty), wx - tx, wy - ty);
+  };
   return {
     levelAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)),
-    groundHeightAt(wx: number, wy: number) {
-      const tx = Math.floor(wx);
-      const ty = Math.floor(wy);
-      return groundHeight(levelAt(tx, ty), rampAt(tx, ty), wx - tx, wy - ty);
-    },
+    groundHeightAt,
+    floorHeightAt: groundHeightAt,
     // Solo el agua detiene el paso (regla 9), y el agua es nivel negativo.
     isSolidAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)) < 0,
   } as unknown as World;
