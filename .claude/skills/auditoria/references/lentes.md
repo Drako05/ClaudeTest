@@ -47,6 +47,9 @@ que nadie toco es justo lo que ninguna tanda mira.
   modo que «no se ve» pasa siempre (#2).
 - Sondear una lista efimera (efectos vivos) en vez de un acumulador de
   dibujados: pasa o falla por suerte (#7).
+- **Mirar efimeros en una ventana de tiempo** (#13): que destellos o
+  efectos hubo en 800 ms depende de la maquina, se cuente lo que se cuente.
+  El juego anota lo que hizo en un acumulador y la prueba espera a que llegue.
 - Umbrales de tiempo pegados a un limite de la plataforma: el toque largo de
   Chrome es 500 ms, y una prueba de «toque corto» de 500 ms cae a suertes (#8).
 - Medir con el reloj del headless lo que depende del ritmo de fotogramas: a

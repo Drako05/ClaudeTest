@@ -103,12 +103,12 @@ Las herramientas se gastan y se rompen, y el inventario son dieciseis casillas
 con pilas de cien. Al golpear algo que no se rompe saltan esquirlas pequenas, y
 lo que entra o sale del inventario se anota en letra pequena («+5 Madera»).
 
-**En los dos:** la salud (corazon) y el hambre (cubiertos) van siempre abajo. En
-PC, como anillos que se vacian en sentido horario a los dos lados de la barra
-de la mano, con MODO a la izquierda e INVENTARIO a la derecha; el **HUD**
+**En los dos:** la salud (corazon) y el hambre (cubiertos) van siempre abajo,
+como anillos que se vacian en sentido horario. En PC, a los dos lados de la
+barra de la mano, con MODO a la izquierda e INVENTARIO a la derecha; el **HUD**
 (hora, dia, semilla, posicion, FPS y los controles) arriba a la izquierda y el
-**panel del entorno** (la hoja) bajo el ojo. En el movil, barras, y el HUD, el
-entorno y el ojo viven en OTROS. Los paneles arrancan cerrados, y con el
+**panel del entorno** (la hoja) bajo el ojo. En el movil, uno al lado del otro en la
+esquina de abajo a la izquierda, y el HUD, el entorno y el ojo viven en OTROS. Los paneles arrancan cerrados, y con el
 inventario abierto solo se anda.
 
 Las **estaciones** son fisicas como un bloque: se chocan de lado y se sube

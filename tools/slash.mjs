@@ -190,12 +190,13 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
     await page.waitForTimeout(600);
   }
   if (view === 'camara baja') {
-    // Arrastrar hacia arriba baja la elevacion, que es lo que aplastaba la
-    // cinta cuando se ensanchaba en el plano del suelo.
-    await drag(0, 320);
+    // Arrastrar hacia arriba sube la mirada y baja la camara por detras (desde
+    // el 2026-09-30 el dedo lleva la mirada tambien en las orbitales), que es lo
+    // que aplastaba la cinta cuando se ensanchaba en el plano del suelo.
+    await drag(0, -320);
   }
   if (view === 'de cerca, girando') {
-    await drag(0, -320);
+    await drag(0, 320);
     // Acercarse estrecha el encuadre ortografico —la semialtura es la mitad de
     // la distancia—, y girar mueve de sitio el punto donde se dio el PRIMER
     // golpe. Las dos cosas juntas son lo que hace caer una esfera envolvente
@@ -252,6 +253,26 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
 
   results.push({ view, pitch, noise, lit: worst, sent, gathered });
 }
+
+// La estocada del modo preciso (TAB), en primera persona: nace abajo a la
+// derecha de la pantalla y va a la mira (pedido del autor, 2026-09-30). Por la
+// linea de la mirada se veia de punta: un punto en el centro. Se cuenta en el
+// cuadrante de abajo a la derecha sin el centro ni los botones, asi que la de
+// antes daria cero aqui.
+const STAB_BOX = { x0: 700, y0: 400, x1: 1040, y1: 560 };
+await page.keyboard.press('Tab');
+await page.waitForTimeout(300);
+const stabRef = decodePng(await page.screenshot());
+const stabNoise = (await sample(stabRef, 2, STAB_BOX)).max;
+const stabBefore = await page.evaluate(() => window.__verdant);
+await page.hover('#action');
+await page.mouse.down();
+await page.waitForTimeout(300);
+const stabbing = await sample(stabRef, 8, STAB_BOX);
+await page.mouse.up();
+await writeFile(new URL('../screenshots/estocada.png', import.meta.url), stabbing.best);
+const stabAfter = await page.evaluate(() => window.__verdant);
+console.log(`estocada (preciso ${stabAfter.precise}): ${stabbing.max} pixeles aclarados abajo a la derecha, ruido ${stabNoise}, ${stabAfter.slashesDrawn - stabBefore.slashesDrawn} mandadas`);
 
 console.log('');
 console.log('vista               elevacion  ruido  pixeles aclarados  barridos mandados  recogido');

@@ -85,10 +85,6 @@ const KINDS: readonly LifeKind[] = [LifeKind.Tree, LifeKind.Plant, LifeKind.Anim
 
 export class Hud {
   private readonly el = {
-    healthBar: byId('healthBar'),
-    healthFill: byId('healthFill'),
-    hungerBar: byId('hungerBar'),
-    hungerFill: byId('hungerFill'),
     healthRing: byId('healthRing'),
     healthArc: byId('healthArc'),
     hungerRing: byId('hungerRing'),
@@ -162,14 +158,10 @@ export class Hud {
     this.lastFps = fps;
     this.lastDraw = draw;
 
-    // Las barras, siempre: son lo unico que no se puede ocultar.
+    // Los anillos de salud y hambre, siempre: son lo unico que no se puede
+    // ocultar. Los mismos en PC y en el movil (`ring.ts`).
     const health = Math.max(0, entities.health[playerId]);
     const hunger = Math.max(0, entities.hunger[playerId]);
-    el.healthFill.style.width = `${health}%`;
-    el.healthBar.setAttribute('aria-valuenow', String(Math.ceil(health)));
-    el.hungerFill.style.width = `${hunger}%`;
-    el.hungerBar.setAttribute('aria-valuenow', String(Math.ceil(hunger)));
-    // Y los anillos de PC, que son las mismas dos cifras (`ring.ts`).
     for (const [ring, arc, value] of [
       [el.healthRing, el.healthArc, health],
       [el.hungerRing, el.hungerArc, hunger],

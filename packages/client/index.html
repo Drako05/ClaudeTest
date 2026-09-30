@@ -138,10 +138,20 @@
       #jump { bottom: calc(10px + var(--atk) + 12px + env(safe-area-inset-bottom)); }
       #run { bottom: calc(10px + var(--atk) + 12px + var(--side) + 10px + env(safe-area-inset-bottom)); }
       #run b, #jump b { font-size: 26px; }
-      /* La franja de salud y hambre va abajo a la izquierda, hasta USAR. */
-      body.touch-active #vitals {
-        right: calc(12px + var(--atk) + 10px + var(--useb) + 12px + env(safe-area-inset-right));
+      /* Los anillos de salud y hambre, los mismos de PC, uno al lado del otro en
+         la esquina de abajo a la izquierda y apoyados en el borde de abajo de
+         ATAQUE y USAR (decisiones del autor, 2026-09-30). Entre USAR y ATAQUE
+         de tamano, y con fondo para leerse sobre el mundo (lo uno y lo otro,
+         mio). No cogen dedos: esa esquina es la del joystick. */
+      :root { --ringm: 80px; }
+      body.touch-active .ring {
+        position: fixed; z-index: 11; width: var(--ringm); height: var(--ringm);
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        border-radius: 50%; background: rgba(8, 14, 28, 0.62); pointer-events: none;
       }
+      body.touch-active #hungerRing { left: calc(12px + env(safe-area-inset-left)); }
+      body.touch-active #healthRing { left: calc(12px + var(--ringm) + 10px + env(safe-area-inset-left)); }
+      body.touch-active .ringIcon { width: 36px; height: 36px; }
 
       /*
         Arriba en el movil (boceto del autor): OTROS a la izquierda, la barra de
@@ -320,38 +330,12 @@
       .row { display: flex; justify-content: space-between; gap: 16px; }
       .dim { color: #8b9bb4; }
 
-      /*
-        La franja inferior: salud y hambre, siempre a la vista, con el boton del
-        inventario en la esquina. Es lo mas bajo de la pantalla; el racimo del
-        pulgar va encima. Las barras no llevan nombre: las identifica su icono,
-        del mismo color que su relleno.
-      */
-      #vitals {
-        position: fixed; z-index: 11;
-        left: calc(12px + env(safe-area-inset-left));
-        right: calc(12px + env(safe-area-inset-right));
-        bottom: calc(10px + env(safe-area-inset-bottom));
-        height: var(--vitals-h);
-        display: flex; align-items: center; gap: 10px;
-        pointer-events: none;
+      /* Lo mas bajo de la pantalla del movil son los anillos (de 80): lo que
+         vive abajo se apoya encima. */
+      body.touch-active {
+        --vitals-h: var(--ringm);
+        --above-vitals: calc(var(--vitals-h) + 20px + env(safe-area-inset-bottom));
       }
-      #vitalBars {
-        flex: 1; min-width: 0;
-        display: flex; flex-direction: column; justify-content: center; gap: 7px;
-        height: 100%; padding: 0 12px 0 10px; border-radius: 12px;
-        background: rgba(8, 14, 28, 0.62);
-        border: 1px solid rgba(140, 190, 255, 0.18);
-        backdrop-filter: blur(6px);
-      }
-      .vital { display: flex; align-items: center; gap: 8px; }
-      .vital svg { width: 16px; height: 16px; flex: none; display: block; }
-      .bar {
-        flex: 1; height: 9px; border-radius: 5px; overflow: hidden;
-        background: rgba(255,255,255,.14);
-      }
-      .bar > i { display: block; height: 100%; width: 100%; transition: width .12s linear; }
-      #healthFill { background: linear-gradient(90deg, #ff6b6b, #ff9f7a); }
-      #hungerFill { background: linear-gradient(90deg, #ffc46b, #ffe89a); }
 
       /*
         La barra de abajo de PC (boceto del autor, 2026-09-30). Tres columnas
@@ -380,7 +364,6 @@
       }
       body:not(.touch-active) #hotbar { position: static; transform: none; }
       body:not(.touch-active) #bottomBar .round { display: flex; position: static; }
-      body:not(.touch-active) #vitals { display: none; }
       #barExtras:empty { display: none; }
       /* Anillos que se vacian en sentido horario: lo gastado, en oscuro, crece
          desde las 12 (`ring.ts`). */
@@ -403,12 +386,17 @@
       #modeBar .mode-precise, #modeTouch .mode-precise { display: none; }
       body.precise #modeBar .mode-sweep, body.precise #modeTouch .mode-sweep { display: none; }
       body.precise #modeBar .mode-precise, body.precise #modeTouch .mode-precise { display: block; }
-      /* En el movil la barra y el INVENTARIO vuelven arriba, y los anillos y el
-         MODO de PC no estan. */
+      /* MODO se enciende al pulsarlo (pedido del autor), como USAR y SALTAR. */
+      #modeBar.on {
+        background: rgba(60, 104, 168, .86); border-color: rgba(170, 214, 255, .75); color: #f4f9ff;
+      }
+      /* La mochila, mas grande que los demas iconos redondos (pedido del autor). */
+      #invOpen svg { width: 34px; height: 34px; }
+      /* En el movil la barra y el INVENTARIO vuelven arriba, los anillos a su
+         esquina (arriba, con el racimo del pulgar), y el MODO de PC no esta. */
       body.touch-active #bottomBar,
       body.touch-active #barBox,
       body.touch-active .barSide { display: contents; }
-      body.touch-active .ring,
       body.touch-active #modeBar { display: none; }
 
       /*
@@ -923,31 +911,6 @@
       </div>
     </div>
 
-    <!-- La franja de salud y hambre del movil (en PC son los anillos de la barra
-         de abajo). Sin rotulos: un corazon y unos cubiertos, en SVG y del color
-         de su barra, para que se vean iguales en todos los sistemas. -->
-    <div id="vitals">
-      <div id="vitalBars">
-        <div class="vital">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#ff6b6b" d="M12 21s-7.4-4.5-9.5-9.1C1 8.5 3.1 4.4 6.8 4.4c2.1 0 3.6 1.2 5.2 3.2 1.6-2 3.1-3.2 5.2-3.2 3.7 0 5.8 4.1 4.3 7.5C19.4 16.5 12 21 12 21z" />
-          </svg>
-          <div class="bar" id="healthBar" role="meter" aria-label="Salud"
-               aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="healthFill"></i></div>
-        </div>
-        <div class="vital">
-          <!-- Cuchara y tenedor, como el anillo de PC. -->
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#ffc46b" stroke-width="2.2" stroke-linecap="round">
-            <path d="M20 20l-8.4-8.4" />
-            <ellipse cx="8.6" cy="8.6" rx="2.8" ry="4.3" transform="rotate(-45 8.6 8.6)" />
-            <path d="M4 20l10-10M12.5 8.5l3 3M12.5 8.5l4-4M14 10l4-4M15.5 11.5l4-4" />
-          </svg>
-          <div class="bar" id="hungerBar" role="meter" aria-label="Hambre"
-               aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="hungerFill"></i></div>
-        </div>
-      </div>
-    </div>
-
     <!-- El inventario, con la tecla E o el boton INVENTARIO: PERSONAJE,
          INVENTARIO y RECETAS, segun los bocetos del autor. -->
     <div id="invPanel" hidden>
@@ -1036,17 +999,17 @@
         </div>
       </div>
       <div class="barSide right">
-        <!-- Una mochila de explorador: solapa, dos correas con hebilla, bolsillo
-             delantero y dos laterales (el adjunto del autor). -->
+        <!-- Una mochila de explorador, como el segundo adjunto del autor: asa,
+             solapa con dos cierres, bolsillo delantero y dos laterales. Casi
+             tan ancha como alta, para que quepa grande en el boton. -->
         <button id="invOpen" class="round" type="button" aria-expanded="false" aria-controls="invPanel" aria-label="Inventario">
           <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M10 5Q12 2.6 14 5" />
-            <path d="M6.5 8Q6.5 5 9.5 5h5Q17.5 5 17.5 8v11q0 2-2 2h-7q-2 0-2-2z" />
-            <path d="M6.5 10.5Q12 13 17.5 10.5" />
-            <path d="M9.5 5.3V15M14.5 5.3V15" />
-            <path d="M8.6 11.3h1.8v1.8H8.6zM13.6 11.3h1.8v1.8h-1.8z" />
-            <path d="M8.5 15.5h7v3.8h-7z" />
-            <path d="M6.5 12.5H5.2q-1 0-1 1V17q0 1 1 1h1.3M17.5 12.5h1.3q1 0 1 1V17q0 1-1 1h-1.3" />
+            <path d="M10 5.2V4.3a2 2 0 0 1 4 0v.9" />
+            <path d="M8.5 5.2h7a3 3 0 0 1 3 3v9.3a3 3 0 0 1-3 3h-7a3 3 0 0 1-3-3V8.2a3 3 0 0 1 3-3z" />
+            <path d="M5.5 10.5Q12 12.6 18.5 10.5" />
+            <path d="M9.5 11v2M14.5 11v2" />
+            <path d="M9 14.8h6a1 1 0 0 1 1 1v2.2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.2a1 1 0 0 1 1-1z" />
+            <path d="M5.5 12.5H4.2a.9.9 0 0 0-.9.9v3.6a2.3 2.3 0 0 0 2.2 2.3M18.5 12.5h1.3a.9.9 0 0 1 .9.9v3.6a2.3 2.3 0 0 1-2.2 2.3" />
           </svg>
         </button>
         <!-- Los botones que vendran (pedido del autor). -->

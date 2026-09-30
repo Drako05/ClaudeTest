@@ -140,6 +140,24 @@ Formato:
   tiene que ser lo que se quiere probar.
 - **Donde vive ahora**: lente B.
 
+### 13. La rueda contaba destellos en una ventana de tiempo (2026-09-30)
+- **Que paso**: la comprobacion de la rueda observaba 800 ms que casillas se
+  encendian al girar dos muescas y exigia exactamente dos distintas. En el
+  runner de CI, lento, aun seguia encendida la de la muesca anterior: conto
+  tres y la casilla `desktop` salio en rojo con el juego bien. El primer
+  arreglo cambio «cuantas» por «cuales», **pero dejo la ventana**, y el humo
+  entero en local, con la maquina cargada, fallo al reves: la ultima casilla
+  se encendio despues de cerrarse los 800 ms.
+- **Por que se escapo**: en local la maquina es rapida y la cuenta cuadraba
+  siempre; y al arreglarlo se corrigio lo que se contaba, no la ventana, que
+  era la causa.
+- **Que lo habria visto**: el patron del #7 un paso mas alla: **mirar cosas
+  efimeras dentro de una ventana de tiempo** depende de la velocidad de la
+  maquina, cuente lo que cuente. El juego anota en un **acumulador** lo que
+  hizo (`hotbarPasses`, las casillas encendidas en orden, apuntadas al
+  encenderse) y el humo **espera a que llegue** y lo compara entero.
+- **Donde vive ahora**: lente B.
+
 ---
 
 ## Del proceso del agente

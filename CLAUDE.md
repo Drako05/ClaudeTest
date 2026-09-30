@@ -137,8 +137,11 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     objetivo que cruza el centro de la mira**, cortado por el terreno y a
     menos de 2,5 (`preciseTarget`, el mismo rayo que abre una estacion). Es un
     estado de la `Intent` (`precise`), como correr; se cambia con TAB o el
-    boton MODO, y en vez del arco se ve una **estocada** recta hasta lo
-    golpeado (`stabLine`).
+    boton MODO, y en vez del arco se ve una **estocada** recta que **nace
+    abajo a la derecha de la pantalla** y va hasta lo golpeado en el centro de
+    la mira (`stabLine`, con `STAB_SCREEN`). Recorria la linea de la mirada y,
+    vista de punta, solo se veia al moverse (lo vio el autor); `npm run slash`
+    la cuenta en pixeles en ese cuadrante.
 
     **Colocar** va donde se siembra o, si la mirada toca un **costado** del
     terreno, en la casilla de delante de esa pared (`aimSurface`), y la caja
@@ -846,19 +849,21 @@ boton, y un dedo sobre el mundo gira la camara y nada mas.
 **ATAQUE**, el mas grande, en la esquina derecha, que es donde cae el pulgar en
 reposo; **USAR** a su izquierda, apoyado en su mismo borde de abajo; y
 **CORRER** y **SALTAR** en columna encima del ataque, alineados a su borde
-derecho. La **franja de salud y hambre** va abajo a la izquierda, hasta USAR.
+derecho. Los **anillos de salud y hambre** van abajo a la izquierda.
 Arriba, **OTROS** a la izquierda, la **barra de la mano** en el centro exacto
 (sus casillas encogen en pantallas estrechas para no pisar a los redondos) e
 **INVENTARIO** a la derecha; OTROS despliega **en columna debajo de el** el
 ojo, el HUD y el entorno, y se cierra tocando fuera. **Los botones son solo
 iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
 USAR, espada y pico cruzados en ATAQUE, una **mochila de explorador** en
-INVENTARIO (con solapa, correas y bolsillos, como el adjunto del autor del
-2026-09-30), tres barras en OTROS, y CORRER y SALTAR con su glifo; el nombre va
-en `aria-label`. Los dibujos son mios. Y **MODO** (2026-09-30), mas pequeno que
+INVENTARIO (asa, solapa con dos cierres y bolsillos, casi tan ancha como alta
+y mas grande que los otros iconos, como el adjunto del autor del 2026-09-30),
+tres barras en OTROS, y CORRER y SALTAR con su glifo; el nombre va en
+`aria-label`. Los dibujos son mios. Y **MODO** (2026-09-30), mas pequeno que
 USAR y en la diagonal de arriba a la izquierda del ataque: un toque cambia de
-modo de golpe, y su icono dice cual —un tajo para el barrido, una mirilla para
-el preciso—. Sustituyo al racimo en fila
+modo de golpe, su icono dice cual —un tajo para el barrido, una mirilla para
+el preciso— y **se enciende al pulsarlo**, como USAR y SALTAR (en PC tambien,
+y con TAB). Sustituyo al racimo en fila
 —accion, salto, carrera, comer y sembrar, ordenados por el borde— y a los
 botones de comer y sembrar, que ahora son USAR con la baya o la semilla en la
 mano. Los tamanos son mios.
@@ -871,13 +876,16 @@ los lados iguales, que es lo que centra la caja midan lo que midan los botones.
 **Los anillos se vacian en sentido horario**: lo gastado crece desde las 12
 (`ring.ts`, puro y con su test). En el movil esas piezas se sacan de la caja
 con `display: contents` y vuelven a su sitio: la barra y el INVENTARIO arriba,
-sin anillos.
+y **los anillos, los mismos elementos**, en la esquina de abajo a la izquierda.
 
-**La franja de salud y hambre** del movil es decision del autor: siempre a la
-vista, sin rotulos —un corazon y unos cubiertos en SVG, del color de su barra;
-fueron un muslo de pollo hasta que el autor dibujo cubiertos en el anillo de
-PC—. Lo que vive abajo en PC (el registro, el panel de desarrollo) se apoya
-encima de la barra con la variable CSS `--above-vitals`.
+**Salud y hambre son anillos tambien en el movil** (decision del autor,
+2026-09-30; antes, una franja de barras): uno al lado del otro, pegados a la
+esquina de abajo a la izquierda y apoyados en el borde de abajo de ATAQUE y
+USAR, de 80 px, entre los dos de tamano. No cogen dedos, porque esa esquina es
+la del joystick. Siempre a la vista y sin rotulos: un corazon y unos cubiertos
+—fueron un muslo de pollo hasta que el autor dibujo cubiertos—. Lo que vive
+abajo (el registro, el panel de desarrollo) se apoya encima con la variable
+CSS `--above-vitals`.
 
 **El HUD y el inventario arrancan cerrados**, tambien decision suya. El HUD
 (hora, dia, semilla, posicion, FPS y, en PC, los controles) se abre con su
@@ -913,8 +921,8 @@ ortografica conserva el aspecto plano del isometrico y sirve para comparar.
 **El ojo recorre tres vistas: perspectiva → isometrica → primera persona**, con
 el boton o con P. La primera persona la pidio el autor despues, con estas
 decisiones suyas: el ojo lleva un **punto de mira** en esa vista; arrastrar
-**hacia arriba es mirar arriba** —el dedo lleva la mirada, al reves que en las
-orbitales, que «agarran el mundo»—; y la pinza es un **catalejo temporal**, que
+**hacia arriba es mirar arriba** —el dedo lleva la mirada—; y la pinza es un
+**catalejo temporal**, que
 estrecha el campo de vision y al soltar vuelve. En la interfaz la ortografica
 se llama «isometrica», que es como la llama el autor.
 
@@ -943,9 +951,10 @@ perspectiva y la isometrica, **detras de el sobre la linea de la mirada y
 mirandolo**, asi que el centro de la pantalla es siempre hacia donde se mira y
 cambiar de vista no mueve la mirada. Antes cada vista tenia su inclinacion
 (`fpPitch` aparte) y la orbital miraba a 1,6: al compartir la mirada, una sola.
-**La isometrica tambien la comparte**, por decision del autor. Arrastrar
-conserva el sentido de cada vista —en primera persona arriba es mirar arriba; en
-las orbitales se «agarra el mundo»—, pero los dos mueven la misma inclinacion.
+**La isometrica tambien la comparte**, por decision del autor. Y **arrastrar
+hacia arriba es mirar arriba en las tres**, como el raton en PC: en las
+orbitales el arrastre vertical «agarraba el mundo» hasta el 2026-09-30, cuando
+el autor lo pidio igual que en PC.
 
 **Y la tercera persona mira hacia arriba**, pedido del autor: la camara baja por
 detras, y para eso **choca** (`camera-collision.ts`, puro). Un rayo desde los

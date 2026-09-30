@@ -51,8 +51,8 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El material de las aspas **no se ilumina**, para que el aspecto no cambiara | Las features ya son aspas | cambiar a Lambert, con pegas |
 | La noche como **vela sobre la pantalla**, no bajando las luces | El isometrico se retira | trabajo de verdad si se quiere luz |
 | Sin `?seed` se juega un mundo al azar (el 3D usaba siempre el 12345) | El isometrico se retira | una linea |
-| Salud y hambre **apiladas** (salud arriba), la franja de 50 px y **sin numero** en las barras | La franja de salud y hambre | CSS |
-| Los iconos de los botones y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y el muslo | La franja de salud y hambre | SVG |
+| Salud y hambre **sin numero** en los anillos | La franja de salud y hambre | CSS |
+| Los iconos de los botones y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y los cubiertos | La franja de salud y hambre | SVG |
 | El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `CLAUDE.md`, racimo del pulgar | un numero |
 | Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 70-120, 70 por defecto) | `CLAUDE.md`, las tres vistas | un numero en `camera.ts` |
 | Sensibilidad del raton capturado: **0,0025 rad por pixel** (unos 0,14 grados) | El raton lleva la mirada | un numero en `camera.ts` |
@@ -77,10 +77,12 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El modo de golpe **arranca en barrido** y no se recuerda entre partidas | Ajustes de la tanda 2 | una linea |
 | La estacion puesta contra una pared cae con la **gravedad del salto** (62), y la caida solo se ve | Ajustes de la tanda 2 | `stations-view.ts` |
 | La rueda ilumina cada casilla **140 ms**, escalonadas **40 ms** | Ajustes de la tanda 2 | dos numeros en `inventory-ui.ts` |
-| Los **cubiertos** tambien en la franja del movil (tu los dibujaste en el anillo de PC) | Ajustes de la tanda 2 | SVG |
-| Los dibujos de la **mochila de explorador**, el **tajo** y la **mirilla**; los anillos de **56 px** y trazo 5 | Ajustes de la tanda 2 | SVG y CSS en `index.html` |
+| Los dibujos del **tajo** y la **mirilla**; los anillos de PC de **56 px** y trazo 5 | Ajustes de la tanda 2 | SVG y CSS en `index.html` |
+| La **mochila** redibujada como tu adjunto, casi cuadrada, a **34 px** en el boton (antes 28) | Ajustes de la tanda 2, 2.ª ronda | SVG y CSS en `index.html` |
 | MODO en el movil de **44 px**, a 72 px (en cada eje) del centro del ataque | Ajustes de la tanda 2 | CSS |
-| La **estocada** empieza **0,6** delante de los ojos | Ajustes de la tanda 2 | un numero en `effects.ts` |
+| La **estocada** nace en el punto de pantalla **(0,55; −0,55)** —abajo a la derecha, en coordenadas normalizadas— a la **profundidad de los ojos** (al menos 1 delante de la camara) | Ajustes de la tanda 2, 2.ª ronda | `STAB_SCREEN` en `effects.ts` |
+| Anillos del movil de **80 px** (USAR 64, ATAQUE 96), con un **disco oscuro** detras, **hambre primero** como en PC, a 12 px del borde y 10 entre ellos | Ajustes de la tanda 2, 2.ª ronda | CSS en `index.html` |
+| **TAB** tambien enciende el boton MODO de PC; la luz dura lo que el toque y **al menos 150 ms**, como USAR y SALTAR | Ajustes de la tanda 2, 2.ª ronda | una linea en `controls.ts` |
 | El marco de la **pared** es la cara de cubo tocada: una casilla de ancho y un nivel de alto | Ajustes de la tanda 2 | `overlays.ts` |
 | Lo que no cabe: el golpe **no completa** y el objeto se queda, sin aviso; tirar (soltar fuera del panel y confirmar) lo **hace desaparecer**, hasta que haya objetos en el suelo | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
 | Las **descripciones** de los objetos (una frase cada uno) | Inventario de los bocetos | texto en `inventory-ui.ts` |
@@ -455,6 +457,36 @@ golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
 
+## Ajustes de la tanda 2, 2.ª ronda — HECHO (2026-09-30)
+
+Antes que nada: **la CI de la entrega anterior (`ac4eff0`) salio en rojo** en
+la casilla `desktop`, y la culpa era de una comprobacion mia, no del juego. La
+de la rueda contaba cuantas casillas distintas se encendian mientras se giraban
+dos muescas y exigia exactamente dos; en el runner lento seguia encendida la de
+la muesca anterior y conto tres. El juego anota ahora las casillas que enciende, en
+orden, y el humo espera a que lleguen y las compara: sin ventana de tiempo,
+que en una maquina cargada falla tambien al reves (escape #13 de la
+auditoria).
+
+Lo que pediste:
+- **La mochila**, como tu adjunto: asa, solapa curva, dos cierres, bolsillo
+  delantero y laterales, sin correas; casi cuadrada y mas grande en el boton.
+- **La estocada del modo preciso nace abajo a la derecha de la pantalla** y va
+  hasta lo golpeado en el centro de la mira. Antes recorria la propia linea de
+  la vista y se veia de punta: solo aparecia al moverse. Medido con pixeles en
+  primera persona: 9.153 aclarados abajo a la derecha, y cero con el arranque
+  de antes.
+- **En el movil, subir el dedo sube la mirada en las tres vistas**, como el
+  raton en PC. Las orbitales ya no «agarran el mundo» en vertical; en
+  horizontal no cambia nada.
+- **MODO se ilumina al pulsarlo**, en el movil y en PC, y con TAB.
+- **En el movil, los anillos de PC** en vez de las barras: uno al lado del
+  otro, en la esquina de abajo a la izquierda, apoyados en el borde de abajo
+  de ATAQUE y USAR, y de un tamano entre los dos. Son los mismos elementos que
+  en PC, sacados de la caja con CSS: una sola cifra y un solo dibujo.
+
+Lo que decidi yo va arriba, en «Esperando tu juicio».
+
 ## Ajustes de la tanda 2 — HECHO (2026-09-30)
 
 Lo que pediste tras jugarla, y lo que respondiste:
@@ -776,6 +808,9 @@ de `CLAUDE.md`. Recolectar la propia solo hace algo si hay algo pisable encima
 ---
 
 ## La franja de salud y hambre — HECHA (2026-09-26)
+
+*(Sustituida el 2026-09-30: en el movil van ahora los anillos de PC, ver
+«Ajustes de la tanda 2, 2.ª ronda». Lo de abajo es historia.)*
 
 Pedido del autor, con sus decisiones: salud y hambre siempre a la vista, abajo
 del todo y bajo el racimo del pulgar, sin rotulo y con un corazon y un muslo de

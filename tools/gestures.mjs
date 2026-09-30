@@ -219,16 +219,24 @@ for (const id of ['use', 'jump']) {
 const modeBtn = await center('modeTouch');
 const shownIcon = () => page.evaluate(() =>
   getComputedStyle(document.querySelector('#modeTouch .mode-precise')).display !== 'none' ? 'mirilla' : 'tajo');
+const modeLit = () => page.evaluate(() => document.getElementById('modeTouch').classList.contains('on'));
 const mode0 = await probe();
 const icon0 = await shownIcon();
-await tapReal(modeBtn);
+// Con el dedo puesto se enciende, y al soltar se apaga (pedido del autor).
+await real('touchStart', [modeBtn]);
+await page.waitForTimeout(80);
+const litHeld = await modeLit();
+await real('touchEnd', []);
+await page.waitForTimeout(400);
+const litAfter = await modeLit();
 const mode1 = await probe();
 const icon1 = await shownIcon();
 await tapReal(modeBtn);
 const mode2 = await probe();
-console.log(`  MODO: preciso ${mode0.precise} -> ${mode1.precise} -> ${mode2.precise}, icono ${icon0} -> ${icon1}`);
+console.log(`  MODO: preciso ${mode0.precise} -> ${mode1.precise} -> ${mode2.precise}, icono ${icon0} -> ${icon1}, luz ${litHeld} -> ${litAfter}`);
 check(!mode0.precise && mode1.precise && !mode2.precise && icon0 === 'tajo' && icon1 === 'mirilla',
   'el boton MODO no alterna el modo o su icono');
+check(litHeld && !litAfter, 'el boton MODO no se enciende al tocarlo o no se apaga al soltar');
 
 // El inventario con el dedo: arrastrar dentro de la barra con el inventario
 // cerrado, arrastrar una casilla a otra y a la barra con el abierto, y mantener

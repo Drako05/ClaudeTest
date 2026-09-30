@@ -51,26 +51,26 @@ export function slashEdge(
   }));
 }
 
-/** Donde empieza la estocada, delante de los ojos. **Propuesta mia.** */
-export const STAB_START = 0.6;
+/**
+ * Donde nace la estocada en la pantalla: abajo a la derecha, en coordenadas
+ * normalizadas (-1 a 1, `y` hacia arriba). **Propuesta mia.**
+ */
+export const STAB_SCREEN = { x: 0.55, y: -0.55 } as const;
 
 /**
- * La estocada del **modo preciso** (decision del autor, 2026-09-30): una recta
- * desde un poco delante de los ojos hasta donde llega el golpe —el objetivo
- * tocado, o el alcance si no toca nada—. Se dibuja con el mismo trazo que el
- * barrido, asi que sale en coordenadas de three.js como `slashEdge`: `y` es la
- * altura. Unos pocos puntos para que la cinta se ensanche igual en toda ella.
+ * La estocada del **modo preciso** (decisiones del autor, 2026-09-30): una
+ * recta que **nace abajo a la derecha de la pantalla** y va hasta lo golpeado
+ * en el centro de la mira —o hasta el alcance si no toca nada—. Recorria la
+ * linea de la mirada, y vista de punta solo se veia al moverse; asi cruza la
+ * pantalla en diagonal. Los extremos entran ya en coordenadas de three.js (`y`
+ * es la altura), como los de `slashEdge`. Unos pocos puntos para que la cinta
+ * se ensanche igual en toda ella.
  */
-export function stabLine(
-  origin: { x: number; y: number; z: number },
-  dir: { x: number; y: number; z: number },
-  length: number,
-): Point3[] {
-  const from = Math.min(STAB_START, length * 0.5);
+export function stabLine(from: Point3, to: Point3): Point3[] {
   const out: Point3[] = [];
   for (let i = 0; i <= 4; i++) {
-    const t = from + ((length - from) * i) / 4;
-    out.push({ x: origin.x + dir.x * t, y: origin.z + dir.z * t, z: origin.y + dir.y * t });
+    const k = i / 4;
+    out.push({ x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k, z: from.z + (to.z - from.z) * k });
   }
   return out;
 }

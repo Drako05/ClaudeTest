@@ -372,7 +372,6 @@ async function desktopPass(browser, baseUrl) {
   // La barra de abajo de PC, segun el boceto del autor: MODO, la caja con el
   // anillo del hambre, la barra de la mano y el de la salud, e INVENTARIO. La
   // caja, centrada al pixel; MODO e INVENTARIO, del mismo tamano.
-  check(!(await page.isVisible('#vitals')), 'en PC se ve la franja de barras del movil');
   check(await page.isVisible('#hudToggle'), 'falta el boton del HUD');
   check(!(await page.isVisible('#others')), 'en PC se ve OTROS, que es del movil');
   const bar = await page.evaluate(() => {
@@ -423,8 +422,8 @@ async function desktopPass(browser, baseUrl) {
   check(walked > 1, `el jugador apenas se movio: ${walked.toFixed(2)} casillas`);
   check(moved.tick > spawn.tick, 'la simulacion no avanzo');
   check(moved.hunger < spawn.hunger, 'el hambre no bajo con el tiempo');
-  const hudHunger = await page.evaluate(() => document.getElementById('hungerFill').style.width);
-  check(hudHunger !== '100%', `la barra de hambre del HUD no bajo (${hudHunger})`);
+  const hudHunger = await page.evaluate(() => Number(document.getElementById('hungerRing').getAttribute('aria-valuenow')));
+  check(hudHunger < 100, `el anillo del hambre no bajo (${hudHunger})`);
 
   // La mirada es la de la camara (regla 5): el rumbo y la inclinacion del
   // nucleo son los de la camara, y girarla los gira.
@@ -518,26 +517,22 @@ async function desktopPass(browser, baseUrl) {
   await page.waitForTimeout(200);
   const w1 = await state(page);
   // Dos muescas seguidas: se iluminan las dos casillas por las que pasa, no
-  // solo la de llegada (pedido del autor).
-  let lit = 0;
-  const watchPass = page.evaluate(() => new Promise((done) => {
-    let n = 0;
-    const seen = new Set();
-    const obs = new MutationObserver(() => {
-      document.querySelectorAll('#hotbar .slot.pass').forEach((el) => seen.add(el));
-      n = seen.size;
-    });
-    obs.observe(document.getElementById('hotbar'), { attributes: true, subtree: true, attributeFilter: ['class'] });
-    setTimeout(() => { obs.disconnect(); done(n); }, 600);
-  }));
+  // solo la de llegada (pedido del autor). Se lee el ACUMULADO de casillas
+  // encendidas, en orden, y se espera a que llegue: nada de contar lo que se
+  // ve en una ventana de tiempo, que en una maquina cargada cae a suertes
+  // (escape 13, dos veces).
   await wheel(-100);
   await wheel(-100);
-  lit = await watchPass;
+  const n0 = w0.hotbarPasses.length;
+  await page.waitForFunction((n) => window.__verdant.hotbarPasses.length >= n, n0 + 3, { timeout: 5000 }).catch(() => {});
   const w2 = await state(page);
-  console.log(`  rueda: casilla ${w0.selectedSlot + 1} -> ${w1.selectedSlot + 1} -> ${w2.selectedSlot + 1}, iluminadas al pasar ${lit}`);
+  const lit = w2.hotbarPasses.slice(n0);
+  const passed = [(w0.selectedSlot + 1) % 4, w0.selectedSlot, (w0.selectedSlot + 3) % 4];
+  console.log(`  rueda: casilla ${w0.selectedSlot + 1} -> ${w1.selectedSlot + 1} -> ${w2.selectedSlot + 1}, iluminadas al pasar ${lit.map((i) => i + 1)}`);
   check(w1.selectedSlot === (w0.selectedSlot + 1) % 4 && w2.selectedSlot === (w0.selectedSlot + 3) % 4,
     'la rueda no recorre la barra de la mano');
-  check(lit === 2 && w2.hotbarPasses - w0.hotbarPasses === 3, `la rueda no ilumino las casillas por las que paso: ${lit}`);
+  check(lit.join() === passed.join(),
+    `la rueda no ilumino las casillas ${passed.map((i) => i + 1)} por las que paso: ${lit.map((i) => i + 1)}`);
   check(w2.distance === w0.distance, 'la rueda sigue haciendo zoom');
   // El inventario, con su tecla: E lo abre, muestra lo del juego, y E lo
   // cierra. Abrirlo suelta el cursor y NO pausa (decision del autor).
@@ -1223,11 +1218,11 @@ async function mobilePass(browser, baseUrl) {
   for (const id of ['#action', '#jump', '#run', '#use', '#others', '#invOpen', '#modeTouch']) {
     check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);
   }
-  check(!(await page.isVisible('#modeBar')) && !(await page.isVisible('#hungerRing')), 'en el movil se ven MODO o los anillos de PC');
+  check(!(await page.isVisible('#modeBar')), 'en el movil se ve el MODO de PC');
   check((await page.locator('#eat, #plant').count()) === 0, 'siguen los botones de comer o sembrar');
   check(!(await page.isVisible('#proj')) && !(await page.isVisible('#hudToggle')), 'el ojo o el HUD se ven sin abrir OTROS');
   check(!(await page.isVisible('#help')), 'la ayuda de teclado se ve en el movil');
-  for (const id of ['#vitals', '#hotbar']) {
+  for (const id of ['#hungerRing', '#healthRing', '#hotbar']) {
     check(await page.isVisible(id), `${id} no se ve en el movil`);
   }
   // La barra de la mano, arriba en el movil: tocar una casilla la elige.
@@ -1240,11 +1235,11 @@ async function mobilePass(browser, baseUrl) {
   const bar = await page.evaluate(() => document.getElementById('hotbar').getBoundingClientRect().toJSON());
   check(bar.top < 100 && bar.left >= 0 && bar.right <= 390, `la barra del movil no cabe arriba: ${JSON.stringify(bar)}`);
   check(Math.abs((bar.left + bar.right) / 2 - 390 / 2) <= 1, `la barra del movil no esta centrada: ${JSON.stringify(bar)}`);
-  // El racimo cabe en la pantalla y queda ENTERO por encima de la franja de
-  // salud y hambre, que llega hasta el borde derecho.
+  // El racimo cabe en la pantalla, y los anillos de salud y hambre van abajo a
+  // la izquierda.
   const rect = (id) => page.evaluate((i) => document.getElementById(i).getBoundingClientRect().toJSON(), id);
-  const [atk, use, jump, run, vitals, others, invOpen] = await Promise.all(
-    ['action', 'use', 'jump', 'run', 'vitals', 'others', 'invOpen'].map(rect),
+  const [atk, use, jump, run, hungerR, healthR, others, invOpen] = await Promise.all(
+    ['action', 'use', 'jump', 'run', 'hungerRing', 'healthRing', 'others', 'invOpen'].map(rect),
   );
   check(atk.right <= 390 && atk.bottom <= 844 && atk.right > 390 - 30, `el ataque no esta en la esquina: ${JSON.stringify(atk)}`);
   check(use.right <= atk.left, 'USAR no esta a la izquierda del ataque');
@@ -1275,7 +1270,15 @@ async function mobilePass(browser, baseUrl) {
   const feedR = await rect('pickupFeed');
   check(feedR.top >= invOpen.bottom && feedR.top - invOpen.bottom < 16 && Math.abs(feedR.right - invOpen.right) < 1,
     `el registro no va justo debajo de INVENTARIO: ${JSON.stringify(feedR)}`);
-  check(vitals.right <= use.left && vitals.left < 40, `la franja no va de la izquierda hasta USAR: ${JSON.stringify(vitals)}`);
+  // Los anillos: uno al lado del otro en la esquina de abajo a la izquierda,
+  // apoyados en el borde de abajo de ATAQUE y USAR, de tamano entre los dos, y
+  // sin pisar USAR (decisiones del autor, 2026-09-30).
+  console.log(`  anillos: ${hungerR.width}px en ${hungerR.left},${hungerR.bottom} y ${healthR.left},${healthR.bottom}; ATAQUE abajo en ${atk.bottom}`);
+  check(hungerR.left < 20 && hungerR.right <= healthR.left, `los anillos no van juntos en la esquina de la izquierda: ${JSON.stringify([hungerR, healthR])}`);
+  check([hungerR, healthR].every((r) => Math.abs(r.bottom - atk.bottom) <= 1), 'los anillos no apoyan en el borde de abajo de ATAQUE');
+  check(hungerR.width > use.width && hungerR.width < atk.width, `los anillos no miden entre USAR y ATAQUE: ${hungerR.width}`);
+  check(healthR.right <= use.left && !overlap(healthR, mode), 'los anillos pisan USAR o MODO');
+  check((await page.locator('#vitals').count()) === 0, 'siguen las barras de salud y hambre');
   check(others.left < 40 && others.top < 40 && invOpen.right > 350 && invOpen.top < 40, 'OTROS o INVENTARIO no estan arriba en las esquinas');
 
   // OTROS despliega el ojo, el HUD y el entorno. La pista de los gestos vive

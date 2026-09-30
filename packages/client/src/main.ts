@@ -23,6 +23,7 @@ import {
   MeshLambertMaterial,
   PlaneGeometry,
   Scene,
+  Vector3,
   WebGLRenderer,
   DoubleSide,
   MeshBasicMaterial,
@@ -54,7 +55,7 @@ import {
   type GameState,
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
-import { Effects, SLASH_FP_HALF_WIDTH, SLASH_HALF_WIDTH, slashEdge, stabLine } from './effects.js';
+import { Effects, SLASH_FP_HALF_WIDTH, SLASH_HALF_WIDTH, slashEdge, STAB_SCREEN, stabLine } from './effects.js';
 import { cameraClearance } from './camera-collision.js';
 import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
@@ -328,6 +329,21 @@ function colorOf(terrain: Terrain, wx: number, wy: number): readonly [number, nu
   // La franja de brillo es la de `art.ts`, para que el mundo se vea el mismo.
   const k = 0.9 + (shadeStepAt(seed, wx, wy) / (SHADE_STEPS - 1)) * 0.2;
   return [(rgb[0] / 255) * k, (rgb[1] / 255) * k, (rgb[2] / 255) * k];
+}
+
+/**
+ * El punto del mundo que se ve en `at` de la pantalla (coordenadas normalizadas)
+ * a la profundidad de `depthOf`, y a un bloque como poco. Vale para las dos
+ * proyecciones: el rayo va del plano cercano al lejano, que en la ortografica
+ * son paralelos. Es de donde nace la estocada del modo preciso.
+ */
+function screenPoint(at: { x: number; y: number }, depthOf: Vector3): { x: number; y: number; z: number } {
+  const cam = camera.active;
+  const near = new Vector3(at.x, at.y, -1).unproject(cam);
+  const dir = new Vector3(at.x, at.y, 1).unproject(cam).sub(near).normalize();
+  const d = Math.max(1, depthOf.clone().sub(near).dot(dir));
+  const p = near.addScaledVector(dir, d);
+  return { x: p.x, y: p.y, z: p.z };
 }
 
 interface ChunkView {
@@ -632,8 +648,13 @@ function frame(now: number): void {
       const eye = { x: e.x[id], y: e.y[id], z: e.z[id] + EYE_HEIGHT };
       const width = camera.projection === 'primera' ? SLASH_FP_HALF_WIDTH : SLASH_HALF_WIDTH;
       if (intent.precise) {
+        // Hasta lo golpeado, en el centro de la mira; y desde abajo a la
+        // derecha de la pantalla, a la profundidad de los ojos (en primera
+        // persona, a un bloque): por la linea de la mirada se veia de punta.
         const dir = lookVector(e.facingX[id], e.facingY[id], e.lookZ[id]);
-        effects.spawnSlash(stabLine(eye, dir, stab ? stab.t : STRIKE_RANGE), width);
+        const t = stab ? stab.t : STRIKE_RANGE;
+        const to = { x: eye.x + dir.x * t, y: eye.z + dir.z * t, z: eye.y + dir.y * t };
+        effects.spawnSlash(stabLine(screenPoint(STAB_SCREEN, new Vector3(eye.x, eye.z, eye.y)), to), width);
       } else {
         effects.spawnSlash(slashEdge(eye, strikeOf(state.world, e, id).rays), width);
       }
@@ -896,8 +917,8 @@ Object.defineProperty(window, '__verdant', {
       stationTiles: stationTilesAround(state, 5),
       selectedSlot: state.inventory.selected,
       itemsSent: { ...items.sent },
-      /** Casillas iluminadas al paso de la rueda. Acumulado. */
-      hotbarPasses: items.passes,
+      /** Casillas iluminadas al paso de la rueda, en orden. Acumulado. */
+      hotbarPasses: [...items.passes],
       inventoryPage: items.currentPage,
       /** Lo que dice el registro de objetos, de la mas vieja a la mas nueva. */
       feed: feed.lines.map((l) => l.text),

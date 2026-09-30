@@ -166,27 +166,24 @@ export class OrbitCamera {
   }
 
   /**
-   * Arrastrar gira. El giro horizontal es el mismo en las tres vistas —dedo a
-   * la derecha, mirada a la derecha—; el vertical no:
+   * Arrastrar gira, igual en las tres vistas: dedo a la derecha, mirada a la
+   * derecha; y **subir el dedo es mirar arriba**, como el raton en PC (`turn`).
+   * El dedo lleva la mirada, como en los shooters de movil.
    *
-   * - en las orbitales el arrastre «agarra el mundo»: bajar el dedo baja la
-   *   camara, o sea que se mira mas hacia arriba;
-   * - en primera persona el dedo **lleva la mirada**, como en los shooters de
-   *   movil: subir el dedo es mirar arriba. Decision del autor.
-   *
-   * Los dos mueven la MISMA inclinacion: solo cambia el sentido del dedo.
+   * En las orbitales el arrastre vertical «agarraba el mundo» —bajar el dedo
+   * era mirar arriba— hasta el 2026-09-30, cuando el autor pidio dejarlo como
+   * en PC.
    */
   orbit(dx: number, dy: number): void {
     this.yaw -= dx * 0.006;
-    const sign = this.projection === 'primera' ? -1 : 1;
-    this.pitch = clamp(this.pitch + sign * dy * 0.005, -PITCH_LIMIT, PITCH_LIMIT);
+    this.pitch = clamp(this.pitch - dy * 0.005, -PITCH_LIMIT, PITCH_LIMIT);
   }
 
   /**
    * El raton capturado de PC (`pointer-lock.ts`): hacia donde se mueve el
    * cursor, se mueve la mirada, en las TRES vistas (decision del autor). No es
-   * `orbit`: ahi el arrastre de las orbitales «agarra el mundo», y aqui el
-   * raton arriba es mirar arriba en todas.
+   * `orbit` por la sensibilidad: el raton va en pixeles de raton y el dedo en
+   * pixeles de pantalla. El sentido es el mismo: arriba es mirar arriba.
    */
   turn(dx: number, dy: number): void {
     this.yaw -= dx * MOUSE_TURN;

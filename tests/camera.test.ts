@@ -74,15 +74,22 @@ describe('La primera persona', () => {
     expect(looking(cam).y).toBeGreaterThan(before);
   });
 
-  it('y en las orbitales es al reves: arrastrar hacia arriba sube la camara', () => {
-    // Contraste: el mismo gesto baja la mirada en la orbital, que «agarra el
-    // mundo». Si las dos fueran iguales, el test de arriba no diria nada.
-    const cam = new OrbitCamera();
-    cam.follow(0, 0, 0, 800, 600);
-    const before = looking(cam).y;
-    cam.orbit(0, -80);
-    cam.follow(0, 0, 0, 800, 600);
-    expect(looking(cam).y).toBeLessThan(before);
+  it('y en las orbitales tambien, como el raton en PC (pedido del autor, 2026-09-30)', () => {
+    // Hasta ese dia la orbital «agarraba el mundo» y este mismo gesto bajaba
+    // la mirada. En las dos, perspectiva e isometrica; y bajando el dedo, al
+    // reves.
+    for (const n of [0, 1]) {
+      const cam = new OrbitCamera();
+      for (let i = 0; i < n; i++) cam.cycleProjection();
+      cam.follow(0, 0, 0, 800, 600);
+      const before = looking(cam).y;
+      cam.orbit(0, -80);
+      cam.follow(0, 0, 0, 800, 600);
+      expect(looking(cam).y).toBeGreaterThan(before);
+      cam.orbit(0, 160);
+      cam.follow(0, 0, 0, 800, 600);
+      expect(looking(cam).y).toBeLessThan(before);
+    }
   });
 
   it('el giro horizontal va en el mismo sentido en las tres vistas', () => {
@@ -148,7 +155,7 @@ describe('Una sola mirada para las tres vistas', () => {
 
   it('en tercera persona se puede mirar hacia arriba: la camara baja por detras', () => {
     const cam = view(0);
-    cam.orbit(0, 100_000); // dedo abajo: en la orbital, «agarrar el mundo» sube la mirada
+    cam.orbit(0, -100_000); // dedo arriba: mirar arriba
     expect(cam.pitch).toBeGreaterThan(1);
     cam.follow(0, 0, 0, 800, 600);
     expect(looking(cam).y).toBeGreaterThan(0.8);

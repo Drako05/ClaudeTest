@@ -282,16 +282,20 @@ export class InventoryUi {
     const now = performance.now();
     const at = Math.max(now, this.lastPassAt + PASS_GAP_MS);
     this.lastPassAt = at;
-    this.passes++;
     window.setTimeout(() => {
       el.classList.add('pass');
+      this.passes.push(slot);
       window.setTimeout(() => el.classList.remove('pass'), PASS_MS);
     }, at - now);
   }
 
   private lastPassAt = 0;
-  /** Casillas iluminadas al paso de la rueda. Acumulado, para el humo. */
-  passes = 0;
+  /**
+   * Las casillas que la rueda ha encendido, en orden, anotadas al encenderse.
+   * Acumulado, para el humo: asi afirma cuales sin depender de cuanto tarde
+   * la maquina (escape 13).
+   */
+  readonly passes: number[] = [];
 
   toggle(): void {
     const open = this.panel.hidden;

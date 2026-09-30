@@ -87,7 +87,7 @@ export class Controls {
       // TAB cambia el modo de golpe (decision del autor) y no mueve el foco.
       if (e.code === 'Tab') {
         e.preventDefault();
-        if (!e.repeat) this.toggleMode();
+        if (!e.repeat) this.modeKey();
       }
       if (!e.repeat && (e.code === 'ControlLeft' || e.code === 'ControlRight')) this.onFreeCursor?.(true);
       this.keys.add(e.code);
@@ -332,18 +332,23 @@ export class Controls {
     }
   }
 
-  /** Conecta un boton MODO: un toque o un clic cambia de modo. */
+  /**
+   * Conecta un boton MODO: un toque o un clic cambia de modo, y se enciende
+   * mientras se pulsa, como USAR y SALTAR (pedido del autor, 2026-09-30).
+   */
   bindModeButton(el: HTMLElement | null): void {
     if (!el) return;
     this.modeEls.push(el);
-    const press = (e: Event) => {
-      e.preventDefault();
-      this.toggleMode();
-    };
-    el.addEventListener('touchstart', press, { passive: false });
-    el.addEventListener('pointerdown', (e) => {
-      if ((e as PointerEvent).pointerType !== 'touch') press(e);
-    });
+    this.bindTap(el, () => this.toggleMode());
+  }
+
+  /** TAB: cambia el modo y enciende un instante el boton MODO (propuesta mia). */
+  private modeKey(): void {
+    this.toggleMode();
+    for (const el of this.modeEls) {
+      el.classList.add('on');
+      setTimeout(() => el.classList.remove('on'), FLASH_MS);
+    }
   }
 
   /** Conecta el boton de correr del movil, igual que el de saltar. */

@@ -8,9 +8,25 @@ import {
   progressOf,
   SLASH_SECONDS,
   slashEdge,
+  stabLine,
   CHIPS_PER_HIT,
   desaturate,
 } from '../packages/client/src/effects.js';
+
+describe('La estocada del modo preciso', () => {
+  it('va recta de un extremo al otro: del borde de la pantalla a lo golpeado', () => {
+    const from = { x: 1, y: 2, z: 3 };
+    const to = { x: 4, y: 0, z: 7 };
+    const line = stabLine(from, to);
+    expect(line[0]).toEqual(from);
+    expect(line[line.length - 1]).toEqual(to);
+    // Todos los puntos en la recta: el del medio, en el medio.
+    const mid = line[Math.floor(line.length / 2)];
+    expect(mid.x).toBeCloseTo(2.5);
+    expect(mid.y).toBeCloseTo(1);
+    expect(mid.z).toBeCloseTo(5);
+  });
+});
 import { debrisPalette, LOOKS, ROCK_FACES } from '../packages/client/src/palette.js';
 
 /**
