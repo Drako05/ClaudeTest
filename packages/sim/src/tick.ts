@@ -11,6 +11,7 @@ import { CHUNK_SIZE, DAY_TICKS, TICK_DT, type Intent } from '@verdant/shared';
 import { EntityKind, EntityStore } from './entities.js';
 import { moveAirborne, moveEntity, RUN_MULTIPLIER } from './systems/movement.js';
 import { applyVertical, takeOff } from './systems/jump.js';
+import { autoJumpDue } from './systems/autojump.js';
 import { spendJump, updateSurvival } from './systems/survival.js';
 import {
   craftNear,
@@ -162,7 +163,10 @@ export function step(state: GameState, intent: Intent): void {
     let jumped = false;
     if (entities.grounded[playerId]) {
       moveEntity(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT, intent.run);
-      if (intent.jump) jumped = takeOff(entities, playerId);
+      // El auto salto es un salto como otro: despega igual y cobra igual.
+      const autoJump =
+        intent.autoJump && autoJumpDue(world, entities, playerId, intent.moveX, intent.moveY, intent.run);
+      if (intent.jump || autoJump) jumped = takeOff(entities, playerId);
     } else {
       moveAirborne(world, entities, playerId, intent.moveX, intent.moveY, TICK_DT, intent.run);
     }

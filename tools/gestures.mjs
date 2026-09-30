@@ -371,6 +371,32 @@ console.log(`  bolsa a la cintura: ${JSON.stringify(belted.worn)}, casillas ${be
 check(belted.worn[0] === 20 && belted.openSlots === 18, 'arrastrar la bolsa a la cintura con el dedo no la puso');
 await page.screenshot({ path: 'screenshots/movil-personaje-ropa.png' });
 
+// La barra deslizable (pedido del autor, 2026-09-30): en un telefono mas bajo
+// (375x640) la rejilla no cabe. Arrastrar el mando con el dedo la desliza, y
+// no arrastra ninguna casilla.
+await tapReal(await at('#invTabs button:nth-child(2)'));
+await page.setViewportSize({ width: 375, height: 640 });
+await page.waitForTimeout(400);
+const railAt = () => page.evaluate(() => {
+  const g = document.getElementById('invGrid');
+  const rail = g.parentElement.querySelector('.rail');
+  const t = rail.querySelector('i').getBoundingClientRect();
+  return {
+    shown: getComputedStyle(rail).visibility === 'visible',
+    top: g.scrollTop, max: g.scrollHeight - g.clientHeight,
+    thumb: { x: t.x + t.width / 2, y: t.y + t.height / 2 },
+  };
+});
+const rail0 = await railAt();
+const moves0 = (await probe()).itemsSent.move;
+await dragReal(rail0.thumb, { x: rail0.thumb.x, y: rail0.thumb.y + 200 });
+const rail1 = await railAt();
+const afterRail = await probe();
+console.log(`  barra deslizable: ${rail0.shown ? 'se ve' : 'no se ve'}, deslizado ${rail0.top} -> ${rail1.top.toFixed(0)} de ${rail1.max}`);
+check(rail0.shown && rail0.max > 0, 'con la bolsa la rejilla no desborda o la barra no se ve');
+check(rail1.top > rail0.top + 10, 'arrastrar el mando con el dedo no deslizo la rejilla');
+check(afterRail.itemsSent.move === moves0 && !afterRail.discardAsk, 'arrastrar el mando movio o tiro una casilla');
+
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();
 server.close();

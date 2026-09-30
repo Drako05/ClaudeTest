@@ -4,7 +4,8 @@
  *
  * **El hambre gasta segun el esfuerzo** (decision del autor, 2026-09-30):
  * quieto o andando se vacia en un dia de juego; corriendo, mas deprisa en la
- * misma proporcion en que se corre mas deprisa; y cada salto cuesta un 1 %.
+ * misma proporcion en que se corre mas deprisa; y cada salto cuesta un 0,5 %
+ * (fue un 1 % hasta que el autor lo bajo, el mismo dia).
  */
 
 import { DAY_TICKS, TICK_DT } from '@verdant/shared';
@@ -20,8 +21,11 @@ export const HUNGER_EMPTY_DAYS = 1;
 /** Puntos de hambre perdidos por segundo, quieto o andando (de 100). */
 export const HUNGER_DECAY_PER_SEC = 100 / (HUNGER_EMPTY_DAYS * DAY_TICKS * TICK_DT);
 
-/** Lo que cuesta cada salto: el 1 % del hambre total, numero del autor. */
-export const JUMP_HUNGER = 1;
+/**
+ * Lo que cuesta cada salto, tambien el automatico: el 0,5 % del hambre total,
+ * numero del autor.
+ */
+export const JUMP_HUNGER = 0.5;
 
 /** Cobra un salto que ha despegado. Nunca baja de cero. */
 export function spendJump(store: EntityStore, id: number): void {

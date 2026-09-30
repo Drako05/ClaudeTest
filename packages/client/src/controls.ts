@@ -26,6 +26,8 @@ const ZOOM_HOLD_MS = 800;
 const WHEEL_STEP = 50;
 /** Lo minimo que se ve encendido un boton tocado (USAR, SALTAR). **Deduccion mia.** */
 const FLASH_MS = 150;
+/** Donde se recuerda el auto salto en el navegador (solo comodidad). */
+const AUTO_JUMP_STORAGE_KEY = 'verdant.autoJump';
 
 export interface Move {
   /** Vector en el plano de la PANTALLA, sin rotar. Lo rota la camara. */
@@ -364,6 +366,55 @@ export class Controls {
       el.classList.add('on');
       setTimeout(() => el.classList.remove('on'), FLASH_MS);
     }
+  }
+
+  /**
+   * Auto salto: andando hacia un bloque que se sube de un salto, se salta solo
+   * justo antes de chocar (lo decide el nucleo, `systems/autojump.ts`).
+   * Interruptor del movil, montado sobre SALTAR (decision del autor,
+   * 2026-09-30): arranca apagado y **se recuerda** en el navegador de cada
+   * dispositivo, como el angulo de vision.
+   */
+  autoJump = Controls.storedAutoJump();
+  private autoJumpEl: HTMLElement | null = null;
+
+  private static storedAutoJump(): boolean {
+    try {
+      return window.localStorage.getItem(AUTO_JUMP_STORAGE_KEY) === '1';
+    } catch {
+      // Sin almacenamiento (ventana privada, datos bloqueados): apagado.
+      return false;
+    }
+  }
+
+  private toggleAutoJump(): void {
+    this.autoJump = !this.autoJump;
+    this.showAutoJump();
+    try {
+      window.localStorage.setItem(AUTO_JUMP_STORAGE_KEY, this.autoJump ? '1' : '0');
+    } catch {
+      // Se aplica igual; solo no se recordara.
+    }
+  }
+
+  private showAutoJump(): void {
+    this.autoJumpEl?.classList.toggle('on', this.autoJump);
+    this.autoJumpEl?.setAttribute('aria-pressed', String(this.autoJump));
+  }
+
+  /** Conecta el boton de auto salto, con el mismo toque que el de correr. */
+  bindAutoJumpButton(el: HTMLElement | null): void {
+    if (!el) return;
+    this.autoJumpEl = el;
+    this.showAutoJump();
+    const press = (e: Event) => {
+      e.preventDefault();
+      this.toggleAutoJump();
+    };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('pointerdown', (e) => {
+      if ((e as PointerEvent).pointerType !== 'touch') press(e);
+    });
   }
 
   /** Conecta el boton de correr del movil, igual que el de saltar. */

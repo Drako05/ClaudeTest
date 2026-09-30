@@ -23,5 +23,6 @@ export * from './tick.js';
 export * from './debug.js';
 export * from './systems/movement.js';
 export * from './systems/jump.js';
+export * from './systems/autojump.js';
 export * from './systems/survival.js';
 export * from './systems/gathering.js';

@@ -863,7 +863,11 @@ tres barras en OTROS, y CORRER y SALTAR con su glifo; el nombre va en
 USAR y en la diagonal de arriba a la izquierda del ataque: un toque cambia de
 modo de golpe, su icono dice cual —un tajo para el barrido, una mirilla para
 el preciso— y **se enciende al pulsarlo**, como USAR y SALTAR (en PC tambien,
-y con TAB). Sustituyo al racimo en fila
+y con TAB). Y **AUTO SALTO** (2026-09-30), un redondo pequeno montado sobre la
+esquina de arriba a la izquierda de SALTAR, como el boceto del autor: un toque
+lo enciende o apaga, se ilumina encendido, **arranca apagado y se recuerda**
+en el navegador de cada dispositivo (`localStorage`, como el angulo de
+vision). Solo en el movil, decision del autor. Sustituyo al racimo en fila
 —accion, salto, carrera, comer y sembrar, ordenados por el borde— y a los
 botones de comer y sembrar, que ahora son USAR con la baya o la semilla en la
 mano. Los tamanos son mios.
@@ -1033,10 +1037,23 @@ suyos: puede corregirlos, y `tests/jump.test.ts` afirma la relacion que los ata.
 de juego —uno—, y el ritmo **se deriva de `DAY_TICKS`**, para que si el dia
 cambia de duracion el hambre lo siga; corriendo y avanzando, por
 `RUN_MULTIPLIER`, el mismo factor que la velocidad, y con la carrera encendida
-pero quieto, como quieto; y cada salto que despega cuesta `JUMP_HUNGER`, un 1 %.
+pero quieto, como quieto; y cada salto que despega cuesta `JUMP_HUNGER`, un 0,5 %
+(fue un 1 %; lo bajo el autor el mismo dia), el automatico tambien.
 Lo de «avanzando» se mide en el tick comparando la posicion antes y despues de
 moverse (deduccion mia: empujar contra una pared no es correr). Todo respeta
 `survivalFrozen`, y `skipTime` gasta como quieto.
+
+**El AUTO SALTO** (decision del autor, 2026-09-30; `systems/autojump.ts`):
+andando hacia un bloque que se sube de un salto, se salta solo **justo antes
+de chocar**, y se sube sin rozar la cara. Solo si cabe en el salto
+(`JUMP_HEIGHT`, el apice, ~1,16): ni dos bloques, ni una mesa sobre un
+escalon, ni el horno de 1,25, y delante de agua o de un tronco tampoco. Es un
+estado de la `Intent` (`autoJump`), como correr, y **cobra como un salto**. Se
+mira la linea del centro del cuerpo, que es la que decide la altura en la
+colision, y se salta a la distancia que se recorre mientras los pies pasan del
+borde del bloque, con un tick de mas: sin el, a paso de marcha se rozaba la
+cara un tick (`tests/jump.test.ts` cuenta los ticks parados y exige cero). Esa
+lectura, y que delante de agua no salte, son deduccion mia.
 
 ## Recoleccion y fabricacion
 
@@ -1150,6 +1167,16 @@ Lo que el codigo tiene que respetar:
   de recetas se quedan fijas, y solo se deslizan la rejilla del inventario o
   la lista de recetas, centradas; las categorias, cuando sean mas, a los
   lados. El humo lo mide pagina por pagina.
+- **Con mas de lo que cabe, una barra deslizable** a la derecha de la
+  rejilla y de la lista de recetas (pedido del autor, 2026-09-30; solo en el
+  movil): con mas casillas, el fondo de la rejilla casi no se encontraba con
+  el dedo, porque todo es casilla y apoyar en una empieza un arrastre. Se ve
+  **siempre que desborde, y solo entonces**; el mando se arrastra y tocar la
+  pista lo lleva alli. Las cuentas son puras (`scroll-rail.ts`, con su test) y
+  el DOM va en `scroll-rail-view.ts`, que se engancha a cualquier contenedor:
+  la lista de recetas es la misma para la mesa y el horno, asi que cuando
+  haya muchas ya esta. El humo lo mide en un telefono de 375x640, donde 16
+  casillas no caben, y los gestos arrastran el mando con un dedo de verdad.
 - **Arrastrar se prueba con toques de verdad** (`tools/gestures.mjs`): dentro
   de la barra con el inventario cerrado (y al vacio, sin tirar), de casilla a
   casilla y de la rejilla a la barra, y mantener una receta 1,5 s. En PC lo

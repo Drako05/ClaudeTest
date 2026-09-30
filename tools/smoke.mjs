@@ -1363,6 +1363,34 @@ async function mobilePass(browser, baseUrl) {
   check(Math.abs(lp.sel.top - li.sel.top) < 1 && Math.abs(lp.sel.left - li.sel.left) < 1,
     'la zona de descripcion de PERSONAJE no encaja con la de INVENTARIO');
   check(pages.join() === 'inventario,recetas,personaje,inventario', `las pestanas no recorren las paginas: ${pages}`);
+  // La barra deslizable (pedido del autor, 2026-09-30): se ve siempre que la
+  // rejilla tenga mas casillas de las que caben, y solo entonces. Aqui caben;
+  // en un telefono mas bajo (375x640) no, y la barra sale al lado.
+  const railOf = () => page.evaluate(() => {
+    const g = document.getElementById('invGrid');
+    const rail = g.parentElement.querySelector('.rail');
+    const r = (el) => el.getBoundingClientRect().toJSON();
+    return {
+      overflows: g.scrollHeight > g.clientHeight + 0.5,
+      shown: getComputedStyle(rail).visibility === 'visible' && rail.offsetParent !== null,
+      grid: r(g), rail: r(rail), thumb: r(rail.querySelector('i')),
+      panel: r(document.getElementById('invPanel')),
+    };
+  });
+  const railTall = await railOf();
+  await page.setViewportSize({ width: 375, height: 640 });
+  await page.waitForTimeout(300);
+  const railShort = await railOf();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(300);
+  console.log(`  barra deslizable: 390x844 ${railTall.overflows ? 'desborda' : 'cabe'} (${railTall.shown ? 'se ve' : 'no se ve'}), ` +
+    `375x640 ${railShort.overflows ? 'desborda' : 'cabe'} (${railShort.shown ? 'se ve' : 'no se ve'}, mando ${railShort.thumb.height.toFixed(0)} de ${railShort.rail.height.toFixed(0)})`);
+  check(!railTall.overflows && !railTall.shown, `con las casillas a la vista, la barra no deberia verse: ${JSON.stringify(railTall)}`);
+  check(railShort.overflows && railShort.shown, `con mas casillas de las que caben, no se ve la barra: ${JSON.stringify(railShort)}`);
+  check(railShort.thumb.height > 0 && railShort.thumb.height < railShort.rail.height - 1,
+    `el mando no mide la parte que se ve: ${railShort.thumb.height} de ${railShort.rail.height}`);
+  check(railShort.rail.left >= railShort.grid.right && railShort.rail.right <= railShort.panel.right,
+    `la barra no va al lado de la rejilla, dentro del panel: ${JSON.stringify(railShort)}`);
   await page.tap('#invOpen');
   check(!(await page.isVisible('#invPanel')), 'tocar otra vez no cerro el inventario');
 
@@ -1498,6 +1526,44 @@ async function mobilePass(browser, baseUrl) {
   check(spawn.running === false, 'se empieza corriendo');
   check(on.running === true && lit, 'el boton de correr no la encendio o no lo muestra');
   check(off.running === false, 'el boton de correr no la apago al segundo toque');
+
+  // AUTO SALTO (decision del autor, 2026-09-30): un boton pequeno montado sobre
+  // la esquina de arriba a la izquierda de SALTAR, interruptor con luz, que
+  // llega a la Intent y se recuerda.
+  const geo = await page.evaluate(() => {
+    const r = (id) => document.getElementById(id).getBoundingClientRect().toJSON();
+    return { auto: r('autoJump'), jump: r('jump'), run: r('run') };
+  });
+  const cx = (r) => (r.left + r.right) / 2;
+  const cy = (r) => (r.top + r.bottom) / 2;
+  const off45 = Math.hypot(cx(geo.auto) - cx(geo.jump), cy(geo.auto) - cy(geo.jump));
+  console.log(`  auto salto: ${geo.auto.width.toFixed(0)} px, a ${off45.toFixed(1)} del centro de SALTAR (radio ${(geo.jump.width / 2).toFixed(0)})`);
+  check(await page.isVisible('#autoJump'), 'no se ve el boton de auto salto');
+  check(geo.auto.width < geo.jump.width / 1.5, 'el auto salto no es pequeno');
+  check(cx(geo.auto) < cx(geo.jump) && cy(geo.auto) < cy(geo.jump) && Math.abs(off45 - geo.jump.width / 2) < 3,
+    `el auto salto no va sobre la esquina de arriba a la izquierda de SALTAR: ${JSON.stringify(geo)}`);
+  check(geo.auto.top >= geo.run.bottom || geo.auto.right <= geo.run.left, 'el auto salto pisa CORRER');
+  check(spawn.autoJump === false, 'el auto salto arranca encendido');
+  await tap(page, '#autoJump');
+  await page.waitForTimeout(150);
+  const autoOn = await state(page);
+  const autoLit = await page.isVisible('#autoJump.on');
+  check(autoOn.autoJump === true && autoLit, 'el boton de auto salto no lo encendio o no lo muestra');
+  // Y llega a la Intent: los ticks con el auto salto puesto crecen.
+  const autoLater = await waitForLoop(page, 10);
+  check(autoLater.sent.autoJump > autoOn.sent.autoJump, 'el auto salto no llega a la Intent');
+  // Se recuerda: una pagina nueva del mismo navegador arranca encendida.
+  const again = await context.newPage();
+  const reopened = await open(again, baseUrl);
+  check(reopened.autoJump === true && (await again.isVisible('#autoJump.on')), 'el auto salto no se recordo');
+  await again.close();
+  await tap(page, '#autoJump');
+  await page.waitForTimeout(150);
+  const autoOff = await state(page);
+  console.log(`  auto salto: ${spawn.autoJump} -> ${autoOn.autoJump} (luz: ${autoLit}, recordado: ${reopened.autoJump}) -> ${autoOff.autoJump}`);
+  check(autoOff.autoJump === false && !(await page.isVisible('#autoJump.on')), 'el auto salto no se apago al segundo toque');
+  const autoQuiet = await waitForLoop(page, 10);
+  check(autoQuiet.sent.autoJump === autoOff.sent.autoJump, 'apagado, el auto salto sigue llegando a la Intent');
 
   // Saltar y usar: el toque llega a la Intent.
   const b = await state(page);

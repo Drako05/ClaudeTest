@@ -340,7 +340,7 @@ describe('Congelar la supervivencia', () => {
 /**
  * El hambre gasta segun el esfuerzo (decision del autor, 2026-09-30): quieto o
  * andando se vacia en un dia de juego; corriendo y avanzando, por el mismo
- * factor que la velocidad; y cada salto que despega cuesta un 1 %.
+ * factor que la velocidad; y cada salto que despega cuesta un 0,5 %.
  */
 describe('El hambre segun el esfuerzo', () => {
   /**
@@ -394,13 +394,35 @@ describe('El hambre segun el esfuerzo', () => {
     expect(encendida).toBeCloseTo(quieto, 5);
   });
 
-  it('cada salto que despega cuesta un 1 % del hambre', () => {
+  it('cada salto que despega cuesta un 0,5 % del hambre', () => {
     const state = createGame(42);
     const before = state.entities.hunger[state.playerId];
     step(state, intent({ jump: true }));
     const drain = HUNGER_DECAY_PER_SEC * TICK_DT;
     expect(before - state.entities.hunger[state.playerId]).toBeCloseTo(JUMP_HUNGER + drain, 4);
-    expect(JUMP_HUNGER).toBe(1);
+    expect(JUMP_HUNGER).toBe(0.5);
+  });
+
+  it('el auto salto cobra como un salto: contra una mesa, un 0,5 %', () => {
+    // Una mesa delante (1 de alto, se sube de un salto) y andando hacia ella.
+    const drainOf = (auto: boolean) => {
+      const state = createGame(42);
+      const tx = Math.floor(state.entities.x[state.playerId]);
+      const ty = Math.floor(state.entities.y[state.playerId]);
+      state.world.setFeature(tx + 1, ty, Feature.Workbench);
+      const before = state.entities.hunger[state.playerId];
+      let airborne = false;
+      for (let t = 0; t < 30; t++) {
+        step(state, intent({ moveX: 1, autoJump: auto }));
+        if (!state.entities.grounded[state.playerId]) airborne = true;
+      }
+      return { lost: before - state.entities.hunger[state.playerId], airborne };
+    };
+    const con = drainOf(true);
+    const sin = drainOf(false);
+    expect(con.airborne).toBe(true);
+    expect(sin.airborne).toBe(false);
+    expect(con.lost - sin.lost).toBeCloseTo(JUMP_HUNGER, 3);
   });
 
   it('pulsar saltar en el aire no cobra nada', () => {

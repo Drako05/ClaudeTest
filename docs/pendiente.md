@@ -79,9 +79,13 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Los dibujos del **tajo** y la **mirilla**; los anillos de PC de **56 px** y trazo 5 | Ajustes de la tanda 2 | SVG y CSS en `index.html` |
 | La **mochila** redibujada como tu adjunto, casi cuadrada, a **34 px** en el boton (antes 28) | Ajustes de la tanda 2, 2.ª ronda | SVG y CSS en `index.html` |
 | MODO en el movil de **44 px**, a 72 px (en cada eje) del centro del ataque | Ajustes de la tanda 2 | CSS |
+| Auto salto: se mira la **linea del centro del cuerpo** (la que decide la altura en la colision) y se salta a la distancia que se recorre mientras los pies pasan del borde, **con un tick de mas** | Ajustes de la tanda 2, 4.ª ronda | `systems/autojump.ts` |
+| Auto salto: la altura maxima es **el apice exacto** (~1,16); delante de **agua o de un tronco** no salta | Ajustes de la tanda 2, 4.ª ronda | una linea en `autojump.ts` |
+| El boton AUTO SALTO: **30 px**, una **«A»**, con su centro en el borde de SALTAR a 45 grados | Ajustes de la tanda 2, 4.ª ronda | CSS en `index.html` |
+| La barra deslizable: franja tactil de **24 px**, pista de **6** y mando de **10**, el mando nunca menor de **44 px** | Ajustes de la tanda 2, 4.ª ronda | CSS y `MIN_THUMB` en `scroll-rail.ts` |
 | En el aire, **sin mando no se avanza**: es «como en el suelo» | Ajustes de la tanda 2, 3.ª ronda | una linea en `movement.ts` |
 | Correr gasta mas hambre solo si **de verdad se avanza** en el tick: empujando contra una pared con la carrera encendida se gasta como andando | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
-| El salto cobra su 1 % **al despegar**, no al pulsar: pulsar en el aire no cobra | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
+| El salto cobra su 0,5 % **al despegar**, no al pulsar: pulsar en el aire no cobra | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
 | Saltar el tiempo (`skipTime`) gasta hambre **como quieto** | Ajustes de la tanda 2, 3.ª ronda | — |
 | Zona del joystick **sin medir** (antes de que aparezcan los botones tactiles): el cuadrante de antes | Ajustes de la tanda 2, 3.ª ronda | una linea en `gestures.ts` |
 | Cubiertos: la cuchara **3,2** a la izquierda y el tenedor **1,5** a la derecha; puas a **3,2** de eje a eje | Ajustes de la tanda 2, 3.ª ronda | SVG en `index.html` |
@@ -462,6 +466,25 @@ golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
 
+## Ajustes de la tanda 2, 4.ª ronda — HECHO (2026-09-30)
+
+La CI de la 3.ª ronda (`51f6c7b`) salio en verde. Lo que pediste, y lo que
+respondiste:
+- **Una barra deslizable en el movil**, al lado de la rejilla del inventario:
+  se ve siempre que haya mas casillas de las que caben, y su mando se arrastra
+  con el dedo (tocar la pista tambien lo lleva alli). La misma, lista, en las
+  recetas: la lista es la misma para la mesa y el horno. Solo en el movil,
+  como respondiste.
+- **AUTO SALTO**: un boton pequeno sobre SALTAR, como tu boceto. Encendido,
+  andando hacia un bloque que se sube de un salto se salta solo justo antes de
+  chocar, y se sube sin rozar la cara. No salta si el bloque, o varios
+  apilados, pasan del salto (dos bloques, una mesa sobre un escalon, el horno
+  de 1,25). Solo en el movil; **cobra como un salto**; arranca apagado y **se
+  recuerda** en cada dispositivo.
+- **El salto cuesta 0,5 %** del hambre, no 1 %; el automatico tambien.
+
+Lo que decidi yo va arriba, en «Esperando tu juicio».
+
 ## Ajustes de la tanda 2, 3.ª ronda — HECHO (2026-09-30)
 
 La CI de la 2.ª ronda (`5b3a3f6`) salio en verde. Lo que pediste:
@@ -481,7 +504,7 @@ La CI de la 2.ª ronda (`5b3a3f6`) salio en verde. Lo que pediste:
     se vaciaba en unos 3 minutos; ahora en 8;
   - corriendo y avanzando, **×1,6**, el mismo factor que la velocidad; con la
     carrera encendida y quieto, como quieto;
-  - **cada salto, un 1 %** del hambre total.
+  - **cada salto, un 1 %** del hambre total (bajado a 0,5 % en la 4.ª ronda).
 
 Lo que decidi yo va arriba, en «Esperando tu juicio».
 

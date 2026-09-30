@@ -59,7 +59,7 @@ export function speedOf(running: boolean): number {
 }
 
 /** True si el AABB centrado en (cx, cy) solapa algun tile solido. */
-function collides(world: World, cx: number, cy: number): boolean {
+export function collides(world: World, cx: number, cy: number): boolean {
   const minX = Math.floor(cx - BODY_RADIUS);
   const maxX = Math.floor(cx + BODY_RADIUS);
   const minY = Math.floor(cy - BODY_RADIUS);

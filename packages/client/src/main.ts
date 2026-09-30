@@ -178,6 +178,7 @@ projButton.addEventListener('click', () => {
 controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));
 controls.bindRunButton(document.getElementById('run'));
+controls.bindAutoJumpButton(document.getElementById('autoJump'));
 for (const id of ['modeBar', 'modeTouch']) controls.bindModeButton(document.getElementById(id));
 controls.bindActionButton(document.getElementById('action'));
 controls.bindUseButton(document.getElementById('use'));
@@ -503,7 +504,8 @@ let airPeak = 0;
  * una casilla que lo admita, y eso ya lo miden los tests del nucleo. Aqui se
  * mide la otra mitad, que el toque llega.
  */
-const sent = { harvest: 0, jump: 0, use: 0 };
+/** Lo que ha salido en la Intent: pulsaciones, y ticks con el auto salto puesto. */
+const sent = { harvest: 0, jump: 0, use: 0, autoJump: 0 };
 
 /** Ticks desde la ultima accion, para repetir al mantener pulsado. */
 let actionTicks = 0;
@@ -543,6 +545,7 @@ function frame(now: number): void {
   intent.moveX = fwd.x * -move.y + rgt.x * move.x;
   intent.moveY = fwd.y * -move.y + rgt.y * move.x;
   intent.run = controls.running;
+  intent.autoJump = controls.autoJump;
   intent.precise = controls.precise;
   // La mirada es la de la camara, decision del autor: se acciona hacia donde se
   // mira, con el rumbo real y su inclinacion, que inclinan el sector del golpe
@@ -618,6 +621,7 @@ function frame(now: number): void {
     if (intent.harvest) sent.harvest++;
     if (intent.jump) sent.jump++;
     if (intent.use) sent.use++;
+    if (intent.autoJump) sent.autoJump++;
     const pisabaAntes = state.entities.grounded[state.playerId];
     // La estocada del modo preciso llega hasta lo que golpea, y se mide ANTES
     // del paso: despues, lo que cayo ya no esta y la recta se alargaria.
@@ -840,6 +844,7 @@ Object.defineProperty(window, '__verdant', {
         state.world.groundHeightAt(camera.active.position.x, camera.active.position.z),
       playerVisible: player?.visible ?? false,
       running: controls.running,
+      autoJump: controls.autoJump,
       dev: dev.active,
       timeScale: dev.timeScale,
       survivalFrozen: dev.survivalFrozen,

@@ -736,6 +736,13 @@ export interface Intent {
    */
   precise: boolean;
   /**
+   * **Auto salto** (decision del autor, 2026-09-30; boton del movil): andando
+   * hacia un bloque que se sube de un salto, se salta solo justo antes de
+   * chocar. Es un ESTADO, como `run`; lo que decide si toca saltar es el
+   * nucleo (`systems/autojump.ts`), que es quien sabe de alturas.
+   */
+  autoJump: boolean;
+  /**
    * Direccion a la que se quiere mirar, independiente de hacia donde se anda.
    *
    * En (0,0) no hay apuntado y la mirada sigue al movimiento, que es como se
@@ -776,6 +783,7 @@ export function emptyIntent(): Intent {
     jump: false,
     run: false,
     precise: false,
+    autoJump: false,
     aimX: 0,
     aimY: 0,
     aimZ: 0,

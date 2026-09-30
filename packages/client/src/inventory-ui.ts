@@ -40,6 +40,7 @@ import {
   toolStats,
 } from '@verdant/shared';
 import { makePlayerArt } from './art.js';
+import { ScrollRail } from './scroll-rail-view.js';
 
 /** Lo que se tarda en fabricar manteniendo pulsado (decision del autor). */
 export const CRAFT_HOLD_MS = 1500;
@@ -178,6 +179,12 @@ export class InventoryUi {
   }
 
   constructor(private readonly current: () => GameState) {
+    // La barra deslizable del movil, a la rejilla y a las recetas (tambien las
+    // de la mesa y el horno, que usan la misma lista): con mas casillas de las
+    // que caben, el fondo de la rejilla casi no se encuentra con el dedo
+    // (pedido del autor, 2026-09-30).
+    new ScrollRail(this.grid);
+    new ScrollRail(this.recipeList);
     // La barra de la mano: tocar elige; arrastrar mueve (decision del autor).
     for (let i = 0; i < HOTBAR_SLOTS; i++) {
       const b = this.slotButton(i);

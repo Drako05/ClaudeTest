@@ -78,6 +78,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Boton ATAQUE | Golpear; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar el golpe |
 | Boton USAR | Usar lo de la mano: comer una baya, sembrar una semilla |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
+| Boton A, sobre SALTAR | Auto salto: andando hacia un bloque que se sube de un salto, salta solo; interruptor que se recuerda |
 | Boton MODO (junto al ataque) | Modo de golpe: el icono dice cual, tajo (barrido) o mirilla (preciso) |
 | Barra de arriba | Tocar una casilla la pone en la mano; arrastrar las ordena |
 | Boton INVENTARIO | Inventario, con pestanas Personaje, Inventario y Recetas; como en PC, arrastrar y mantener |

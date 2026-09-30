@@ -20,11 +20,13 @@ import { describe, expect, it } from 'vitest';
 import { emptyIntent, TICK_DT } from '@verdant/shared';
 import {
   applyVertical,
+  autoJumpDue,
   createGame,
   EntityKind,
   EntityStore,
   GRAVITY,
   groundHeight,
+  JUMP_HEIGHT,
   JUMP_SPEED,
   moveAirborne,
   moveEntity,
@@ -331,6 +333,118 @@ describe('En el aire se anda como en el suelo', () => {
     const vz = store.vz[id];
     expect(takeOff(store, id)).toBe(false);
     expect(store.vz[id]).toBe(vz);
+  });
+});
+
+/**
+ * El auto salto (decision del autor, 2026-09-30): andando hacia un bloque que
+ * se sube de un salto, se salta solo justo antes de chocar, y se sube sin
+ * quedarse rozando la cara. Mas alto que el salto, nada.
+ */
+describe('El auto salto', () => {
+  /** Un mundo de suelos a mano: `floorAt` es lo que pisa el cuerpo. */
+  function floors(floorAt: (x: number, y: number) => number, solidAt: (x: number) => boolean = () => false): World {
+    return {
+      levelAt: (x: number, y: number) => Math.floor(floorAt(x, y)),
+      groundHeightAt: floorAt,
+      floorHeightAt: floorAt,
+      isSolidAt: (x: number) => solidAt(x),
+    } as unknown as World;
+  }
+
+  /** Anda hacia el este con el auto salto como en `tick.ts`, y cuenta. */
+  function walkEast(world: World, opts: { auto: boolean; running?: boolean; moveX?: number; ticks?: number }) {
+    const store = new EntityStore(4);
+    const id = store.spawn(EntityKind.Player, 0.5, 0.5);
+    store.z[id] = world.floorHeightAt(0.5, 0.5);
+    const moveX = opts.moveX ?? 1;
+    let jumps = 0;
+    let stalls = 0;
+    for (let t = 0; t < (opts.ticks ?? 90); t++) {
+      const x0 = store.x[id];
+      if (store.grounded[id]) {
+        moveEntity(world, store, id, moveX, 0, TICK_DT, opts.running);
+        if (opts.auto && autoJumpDue(world, store, id, moveX, 0, !!opts.running)) {
+          if (takeOff(store, id)) jumps++;
+        }
+      } else {
+        moveAirborne(world, store, id, moveX, 0, TICK_DT, opts.running);
+      }
+      applyVertical(world, store, id, TICK_DT);
+      if (moveX !== 0 && store.x[id] === x0) stalls++;
+    }
+    return { x: store.x[id], z: store.z[id], jumps, stalls };
+  }
+
+  // Un bloque de 1 a partir de x = 3.
+  const bloque = floors((x) => (x >= 3 ? 1 : 0));
+
+  it('andando hacia un bloque de 1 salta solo y sube sin rozar la cara', () => {
+    const out = walkEast(bloque, { auto: true });
+    expect(out.jumps).toBe(1);
+    expect(out.z).toBe(1);
+    expect(out.x).toBeGreaterThan(6);
+    // «De forma fluida»: ningun tick se queda parado contra la pared.
+    expect(out.stalls).toBe(0);
+  });
+
+  it('corriendo, igual', () => {
+    const out = walkEast(bloque, { auto: true, running: true });
+    expect(out.jumps).toBe(1);
+    expect(out.z).toBe(1);
+    expect(out.stalls).toBe(0);
+  });
+
+  it('sin el auto salto se para contra la cara', () => {
+    const out = walkEast(bloque, { auto: false });
+    expect(out.jumps).toBe(0);
+    expect(out.z).toBe(0);
+    expect(out.x).toBeLessThan(3);
+    expect(out.stalls).toBeGreaterThan(0);
+  });
+
+  it('dos bloques, o una mesa sobre un escalon, no: se queda al pie sin saltar', () => {
+    for (const alto of [2, 1 + 1]) {
+      const out = walkEast(floors((x) => (x >= 3 ? alto : 0)), { auto: true });
+      expect(out.jumps).toBe(0);
+      expect(out.z).toBe(0);
+      expect(out.x).toBeLessThan(3);
+    }
+  });
+
+  it('el horno, de 1,25, tampoco: pasa del salto', () => {
+    expect(1.25).toBeGreaterThan(JUMP_HEIGHT);
+    const out = walkEast(floors((x) => (x >= 3 && x < 4 ? 1.25 : 0)), { auto: true });
+    expect(out.jumps).toBe(0);
+    expect(out.x).toBeLessThan(3);
+  });
+
+  it('un talud se anda: no hace saltar', () => {
+    const talud = floors((x) => Math.min(1, Math.max(0, x - 3)));
+    const out = walkEast(talud, { auto: true });
+    expect(out.jumps).toBe(0);
+    expect(out.z).toBe(1);
+  });
+
+  it('quieto frente al bloque no salta', () => {
+    const out = walkEast(bloque, { auto: true, moveX: 0 });
+    expect(out.jumps).toBe(0);
+  });
+
+  it('delante de agua no salta', () => {
+    const agua = floors(() => 0, (x) => x >= 3);
+    const out = walkEast(agua, { auto: true });
+    expect(out.jumps).toBe(0);
+  });
+
+  it('salta justo antes, no en cuanto ve el bloque', () => {
+    // Desde lejos no: a 2 casillas del bloque, andando, aun no toca.
+    const store = new EntityStore(4);
+    const id = store.spawn(EntityKind.Player, 0.9, 0.5);
+    store.z[id] = 0;
+    expect(autoJumpDue(bloque, store, id, 1, 0, false)).toBe(false);
+    store.x[id] = 2.6;
+    expect(autoJumpDue(bloque, store, id, 1, 0, false)).toBe(true);
   });
 });
 

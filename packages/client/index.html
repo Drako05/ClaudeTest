@@ -138,6 +138,18 @@
       #jump { bottom: calc(10px + var(--atk) + 12px + env(safe-area-inset-bottom)); }
       #run { bottom: calc(10px + var(--atk) + 12px + var(--side) + 10px + env(safe-area-inset-bottom)); }
       #run b, #jump b { font-size: 26px; }
+      /* AUTO SALTO: pequeno y montado sobre la esquina de arriba a la izquierda
+         de SALTAR, como el boceto del autor (2026-09-30). Su centro cae en el
+         borde de SALTAR a 45 grados; el tamano y la letra son mios. */
+      :root { --autob: 30px; }
+      #autoJump {
+        /* Encima de SALTAR por ir despues en el DOM, con el mismo z-index. */
+        width: var(--autob); height: var(--autob);
+        right: calc(12px + var(--side) / 2 + var(--side) / 2 * .7071 - var(--autob) / 2 + env(safe-area-inset-right));
+        bottom: calc(10px + var(--atk) + 12px + var(--side) / 2 + var(--side) / 2 * .7071 - var(--autob) / 2 + env(safe-area-inset-bottom));
+        font-size: 15px;
+      }
+      #autoJump b { font-weight: 800; }
       /* Los anillos de salud y hambre, los mismos de PC, uno al lado del otro en
          la esquina de abajo a la izquierda y apoyados en el borde de abajo de
          ATAQUE y USAR (decisiones del autor, 2026-09-30). Entre USAR y ATAQUE
@@ -566,7 +578,32 @@
          lista de recetas (pedido del autor). */
       body.touch-active .invPage { display: none; }
       body.touch-active .invPage.current { display: flex; flex: 1; }
-      body.touch-active #invGrid, body.touch-active #recipeList { max-height: none; flex: 0 1 auto; min-height: 0; }
+      body.touch-active #invGrid, body.touch-active #recipeList { max-height: none; min-height: 0; }
+      /* La barra deslizable (`scroll-rail-view.ts`), solo en el movil. En PC
+         la envoltura no cuenta y la barra no se ve. En el movil la envoltura
+         es lo que encoge en la columna, la rejilla se estira a su alto y se
+         desliza dentro, y la barra cuelga a su derecha sin moverla del centro.
+         La franja tactil de 24 px, la pista de 6 y el mando de 10, mios. */
+      .railBox { display: contents; }
+      .rail { display: none; }
+      body.touch-active .railBox {
+        display: flex; position: relative; flex: 0 1 auto; min-height: 0;
+      }
+      body.touch-active .railBox > * { scrollbar-width: none; }
+      body.touch-active .railBox > ::-webkit-scrollbar { display: none; }
+      body.touch-active .rail {
+        display: block; visibility: hidden; position: absolute; top: 0; bottom: 0;
+        left: calc(100% + 4px); width: 24px; touch-action: none;
+      }
+      body.touch-active .rail.shown { visibility: visible; }
+      .rail::before {
+        content: ''; position: absolute; top: 0; bottom: 0; left: 9px; width: 6px;
+        border-radius: 3px; background: rgba(140, 190, 255, 0.18);
+      }
+      .rail i {
+        position: absolute; top: 0; left: 7px; width: 10px; border-radius: 5px;
+        background: rgba(170, 214, 255, .85); box-shadow: 0 0 0 1px rgba(8, 14, 28, .6);
+      }
       /* Las pestanas sustituyen a los titulos: todo el ancho en tres celdas
          iguales, cada nombre centrado en la suya y en orden fijo. */
       body.touch-active .invPage h2 { display: none; }
@@ -818,6 +855,10 @@
       </button>
       <button id="jump" type="button" aria-label="Saltar">
         <b aria-hidden="true">&#8593;</b>
+      </button>
+      <!-- AUTO SALTO, montado sobre SALTAR (boceto del autor). Interruptor. -->
+      <button id="autoJump" type="button" aria-label="Auto salto" aria-pressed="false">
+        <b aria-hidden="true">A</b>
       </button>
       <!-- Una mano abierta. -->
       <button id="use" type="button" aria-label="Usar">
