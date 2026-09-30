@@ -41,6 +41,11 @@ export class Controls {
   onToggleInventory: (() => void) | null = null;
   /** La rueda recorre la barra de la mano: `+1` la siguiente, `-1` la anterior. */
   onHotbarStep: ((delta: number) => void) | null = null;
+  /**
+   * CTRL mantenido en PC (decision del autor, 2026-09-30): `true` al pulsarlo,
+   * que suelta el cursor sin pausar, y `false` al soltarlo.
+   */
+  onFreeCursor: ((held: boolean) => void) | null = null;
   /** El raton capturado de PC, si lo hay: decide los clics antes que los gestos. */
   mouseLook: MouseLook | null = null;
 
@@ -79,6 +84,12 @@ export class Controls {
       if (!e.repeat && (e.code === 'ShiftLeft' || e.code === 'ShiftRight')) {
         this.toggleRun();
       }
+      // TAB cambia el modo de golpe (decision del autor) y no mueve el foco.
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        if (!e.repeat) this.toggleMode();
+      }
+      if (!e.repeat && (e.code === 'ControlLeft' || e.code === 'ControlRight')) this.onFreeCursor?.(true);
       this.keys.add(e.code);
       if (e.repeat) return;
       switch (e.code) {
@@ -110,7 +121,10 @@ export class Controls {
           break;
       }
     });
-    window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    window.addEventListener('keyup', (e) => {
+      this.keys.delete(e.code);
+      if (e.code === 'ControlLeft' || e.code === 'ControlRight') this.onFreeCursor?.(false);
+    });
     window.addEventListener('blur', () => {
       this.keys.clear();
       this.gestures.clear();
@@ -121,7 +135,10 @@ export class Controls {
     // entrada, sin esperar a que el jugador adivine que existe.
     if (window.matchMedia?.('(pointer: coarse)').matches) Controls.revealTouchUi();
 
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    // El menu del navegador no sale nunca, y en todo el documento: con solo el
+    // lienzo, el clic derecho que abre una estacion lo dejaba caer sobre el
+    // panel recien abierto bajo el cursor (lo vio el autor).
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('pointerdown', (e) => {
       // Y si no, al primer dedo de verdad. No es adorno: un portatil tactil
       // declara puntero fino, asi que sin esta segunda via sus botones no
@@ -294,6 +311,39 @@ export class Controls {
     document.body.classList.toggle('running', this.running);
     this.runEl?.classList.toggle('on', this.running);
     this.runEl?.setAttribute('aria-pressed', String(this.running));
+  }
+
+  /**
+   * Golpe en modo preciso: solo el primer objetivo del centro de la mira; si
+   * no, el barrido. Interruptor, como correr: TAB en PC y el boton MODO (en PC
+   * junto a la barra de la mano; en el movil, junto al ataque). Arranca en
+   * barrido y no se recuerda (propuesta mia).
+   */
+  precise = false;
+  private readonly modeEls: HTMLElement[] = [];
+
+  private toggleMode(): void {
+    this.precise = !this.precise;
+    // El icono de cada boton dice el modo activo: tajo o mirilla (CSS).
+    document.body.classList.toggle('precise', this.precise);
+    for (const el of this.modeEls) {
+      el.setAttribute('aria-pressed', String(this.precise));
+      el.setAttribute('aria-label', this.precise ? 'Modo preciso' : 'Modo barrido');
+    }
+  }
+
+  /** Conecta un boton MODO: un toque o un clic cambia de modo. */
+  bindModeButton(el: HTMLElement | null): void {
+    if (!el) return;
+    this.modeEls.push(el);
+    const press = (e: Event) => {
+      e.preventDefault();
+      this.toggleMode();
+    };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('pointerdown', (e) => {
+      if ((e as PointerEvent).pointerType !== 'touch') press(e);
+    });
   }
 
   /** Conecta el boton de correr del movil, igual que el de saltar. */

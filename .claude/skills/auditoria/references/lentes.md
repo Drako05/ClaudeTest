@@ -53,6 +53,12 @@ que nadie toco es justo lo que ninguna tanda mira.
   13 FPS todo frame lleva tick y el fallo de 144 Hz no existe (#9).
 - Comprobaciones que dependen de donde quedo el jugador: se hacen desde el
   nacimiento o desde un sitio buscado con `?x=&y=`.
+- **Politicas del navegador que el headless no aplica** (#11): recapturar el
+  cursor sin gesto, pantalla completa, audio. Una comprobacion que pasa en
+  headless puede ser falsa en el Chrome del jugador: se fuerza el caso adverso
+  a mano (hacer que la API falle) y se mira que el juego lo aguante.
+- **Un clic de prueba que cae en otra cosa** (#12): antes de clicar para
+  probar algo, `elementFromPoint` en ese punto tiene que ser lo que se prueba.
 
 ## C. Herramientas fuera de CI — ¿siguen funcionando?
 

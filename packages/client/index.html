@@ -122,6 +122,15 @@
         bottom: calc(10px + env(safe-area-inset-bottom));
       }
       #use svg { width: 32px; height: 32px; }
+      /* MODO: mas pequeno que USAR y en la diagonal de arriba a la izquierda
+         del ataque (decision del autor); tamano y distancia, mios. */
+      :root { --modeb: 44px; }
+      #modeTouch {
+        width: var(--modeb); height: var(--modeb);
+        right: calc(12px + var(--atk) / 2 + 72px - var(--modeb) / 2 + env(safe-area-inset-right));
+        bottom: calc(10px + var(--atk) / 2 + 72px - var(--modeb) / 2 + env(safe-area-inset-bottom));
+      }
+      #modeTouch svg { width: 24px; height: 24px; }
       #jump, #run {
         width: var(--side); height: var(--side);
         right: calc(12px + env(safe-area-inset-right));
@@ -345,6 +354,64 @@
       #hungerFill { background: linear-gradient(90deg, #ffc46b, #ffe89a); }
 
       /*
+        La barra de abajo de PC (boceto del autor, 2026-09-30). Tres columnas
+        con las de los lados iguales: asi la caja del medio queda centrada al
+        pixel en la pantalla, midan lo que midan MODO a un lado e INVENTARIO y
+        sus vecinos al otro. En el movil sus piezas vuelven a su sitio.
+      */
+      body:not(.touch-active) {
+        --vitals-h: 76px;
+        --above-vitals: calc(var(--vitals-h) + 20px + env(safe-area-inset-bottom));
+      }
+      #bottomBar {
+        position: fixed; z-index: 11; left: 0; right: 0;
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+        pointer-events: none;
+      }
+      .barSide { display: flex; align-items: center; gap: 10px; }
+      .barSide.left { justify-content: flex-end; }
+      .barSide > * { pointer-events: auto; }
+      #barBox {
+        pointer-events: auto; display: flex; align-items: center; gap: 12px;
+        padding: 8px 12px; border-radius: 18px;
+        background: rgba(8, 14, 28, 0.62); border: 1px solid rgba(140, 190, 255, 0.18);
+        backdrop-filter: blur(6px);
+      }
+      body:not(.touch-active) #hotbar { position: static; transform: none; }
+      body:not(.touch-active) #bottomBar .round { display: flex; position: static; }
+      body:not(.touch-active) #vitals { display: none; }
+      #barExtras:empty { display: none; }
+      /* Anillos que se vacian en sentido horario: lo gastado, en oscuro, crece
+         desde las 12 (`ring.ts`). */
+      .ring { position: relative; width: 56px; height: 56px; flex: none; }
+      .ring .arc { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+      .ring circle { fill: none; stroke-width: 5; }
+      .ring .track { stroke: rgba(0, 0, 0, 0.72); }
+      .ring .fill { transition: stroke-dasharray .12s linear, stroke-dashoffset .12s linear; }
+      #hungerArc { stroke: #ff8a1f; }
+      #healthArc { stroke: #e0403f; }
+      .ringIcon {
+        position: absolute; left: 50%; top: 50%; width: 26px; height: 26px;
+        transform: translate(-50%, -50%);
+        fill: none; stroke: #ff8a1f; stroke-width: 2.2; stroke-linecap: round;
+      }
+      .ringIcon.heart { fill: #e0403f; stroke: none; }
+      /* El boton MODO dice el modo con su icono: tajo o mirilla. */
+      /* Con ids: `#thumbPad svg` pone `display: block` y, con clases, ganaba en
+         el movil (lo cazaron los gestos: salia la mirilla en barrido). */
+      #modeBar .mode-precise, #modeTouch .mode-precise { display: none; }
+      body.precise #modeBar .mode-sweep, body.precise #modeTouch .mode-sweep { display: none; }
+      body.precise #modeBar .mode-precise, body.precise #modeTouch .mode-precise { display: block; }
+      /* En el movil la barra y el INVENTARIO vuelven arriba, y los anillos y el
+         MODO de PC no estan. */
+      body.touch-active #bottomBar,
+      body.touch-active #barBox,
+      body.touch-active .barSide { display: contents; }
+      body.touch-active .ring,
+      body.touch-active #modeBar { display: none; }
+
+      /*
         El inventario (tecla E en PC, boton INVENTARIO en el movil), segun los
         bocetos del autor: PERSONAJE con sus equipables, INVENTARIO con el
         objeto seleccionado y su descripcion, y RECETAS por categorias. En PC,
@@ -387,6 +454,8 @@
       }
       .slot.on { border-color: rgba(170, 214, 255, .85); background: rgba(60, 104, 168, .72); }
       .slot.picked { outline: 2px solid #ffe89a; outline-offset: -3px; }
+      /* La casilla por la que pasa la rueda, un instante. */
+      .slot.pass { border-color: rgba(170, 214, 255, .85); background: rgba(60, 104, 168, .5); }
       .slot.dragging { opacity: .35; }
       .slot.drop { border-color: #ffe89a; }
       .slot.off { opacity: .4; cursor: default; }
@@ -527,12 +596,10 @@
       body.touch-active .recipe .ingredients .slot { width: 46px; height: 46px; font-size: 8px; }
 
 
+      /* Los controles, dentro del panel de informacion (pedido del autor). */
       #help {
-        position: fixed; bottom: var(--above-vitals); left: 12px; z-index: 10;
-        background: rgba(8, 14, 28, 0.78);
-        border: 1px solid rgba(140, 190, 255, 0.22);
-        border-radius: 10px; padding: 10px 14px; font-size: 12px; line-height: 1.7;
-        color: #b8c6dc; backdrop-filter: blur(6px);
+        margin-top: 9px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.1);
+        font-size: 12px; line-height: 1.9; color: #b8c6dc;
       }
       kbd {
         background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
@@ -619,13 +686,10 @@
       body.running #runState { color: #cfe4ff; font-weight: 600; }
       body.running #runState::after { content: ' ACTIVADO'; }
 
-      /* Con el inventario abierto, la ayuda se aparta: comparten esquina. */
-      body:has(#invPanel:not([hidden])) #help { display: none; }
-
       @media (max-width: 560px) {
         #hud { padding: 8px 10px; font-size: 11px; min-width: 148px; }
         #invPanel { font-size: 12px; }
-        #help { font-size: 10px; padding: 7px 10px; }
+        #help { font-size: 10px; }
       }
 
       /* ---- Panel del entorno (esquina superior derecha) ------------------- */
@@ -747,8 +811,6 @@
         background: rgba(0,0,0,.28); border: 1px solid rgba(255,255,255,.08);
       }
 
-      /* Los atajos de teclado y el panel comparten esquina: manda el panel. */
-      body:has(#devPanel:not([hidden])) #help { display: none; }
 
       @media (max-width: 560px) {
         #devPanel { width: 228px; font-size: 11px; max-height: 58vh; }
@@ -773,6 +835,19 @@
       <button id="use" type="button" aria-label="Usar">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M8 12.5V5.8a1.5 1.5 0 0 1 3 0v5.7M11 11V4.3a1.5 1.5 0 0 1 3 0V11M14 11V5.3a1.5 1.5 0 0 1 3 0v6.2M17 11.5V8.3a1.5 1.5 0 0 1 3 0v6.2c0 4.1-2.9 7.2-6.8 7.2h-1.4c-2.1 0-3.5-.9-4.6-2.5l-3.3-4.9a1.5 1.5 0 0 1 2.4-1.8L8 14.3" />
+        </svg>
+      </button>
+      <!-- MODO de golpe, en la diagonal de arriba a la izquierda del ataque y mas
+           pequeno que USAR (decision del autor). Los mismos iconos que en PC. -->
+      <button id="modeTouch" class="modeBtn" type="button" aria-pressed="false" aria-label="Modo barrido">
+        <svg class="mode-sweep" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 20C5 11 11 5 20 4C13.5 7.2 9 12 4 20z" />
+          <path d="M7.5 20.5C9 14.5 13 9.5 19.5 8" />
+        </svg>
+        <svg class="mode-precise" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="6.5" />
+          <path d="M12 2.5v5.2M12 16.3v5.2M2.5 12h5.2M16.3 12h5.2" />
+          <circle cx="12" cy="12" r="1" />
         </svg>
       </button>
       <!-- Una espada y un pico cruzados. El mango del pico se corta donde lo
@@ -829,18 +904,28 @@
       <div class="row dim"><span>FPS</span><span id="fps">0</span></div>
       <div class="row dim"><span>Dibujo</span><span id="draw">—</span></div>
       <div class="row dim touch-only"><span>abajo-izq anda · resto gira · 2 dedos zoom</span></div>
+      <!-- Los controles de PC, dentro del boton de informacion (pedido del
+           autor, 2026-09-30): antes vivian abajo a la izquierda. -->
+      <div id="help">
+        <kbd>WASD</kbd> moverse<br />
+        <kbd id="kbdRun">Shift</kbd> <span id="runState">correr</span><br />
+        <kbd>Espacio</kbd> saltar<br />
+        <kbd>raton</kbd> mirar<br />
+        <kbd>clic izq.</kbd> golpear<br />
+        <kbd>clic der.</kbd> usar lo de la mano<br />
+        <kbd>Tab</kbd> modo de golpe<br />
+        <kbd>1</kbd>-<kbd>4</kbd> <kbd>rueda</kbd> mano<br />
+        <kbd>E</kbd> inventario<br />
+        <kbd>Ctrl</kbd> (mantener) soltar el raton<br />
+        <kbd>Esc</kbd> pausa<br />
+        <kbd>+</kbd>/<kbd>-</kbd> zoom &nbsp; <kbd>P</kbd> vista<br />
+        <kbd>R</kbd> mundo nuevo
+      </div>
     </div>
 
-    <div id="help">
-      <kbd id="kbdRun">Shift</kbd> <span id="runState">correr</span> &nbsp;
-      <kbd>WASD</kbd> moverse &nbsp; <kbd>Espacio</kbd> saltar &nbsp; <kbd>clic izq.</kbd> golpear &nbsp; <kbd>raton</kbd> mirar &nbsp; <kbd>Esc</kbd> pausa<br />
-      <kbd>clic der.</kbd> usar lo de la mano &nbsp; <kbd>1</kbd>-<kbd>4</kbd> mano &nbsp; <kbd>E</kbd> inventario &nbsp;
-      <kbd>rueda</kbd> mano &nbsp; <kbd>R</kbd> mundo nuevo &nbsp; <kbd>+</kbd>/<kbd>-</kbd> zoom &nbsp; <kbd>P</kbd> vista
-    </div>
-
-    <!-- La franja inferior: el inventario en la esquina y, a su derecha, salud y
-         hambre hasta el borde. Sin rotulos: un corazon y un muslo, en SVG y del
-         color de su barra, para que se vean iguales en todos los sistemas. -->
+    <!-- La franja de salud y hambre del movil (en PC son los anillos de la barra
+         de abajo). Sin rotulos: un corazon y unos cubiertos, en SVG y del color
+         de su barra, para que se vean iguales en todos los sistemas. -->
     <div id="vitals">
       <div id="vitalBars">
         <div class="vital">
@@ -851,9 +936,11 @@
                aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="healthFill"></i></div>
         </div>
         <div class="vital">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#ffc46b" d="M15.2 2.6a6.2 6.2 0 0 1 4.4 10.6c-1.7 1.7-4 2.2-6.1 1.6l-2.3 2.3-2.4-2.4 2.3-2.3c-.6-2.1-.1-4.4 1.6-6.1a6.2 6.2 0 0 1 2.5-1.7z" />
-            <path fill="#f3e6cf" d="M8.8 14.7l2.4 2.4-1.9 1.9a2 2 0 1 1-2.5 2.5 2 2 0 1 1-2.5-2.5 2 2 0 1 1 2.5-2.5z" />
+          <!-- Cuchara y tenedor, como el anillo de PC. -->
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="#ffc46b" stroke-width="2.2" stroke-linecap="round">
+            <path d="M20 20l-8.4-8.4" />
+            <ellipse cx="8.6" cy="8.6" rx="2.8" ry="4.3" transform="rotate(-45 8.6 8.6)" />
+            <path d="M4 20l10-10M12.5 8.5l3 3M12.5 8.5l4-4M14 10l4-4M15.5 11.5l4-4" />
           </svg>
           <div class="bar" id="hungerBar" role="meter" aria-label="Hambre"
                aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i id="hungerFill"></i></div>
@@ -895,19 +982,77 @@
       </section>
     </div>
 
-    <!-- La barra de la mano: las casillas 1 a 4. -->
-    <div id="hotbar" class="slots" aria-label="Barra de la mano"></div>
     <!-- Arriba en el movil: OTROS e INVENTARIO. -->
     <!-- Tres barras. -->
     <button id="others" class="round" type="button" aria-expanded="false" aria-label="Otros">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
     </button>
-    <!-- Una mochila. -->
-    <button id="invOpen" class="round" type="button" aria-expanded="false" aria-controls="invPanel" aria-label="Inventario">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6 10a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2zM9.5 6V4.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V6M6 12.5h12M9.5 15.5h5v3h-5z" />
-      </svg>
-    </button>
+    <!-- La barra de abajo de PC, segun el boceto del autor (2026-09-30): MODO,
+         y una caja centrada con el anillo del hambre, la barra de la mano y el
+         de la salud; despues INVENTARIO y el hueco de los botones que vengan.
+         En el movil sus piezas se sacan de la caja (`display: contents`): la
+         barra y el INVENTARIO van arriba y los anillos no se ven. -->
+    <div id="bottomBar">
+      <div class="barSide left">
+        <button id="modeBar" class="round modeBtn" type="button" aria-pressed="false" aria-label="Modo barrido">
+          <!-- Un tajo curvo (barrido) y una mirilla (preciso): el icono dice el modo. -->
+          <svg class="mode-sweep" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 20C5 11 11 5 20 4C13.5 7.2 9 12 4 20z" />
+            <path d="M7.5 20.5C9 14.5 13 9.5 19.5 8" />
+          </svg>
+          <svg class="mode-precise" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="6.5" />
+            <path d="M12 2.5v5.2M12 16.3v5.2M2.5 12h5.2M16.3 12h5.2" />
+            <circle cx="12" cy="12" r="1" />
+          </svg>
+        </button>
+      </div>
+      <div id="barBox">
+        <!-- Anillos que se vacian en sentido horario desde las 12 (`ring.ts`). -->
+        <div class="ring" id="hungerRing" role="meter" aria-label="Hambre"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+          <svg class="arc" viewBox="0 0 48 48" aria-hidden="true">
+            <circle class="track" cx="24" cy="24" r="20" />
+            <circle class="fill" id="hungerArc" cx="24" cy="24" r="20" />
+          </svg>
+          <!-- Cuchara y tenedor cruzados, como en el boceto. -->
+          <svg class="ringIcon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 20l-8.4-8.4" />
+            <ellipse cx="8.6" cy="8.6" rx="2.8" ry="4.3" transform="rotate(-45 8.6 8.6)" />
+            <path d="M4 20l10-10M12.5 8.5l3 3M12.5 8.5l4-4M14 10l4-4M15.5 11.5l4-4" />
+          </svg>
+        </div>
+        <!-- La barra de la mano: las casillas 1 a 4. -->
+        <div id="hotbar" class="slots" aria-label="Barra de la mano"></div>
+        <div class="ring" id="healthRing" role="meter" aria-label="Salud"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+          <svg class="arc" viewBox="0 0 48 48" aria-hidden="true">
+            <circle class="track" cx="24" cy="24" r="20" />
+            <circle class="fill" id="healthArc" cx="24" cy="24" r="20" />
+          </svg>
+          <svg class="ringIcon heart" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 21s-7.4-4.5-9.5-9.1C1 8.5 3.1 4.4 6.8 4.4c2.1 0 3.6 1.2 5.2 3.2 1.6-2 3.1-3.2 5.2-3.2 3.7 0 5.8 4.1 4.3 7.5C19.4 16.5 12 21 12 21z" />
+          </svg>
+        </div>
+      </div>
+      <div class="barSide right">
+        <!-- Una mochila de explorador: solapa, dos correas con hebilla, bolsillo
+             delantero y dos laterales (el adjunto del autor). -->
+        <button id="invOpen" class="round" type="button" aria-expanded="false" aria-controls="invPanel" aria-label="Inventario">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 5Q12 2.6 14 5" />
+            <path d="M6.5 8Q6.5 5 9.5 5h5Q17.5 5 17.5 8v11q0 2-2 2h-7q-2 0-2-2z" />
+            <path d="M6.5 10.5Q12 13 17.5 10.5" />
+            <path d="M9.5 5.3V15M14.5 5.3V15" />
+            <path d="M8.6 11.3h1.8v1.8H8.6zM13.6 11.3h1.8v1.8h-1.8z" />
+            <path d="M8.5 15.5h7v3.8h-7z" />
+            <path d="M6.5 12.5H5.2q-1 0-1 1V17q0 1 1 1h1.3M17.5 12.5h1.3q1 0 1 1V17q0 1-1 1h-1.3" />
+          </svg>
+        </button>
+        <!-- Los botones que vendran (pedido del autor). -->
+        <div id="barExtras"></div>
+      </div>
+    </div>
     <div id="dragGhost"></div>
     <div id="discardAsk" role="alertdialog" aria-labelledby="discardText" hidden>
       <p id="discardText"></p>

@@ -44,6 +44,7 @@ import {
   type Hitbox,
   type Offset,
   type Strike,
+  type Surface,
   type Vec3,
 } from '../aim.js';
 import { treeTrunkAt } from '../trunk.js';
@@ -550,6 +551,17 @@ export function tryUse(
   return null;
 }
 
+/** Donde toca la mirada el terreno, a menos del alcance: suelo o pared (`aimSurface`). */
+export function aimedSurface(world: World, store: EntityStore, id: number): Surface | null {
+  return aimSurface(
+    eyeOf(store, id),
+    store.facingX[id],
+    store.facingY[id],
+    store.lookZ[id],
+    (x, y) => world.groundHeightAt(x, y),
+  );
+}
+
 /**
  * Donde se colocaria algo: la casilla en que la mirada toca el suelo, o, si
  * toca un costado del terreno, **la de delante de esa pared** (decision del
@@ -557,13 +569,7 @@ export function tryUse(
  * del alcance en horizontal, como sembrar.
  */
 export function placeTarget(world: World, store: EntityStore, id: number): Placed | null {
-  const surface = aimSurface(
-    eyeOf(store, id),
-    store.facingX[id],
-    store.facingY[id],
-    store.lookZ[id],
-    (x, y) => world.groundHeightAt(x, y),
-  );
+  const surface = aimedSurface(world, store, id);
   if (!surface) return null;
   return { x: surface.front.x, y: surface.front.y, z: surface.point.z };
 }

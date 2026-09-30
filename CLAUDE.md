@@ -132,6 +132,19 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     el sector es plano**, asi que mirando al frente pasa por encima de un
     arbusto (1,1 de alto, los ojos a 1,75) y hay que mirar hacia el.
 
+    **Dos modos de golpe** (decision del autor, 2026-09-30): el **barrido**,
+    que es todo lo de arriba, y el **preciso**, que golpea **solo el primer
+    objetivo que cruza el centro de la mira**, cortado por el terreno y a
+    menos de 2,5 (`preciseTarget`, el mismo rayo que abre una estacion). Es un
+    estado de la `Intent` (`precise`), como correr; se cambia con TAB o el
+    boton MODO, y en vez del arco se ve una **estocada** recta hasta lo
+    golpeado (`stabLine`).
+
+    **Colocar** va donde se siembra o, si la mirada toca un **costado** del
+    terreno, en la casilla de delante de esa pared (`aimSurface`), y la caja
+    **cae** hasta su suelo desde donde la tocaba la mirada (decision del autor:
+    todo tiene gravedad; la caida solo se ve, el nucleo la pone en su sitio).
+
 13. **El relieve sale de la misma elevacion que el terreno.** `levelFrom` no es
     mas que otra forma de leer el `e < 0.42` que ya separaba el agua, asi que
     `terrainAt` no cambia y los umbrales de bioma siguen calibrados. Si mueves el
@@ -184,6 +197,15 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     es la parabola exacta; con Euler el apice medido salia 1.06 en vez de los
     1.16 de la derivacion, y ese decimo es justo el margen que el autor pidio
     para que subirse a un bloque no fuera al milimetro.
+
+    **Las estaciones entran en ese suelo** (decision del autor, 2026-09-30:
+    fisicas como un bloque). Lo que pisa el cuerpo es `World.floorHeightAt`, el
+    terreno mas la estacion de la casilla (`stationHeight`); lo usan el choque y
+    la vertical, y nada mas —el terreno que se dibuja, el golpe y sembrar
+    siguen con `groundHeightAt`—. Asi una mesa estorba de lado como una pared
+    de un bloque, se sube de un salto y, si se desmonta, se cae. El horno mide
+    1,25 y **no se sube desde su mismo nivel**: a proposito, porque «que haya
+    bloques de diferente altura sera una de las caracteristicas del juego».
 
 22. **Donde se nace hay que ganarselo.** `findSpawn` miraba solo si el tile era
     solido, y eso basto mientras el relieve solo se veia. Con la altura
@@ -504,10 +526,11 @@ segmento caiga fuera de su chunk. La geometria del contorno vive aparte en
 `biome-edges.ts`, sin three.js, para poder verificarla en Node, y mira el vecino
 de la costura con `world.gen` para no registrar chunks por mirar.
 
-**La mirada es la de la camara, asi que la reticula tambien.** Marca las
-casillas de los objetos que el golpe ALCANZA —cuyo hitbox toca el sector, regla
-12—, el mas cercano mas fuerte, y en verde donde se sembraria. Solo lo que la
-accion cumple: nada que el sector no toque.
+**La mirada es la de la camara, asi que la reticula tambien.** Marca **donde
+toca la mirada**: en verde la casilla de suelo, y en blanco la cara de la pared
+si toca un costado del terreno (pedido del autor, 2026-09-30). Sale de
+`aimSurface`, lo mismo que decide donde se siembra y se coloca. Hasta entonces
+marcaba tambien los objetos que el golpe alcanzaba; el autor lo quito.
 
 La congelacion empieza puesta al abrir el panel y solo se aplica con el panel
 abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
@@ -731,8 +754,12 @@ que se lleva en la mano, y tambien la **rueda del raton**, que la recorre (hacia
 abajo, la siguiente; da la vuelta), R empieza un mundo nuevo, **+ y - acercan y
 alejan** —solo ellas: la rueda dejo de hacer zoom el 2026-09-29, decision del
 autor—, y P cambia de proyeccion. **Esc con el inventario abierto lo cierra**
-sin pausar. **Clic izquierdo golpea y clic derecho usa** lo que se
-lleva en la mano: una baya se come, una semilla se siembra. Comer (E), sembrar
+sin pausar. **TAB cambia el modo de golpe** (barrido o preciso) y **CTRL
+mantenido suelta el raton** para pulsar botones sin pausar (las dos, del autor,
+2026-09-30). **Clic izquierdo golpea y clic derecho usa** lo que se
+lleva en la mano: una baya se come, una semilla se siembra. **Con el inventario
+abierto no se golpea ni se usa**: solo se anda (y se salta, deduccion mia).
+Los controles se leen dentro del boton de informacion (i). Comer (E), sembrar
 (F), el inventario (I) y fabricar (C) tuvieron tecla propia hasta el 2026-09-28,
 cuando el autor lo cambio a esto; cambiar una tecla que funciona para meter
 otra no es decision del agente.
@@ -754,19 +781,30 @@ mueve el cursor se mueve la vista, en las tres vistas —raton arriba es mirar
 arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
 (Pointer Lock), que Esc suelta siempre. De ahi sale todo:
 
-- **Sin cursor capturado, el juego esta en pausa** (escala de tiempo cero, como
-  la pausa del panel de desarrollo), con el aviso «Juego en pausa». **Arranca
-  asi**: el navegador exige un clic para capturar. Con el cursor suelto se
-  pulsan los botones (ojo, HUD, inventario, barra del angulo).
+- **Pausa el cursor que suelta el jugador**, no el que suelta el juego. El Esc
+  del jugador en pleno juego para el tiempo (escala cero, como la pausa del
+  panel de desarrollo), con el aviso «Juego en pausa». **Arranca asi**: el
+  navegador exige un clic para capturar. Con el cursor suelto se pulsan los
+  botones (ojo, HUD, inventario, barra del angulo).
+- **El cursor que suelta el juego no pausa** (`MouseLook.free`): el
+  inventario, el panel de desarrollo, CTRL mantenido y la muerte. Al cerrarlos
+  se intenta capturar; si el navegador no deja, **se sigue jugando** con el
+  cursor suelto —se anda, pero el raton no gira la vista— hasta el primer
+  clic, que captura sin golpear.
 - **Un clic en la pantalla captura y reanuda, y ese clic no golpea.** Ya
   capturado, el clic izquierdo golpea en el acto, al apoyar: no hay arrastre
   que distinguir. **Esc no reanuda**, y no por gusto: Chrome no cuenta Esc
   como gesto para volver a capturar el cursor, porque es la salida de
   emergencia del jugador. El autor eligio que solo el clic reanude.
-- **Esc con el inventario abierto lo cierra y vuelve a capturar sin pausar.**
-  Ahi si se puede: el cursor lo solto el juego al abrir, no el jugador, y en
-  ese caso Chrome deja volver a capturarlo sin gesto. Si algun navegador no lo
-  dejara, queda la pausa de siempre y basta un clic.
+- **Esc con el inventario abierto lo cierra sin pausar.** Se intenta
+  recapturar, pero **Chrome no deja**: Esc no cuenta como gesto. Esto decia lo
+  contrario —«el cursor lo solto el juego y Chrome deja»— y el autor vio el
+  juego pausarse (2026-09-30); el headless SI recaptura, y por eso el humo
+  nunca lo vio. Ahora el humo le quita la captura a mano antes del Esc para
+  probar justo ese caso. De ahi el cursor suelto sin pausa de arriba.
+- **El menu del navegador no sale nunca**: `contextmenu` se anula en todo el
+  documento. Con solo el lienzo, el clic derecho que abre una estacion dejaba
+  caer el suyo sobre el panel recien abierto bajo el cursor.
 - **Una cruz en el centro de la pantalla**, en las tres vistas y en PC y
   movil: como las tres comparten la mirada, el centro es justo hacia donde se
   mira y se golpea.
@@ -774,8 +812,7 @@ arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
   pero **no pausan**: abrir el inventario no pausa por decision del autor, y el
   panel tiene su propia pausa y sirve para ver pasar el tiempo; con el panel
   abierto se sigue arrastrando para girar, como antes. Al cerrarlos se intenta
-  capturar otra vez (la tecla cuenta como gesto; Esc, al cerrar el inventario,
-  tambien vale, ver arriba).
+  capturar otra vez (una tecla cuenta como gesto; Esc no, ver arriba).
 - Solo con puntero fino y hasta el primer toque de verdad (`mouseMode`): el
   movil no cambia, y un portatil tactil jugado con el dedo no se congela.
 - Muerto, el cursor se suelta para poder pulsar «Reiniciar», y reiniciar lo
@@ -815,22 +852,37 @@ Arriba, **OTROS** a la izquierda, la **barra de la mano** en el centro exacto
 **INVENTARIO** a la derecha; OTROS despliega **en columna debajo de el** el
 ojo, el HUD y el entorno, y se cierra tocando fuera. **Los botones son solo
 iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
-USAR, espada y pico cruzados en ATAQUE, una mochila en INVENTARIO, tres barras
-en OTROS, y CORRER y SALTAR con su glifo; el nombre va en `aria-label`. Los
-dibujos son mios. Sustituyo al racimo en fila
+USAR, espada y pico cruzados en ATAQUE, una **mochila de explorador** en
+INVENTARIO (con solapa, correas y bolsillos, como el adjunto del autor del
+2026-09-30), tres barras en OTROS, y CORRER y SALTAR con su glifo; el nombre va
+en `aria-label`. Los dibujos son mios. Y **MODO** (2026-09-30), mas pequeno que
+USAR y en la diagonal de arriba a la izquierda del ataque: un toque cambia de
+modo de golpe, y su icono dice cual —un tajo para el barrido, una mirilla para
+el preciso—. Sustituyo al racimo en fila
 —accion, salto, carrera, comer y sembrar, ordenados por el borde— y a los
 botones de comer y sembrar, que ahora son USAR con la baya o la semilla en la
 mano. Los tamanos son mios.
 
-**La franja de salud y hambre** es decision del autor: siempre a la vista, sin
-rotulos —un corazon y un muslo de pollo en SVG, del color de su barra—; en PC,
-de borde a borde. Lo que vive abajo en PC (ayuda, panel de desarrollo) se apoya
-encima con la variable CSS `--above-vitals`.
+**La barra de abajo de PC es el boceto del autor (2026-09-30)**: MODO, una caja
+**centrada al pixel** con el **anillo del hambre**, la **barra de la mano** y el
+**anillo de la salud**, y despues INVENTARIO y un hueco (`#barExtras`) para los
+botones que vendran; MODO e INVENTARIO miden lo mismo. Tres columnas con las de
+los lados iguales, que es lo que centra la caja midan lo que midan los botones.
+**Los anillos se vacian en sentido horario**: lo gastado crece desde las 12
+(`ring.ts`, puro y con su test). En el movil esas piezas se sacan de la caja
+con `display: contents` y vuelven a su sitio: la barra y el INVENTARIO arriba,
+sin anillos.
+
+**La franja de salud y hambre** del movil es decision del autor: siempre a la
+vista, sin rotulos —un corazon y unos cubiertos en SVG, del color de su barra;
+fueron un muslo de pollo hasta que el autor dibujo cubiertos en el anillo de
+PC—. Lo que vive abajo en PC (el registro, el panel de desarrollo) se apoya
+encima de la barra con la variable CSS `--above-vitals`.
 
 **El HUD y el inventario arrancan cerrados**, tambien decision suya. El HUD
-(hora, dia, semilla, posicion, FPS) se abre con su boton —arriba a la izquierda
-en PC, dentro de OTROS en el movil— y **no tiene tecla**; el inventario, con
-**E** en PC y con el boton INVENTARIO en el movil. Cerrados no se escriben: el
+(hora, dia, semilla, posicion, FPS y, en PC, los controles) se abre con su
+boton —arriba a la izquierda en PC, dentro de OTROS en el movil— y **no tiene
+tecla**; el inventario, con **E** o el boton INVENTARIO. Cerrados no se escriben: el
 DOM se refresca diez veces por segundo y no hay por que pagarlo por lo que no
 se ve.
 

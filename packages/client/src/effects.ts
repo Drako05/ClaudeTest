@@ -51,6 +51,30 @@ export function slashEdge(
   }));
 }
 
+/** Donde empieza la estocada, delante de los ojos. **Propuesta mia.** */
+export const STAB_START = 0.6;
+
+/**
+ * La estocada del **modo preciso** (decision del autor, 2026-09-30): una recta
+ * desde un poco delante de los ojos hasta donde llega el golpe —el objetivo
+ * tocado, o el alcance si no toca nada—. Se dibuja con el mismo trazo que el
+ * barrido, asi que sale en coordenadas de three.js como `slashEdge`: `y` es la
+ * altura. Unos pocos puntos para que la cinta se ensanche igual en toda ella.
+ */
+export function stabLine(
+  origin: { x: number; y: number; z: number },
+  dir: { x: number; y: number; z: number },
+  length: number,
+): Point3[] {
+  const from = Math.min(STAB_START, length * 0.5);
+  const out: Point3[] = [];
+  for (let i = 0; i <= 4; i++) {
+    const t = from + ((length - from) * i) / 4;
+    out.push({ x: origin.x + dir.x * t, y: origin.z + dir.z * t, z: origin.y + dir.y * t });
+  }
+  return out;
+}
+
 /** Cuanto tarda un escombro en apagarse una vez posado. */
 export const DEBRIS_SECONDS = 0.85;
 /** Escombros por objeto derribado. */

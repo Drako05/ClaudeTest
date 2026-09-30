@@ -43,6 +43,10 @@ import { makePlayerArt } from './art.js';
 
 /** Lo que se tarda en fabricar manteniendo pulsado (decision del autor). */
 export const CRAFT_HOLD_MS = 1500;
+/** Lo que dura iluminada una casilla por la que pasa la rueda. **Propuesta mia.** */
+const PASS_MS = 140;
+/** Separacion entre dos casillas iluminadas seguidas. **Propuesta mia.** */
+const PASS_GAP_MS = 40;
 /** Lo que hay que mover el puntero para que un toque sea un arrastre. **Propuesta mia.** */
 const DRAG_SLOP = 6;
 /** Casillas de equipables: tres a cada lado del personaje y cuatro debajo (boceto del autor). */
@@ -263,7 +267,31 @@ export class InventoryUi {
   step(delta: number): void {
     const from = this.pending.select >= 0 ? this.pending.select : this.current().inventory.selected;
     this.pending.select = (((from + delta) % HOTBAR_SLOTS) + HOTBAR_SLOTS) % HOTBAR_SLOTS;
+    this.flashPass(this.pending.select);
   }
+
+  /**
+   * Ilumina un instante la casilla por la que pasa la rueda (pedido del autor:
+   * al girar varias muescas se ven todas, no solo la de llegada). Varias
+   * seguidas se escalonan `PASS_GAP_MS` para que se lea el recorrido; los dos
+   * tiempos son mios.
+   */
+  private flashPass(slot: number): void {
+    const el = this.hotbar.children[slot] as HTMLElement | undefined;
+    if (!el) return;
+    const now = performance.now();
+    const at = Math.max(now, this.lastPassAt + PASS_GAP_MS);
+    this.lastPassAt = at;
+    this.passes++;
+    window.setTimeout(() => {
+      el.classList.add('pass');
+      window.setTimeout(() => el.classList.remove('pass'), PASS_MS);
+    }, at - now);
+  }
+
+  private lastPassAt = 0;
+  /** Casillas iluminadas al paso de la rueda. Acumulado, para el humo. */
+  passes = 0;
 
   toggle(): void {
     const open = this.panel.hidden;

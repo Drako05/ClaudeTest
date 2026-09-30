@@ -29,7 +29,7 @@ import {
   type Texture,
 } from 'three';
 import { Feature, Station, stationOfFeature } from '@verdant/shared';
-import { hash2DFloat, STATION_BOXES } from '@verdant/sim';
+import { GRAVITY, hash2DFloat, STATION_BOXES, type Placed, type World } from '@verdant/sim';
 import { STATION_FACES } from './palette.js';
 
 /** Pixeles por bloque de las caras. El arte es de pixeles, como el resto. */
@@ -166,8 +166,16 @@ const PAINTERS: Record<Station.Workbench | Station.Furnace, { top: Painter; side
 /** Las estaciones dibujadas una vez; cada casilla lleva una malla que las comparte. */
 export class StationSet {
   private readonly kinds = new Map<Feature, Kind>();
+  /**
+   * Las que estan cayendo: puestas contra una pared, aparecen donde la tocaba
+   * la mirada y caen hasta su suelo con la gravedad del nucleo (pedido del
+   * autor: todo tiene gravedad). Solo se ve; el nucleo ya la tiene en su sitio.
+   */
+  private readonly falling = new Map<string, { from: number; ground: number; since: number; mesh: Mesh | null }>();
   /** Estaciones mandadas a la escena, para el humo. Acumulado. */
   drawn = 0;
+  /** Caidas empezadas, para el humo. Acumulado. */
+  drops = 0;
 
   constructor() {
     for (const feature of [Feature.Workbench, Feature.Furnace]) {
@@ -213,8 +221,30 @@ export class StationSet {
     const turn = Math.floor(hash2DFloat(seed ^ 0x51a7, tx, ty) * 4) % 4;
     const mesh = new Mesh(kind.geometry, kind.byTurn[turn]);
     mesh.position.set(tx + 0.5, ground + kind.height / 2, ty + 0.5);
+    mesh.userData.half = kind.height / 2;
+    // Si esta cayendo, el chunk que se redibuja la entrega a la caida.
+    const fall = this.falling.get(`${tx},${ty}`);
+    if (fall) fall.mesh = mesh;
     this.drawn++;
     return mesh;
+  }
+
+  /** La estacion recien puesta empieza a caer desde la altura de la mirada. */
+  drop(placed: Placed, world: World): void {
+    const ground = world.groundHeightAt(placed.x + 0.5, placed.y + 0.5);
+    if (placed.z <= ground + 0.01) return;
+    this.falling.set(`${placed.x},${placed.y}`, { from: placed.z, ground, since: performance.now(), mesh: null });
+    this.drops++;
+  }
+
+  /** Cada frame: baja las que caen, `z = z0 - g t^2 / 2`, hasta posarse. */
+  animate(now: number): void {
+    for (const [key, f] of this.falling) {
+      const t = (now - f.since) / 1000;
+      const z = Math.max(f.ground, f.from - (GRAVITY * t * t) / 2);
+      if (f.mesh) f.mesh.position.y = z + f.mesh.userData.half;
+      if (z <= f.ground) this.falling.delete(key);
+    }
   }
 
   /** Lo que mide de ancho, para su sombra: algo mas que su casilla. */

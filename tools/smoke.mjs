@@ -364,23 +364,36 @@ async function desktopPass(browser, baseUrl) {
     check(!(await page.isVisible(id)), `el boton ${id} del pulgar se ve en PC`);
   }
   check(await page.isVisible('#proj'), 'el ojo de la proyeccion no se ve');
-  check(await page.isVisible('#help'), 'la ayuda de teclado no se ve en PC');
+  // La ayuda de teclado vive dentro del boton de informacion (pedido del
+  // autor, 2026-09-30): cerrado el HUD no se ve.
+  check(!(await page.isVisible('#help')) && (await page.evaluate(() => !!document.querySelector('#hud #help'))),
+    'la ayuda de teclado no esta dentro del panel de informacion');
 
-  // La franja de salud y hambre se ve siempre; HUD e inventario arrancan
-  // cerrados (decision del autor) y se abren con su boton.
-  check(await page.isVisible('#vitals'), 'la franja de salud y hambre no se ve');
+  // La barra de abajo de PC, segun el boceto del autor: MODO, la caja con el
+  // anillo del hambre, la barra de la mano y el de la salud, e INVENTARIO. La
+  // caja, centrada al pixel; MODO e INVENTARIO, del mismo tamano.
+  check(!(await page.isVisible('#vitals')), 'en PC se ve la franja de barras del movil');
   check(await page.isVisible('#hudToggle'), 'falta el boton del HUD');
-  check(!(await page.isVisible('#invOpen')) && !(await page.isVisible('#others')), 'en PC se ven los botones del movil');
+  check(!(await page.isVisible('#others')), 'en PC se ve OTROS, que es del movil');
+  const bar = await page.evaluate(() => {
+    const r = (id) => document.getElementById(id).getBoundingClientRect().toJSON();
+    return { box: r('barBox'), hotbar: r('hotbar'), mode: r('modeBar'), inv: r('invOpen'), hunger: r('hungerRing'), health: r('healthRing') };
+  });
+  const mid = (r) => r.x + r.width / 2;
+  console.log(`  barra de abajo: caja centrada en ${mid(bar.box).toFixed(1)}, MODO ${bar.mode.width}x${bar.mode.height}, INVENTARIO ${bar.inv.width}x${bar.inv.height}`);
+  check(Math.abs(mid(bar.box) - 640) <= 1 && Math.abs(mid(bar.hotbar) - 640) <= 1, `la barra de la mano no esta centrada: ${mid(bar.box)}, ${mid(bar.hotbar)}`);
+  check(bar.mode.right <= bar.box.left && bar.inv.left >= bar.box.right, 'MODO no queda a la izquierda o INVENTARIO a la derecha de la caja');
+  check(bar.mode.width === bar.inv.width && bar.mode.height === bar.inv.height && bar.inv.width > 0, 'MODO e INVENTARIO no miden lo mismo');
+  check(bar.hunger.right <= bar.hotbar.left && bar.health.left >= bar.hotbar.right, 'los anillos no flanquean la barra de la mano');
   check(!spawn.hudOpen && !(await page.isVisible('#hud')), 'el HUD no arranca cerrado');
   check(!spawn.inventoryOpen && !(await page.isVisible('#invPanel')), 'el inventario no arranca cerrado');
   const vit = await page.evaluate(() => ({
-    health: Number(document.getElementById('healthBar').getAttribute('aria-valuenow')),
-    hunger: Number(document.getElementById('hungerBar').getAttribute('aria-valuenow')),
-    right: document.getElementById('vitals').getBoundingClientRect().right,
+    health: Number(document.getElementById('healthRing').getAttribute('aria-valuenow')),
+    hunger: Number(document.getElementById('hungerRing').getAttribute('aria-valuenow')),
+    arc: document.getElementById('hungerArc').getAttribute('stroke-dasharray'),
   }));
   // El hambre ya corre mientras carga la pagina, asi que se pide cerca de 100.
-  check(vit.health === 100 && vit.hunger >= 90, `barras de salida inesperadas: ${JSON.stringify(vit)}`);
-  check(vit.right > 1280 - 30, `las barras no llegan al borde derecho (${vit.right})`);
+  check(vit.health === 100 && vit.hunger >= 90 && !!vit.arc, `anillos de salida inesperados: ${JSON.stringify(vit)}`);
 
   // Los botones se pulsan con el cursor suelto, o sea en pausa: capturado, el
   // clic va al lienzo y golpea.
@@ -448,10 +461,9 @@ async function desktopPass(browser, baseUrl) {
     check(d <= 2.5 + Math.SQRT1_2 + 1e-6, `se alcanza la casilla ${tx},${ty}, a ${d.toFixed(2)}`);
     check(d < 0.8 || (dx * turned.aim[0] + dy * turned.aim[1]) / d > 0, `se alcanza la casilla ${tx},${ty}, que queda detras`);
   }
-  check(
-    turned.reticleTiles === turned.reach.length,
-    `la reticula marca ${turned.reticleTiles} casillas y se alcanzan ${turned.reach.length}`,
-  );
+  // La reticula ya no marca lo que se alcanza (pedido del autor): marca donde
+  // toca la mirada, el suelo o una pared.
+  check(!turned.plantTile || turned.reticle === 'suelo', `mirando al suelo la reticula marca ${turned.reticle}`);
 
   // Mirar hacia arriba en tercera persona (pedido del autor): la camara baja
   // por detras, y la colision la para antes del suelo. Con el raton capturado,
@@ -505,13 +517,27 @@ async function desktopPass(browser, baseUrl) {
   await wheel(100);
   await page.waitForTimeout(200);
   const w1 = await state(page);
+  // Dos muescas seguidas: se iluminan las dos casillas por las que pasa, no
+  // solo la de llegada (pedido del autor).
+  let lit = 0;
+  const watchPass = page.evaluate(() => new Promise((done) => {
+    let n = 0;
+    const seen = new Set();
+    const obs = new MutationObserver(() => {
+      document.querySelectorAll('#hotbar .slot.pass').forEach((el) => seen.add(el));
+      n = seen.size;
+    });
+    obs.observe(document.getElementById('hotbar'), { attributes: true, subtree: true, attributeFilter: ['class'] });
+    setTimeout(() => { obs.disconnect(); done(n); }, 600);
+  }));
   await wheel(-100);
   await wheel(-100);
-  await page.waitForTimeout(200);
+  lit = await watchPass;
   const w2 = await state(page);
-  console.log(`  rueda: casilla ${w0.selectedSlot + 1} -> ${w1.selectedSlot + 1} -> ${w2.selectedSlot + 1}`);
+  console.log(`  rueda: casilla ${w0.selectedSlot + 1} -> ${w1.selectedSlot + 1} -> ${w2.selectedSlot + 1}, iluminadas al pasar ${lit}`);
   check(w1.selectedSlot === (w0.selectedSlot + 1) % 4 && w2.selectedSlot === (w0.selectedSlot + 3) % 4,
     'la rueda no recorre la barra de la mano');
+  check(lit === 2 && w2.hotbarPasses - w0.hotbarPasses === 3, `la rueda no ilumino las casillas por las que paso: ${lit}`);
   check(w2.distance === w0.distance, 'la rueda sigue haciendo zoom');
   // El inventario, con su tecla: E lo abre, muestra lo del juego, y E lo
   // cierra. Abrirlo suelta el cursor y NO pausa (decision del autor).
@@ -520,6 +546,32 @@ async function desktopPass(browser, baseUrl) {
   check(await page.isVisible('#invPanel'), 'E no abrio el inventario');
   const invOpen = await state(page);
   check(!invOpen.pointerLocked && !invOpen.paused, 'abrir el inventario no solto el cursor o pauso');
+  // Con el inventario abierto solo se anda (pedido del autor): un clic en el
+  // mundo no golpea ni usa.
+  // Sobre un punto del mundo que el panel no tape: en el centro el clic caeria
+  // en el panel y la comprobacion no podria fallar.
+  const world = await page.evaluate(() => {
+    for (let y = 200; y < 600; y += 40) {
+      for (let x = 20; x < 1260; x += 40) if (document.elementFromPoint(x, y)?.id === 'view') return { x, y };
+    }
+    return null;
+  });
+  check(world !== null, 'el inventario tapa el mundo entero: no hay donde clicar');
+  if (world) {
+    await page.mouse.click(world.x, world.y);
+    await page.mouse.click(world.x, world.y, { button: 'right' });
+  }
+  await page.waitForTimeout(300);
+  const clickedOpen = await state(page);
+  check(clickedOpen.sent.harvest === invOpen.sent.harvest && clickedOpen.sent.use === invOpen.sent.use,
+    'con el inventario abierto un clic golpeo o uso');
+  // El menu del navegador no sale nunca, tampoco sobre el panel (lo vio el
+  // autor al abrir una estacion con el clic derecho).
+  check(await page.evaluate(() => {
+    const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    document.getElementById('invPanel').dispatchEvent(ev);
+    return ev.defaultPrevented;
+  }), 'el clic derecho sobre el panel deja salir el menu del navegador');
   check((await page.locator('#recipeList .recipe').count()) === 2, 'el recetario no lista las dos herramientas de piedra');
   check((await page.locator('#charGrid .slot.equip').count()) === 10, 'faltan las casillas de equipables');
   // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
@@ -548,12 +600,20 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  descripcion: «${shown.slice(0, 30)}…» -> «${await desc()}»`);
   check(shown !== '' && (await desc()) === '', 'tocar una casilla vacia no limpio la descripcion');
   await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
-  // Esc lo cierra sin pausar.
+  // Esc lo cierra sin pausar. Y SIN poder recapturar, que es lo que pasa en un
+  // Chrome de verdad —Esc no cuenta como gesto— y el headless no reproduce: se
+  // le quita la captura a mano para probar justo ese caso.
+  await page.evaluate(() => {
+    window.__lockBackup = HTMLCanvasElement.prototype.requestPointerLock;
+    HTMLCanvasElement.prototype.requestPointerLock = () => Promise.reject(new Error('sin gesto'));
+  });
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   const escClosed = await state(page);
+  await page.evaluate(() => { HTMLCanvasElement.prototype.requestPointerLock = window.__lockBackup; });
   check(!(await page.isVisible('#invPanel')), 'Esc no cerro el inventario');
-  check(!escClosed.paused, 'cerrar el inventario con Esc pauso el juego');
+  console.log(`  Esc sin poder recapturar: pausa ${escClosed.paused}, cursor suelto sin pausa ${escClosed.cursorFree}`);
+  check(!escClosed.paused && escClosed.cursorFree, 'cerrar el inventario con Esc pauso el juego');
   // Y al reabrirlo no queda nada seleccionado.
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(250);
@@ -602,6 +662,31 @@ async function desktopPass(browser, baseUrl) {
   await page.click('#statsToggle');
   check(!(await page.isVisible('#statsPanel')), 'el panel no se replego al volver a pulsar');
   await play(page);
+
+  // CTRL mantenido suelta el cursor sin pausar, y al soltarlo se recaptura
+  // (decision del autor, 2026-09-30).
+  await page.keyboard.down('Control');
+  await page.waitForTimeout(300);
+  const ctrlHeld = await state(page);
+  await page.keyboard.up('Control');
+  await page.waitForTimeout(400);
+  const ctrlUp = await state(page);
+  console.log(`  CTRL: capturado ${ctrlHeld.pointerLocked} -> ${ctrlUp.pointerLocked}, pausa ${ctrlHeld.paused}`);
+  check(!ctrlHeld.pointerLocked && !ctrlHeld.paused, 'mantener CTRL no solto el cursor o pauso');
+  check(ctrlUp.pointerLocked, 'soltar CTRL no volvio a capturar el cursor');
+  // TAB cambia el modo de golpe, y el boton MODO lo dice con su icono.
+  const modeIcon = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('#modeBar .mode-precise')).display !== 'none');
+  const m0 = await state(page);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(250);
+  const m1 = await state(page);
+  const icon1 = await modeIcon();
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(250);
+  const m2 = await state(page);
+  console.log(`  TAB: preciso ${m0.precise} -> ${m1.precise} -> ${m2.precise}`);
+  check(!m0.precise && m1.precise && !m2.precise && icon1 && !(await modeIcon()), 'TAB no alterna el modo de golpe o su icono');
 
   // La barra de la mano: siempre a la vista, y las teclas 1-4 eligen casilla.
   check(await page.isVisible('#hotbar'), 'la barra de la mano no se ve en PC');
@@ -1058,7 +1143,8 @@ async function stationsPass(browser, baseUrl) {
     // 0,5 + 0,34 del centro en los dos ejes.
     const gap = Math.max(Math.abs(pushed.x - (oven.x + 0.5)), Math.abs(pushed.y - (oven.y + 0.5)));
     console.log(`  andar contra el horno: a ${gap.toFixed(2)} de su centro`);
-    check(gap > 0.83, `el cuerpo se metio en el horno: a ${gap.toFixed(2)} de su centro`);
+    // Como una pared de terreno, se para con el centro del cuerpo en su borde.
+    check(gap >= 0.5, `el cuerpo se metio en el horno: a ${gap.toFixed(2)} de su centro`);
   }
 
   // La mesa, a la espalda: pico de cobre y mochila.
@@ -1134,9 +1220,10 @@ async function mobilePass(browser, baseUrl) {
   check(await page.evaluate(() => document.body.classList.contains('touch-active')), 'el body no entro en modo tactil');
   // El boceto del autor: arriba OTROS, la barra e INVENTARIO; abajo USAR y el
   // ATAQUE, con CORRER y SALTAR encima. Ni COMER ni SEMBRAR.
-  for (const id of ['#action', '#jump', '#run', '#use', '#others', '#invOpen']) {
+  for (const id of ['#action', '#jump', '#run', '#use', '#others', '#invOpen', '#modeTouch']) {
     check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);
   }
+  check(!(await page.isVisible('#modeBar')) && !(await page.isVisible('#hungerRing')), 'en el movil se ven MODO o los anillos de PC');
   check((await page.locator('#eat, #plant').count()) === 0, 'siguen los botones de comer o sembrar');
   check(!(await page.isVisible('#proj')) && !(await page.isVisible('#hudToggle')), 'el ojo o el HUD se ven sin abrir OTROS');
   check(!(await page.isVisible('#help')), 'la ayuda de teclado se ve en el movil');
@@ -1166,16 +1253,23 @@ async function mobilePass(browser, baseUrl) {
   check(Math.abs(jump.right - atk.right) < 1 && Math.abs(run.right - atk.right) < 1,
     `correr y saltar no van al borde derecho del ataque: ${run.right} / ${jump.right} / ${atk.right}`);
   check(bar.left >= others.right + 8 && bar.right <= invOpen.left - 8, 'la barra de la mano pisa OTROS o INVENTARIO');
+  // MODO: mas pequeno que USAR, en la diagonal de arriba a la izquierda del
+  // ataque y sin pisar a nadie (decision del autor).
+  const mode = await rect('modeTouch');
+  const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  check(mode.width < use.width, `MODO no es mas pequeno que USAR: ${mode.width} / ${use.width}`);
+  check(mode.right <= atk.left + 4 && mode.bottom <= atk.top + 4, `MODO no esta arriba a la izquierda del ataque: ${JSON.stringify(mode)}`);
+  check(![use, jump, run, atk].some((r) => overlap(mode, r)), 'MODO pisa otro boton');
   // Solo iconos: ningun boton lleva rotulo, y cada uno lleva su nombre para
   // el lector de pantalla.
   const labels = await page.evaluate(() =>
-    ['action', 'use', 'jump', 'run', 'others', 'invOpen'].map((id) => {
+    ['action', 'use', 'jump', 'run', 'others', 'invOpen', 'modeTouch'].map((id) => {
       const b = document.getElementById(id);
       return { id, text: b.textContent.replace(/[\s\u00bb\u2191]/g, ''), label: b.getAttribute('aria-label'), svg: !!b.querySelector('svg') };
     }),
   );
   check(labels.every((l) => l.text === '' && l.label), `hay botones con rotulo: ${JSON.stringify(labels)}`);
-  check(labels.filter((l) => l.svg).length === 4, 'USAR, ATAQUE, OTROS o INVENTARIO no llevan su icono');
+  check(labels.filter((l) => l.svg).length === 5, 'USAR, ATAQUE, OTROS, INVENTARIO o MODO no llevan su icono');
   // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
   check(await page.isVisible('#crosshair'), 'la cruz no se ve en el movil');
   const feedR = await rect('pickupFeed');
@@ -1637,6 +1731,19 @@ async function reliefPass(browser, baseUrl) {
     }
     console.log(`  contra la pared: lo mas que se sube andando es ${peor.subida} nivel(es)`);
     check(peor.subida <= 1, `andar salvo un muro sin saltar: subio ${peor.subida} niveles`);
+
+    // Al pie de la pared, mirando casi de frente en ocho rumbos: la reticula
+    // enmarca la cara de la pared en alguno (pedido del autor, 2026-09-30).
+    await open(page, baseUrl, at);
+    await look(page, 0, -200);
+    const marks = [];
+    for (let i = 0; i < 8; i++) {
+      await page.waitForTimeout(150);
+      marks.push((await state(page)).reticle);
+      await look(page, 314, 0);
+    }
+    console.log(`  reticula al girar al pie de la pared: ${marks.join(', ')}`);
+    check(marks.includes('pared'), 'mirando a la pared la reticula no enmarca su cara');
 
     // El salto: despega, levanta mas de un bloque y vuelve al suelo.
     const antesDelSalto = await open(page, baseUrl, at);

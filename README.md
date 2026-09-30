@@ -53,10 +53,12 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Clic en la pantalla | Capturar el cursor y jugar (el juego arranca en pausa) |
 | Raton | Mirar: la vista va con el cursor, tambien arriba y abajo (en tercera persona se puede mirar al cielo) |
 | `Esc` | Soltar el cursor y **pausar**; con el cursor suelto se pulsan los botones. Con el inventario abierto, lo cierra sin pausar |
+| `Ctrl` (mantener) | Soltar el cursor para pulsar botones, **sin pausar** |
+| `Tab` | Modo de golpe: barrido (el sector) o preciso (solo lo del centro de la mira) |
 | Rueda | Recorrer la barra de la mano |
 | `+` / `-` | Zoom; en primera persona, catalejo que vuelve al dejar de pulsar |
 | Clic izquierdo | Golpear hacia donde mira la camara, con lo que se lleve en la mano |
-| Clic derecho | Usar lo de la mano: una baya se come, una semilla se siembra donde mira la camara |
+| Clic derecho | Usar: mirando una estacion, la abre; si no, lo de la mano (una baya se come, una semilla se siembra, una estacion se pone, tambien contra una pared) |
 | `Espacio` | Saltar |
 | `Shift` | Correr: interruptor, se queda encendido |
 | `E` | Inventario y recetas (no pausa): arrastrar mueve o apila, soltar fuera tira (pide confirmacion), mantener 1,5 s una receta la fabrica |
@@ -76,6 +78,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Boton ATAQUE | Golpear; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar el golpe |
 | Boton USAR | Usar lo de la mano: comer una baya, sembrar una semilla |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
+| Boton MODO (junto al ataque) | Modo de golpe: el icono dice cual, tajo (barrido) o mirilla (preciso) |
 | Barra de arriba | Tocar una casilla la pone en la mano; arrastrar las ordena |
 | Boton INVENTARIO | Inventario, con pestanas Personaje, Inventario y Recetas; como en PC, arrastrar y mantener |
 | Boton OTROS | Cambiar de vista (el ojo), el HUD y el panel del entorno |
@@ -100,10 +103,16 @@ Las herramientas se gastan y se rompen, y el inventario son dieciseis casillas
 con pilas de cien. Al golpear algo que no se rompe saltan esquirlas pequenas, y
 lo que entra o sale del inventario se anota en letra pequena («+5 Madera»).
 
-**En los dos:** la salud (corazon) y el hambre (muslo) van siempre abajo. En
-PC, de borde a borde, con el **HUD** (hora, dia, semilla, posicion, FPS) arriba
-a la izquierda y el **panel del entorno** (la hoja) bajo el ojo; en el movil,
-esos dos y el ojo viven en OTROS. Los paneles arrancan cerrados.
+**En los dos:** la salud (corazon) y el hambre (cubiertos) van siempre abajo. En
+PC, como anillos que se vacian en sentido horario a los dos lados de la barra
+de la mano, con MODO a la izquierda e INVENTARIO a la derecha; el **HUD**
+(hora, dia, semilla, posicion, FPS y los controles) arriba a la izquierda y el
+**panel del entorno** (la hoja) bajo el ojo. En el movil, barras, y el HUD, el
+entorno y el ojo viven en OTROS. Los paneles arrancan cerrados, y con el
+inventario abierto solo se anda.
+
+Las **estaciones** son fisicas como un bloque: se chocan de lado y se sube
+encima (el horno, mas alto que el salto, no desde su mismo nivel).
 
 En el movil, el ATAQUE es el boton mas grande, en la esquina de abajo a la
 derecha, con USAR a su izquierda y CORRER y SALTAR encima: la distribucion del

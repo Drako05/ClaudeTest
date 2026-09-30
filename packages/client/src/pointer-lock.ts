@@ -7,12 +7,17 @@
  * relativo y **Esc lo suelta siempre**, porque asi lo impone el navegador. Y
  * de ahi sale lo demas:
  *
- * - **Sin cursor capturado, el juego esta en pausa**, con el aviso en
- *   pantalla. Tambien al arrancar: el navegador exige un clic para capturar.
+ * - **Pausa solo el Esc del jugador**: cuando el navegador suelta el cursor sin
+ *   que el juego lo pidiera. Y al arrancar, porque el navegador exige un clic
+ *   para capturar. En pausa sale el aviso.
+ * - **Lo que suelta el propio juego no pausa** (`free`): el inventario, el
+ *   panel de desarrollo, CTRL mantenido (decision del autor, 2026-09-30) y la
+ *   muerte. Al cerrarlos se intenta capturar otra vez; si el navegador no lo
+ *   deja —Chrome no deja sin un gesto, y Esc no cuenta como gesto—, **se sigue
+ *   jugando** con el cursor suelto, sin girar la vista, hasta el primer clic.
+ *   Asi Esc cierra el inventario sin pausar, que es lo que pidio el autor: la
+ *   version anterior suponia que Chrome recapturaba sin gesto, y no lo hace.
  * - **Un clic en la pantalla lo captura y reanuda**, y ese clic no golpea.
- * - El **panel de desarrollo** y el **inventario** sueltan el cursor pero **no
- *   pausan**: el primero tiene su propia pausa y sirve para ver pasar el
- *   tiempo, y abrir el inventario no pausa por decision del autor.
  *
  * El movil no entra aqui: `mouseMode` exige un puntero fino y se apaga al
  * primer toque de verdad (`touch-active`), para que un portatil tactil jugado
@@ -24,13 +29,15 @@ export interface PauseInputs {
   mouseMode: boolean;
   /** El cursor esta capturado. */
   locked: boolean;
-  /** El panel de desarrollo esta abierto. */
+  /** El panel de desarrollo o el inventario estan abiertos. */
   devOpen: boolean;
+  /** El cursor lo solto el juego, no el Esc del jugador. */
+  free: boolean;
 }
 
-/** Sin cursor capturado el juego esta en pausa, salvo con el panel de desarrollo. */
-export function isPaused({ mouseMode, locked, devOpen }: PauseInputs): boolean {
-  return mouseMode && !locked && !devOpen;
+/** Sin cursor capturado el juego esta en pausa, salvo que lo soltara el juego. */
+export function isPaused({ mouseMode, locked, devOpen, free }: PauseInputs): boolean {
+  return mouseMode && !locked && !devOpen && !free;
 }
 
 export class MouseLook {
@@ -45,6 +52,13 @@ export class MouseLook {
    */
   private wasLocked = false;
   private readonly fine: boolean;
+  /**
+   * El cursor esta suelto porque lo solto el juego: no pausa. Se apaga al
+   * capturar, y con el Esc del jugador, que es lo unico que pausa.
+   */
+  private free = false;
+  /** El juego acaba de pedir soltar: el siguiente `pointerlockchange` es suyo. */
+  private releasing = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -56,7 +70,14 @@ export class MouseLook {
     // Sin esto, abrir un panel justo tras pedir la captura lo dejaba abierto
     // con el cursor capturado y sus botones sin poder pulsarse.
     document.addEventListener('pointerlockchange', () => {
-      if (this.locked && this.devOpen()) document.exitPointerLock();
+      if (this.locked) {
+        this.free = false;
+        if (this.devOpen()) this.release();
+        return;
+      }
+      // Suelto sin haberlo pedido el juego: el Esc del jugador, que pausa.
+      if (!this.releasing) this.free = false;
+      this.releasing = false;
     });
     document.addEventListener('mousemove', (e) => {
       const first = !this.wasLocked;
@@ -76,7 +97,12 @@ export class MouseLook {
   }
 
   get paused(): boolean {
-    return isPaused({ mouseMode: this.mouseMode, locked: this.locked, devOpen: this.devOpen() });
+    return isPaused({
+      mouseMode: this.mouseMode,
+      locked: this.locked,
+      devOpen: this.devOpen(),
+      free: this.free,
+    });
   }
 
   /**
@@ -108,8 +134,17 @@ export class MouseLook {
     }
   }
 
+  /** Suelta el cursor sin pausar: lo pide el juego, no el jugador. */
   release(): void {
-    if (this.locked) document.exitPointerLock();
+    if (!this.locked) return;
+    this.free = true;
+    this.releasing = true;
+    document.exitPointerLock();
+  }
+
+  /** Si el cursor esta suelto por el juego, sin pausa. Para el humo. */
+  get freed(): boolean {
+    return this.free && !this.locked;
   }
 
   /** El movimiento del raton acumulado desde el ultimo frame, en pixeles. */

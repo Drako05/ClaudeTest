@@ -19,6 +19,7 @@ import {
   LifeKind,
 } from '@verdant/shared';
 import { clockLabel, dayNumber, toChunkCoord, type GameState } from '@verdant/sim';
+import { ringDash } from './ring.js';
 
 function byId(id: string): HTMLElement {
   const node = document.getElementById(id);
@@ -88,6 +89,10 @@ export class Hud {
     healthFill: byId('healthFill'),
     hungerBar: byId('hungerBar'),
     hungerFill: byId('hungerFill'),
+    healthRing: byId('healthRing'),
+    healthArc: byId('healthArc'),
+    hungerRing: byId('hungerRing'),
+    hungerArc: byId('hungerArc'),
     hudToggle: byId('hudToggle'),
     hud: byId('hud'),
     statsToggle: byId('statsToggle'),
@@ -164,6 +169,16 @@ export class Hud {
     el.healthBar.setAttribute('aria-valuenow', String(Math.ceil(health)));
     el.hungerFill.style.width = `${hunger}%`;
     el.hungerBar.setAttribute('aria-valuenow', String(Math.ceil(hunger)));
+    // Y los anillos de PC, que son las mismas dos cifras (`ring.ts`).
+    for (const [ring, arc, value] of [
+      [el.healthRing, el.healthArc, health],
+      [el.hungerRing, el.hungerArc, hunger],
+    ] as const) {
+      const { dasharray, dashoffset } = ringDash(value);
+      arc.setAttribute('stroke-dasharray', dasharray);
+      arc.setAttribute('stroke-dashoffset', String(dashoffset));
+      ring.setAttribute('aria-valuenow', String(Math.ceil(value)));
+    }
 
     el.dead.classList.toggle('show', entities.alive[playerId] === 0);
     if (this.hudOpen) this.updateInfo(state);

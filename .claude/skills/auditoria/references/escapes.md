@@ -113,6 +113,33 @@ Formato:
   `client/input.ts` en un test y un razonamiento de «tres casillas» en
   `slash`.)
 
+### 11. Esc cerraba el inventario y pausaba en un Chrome de verdad (2026-09-30)
+- **Que paso**: `CLAUDE.md` afirmaba que, como el cursor lo habia soltado el
+  juego, Chrome dejaba recapturarlo sin gesto al cerrar con Esc. No es asi: Esc
+  no cuenta como gesto, la captura se rechaza y el juego se pausaba. Lo vio el
+  autor jugando.
+- **Por que se escapo**: el humo lo comprobaba en el headless, que **si**
+  recaptura sin gesto. La comprobacion pasaba en un navegador que no se
+  comporta como el del jugador, y la afirmacion del documento nunca se probo
+  contra uno de verdad.
+- **Que lo habria visto**: para cada comportamiento que dependa de una
+  politica del navegador (gestos de usuario, captura del cursor, pantalla
+  completa, audio), preguntar si el headless la aplica igual; si no, forzar el
+  caso adverso a mano (el humo ahora hace que `requestPointerLock` falle antes
+  del Esc).
+- **Donde vive ahora**: lente B (patron: politicas del navegador que el
+  headless no aplica).
+
+### 12. «Con el inventario abierto no golpea» clicaba sobre el panel (2026-09-30)
+- **Que paso**: la primera version de esa comprobacion clicaba en el centro
+  de la pantalla, donde esta el panel del inventario: el clic nunca llegaba al
+  mundo y la comprobacion pasaba con el arreglo quitado. Se vio al mutar.
+- **Por que se escapo**: no se escapo del todo, la lente B la cazo; se anota
+  porque el patron se repetira: **un clic de prueba que cae en otra cosa**.
+- **Que lo habria visto**: antes de clicar, `elementFromPoint` en ese punto:
+  tiene que ser lo que se quiere probar.
+- **Donde vive ahora**: lente B.
+
 ---
 
 ## Del proceso del agente

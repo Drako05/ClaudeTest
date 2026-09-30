@@ -73,6 +73,15 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El **dibujo** de la mesa (tablas, cuadricula arriba, patas, sierra y martillo) y del horno (ladrillo, boca con brasa, tiro arriba); el frente mira a un lado **al azar de la casilla**, no hacia quien la puso | Recoleccion y fabricacion, tanda 2 | `stations-view.ts` |
 | Nombres cortos y descripciones de los objetos nuevos; los huecos de ropa vacios dicen «Espalda» y «Cintura» | Recoleccion y fabricacion, tanda 2 | texto en `inventory-ui.ts` |
 | «Materiales de metal» en el panel de desarrollo: lo justo para toda la tanda 2 | Recoleccion y fabricacion, tanda 2 | quitarlo |
+| Con el inventario abierto **se salta** (tu dijiste «solo moverse») | Ajustes de la tanda 2 | una linea en `main.ts` |
+| El modo de golpe **arranca en barrido** y no se recuerda entre partidas | Ajustes de la tanda 2 | una linea |
+| La estacion puesta contra una pared cae con la **gravedad del salto** (62), y la caida solo se ve | Ajustes de la tanda 2 | `stations-view.ts` |
+| La rueda ilumina cada casilla **140 ms**, escalonadas **40 ms** | Ajustes de la tanda 2 | dos numeros en `inventory-ui.ts` |
+| Los **cubiertos** tambien en la franja del movil (tu los dibujaste en el anillo de PC) | Ajustes de la tanda 2 | SVG |
+| Los dibujos de la **mochila de explorador**, el **tajo** y la **mirilla**; los anillos de **56 px** y trazo 5 | Ajustes de la tanda 2 | SVG y CSS en `index.html` |
+| MODO en el movil de **44 px**, a 72 px (en cada eje) del centro del ataque | Ajustes de la tanda 2 | CSS |
+| La **estocada** empieza **0,6** delante de los ojos | Ajustes de la tanda 2 | un numero en `effects.ts` |
+| El marco de la **pared** es la cara de cubo tocada: una casilla de ancho y un nivel de alto | Ajustes de la tanda 2 | `overlays.ts` |
 | Lo que no cabe: el golpe **no completa** y el objeto se queda, sin aviso; tirar (soltar fuera del panel y confirmar) lo **hace desaparecer**, hasta que haya objetos en el suelo | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
 | Las **descripciones** de los objetos (una frase cada uno) | Inventario de los bocetos | texto en `inventory-ui.ts` |
 | La **barrita de desgaste** en las herramientas (no estaba en el boceto) | Inventario de los bocetos | CSS |
@@ -445,6 +454,36 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Ajustes de la tanda 2 — HECHO (2026-09-30)
+
+Lo que pediste tras jugarla, y lo que respondiste:
+- **Con el inventario abierto no se usa ni se ataca**; se anda.
+- **Esc cierra el inventario sin pausar.** Chrome no deja volver a capturar el
+  cursor sin un gesto, y Esc no cuenta como gesto: por eso se pausaba. Ahora
+  el cursor que suelta el propio juego (inventario, CTRL, panel) no pausa: se
+  sigue jugando y el primer clic lo captura. Solo pausa tu Esc en pleno juego.
+- **CTRL mantenido suelta el raton** para pulsar botones, sin pausar; al
+  soltarlo se vuelve a capturar.
+- **El menu del navegador ya no sale** al abrir una estacion con clic derecho.
+- **Las estaciones son fisicas como un bloque**: se chocan de lado y se sube
+  encima; el horno sigue midiendo 1,25, mas que el salto, a proposito.
+- **Colocar mirando a una pared** la pone delante de ella y cae hasta el suelo.
+- **La rueda ilumina cada casilla por la que pasa.**
+- **Icono de INVENTARIO**: una mochila de explorador, como tu adjunto.
+- **La barra de abajo de PC**, tu boceto: MODO, la caja centrada con el anillo
+  del hambre (con cubiertos), la barra de la mano y el anillo de la salud, e
+  INVENTARIO con hueco para mas botones. Los anillos se vacian en sentido
+  horario.
+- **Los controles de PC**, dentro del boton de informacion.
+- **La reticula** ya no marca lo que alcanza el golpe; marca el suelo y ahora
+  tambien la cara de la pared que se mira.
+- **Dos modos de golpe**: barrido (el de siempre) y preciso (solo el primer
+  objetivo del centro de la mira). TAB o el boton MODO; en el movil, mas
+  pequeno que USAR y en la diagonal de arriba a la izquierda del ataque. En
+  preciso se ve una estocada recta.
+
+Lo que decidi yo va arriba, en «Esperando tu juicio».
 
 ## Recoleccion y fabricacion — tandas 1 y 2 HECHAS (2026-09-28 y 2026-09-29)
 

@@ -17,7 +17,7 @@ import {
   type Scene,
 } from 'three';
 import { CHUNK_SIZE } from '@verdant/shared';
-import { actionReach, groundHeight, targetTile, type GameState, type World } from '@verdant/sim';
+import { aimedSurface, groundHeight, type GameState, type Surface, type World } from '@verdant/sim';
 import { collectBiomeEdges } from './biome-edges.js';
 
 const LIFT = 0.03;
@@ -61,44 +61,61 @@ function pushSquare(out: number[], world: World, wx: number, wy: number): void {
   }
 }
 
+/**
+ * Empuja el contorno de la cara de cubo de una pared que toca la mirada: la del
+ * plano (x o y entero) mas cercano al punto tocado, de una casilla de ancho y
+ * un nivel de alto, separada un pelo hacia el lado de quien mira.
+ */
+function pushWallFace(out: number[], world: World, s: Surface): void {
+  const { point, tile, front } = s;
+  const alongX = Math.abs(point.x - Math.round(point.x)) < Math.abs(point.y - Math.round(point.y));
+  const top = world.levelAt(tile.x, tile.y);
+  const z0 = Math.min(Math.floor(point.z + 1e-6), top - 1);
+  const z1 = z0 + 1;
+  const corners: Array<[number, number]> = [];
+  if (alongX) {
+    const x = Math.round(point.x) + Math.sign(front.x - tile.x) * LIFT;
+    const y = Math.floor(point.y);
+    corners.push([x, y], [x, y + 1]);
+  } else {
+    const y = Math.round(point.y) + Math.sign(front.y - tile.y) * LIFT;
+    const x = Math.floor(point.x);
+    corners.push([x, y], [x + 1, y]);
+  }
+  const [[ax, ay], [bx, by]] = corners;
+  out.push(ax, z0, ay, bx, z0, by, bx, z0, by, bx, z1, by, bx, z1, by, ax, z1, ay, ax, z1, ay, ax, z0, ay);
+}
+
 export class Overlays {
   /**
-   * La casilla apuntada va mas marcada que las dos flanqueantes: sigue siendo la
-   * que importa para sembrar. Mismas opacidades que el isometrico.
+   * Donde toca la mirada: la casilla de suelo, o la cara de la pared (pedido
+   * del autor, 2026-09-30). Es donde se sembraria o se colocaria algo. Los
+   * objetos al alcance ya no se marcan: lo pidio tambien el autor.
    */
-  private readonly aimed = lines(0xffffff, 0.55);
-  private readonly flanks = lines(0xffffff, 0.22);
-  /** Donde se sembraria: la casilla en que la mirada toca el suelo. */
   private readonly plant = lines(0xb8f28a, 0.45);
+  private readonly wall = lines(0xffffff, 0.5);
   private readonly grids = new Map<string, LineSegments>();
   private readonly borders = new Map<string, { mesh: LineSegments; segments: number; misplaced: number }>();
 
   constructor(private readonly scene: Scene) {
-    scene.add(this.aimed, this.flanks, this.plant);
+    scene.add(this.plant, this.wall);
   }
 
-  /**
-   * Marca las casillas de los objetos que el golpe ALCANZA —cuyo hitbox toca el
-   * sector, regla 12—, el mas cercano mas fuerte; y, en verde, donde se
-   * sembraria. Solo lo que la accion cumple: nada de lo que el sector no toca.
-   */
+  /** Marca donde toca la mirada: el suelo en verde, la cara de una pared en blanco. */
   updateReticle(state: GameState): void {
-    const area = actionReach(state.world, state.entities, state.playerId);
-    const aimed: number[] = [];
-    const flanks: number[] = [];
-    area.forEach((t, i) => pushSquare(i === 0 ? aimed : flanks, state.world, t.x, t.y));
-    setPositions(this.aimed, aimed);
-    setPositions(this.flanks, flanks);
-    const plant: number[] = [];
-    const where = targetTile(state.world, state.entities, state.playerId);
-    if (where) pushSquare(plant, state.world, where.x, where.y);
-    setPositions(this.plant, plant);
+    const floor: number[] = [];
+    const wall: number[] = [];
+    const s = aimedSurface(state.world, state.entities, state.playerId);
+    if (s?.top) pushSquare(floor, state.world, s.tile.x, s.tile.y);
+    else if (s) pushWallFace(wall, state.world, s);
+    setPositions(this.plant, floor);
+    setPositions(this.wall, wall);
   }
 
-  /** Casillas marcadas por la reticula ahora mismo. */
-  get reticleTiles(): number {
-    const count = (m: LineSegments) => m.geometry.getAttribute('position').count / 8;
-    return count(this.aimed) + count(this.flanks);
+  /** Lo que marca la reticula ahora mismo: suelo, pared o nada. */
+  get reticle(): 'suelo' | 'pared' | null {
+    const count = (m: LineSegments) => m.geometry.getAttribute('position').count;
+    return count(this.plant) > 0 ? 'suelo' : count(this.wall) > 0 ? 'pared' : null;
   }
 
   /**

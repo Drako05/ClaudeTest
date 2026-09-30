@@ -215,6 +215,21 @@ for (const id of ['use', 'jump']) {
   check(lit && off, `el boton ${id} no se enciende al tocarlo o no se apaga al soltar`);
 }
 
+// El boton MODO con un toque de verdad: cambia de modo y de icono, y vuelve.
+const modeBtn = await center('modeTouch');
+const shownIcon = () => page.evaluate(() =>
+  getComputedStyle(document.querySelector('#modeTouch .mode-precise')).display !== 'none' ? 'mirilla' : 'tajo');
+const mode0 = await probe();
+const icon0 = await shownIcon();
+await tapReal(modeBtn);
+const mode1 = await probe();
+const icon1 = await shownIcon();
+await tapReal(modeBtn);
+const mode2 = await probe();
+console.log(`  MODO: preciso ${mode0.precise} -> ${mode1.precise} -> ${mode2.precise}, icono ${icon0} -> ${icon1}`);
+check(!mode0.precise && mode1.precise && !mode2.precise && icon0 === 'tajo' && icon1 === 'mirilla',
+  'el boton MODO no alterna el modo o su icono');
+
 // El inventario con el dedo: arrastrar dentro de la barra con el inventario
 // cerrado, arrastrar una casilla a otra y a la barra con el abierto, y mantener
 // una receta 1,5 s para fabricarla (decisiones del autor). Con materiales del
@@ -248,6 +263,19 @@ check(items(barVoid).join() === items(barSwap).join() && !barVoid.discardAsk && 
 // Inventario abierto: de una casilla a otra, y de la rejilla a la barra.
 const invBtn = await center('invOpen');
 await tapReal(invBtn);
+// Con el inventario abierto no se ataca (pedido del autor), aunque el dedo
+// llegue al boton.
+const atkAt = await center('action');
+const atkFree = await page.evaluate((p) => !!document.elementFromPoint(p.x, p.y)?.closest('#action'), atkAt);
+const beforeAtk = await probe();
+await real('touchStart', [atkAt]);
+await page.waitForTimeout(600);
+await real('touchEnd', []);
+await page.waitForTimeout(300);
+const afterAtk = await probe();
+console.log(`  ATAQUE con el inventario abierto: boton a tiro ${atkFree}, golpes ${beforeAtk.sent.harvest} -> ${afterAtk.sent.harvest}`);
+check(atkFree, 'el panel tapa el boton de ataque: la comprobacion no probaria nada');
+check(afterAtk.sent.harvest === beforeAtk.sent.harvest, 'con el inventario abierto el boton de ataque golpeo');
 const slotAt = (n) => at(`#invGrid .slot:nth-child(${n})`);
 const beforeDrag = await probe();
 const moving = beforeDrag.slots[0].item;

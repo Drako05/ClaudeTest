@@ -43,6 +43,9 @@ import {
   clockLabel,
   EYE_HEIGHT,
   hitboxAt,
+  lookVector,
+  preciseTarget,
+  STRIKE_RANGE,
   strikeOf,
   targetTile,
   skipTime,
@@ -51,7 +54,7 @@ import {
   type GameState,
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
-import { Effects, SLASH_FP_HALF_WIDTH, SLASH_HALF_WIDTH, slashEdge } from './effects.js';
+import { Effects, SLASH_FP_HALF_WIDTH, SLASH_HALF_WIDTH, slashEdge, stabLine } from './effects.js';
 import { cameraClearance } from './camera-collision.js';
 import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
@@ -174,6 +177,7 @@ projButton.addEventListener('click', () => {
 controls.onToggleProjection = toggleProjection;
 controls.bindJumpButton(document.getElementById('jump'));
 controls.bindRunButton(document.getElementById('run'));
+for (const id of ['modeBar', 'modeTouch']) controls.bindModeButton(document.getElementById(id));
 controls.bindActionButton(document.getElementById('action'));
 controls.bindUseButton(document.getElementById('use'));
 controls.onRestart = restart;
@@ -278,9 +282,9 @@ const mouseLook = new MouseLook(canvas, () => dev.active || items.open);
 controls.mouseLook = mouseLook;
 window.addEventListener('keydown', (e) => {
   // Esc con el inventario abierto lo cierra, sin pausar (pedido del autor): al
-  // cerrar se vuelve a capturar el cursor. Chrome lo deja sin gesto porque lo
-  // solto el juego al abrir, no el jugador; si aun asi lo rechazara, queda la
-  // pausa de siempre y basta un clic.
+  // cerrar se intenta capturar el cursor. Chrome no lo deja —Esc no cuenta como
+  // gesto—, y por eso el cursor que suelta el juego no pausa (`pointer-lock.ts`):
+  // se sigue jugando y el primer clic lo captura.
   if (e.code === 'Escape' && items.open) {
     items.toggle();
     return;
@@ -289,6 +293,12 @@ window.addEventListener('keydown', (e) => {
   if (dev.active) mouseLook.release();
   else if (!items.open) mouseLook.capture();
 });
+// CTRL mantenido suelta el cursor para pulsar botones, sin pausar (decision del
+// autor, 2026-09-30); al soltarlo se intenta capturar otra vez.
+controls.onFreeCursor = (held) => {
+  if (held) mouseLook.release();
+  else if (!dev.active && !items.open) mouseLook.capture();
+};
 items.onToggle = (open) => {
   if (open) mouseLook.release();
   else if (!dev.active) mouseLook.capture();
@@ -517,6 +527,7 @@ function frame(now: number): void {
   intent.moveX = fwd.x * -move.y + rgt.x * move.x;
   intent.moveY = fwd.y * -move.y + rgt.y * move.x;
   intent.run = controls.running;
+  intent.precise = controls.precise;
   // La mirada es la de la camara, decision del autor: se acciona hacia donde se
   // mira, con el rumbo real y su inclinacion, que inclinan el sector del golpe
   // (regla 12).
@@ -548,6 +559,11 @@ function frame(now: number): void {
   let jump = collect && controls.takeJump();
   let action = collect && controls.takeAction();
   let use = collect && controls.takeUse();
+  // Con el inventario abierto —el de E o el de una estacion— solo se anda
+  // (pedido del autor): lo pulsado se consume igual, para que no se dispare al
+  // cerrarlo, y el ataque mantenido no repite.
+  const acting = !items.open;
+  if (!acting) action = use = false;
   // Las peticiones del inventario (mano, intercambiar, tirar, fabricar) no se
   // tiran en pausa: esperan al primer frame con tick.
   let asked = accumulator >= TICK_DT ? items.take() : null;
@@ -574,7 +590,7 @@ function frame(now: number): void {
     // no en tiempo real para que sea la misma con cualquier ritmo de fotograma.
     intent.harvest = action;
     action = false;
-    if (controls.actionHeld && ++actionTicks >= ACTION_REPEAT_TICKS) {
+    if (acting && controls.actionHeld && ++actionTicks >= ACTION_REPEAT_TICKS) {
       intent.harvest = true;
       actionTicks = 0;
     }
@@ -587,7 +603,13 @@ function frame(now: number): void {
     if (intent.jump) sent.jump++;
     if (intent.use) sent.use++;
     const pisabaAntes = state.entities.grounded[state.playerId];
+    // La estocada del modo preciso llega hasta lo que golpea, y se mide ANTES
+    // del paso: despues, lo que cayo ya no esta y la recta se alargaria.
+    const stab = accionando && intent.precise ? preciseTarget(state.world, state.entities, state.playerId) : null;
     step(state, intent);
+    // La estacion recien puesta cae desde donde la toco la mirada (pedido del
+    // autor: todo tiene gravedad). Solo se ve: el nucleo ya la tiene en su sitio.
+    if (state.lastPlaced) stations.drop(state.lastPlaced, state.world);
     // Usar una estacion abre su panel: sus recetas solo se ven asi (decision
     // del autor). Sale del nucleo, que es quien sabe que se miraba.
     if (state.lastOpened) items.openStation(state.lastOpened.station);
@@ -604,13 +626,17 @@ function frame(now: number): void {
       // que sale de los ojos en las tres vistas. Es el mismo golpe que acaba de
       // decidir la simulacion. Sale siempre, haya algo que golpear o no: es el
       // gesto, no el resultado.
+      // En modo preciso, en cambio, una estocada recta hasta lo golpeado.
       const e = state.entities;
       const id = state.playerId;
       const eye = { x: e.x[id], y: e.y[id], z: e.z[id] + EYE_HEIGHT };
-      effects.spawnSlash(
-        slashEdge(eye, strikeOf(state.world, e, id).rays),
-        camera.projection === 'primera' ? SLASH_FP_HALF_WIDTH : SLASH_HALF_WIDTH,
-      );
+      const width = camera.projection === 'primera' ? SLASH_FP_HALF_WIDTH : SLASH_HALF_WIDTH;
+      if (intent.precise) {
+        const dir = lookVector(e.facingX[id], e.facingY[id], e.lookZ[id]);
+        effects.spawnSlash(stabLine(eye, dir, stab ? stab.t : STRIKE_RANGE), width);
+      } else {
+        effects.spawnSlash(slashEdge(eye, strikeOf(state.world, e, id).rays), width);
+      }
     }
     // Lo golpeado que siguio en pie suelta esquirlas: mas pequenas, apagadas y
     // semitransparentes que los escombros de romper (decision del autor).
@@ -670,6 +696,9 @@ function frame(now: number): void {
   camera.relaxSpyglass(dt, controls.zoomHeld);
 
   syncChunks();
+  // Despues de redibujar los chunks: la caja recien puesta nace en su suelo y
+  // la caida la sube a donde va.
+  stations.animate(performance.now());
   overlays.updateReticle(state);
   overlays.syncDebug(
     state.world,
@@ -774,6 +803,12 @@ Object.defineProperty(window, '__verdant', {
       /** El raton capturado de PC y la pausa que trae soltarlo. */
       paused: mouseLook.paused,
       pointerLocked: mouseLook.locked,
+      /** Cursor suelto por el juego (inventario, CTRL), sin pausa. */
+      cursorFree: mouseLook.freed,
+      /** Golpe en modo preciso (TAB o el boton MODO). */
+      precise: controls.precise,
+      /** Estaciones que empezaron a caer al ponerlas contra una pared. */
+      stationDrops: stations.drops,
       mouseMode: mouseLook.mouseMode,
       fovPanel: fovPanel.open,
       /** A que distancia del pivote ha quedado la camara tras la colision. */
@@ -791,7 +826,8 @@ Object.defineProperty(window, '__verdant', {
       borderSegments: overlays.borderSegmentCount,
       misplacedBorders: overlays.misplacedBorderCount,
       /** Casillas que marca la reticula: las que la accion alcanza. */
-      reticleTiles: overlays.reticleTiles,
+      /** Lo que marca la reticula: 'suelo', 'pared' o null. */
+      reticle: overlays.reticle,
       /** Lo recolectado, para poder comprobar la accion desde fuera. */
       gathered,
       /** Barridos y escombros DIBUJADOS, acumulados. Ver `EffectsView`. */
@@ -860,6 +896,8 @@ Object.defineProperty(window, '__verdant', {
       stationTiles: stationTilesAround(state, 5),
       selectedSlot: state.inventory.selected,
       itemsSent: { ...items.sent },
+      /** Casillas iluminadas al paso de la rueda. Acumulado. */
+      hotbarPasses: items.passes,
       inventoryPage: items.currentPage,
       /** Lo que dice el registro de objetos, de la mas vieja a la mas nueva. */
       feed: feed.lines.map((l) => l.text),
