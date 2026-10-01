@@ -238,6 +238,36 @@ check(!mode0.precise && mode1.precise && !mode2.precise && icon0 === 'tajo' && i
   'el boton MODO no alterna el modo o su icono');
 check(litHeld && !litAfter, 'el boton MODO no se enciende al tocarlo o no se apaga al soltar');
 
+// ENTRADA en TAP, con un dedo de verdad sobre el mundo: mantenerlo ataca, y
+// arrastrarlo despues gira la camara sin dejar de atacar (decision del autor,
+// 2026-10-01).
+const entryBtn = await center('inputMode');
+await tapReal(entryBtn);
+const inTap = await probe();
+const spot = { x: 90, y: 380 };
+await real('touchStart', [spot]);
+// Se espera a que llegue el primer golpe del sostenido, no un tiempo fijo:
+// en una maquina cargada, a los 500 ms aun podia no haberse procesado
+// (escape 13: nada de mirar dentro de una ventana de tiempo).
+await page.waitForFunction((n) => window.__verdant.sent.tapHarvest > n, inTap.sent.tapHarvest, { timeout: 5000 }).catch(() => {});
+const heldTap = await probe();
+for (let i = 1; i <= 16; i++) {
+  await real('touchMove', [{ x: spot.x + i * 10, y: spot.y }]);
+  await page.waitForTimeout(50);
+}
+const draggedTap = await probe();
+await real('touchEnd', []);
+await page.waitForTimeout(300);
+const tapTurn = draggedTap.yaw - heldTap.yaw;
+const tapWhileDrag = draggedTap.sent.tapHarvest - heldTap.sent.tapHarvest;
+console.log(`  TAP con el dedo: entrada ${inTap.tapInput}, mantener ${heldTap.sent.tapHarvest - inTap.sent.tapHarvest} ataques, ` +
+  `arrastrando giro ${tapTurn.toFixed(2)} rad y ${tapWhileDrag} ataques`);
+check(inTap.tapInput, 'el boton ENTRADA no paso a TAP con el dedo');
+check(heldTap.sent.tapHarvest > inTap.sent.tapHarvest, 'en TAP mantener el dedo no ataco');
+check(Math.abs(tapTurn) > 0.1 && tapWhileDrag > 0, 'en TAP arrastrar tras mantener no giro la camara o dejo de atacar');
+await tapReal(entryBtn);
+check(!(await probe()).tapInput, 'el boton ENTRADA no volvio a MIRA');
+
 // El inventario con el dedo: arrastrar dentro de la barra con el inventario
 // cerrado, arrastrar una casilla a otra y a la barra con el abierto, y mantener
 // una receta 1,5 s para fabricarla (decisiones del autor). Con materiales del

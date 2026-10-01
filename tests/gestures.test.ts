@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   Gestures,
+  HOLD_MS,
   PINCH_THRESHOLD,
   STICK_DEAD,
   STICK_RADIUS,
@@ -333,5 +334,75 @@ describe('El dedo de la accion gira la camara', () => {
     const g = fresh();
     g.downAction('accion:0', BUTTON.x, BUTTON.y);
     expect(g.up('accion:0')?.role).toBe('actionLook');
+  });
+});
+
+/**
+ * El modo TAP (decision del autor, 2026-10-01): un dedo en el mundo que se
+ * suelta enseguida es un toque (usar y luego atacar); quieto `HOLD_MS`, un
+ * ataque sostenido que, si luego se arrastra, gira la camara sin parar; y
+ * arrastrado antes, solo camara. Aqui se clasifica; que hacer con cada cosa
+ * es de `controls.ts` y `main.ts`.
+ */
+describe('Los dedos del modo TAP', () => {
+  it('soltado enseguida y sin moverse, es un toque', () => {
+    const g = fresh();
+    g.down(1, LOOK_SPOT.x, LOOK_SPOT.y, true, 1000);
+    const r = g.up(1, 1000 + HOLD_MS - 50);
+    expect(r?.tap).toBe(true);
+    expect(r?.heldMs).toBeLessThan(HOLD_MS);
+    expect(r?.paired).toBe(false);
+  });
+
+  it('quieto HOLD_MS, pasa a sostenido; antes no', () => {
+    const g = fresh();
+    g.down(1, LOOK_SPOT.x, LOOK_SPOT.y, true, 1000);
+    expect(g.promoteHold(1, 1000 + HOLD_MS - 1)).toBe(false);
+    expect(g.promoteHold(1, 1000 + HOLD_MS)).toBe(true);
+    expect(g.up(1, 2000)?.role).toBe('tapHold');
+  });
+
+  it('arrastrado antes de HOLD_MS, ya no se sostiene: solo camara', () => {
+    const g = fresh();
+    g.down(1, LOOK_SPOT.x, LOOK_SPOT.y, true, 1000);
+    g.move(1, LOOK_SPOT.x + 40, LOOK_SPOT.y);
+    expect(g.promoteHold(1, 1000 + HOLD_MS * 2)).toBe(false);
+    expect(g.takeOrbit().dx).toBe(40);
+    expect(g.up(1, 2000)?.tap).toBe(false);
+  });
+
+  it('sostenido y luego arrastrado, gira la camara', () => {
+    const g = fresh();
+    g.down(1, LOOK_SPOT.x, LOOK_SPOT.y, true, 1000);
+    g.promoteHold(1, 1000 + HOLD_MS);
+    for (let i = 1; i <= 5; i++) g.move(1, LOOK_SPOT.x + i * 10, LOOK_SPOT.y);
+    expect(Math.abs(g.takeOrbit().dx)).toBeGreaterThan(0);
+    expect(g.pointOf(1)).toEqual({ x: LOOK_SPOT.x + 50, y: LOOK_SPOT.y });
+  });
+
+  it('un sostenido no cuenta para la pinza: otro dedo de camara solo gira', () => {
+    const g = fresh();
+    g.down(1, LOOK_SPOT.x, LOOK_SPOT.y, true, 1000);
+    g.promoteHold(1, 1000 + HOLD_MS);
+    g.down(2, LOOK_SPOT.x - 100, LOOK_SPOT.y, true, 1400);
+    g.move(2, LOOK_SPOT.x - 150, LOOK_SPOT.y);
+    expect(g.takeZoom()).toBe(1);
+    expect(g.takeOrbit().dx).toBe(-50);
+  });
+
+  it('dos dedos a la vez son una pinza: ninguno es toque ni sostenido', () => {
+    const g = fresh();
+    g.down(1, LOOK_SPOT.x, LOOK_SPOT.y, true, 1000);
+    g.down(2, LOOK_SPOT.x - 100, LOOK_SPOT.y, true, 1010);
+    expect(g.promoteHold(1, 1000 + HOLD_MS)).toBe(false);
+    expect(g.up(1, 1100)?.paired).toBe(true);
+    expect(g.up(2, 1100)?.paired).toBe(true);
+  });
+
+  it('el joystick nunca es un toque del modo TAP', () => {
+    const g = fresh();
+    g.down(1, STICK_SPOT.x, STICK_SPOT.y, true, 1000);
+    expect(g.promoteHold(1, 1000 + HOLD_MS)).toBe(false);
+    expect(g.up(1, 1100)?.role).toBe('stick');
   });
 });

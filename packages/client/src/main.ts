@@ -45,7 +45,7 @@ import {
   EYE_HEIGHT,
   hitboxAt,
   lookVector,
-  preciseTarget,
+  gazeTarget,
   STRIKE_RANGE,
   strikeOf,
   targetTile,
@@ -56,7 +56,8 @@ import {
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
 import { Effects, SLASH_FP_HALF_WIDTH, SLASH_HALF_WIDTH, slashEdge, STAB_SCREEN, stabLine } from './effects.js';
-import { cameraClearance } from './camera-collision.js';
+import { cameraClearance, rayHit } from './camera-collision.js';
+import { TapSequencer } from './tap-input.js';
 import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
@@ -180,6 +181,7 @@ controls.bindJumpButton(document.getElementById('jump'));
 controls.bindRunButton(document.getElementById('run'));
 controls.bindAutoJumpButton(document.getElementById('autoJump'));
 for (const id of ['modeBar', 'modeTouch']) controls.bindModeButton(document.getElementById(id));
+controls.bindInputButton(document.getElementById('inputMode'));
 controls.bindActionButton(document.getElementById('action'));
 controls.bindUseButton(document.getElementById('use'));
 controls.onRestart = restart;
@@ -333,19 +335,75 @@ function colorOf(terrain: Terrain, wx: number, wy: number): readonly [number, nu
 }
 
 /**
- * El punto del mundo que se ve en `at` de la pantalla (coordenadas normalizadas)
- * a la profundidad de `depthOf`, y a un bloque como poco. Vale para las dos
- * proyecciones: el rayo va del plano cercano al lejano, que en la ortografica
- * son paralelos. Es de donde nace la estocada del modo preciso.
+ * El punto del mundo que se ve en `at` de la pantalla de PRIMERA PERSONA
+ * (coordenadas normalizadas) a la profundidad de `depthOf`, y a un bloque como
+ * poco. Es de donde nace la estocada del modo preciso, y va con la camara de
+ * primera persona en las tres vistas —que sigue en los ojos aunque no se
+ * dibuje con ella—: asi el recorrido en el mundo es el mismo en todas. Con la
+ * camara activa, en tercera persona nacia lejos del jugador (lo vio el autor,
+ * 2026-10-01).
  */
 function screenPoint(at: { x: number; y: number }, depthOf: Vector3): { x: number; y: number; z: number } {
-  const cam = camera.active;
+  const cam = camera.firstPerson;
   const near = new Vector3(at.x, at.y, -1).unproject(cam);
   const dir = new Vector3(at.x, at.y, 1).unproject(cam).sub(near).normalize();
   const d = Math.max(1, depthOf.clone().sub(near).dot(dir));
   const p = near.addScaledVector(dir, d);
   return { x: p.x, y: p.y, z: p.z };
 }
+
+/** Una mirada para la Intent: rumbo horizontal unitario y el seno de la inclinacion. */
+interface Aim {
+  aimX: number;
+  aimY: number;
+  aimZ: number;
+}
+
+/** Hasta donde se busca el punto tocado en el modo TAP. Mas alla, el cielo. */
+const TAP_RAY_MAX = 120;
+
+/**
+ * Modo TAP: la mirada que va **de los ojos al punto del mundo que hay bajo el
+ * dedo** en `(x, y)` de la pantalla. Se busca con un rayo de la camara activa
+ * por ese punto, que choca con el terreno o con un hitbox (`rayHit`, el mismo
+ * que para la camara); sin choque, hacia un punto lejano del rayo. Lo demas lo
+ * hace el nucleo con su alcance de siempre: el golpe, sembrar o abrir salen de
+ * los ojos con esta mirada, y lo que quede mas lejos no se alcanza.
+ */
+function aimAt(p: { x: number; y: number }): Aim {
+  const r = canvas.getBoundingClientRect();
+  const nx = ((p.x - r.left) / r.width) * 2 - 1;
+  const ny = -(((p.y - r.top) / r.height) * 2 - 1);
+  const cam = camera.active;
+  const near = new Vector3(nx, ny, -1).unproject(cam);
+  const ray = new Vector3(nx, ny, 1).unproject(cam).sub(near).normalize();
+  // De three.js (`y` arriba) al nucleo (`z` arriba).
+  const from = { x: near.x, y: near.z, z: near.y };
+  const dir = { x: ray.x, y: ray.z, z: ray.y };
+  const t = rayHit(
+    from,
+    dir,
+    TAP_RAY_MAX,
+    (x, y) => state.world.groundHeightAt(x, y),
+    (tx, ty) => hitboxAt(state.world, tx, ty),
+  );
+  const e = state.entities;
+  const id = state.playerId;
+  const dx = from.x + dir.x * t - e.x[id];
+  const dy = from.y + dir.y * t - e.y[id];
+  const dz = from.z + dir.z * t - (e.z[id] + EYE_HEIGHT);
+  const flat = Math.hypot(dx, dy);
+  const len = Math.hypot(flat, dz) || 1;
+  // Justo encima o debajo de los ojos no hay rumbo: el de la camara.
+  if (flat < 1e-6) {
+    const f = camera.forward();
+    return { aimX: f.x, aimY: f.y, aimZ: dz / len };
+  }
+  return { aimX: dx / flat, aimY: dy / flat, aimZ: dz / len };
+}
+
+/** La ultima mirada de un toque o sostenido del modo TAP, para el humo. */
+let lastTapAim: Aim | null = null;
 
 interface ChunkView {
   readonly mesh: Mesh;
@@ -505,12 +563,18 @@ let airPeak = 0;
  * mide la otra mitad, que el toque llega.
  */
 /** Lo que ha salido en la Intent: pulsaciones, y ticks con el auto salto puesto. */
-const sent = { harvest: 0, jump: 0, use: 0, autoJump: 0 };
+const sent = { harvest: 0, jump: 0, use: 0, autoJump: 0, tapUse: 0, tapHarvest: 0 };
+
+/** La ultima estocada, en coordenadas de three.js, para el humo. */
+let lastStab: { from: Vector3Like; to: Vector3Like; eye: Vector3Like } | null = null;
+type Vector3Like = { x: number; y: number; z: number };
 
 /** Ticks desde la ultima accion, para repetir al mantener pulsado. */
 let actionTicks = 0;
 /** 15 ticks a 60 Hz son cuatro acciones por segundo, la cadencia de siempre. */
 const ACTION_REPEAT_TICKS = 15;
+/** El orden del modo TAP: usar y luego atacar, y el sostenido con su cadencia. */
+const tapSeq = new TapSequencer<Aim>(ACTION_REPEAT_TICKS);
 /**
  * Lo recolectado y lo ultimo que se saco, para decirlo en el HUD.
  *
@@ -583,6 +647,17 @@ function frame(now: number): void {
   // cerrarlo, y el ataque mantenido no repite.
   const acting = !items.open;
   if (!acting) action = use = false;
+  // Modo TAP (ENTRADA): el toque rapido y el primer golpe del sostenido son
+  // pestillos como los demas, y con el inventario abierto se tiran igual.
+  let tap = collect ? controls.takeTap() : null;
+  let tapStrike = collect && controls.takeTapStrike();
+  if (!acting) {
+    tap = null;
+    tapStrike = false;
+    tapSeq.clear();
+  }
+  // La mirada de siempre, la de la camara; un toque la cambia solo en su tick.
+  const crossAim: Aim = { aimX: intent.aimX, aimY: intent.aimY, aimZ: intent.aimZ };
   // Las peticiones del inventario (mano, intercambiar, tirar, fabricar) no se
   // tiran en pausa: esperan al primer frame con tick.
   let asked = accumulator >= TICK_DT ? items.take() : null;
@@ -615,6 +690,34 @@ function frame(now: number): void {
     }
     if (!controls.actionHeld) actionTicks = 0;
 
+    // Modo TAP. Un toque rapido USA en el punto tocado y, al tick siguiente,
+    // ATACA alli si el USAR no hizo nada (abrir, comer, sembrar o colocar lo
+    // cancelan: decision del autor). Mantener ataca sostenido, con la cadencia
+    // del boton, hacia donde este el dedo.
+    const holding = acting ? controls.tapHoldPoint() : null;
+    const tapped = tapSeq.step({
+      tap: tap ? aimAt(tap) : null,
+      hold: holding ? () => aimAt(holding) : null,
+      strike: tapStrike,
+      usedLast: !!state.lastUsed,
+    });
+    tap = null;
+    tapStrike = false;
+    if (tapped.use) {
+      intent.use = true;
+      sent.tapUse++;
+    }
+    if (tapped.harvest) {
+      intent.harvest = true;
+      sent.tapHarvest++;
+    }
+    const aim = tapped.aim ?? crossAim;
+    intent.aimX = aim.aimX;
+    intent.aimY = aim.aimY;
+    intent.aimZ = aim.aimZ;
+    // Lo que de verdad lleva la Intent en el tick del toque, para el humo.
+    if (tapped.aim) lastTapAim = { aimX: intent.aimX, aimY: intent.aimY, aimZ: intent.aimZ };
+
     // La Intent se guarda en vez de pasarse en linea: hace falta saber si se
     // acciono para lanzar el barrido, aunque no se derribara nada.
     const accionando = intent.harvest;
@@ -625,7 +728,23 @@ function frame(now: number): void {
     const pisabaAntes = state.entities.grounded[state.playerId];
     // La estocada del modo preciso llega hasta lo que golpea, y se mide ANTES
     // del paso: despues, lo que cayo ya no esta y la recta se alargaria.
-    const stab = accionando && intent.precise ? preciseTarget(state.world, state.entities, state.playerId) : null;
+    // Con la mirada de este tick, que en el modo TAP puede ser la del dedo.
+    const eyeNow = {
+      x: state.entities.x[state.playerId],
+      y: state.entities.y[state.playerId],
+      z: state.entities.z[state.playerId] + EYE_HEIGHT,
+    };
+    const stab =
+      accionando && intent.precise
+        ? gazeTarget(
+            eyeNow,
+            intent.aimX,
+            intent.aimY,
+            intent.aimZ,
+            (x, y) => state.world.groundHeightAt(x, y),
+            (tx, ty) => hitboxAt(state.world, tx, ty),
+          )
+        : null;
     step(state, intent);
     // La estacion recien puesta cae desde donde la toco la mirada (pedido del
     // autor: todo tiene gravedad). Solo se ve: el nucleo ya la tiene en su sitio.
@@ -658,7 +777,9 @@ function frame(now: number): void {
         const dir = lookVector(e.facingX[id], e.facingY[id], e.lookZ[id]);
         const t = stab ? stab.t : STRIKE_RANGE;
         const to = { x: eye.x + dir.x * t, y: eye.z + dir.z * t, z: eye.y + dir.y * t };
-        effects.spawnSlash(stabLine(screenPoint(STAB_SCREEN, new Vector3(eye.x, eye.z, eye.y)), to), width);
+        const from = screenPoint(STAB_SCREEN, new Vector3(eye.x, eye.z, eye.y));
+        lastStab = { from, to, eye: { x: eye.x, y: eye.z, z: eye.y } };
+        effects.spawnSlash(stabLine(from, to), width);
       } else {
         effects.spawnSlash(slashEdge(eye, strikeOf(state.world, e, id).rays), width);
       }
@@ -845,6 +966,11 @@ Object.defineProperty(window, '__verdant', {
       playerVisible: player?.visible ?? false,
       running: controls.running,
       autoJump: controls.autoJump,
+      lastStab,
+      tapInput: controls.tapInput,
+      lastTapAim,
+      /** La mirada de la cruz, la que lleva la Intent sin toque del modo TAP. */
+      crossAim: { aimX: camera.forward().x, aimY: camera.forward().y, aimZ: Math.sin(camera.lookPitch) },
       dev: dev.active,
       timeScale: dev.timeScale,
       survivalFrozen: dev.survivalFrozen,

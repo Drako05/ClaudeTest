@@ -14,7 +14,7 @@
  * lo de la mano.
  */
 
-import { Gestures, STICK_RADIUS } from './gestures.js';
+import { Gestures, HOLD_MS, STICK_RADIUS } from './gestures.js';
 import type { MouseLook } from './pointer-lock.js';
 
 /** Cuanto aguanta el catalejo tras la ultima pulsacion de + o -, en ms. */
@@ -28,6 +28,8 @@ const WHEEL_STEP = 50;
 const FLASH_MS = 150;
 /** Donde se recuerda el auto salto en el navegador (solo comodidad). */
 const AUTO_JUMP_STORAGE_KEY = 'verdant.autoJump';
+/** Donde se recuerda la ENTRADA (MIRA o TAP) en el navegador (solo comodidad). */
+const TAP_INPUT_STORAGE_KEY = 'verdant.tapInput';
 
 export interface Move {
   /** Vector en el plano de la PANTALLA, sin rotar. Lo rota la camara. */
@@ -180,7 +182,17 @@ export class Controls {
         // Ignorado a proposito: sin captura el gesto sigue funcionando.
       }
       if (e.pointerType === 'touch') this.gestures.setStickZone(Controls.stickZone());
-      this.gestures.down(e.pointerId, e.clientX, e.clientY, e.pointerType === 'touch');
+      this.gestures.down(e.pointerId, e.clientX, e.clientY, e.pointerType === 'touch', performance.now());
+      // Modo TAP: si el dedo se queda quieto `HOLD_MS`, es un ataque sostenido.
+      if (this.tapInput && e.pointerType === 'touch') {
+        const id = e.pointerId;
+        window.setTimeout(() => {
+          if (this.gestures.promoteHold(id, performance.now())) {
+            this.tapHoldId = id;
+            this.tapStrikeQueued = true;
+          }
+        }, HOLD_MS);
+      }
       this.drawStick();
     });
     canvas.addEventListener('pointermove', (e) => {
@@ -189,7 +201,17 @@ export class Controls {
     });
     for (const type of ['pointerup', 'pointercancel', 'pointerleave']) {
       canvas.addEventListener(type, (e) => {
-        const released = this.gestures.up((e as PointerEvent).pointerId);
+        const pointerId = (e as PointerEvent).pointerId;
+        const released = this.gestures.up(pointerId, performance.now());
+        if (pointerId === this.tapHoldId) this.tapHoldId = null;
+        // Modo TAP: un toque rapido en el mundo, sin moverse y sin ser parte de
+        // una pinza, usa en ese punto y luego ataca (`main.ts`).
+        if (
+          type === 'pointerup' && released && this.tapInput && released.isTouch &&
+          released.role === 'look' && released.tap && !released.paired && released.heldMs < HOLD_MS
+        ) {
+          this.tapQueued = { x: (e as PointerEvent).clientX, y: (e as PointerEvent).clientY };
+        }
         // El clic izquierdo del raton acciona, pero SOLO si no arrastro: con la
         // camara libre, arrastrar es girar la vista, y las dos cosas comparten
         // boton. Se decide al soltar porque hasta entonces no se sabe cual de
@@ -415,6 +437,78 @@ export class Controls {
     el.addEventListener('pointerdown', (e) => {
       if ((e as PointerEvent).pointerType !== 'touch') press(e);
     });
+  }
+
+  /**
+   * ENTRADA del movil (decision del autor, 2026-10-01): en **MIRA** se actua
+   * hacia la cruz, como siempre; en **TAP**, ademas, tocando el mundo. Un toque
+   * rapido usa en ese punto y, si no se uso nada, ataca; mantenerlo
+   * `HOLD_MS` ataca sostenido, y arrastrarlo despues gira la camara sin parar
+   * de atacar; arrastrar antes es solo camara. ATAQUE y USAR siguen yendo a la
+   * cruz en los dos. Interruptor como MODO, que arranca en MIRA y **se
+   * recuerda** como el auto salto.
+   */
+  tapInput = Controls.storedTapInput();
+  private readonly inputEls: HTMLElement[] = [];
+  /** El toque rapido del modo TAP, con su punto de pantalla. Se consume una vez. */
+  private tapQueued: { x: number; y: number } | null = null;
+  /** El primer golpe del sostenido, en cuanto se reconoce. */
+  private tapStrikeQueued = false;
+  /** El dedo que sostiene el ataque en el modo TAP. */
+  private tapHoldId: number | null = null;
+
+  private static storedTapInput(): boolean {
+    try {
+      return window.localStorage.getItem(TAP_INPUT_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private toggleInput(): void {
+    this.tapInput = !this.tapInput;
+    this.showInput();
+    try {
+      window.localStorage.setItem(TAP_INPUT_STORAGE_KEY, this.tapInput ? '1' : '0');
+    } catch {
+      // Se aplica igual; solo no se recordara.
+    }
+  }
+
+  private showInput(): void {
+    // El icono dice la entrada: la cruz en MIRA y la mano en TAP (CSS).
+    document.body.classList.toggle('tap-input', this.tapInput);
+    for (const el of this.inputEls) {
+      el.setAttribute('aria-pressed', String(this.tapInput));
+      el.setAttribute('aria-label', this.tapInput ? 'Entrada: tap' : 'Entrada: mira');
+    }
+  }
+
+  /** Conecta el boton ENTRADA: como MODO, un toque alterna y se enciende. */
+  bindInputButton(el: HTMLElement | null): void {
+    if (!el) return;
+    this.inputEls.push(el);
+    this.showInput();
+    this.bindTap(el, () => this.toggleInput());
+  }
+
+  /** El toque rapido del modo TAP, si lo hubo: su punto de pantalla. */
+  takeTap(): { x: number; y: number } | null {
+    const out = this.tapQueued;
+    this.tapQueued = null;
+    return out;
+  }
+
+  /** El primer golpe de un sostenido del modo TAP. Se consume una vez. */
+  takeTapStrike(): boolean {
+    const out = this.tapStrikeQueued;
+    this.tapStrikeQueued = false;
+    return out;
+  }
+
+  /** Donde esta el dedo que sostiene el ataque del modo TAP, o `null`. */
+  tapHoldPoint(): { x: number; y: number } | null {
+    return this.tapHoldId === null ? null : this.gestures.pointOf(this.tapHoldId);
   }
 
   /** Conecta el boton de correr del movil, igual que el de saltar. */

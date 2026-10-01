@@ -25,7 +25,13 @@
  * de camara y el zoom saltaria solo.
  */
 
-export type Role = 'stick' | 'look' | 'actionLook';
+/**
+ * `'tapHold'` es el dedo del mundo que, en el modo TAP, se ha quedado quieto
+ * `HOLD_MS`: ataca sostenido y, si luego se arrastra, gira la camara sin dejar
+ * de atacar. Gira como el dedo de la accion y, como el, no cuenta para la
+ * pinza.
+ */
+export type Role = 'stick' | 'look' | 'actionLook' | 'tapHold';
 
 /** Clave de un puntero: los del lienzo son `pointerId`; los del boton, texto. */
 export type PointerKey = number | string;
@@ -41,7 +47,19 @@ interface Touch {
   isTouch: boolean;
   /** Lo mas que se ha alejado de donde nacio. Distingue un clic de un arrastre. */
   travel: number;
+  /** Cuando nacio, en ms: distingue un toque de uno sostenido (modo TAP). */
+  bornAt: number;
+  /** Si llego a compartir pantalla con otro dedo de camara: era una pinza. */
+  paired: boolean;
 }
+
+/**
+ * Lo que tiene que quedarse quieto un dedo en el mundo para que, en el modo
+ * TAP, sea un ataque sostenido y no un toque. **Deduccion mia**: lejos de los
+ * 500 ms del toque largo de Chrome, que hizo caer una prueba a suertes
+ * (escape 8 de la auditoria).
+ */
+export const HOLD_MS = 300;
 
 /**
  * Pixeles que puede moverse un puntero sin dejar de ser un CLIC.
@@ -59,6 +77,10 @@ export interface Release {
   readonly isTouch: boolean;
   /** True si apenas se movio: fue un clic, no un arrastre. */
   readonly tap: boolean;
+  /** Lo que estuvo apoyado, en ms. */
+  readonly heldMs: number;
+  /** Si llego a ser parte de una pinza. */
+  readonly paired: boolean;
 }
 
 /** Radio en pixeles al que el joystick da su valor maximo. */
@@ -122,9 +144,13 @@ export class Gestures {
     return x < zone.right && y > zone.top ? 'stick' : 'look';
   }
 
-  down(id: number, x: number, y: number, isTouch: boolean): void {
+  down(id: number, x: number, y: number, isTouch: boolean, now = 0): void {
     const role = this.roleFor(x, y, isTouch);
-    this.touches.set(id, { role, x, y, originX: x, originY: y, isTouch, travel: 0 });
+    this.touches.set(id, { role, x, y, originX: x, originY: y, isTouch, travel: 0, bornAt: now, paired: false });
+    // Dos dedos de camara a la vez son una pinza: ninguno de los dos sera ya
+    // un toque ni un sostenido del modo TAP.
+    const looks = this.lookTouches();
+    if (looks.length >= 2) for (const t of looks) t.paired = true;
     // Que entre o salga un dedo de camara reinicia la referencia de la pinza:
     // sin esto, levantar uno de los dos daba un salto de zoom.
     this.resetPinch();
@@ -135,7 +161,7 @@ export class Gestures {
    * pasa por `roleFor`: su dueno es siempre el mismo.
    */
   downAction(key: string, x: number, y: number): void {
-    this.touches.set(key, { role: 'actionLook', x, y, originX: x, originY: y, isTouch: true, travel: 0 });
+    this.touches.set(key, { role: 'actionLook', x, y, originX: x, originY: y, isTouch: true, travel: 0, bornAt: 0, paired: false });
   }
 
   move(id: PointerKey, x: number, y: number): void {
@@ -147,7 +173,7 @@ export class Gestures {
     const travel = Math.hypot(x - touch.originX, y - touch.originY);
     if (travel > touch.travel) touch.travel = travel;
 
-    if (touch.role === 'actionLook') {
+    if (touch.role === 'actionLook' || touch.role === 'tapHold') {
       // No gira hasta pasar `TAP_SLOP`: un pulgar que solo mantiene el boton
       // tiembla, y sin umbral la camara daria tirones. Lo de antes del umbral
       // se pierde a proposito, para no dar un salto al cruzarlo. (Umbral
@@ -181,13 +207,39 @@ export class Gestures {
    * de un dedo y si apenas se movio. Quien decide que hacer con eso es
    * `controls.ts` — aqui no se sabe que existe una accion.
    */
-  up(id: PointerKey): Release | null {
+  up(id: PointerKey, now = 0): Release | null {
     const touch = this.touches.get(id);
     this.touches.delete(id);
     // El dedo de la accion no forma parte de ninguna pinza: soltarlo no la toca.
-    if (touch?.role !== 'actionLook') this.resetPinch();
+    if (touch?.role !== 'actionLook' && touch?.role !== 'tapHold') this.resetPinch();
     if (!touch) return null;
-    return { role: touch.role, isTouch: touch.isTouch, tap: touch.travel <= TAP_SLOP };
+    return {
+      role: touch.role,
+      isTouch: touch.isTouch,
+      tap: touch.travel <= TAP_SLOP,
+      heldMs: now - touch.bornAt,
+      paired: touch.paired,
+    };
+  }
+
+  /**
+   * Modo TAP: si el dedo `id` del mundo lleva `HOLD_MS` quieto y solo, y por
+   * tanto pasa a ser un ataque sostenido. Si lo es, cambia de dueno
+   * (`'tapHold'`): desde ahi arrastrarlo gira la camara sin parar de atacar.
+   */
+  promoteHold(id: PointerKey, now: number): boolean {
+    const touch = this.touches.get(id);
+    if (!touch || touch.role !== 'look' || !touch.isTouch || touch.paired) return false;
+    if (touch.travel > TAP_SLOP || now - touch.bornAt < HOLD_MS) return false;
+    touch.role = 'tapHold';
+    this.resetPinch();
+    return true;
+  }
+
+  /** Donde esta ahora un dedo, o `null` si ya no esta apoyado. */
+  pointOf(id: PointerKey): { x: number; y: number } | null {
+    const touch = this.touches.get(id);
+    return touch ? { x: touch.x, y: touch.y } : null;
   }
 
   /** Se sueltan todos: al perder el foco de la ventana, por ejemplo. */

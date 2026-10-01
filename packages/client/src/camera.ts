@@ -260,10 +260,15 @@ export class OrbitCamera {
   ): void {
     this.target.set(x, y + FP_EYE, z);
     const look = this.look();
+    // La de primera persona va SIEMPRE en los ojos, se dibuje con ella o no:
+    // la estocada sale de un punto de su pantalla, y asi hace el mismo
+    // recorrido en el mundo en las tres vistas (pedido del autor, 2026-10-01;
+    // con la camara activa nacia lejos del jugador en tercera persona).
+    this.firstPerson.position.copy(this.target);
+    this.firstPerson.lookAt(this.target.clone().add(look));
+    this.firstPerson.updateMatrixWorld();
     if (this.projection === 'primera') {
       this.camDistance = 0;
-      this.firstPerson.position.copy(this.target);
-      this.firstPerson.lookAt(this.target.clone().add(look));
       this.resize(width, height);
       return;
     }

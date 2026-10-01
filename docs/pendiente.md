@@ -75,17 +75,22 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Con el inventario abierto **se salta** (tu dijiste «solo moverse») | Ajustes de la tanda 2 | una linea en `main.ts` |
 | El modo de golpe **arranca en barrido** y no se recuerda entre partidas | Ajustes de la tanda 2 | una linea |
 | La estacion puesta contra una pared cae con la **gravedad del salto** (62), y la caida solo se ve | Ajustes de la tanda 2 | `stations-view.ts` |
-| La rueda ilumina cada casilla **140 ms**, escalonadas **40 ms** | Ajustes de la tanda 2 | dos numeros en `inventory-ui.ts` |
+| La rueda ilumina cada casilla **140 ms**, **una a la vez** y en el acto (antes, escalonadas 40 ms) | Ajustes de la tanda 2 | dos numeros en `inventory-ui.ts` |
 | Los dibujos del **tajo** y la **mirilla**; los anillos de PC de **56 px** y trazo 5 | Ajustes de la tanda 2 | SVG y CSS en `index.html` |
 | La **mochila** redibujada como tu adjunto, casi cuadrada, a **34 px** en el boton (antes 28) | Ajustes de la tanda 2, 2.ª ronda | SVG y CSS en `index.html` |
 | MODO en el movil de **44 px**, a 72 px (en cada eje) del centro del ataque | Ajustes de la tanda 2 | CSS |
+| ENTRADA en TAP: el sostenido empieza a los **300 ms** quieto (`HOLD_MS`); el joystick no cuenta como «pantalla» | Ajustes de la tanda 2, 5.ª ronda | un numero en `gestures.ts` |
+| En TAP, sin nada bajo el dedo (el cielo), se apunta a un punto lejano del rayo; el sostenido apunta al dedo **en cada golpe** | Ajustes de la tanda 2, 5.ª ronda | `aimAt` en `main.ts` |
+| El arco de MODO y ENTRADA: **84 px** del centro del ataque, botones de **44**, a 153 y 117 grados | Ajustes de la tanda 2, 5.ª ronda | CSS en `index.html` |
+| El dibujo de la **mano que toca** (TAP) y la cruz (MIRA) en ENTRADA | Ajustes de la tanda 2, 5.ª ronda | SVG en `index.html` |
+| En PC la franja de la barra deslizable es de **18 px** (en el movil, 24) | Ajustes de la tanda 2, 5.ª ronda | CSS |
 | Auto salto: se mira la **linea del centro del cuerpo** (la que decide la altura en la colision) y se salta a la distancia que se recorre mientras los pies pasan del borde, **con un tick de mas** | Ajustes de la tanda 2, 4.ª ronda | `systems/autojump.ts` |
 | Auto salto: la altura maxima es **el apice exacto** (~1,16); delante de **agua o de un tronco** no salta | Ajustes de la tanda 2, 4.ª ronda | una linea en `autojump.ts` |
 | El boton AUTO SALTO: **30 px**, una **«A»**, con su centro en el borde de SALTAR a 45 grados | Ajustes de la tanda 2, 4.ª ronda | CSS en `index.html` |
 | La barra deslizable: franja tactil de **24 px**, pista de **6** y mando de **10**, el mando nunca menor de **44 px** | Ajustes de la tanda 2, 4.ª ronda | CSS y `MIN_THUMB` en `scroll-rail.ts` |
 | En el aire, **sin mando no se avanza**: es «como en el suelo» | Ajustes de la tanda 2, 3.ª ronda | una linea en `movement.ts` |
 | Correr gasta mas hambre solo si **de verdad se avanza** en el tick: empujando contra una pared con la carrera encendida se gasta como andando | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
-| El salto cobra su 0,5 % **al despegar**, no al pulsar: pulsar en el aire no cobra | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
+| El salto cobra su 0,25 % **al despegar**, no al pulsar: pulsar en el aire no cobra | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
 | Saltar el tiempo (`skipTime`) gasta hambre **como quieto** | Ajustes de la tanda 2, 3.ª ronda | — |
 | Zona del joystick **sin medir** (antes de que aparezcan los botones tactiles): el cuadrante de antes | Ajustes de la tanda 2, 3.ª ronda | una linea en `gestures.ts` |
 | Cubiertos: la cuchara **3,2** a la izquierda y el tenedor **1,5** a la derecha; puas a **3,2** de eje a eje | Ajustes de la tanda 2, 3.ª ronda | SVG en `index.html` |
@@ -465,6 +470,30 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Ajustes de la tanda 2, 5.ª ronda — HECHO (2026-10-01)
+
+La CI de la 4.ª ronda (`36e683f`) salio en verde. Lo que pediste, y lo que
+respondiste:
+- **La estocada en tercera persona** hace el mismo recorrido que en primera:
+  nace a un bloque de los ojos, abajo a la derecha de la mirada. Antes nacia
+  en la pantalla de la camara, que en tercera persona va detras, y salia de
+  muy lejos (medido: a 8,5 bloques; ahora, a 1,06).
+- **Las barras deslizables tambien en PC**, en la rejilla y en las recetas.
+- **El hambre se vacia en 2 dias** quieto o andando, y **el salto cuesta
+  0,25 %**.
+- **La rueda enciende una sola casilla a la vez**, en el acto: girando
+  deprisa ya no se quedan todas encendidas.
+- **MODO y ENTRADA**, como tu boceto, en un arco alrededor del ataque a la
+  misma distancia de su centro: ENTRADA arriba y MODO abajo a la izquierda.
+- **ENTRADA: MIRA o TAP.** En TAP, un toque en el mundo usa alli y, si no se
+  uso nada (abrir, comer, sembrar, colocar), ataca alli; mantener ataca
+  sostenido, y arrastrar despues gira la camara sin parar de atacar; arrastrar
+  antes es solo camara. ATAQUE y USAR siguen yendo a la cruz, la cruz se
+  queda y la entrada se recuerda. Iconos: la cruz en MIRA y una mano tocando
+  en TAP.
+
+Lo que decidi yo va arriba, en «Esperando tu juicio».
 
 ## Ajustes de la tanda 2, 4.ª ronda — HECHO (2026-09-30)
 

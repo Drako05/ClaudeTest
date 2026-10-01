@@ -3,9 +3,9 @@
  * salud empieza a caer, y con hambre alta la salud se regenera despacio.
  *
  * **El hambre gasta segun el esfuerzo** (decision del autor, 2026-09-30):
- * quieto o andando se vacia en un dia de juego; corriendo, mas deprisa en la
- * misma proporcion en que se corre mas deprisa; y cada salto cuesta un 0,5 %
- * (fue un 1 % hasta que el autor lo bajo, el mismo dia).
+ * quieto o andando se vacia en dos dias de juego (fue uno hasta el 2026-10-01);
+ * corriendo, mas deprisa en la misma proporcion en que se corre mas deprisa; y
+ * cada salto cuesta un 0,25 % (fue un 1 % y luego un 0,5 %).
  */
 
 import { DAY_TICKS, TICK_DT } from '@verdant/shared';
@@ -16,16 +16,16 @@ import type { EntityStore } from '../entities.js';
  * autor. El ritmo se deriva de `DAY_TICKS`, asi que si un dia cambia de
  * duracion el hambre la sigue sola.
  */
-export const HUNGER_EMPTY_DAYS = 1;
+export const HUNGER_EMPTY_DAYS = 2;
 
 /** Puntos de hambre perdidos por segundo, quieto o andando (de 100). */
 export const HUNGER_DECAY_PER_SEC = 100 / (HUNGER_EMPTY_DAYS * DAY_TICKS * TICK_DT);
 
 /**
- * Lo que cuesta cada salto, tambien el automatico: el 0,5 % del hambre total,
+ * Lo que cuesta cada salto, tambien el automatico: el 0,25 % del hambre total,
  * numero del autor.
  */
-export const JUMP_HUNGER = 0.5;
+export const JUMP_HUNGER = 0.25;
 
 /** Cobra un salto que ha despegado. Nunca baja de cero. */
 export function spendJump(store: EntityStore, id: number): void {

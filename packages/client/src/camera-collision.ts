@@ -34,6 +34,24 @@ export function cameraClearance(
   ground: Ground,
   boxAt: (tx: number, ty: number) => Hitbox | null,
 ): number {
+  const hit = rayHit(pivot, dir, maxDist, ground, boxAt);
+  if (hit >= maxDist) return maxDist;
+  return Math.max(CAMERA_MIN, hit - CAMERA_MARGIN);
+}
+
+/**
+ * Donde choca primero un rayo desde `pivot` en la direccion unitaria `dir`
+ * con el terreno o con un hitbox, sin margen: la distancia, o `maxDist` si no
+ * choca antes. Lo usan la camara (con su margen) y el modo TAP, que busca el
+ * punto del mundo que hay bajo el dedo.
+ */
+export function rayHit(
+  pivot: Vec3,
+  dir: Vec3,
+  maxDist: number,
+  ground: Ground,
+  boxAt: (tx: number, ty: number) => Hitbox | null,
+): number {
   let hit = groundHit(pivot, dir, maxDist, ground)?.t ?? maxDist;
 
   // Los hitboxes viven dentro de su casilla, asi que basta mirar las casillas
@@ -66,7 +84,5 @@ export function cameraClearance(
     }
     if (!Number.isFinite(t)) break;
   }
-
-  if (hit >= maxDist) return maxDist;
-  return Math.max(CAMERA_MIN, hit - CAMERA_MARGIN);
+  return Math.min(hit, maxDist);
 }

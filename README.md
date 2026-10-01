@@ -73,13 +73,14 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Gesto | Accion |
 |---|---|
 | Pulgar abajo a la izquierda, hasta el anillo de salud y la mitad de CORRER | Joystick flotante: apunta, no dosifica |
-| Un dedo en el resto de la pantalla | Girar la camara |
+| Un dedo en el resto de la pantalla | Girar la camara; con ENTRADA en TAP, ademas, un toque usa y si no ataca ahi, y mantener ataca sostenido |
 | Dos dedos de camara | Zoom; en primera persona, catalejo que vuelve al soltar |
 | Boton ATAQUE | Golpear; mantener repite 4 veces por segundo, y arrastrar ese mismo dedo gira la camara sin soltar el golpe |
 | Boton USAR | Usar lo de la mano: comer una baya, sembrar una semilla |
 | Botones SALTAR y CORRER | Saltar; correr es un interruptor |
 | Boton A, sobre SALTAR | Auto salto: andando hacia un bloque que se sube de un salto, salta solo; interruptor que se recuerda |
 | Boton MODO (junto al ataque) | Modo de golpe: el icono dice cual, tajo (barrido) o mirilla (preciso) |
+| Boton ENTRADA (junto al ataque) | MIRA (se actua hacia la cruz) o TAP (tambien tocando el mundo); se recuerda |
 | Barra de arriba | Tocar una casilla la pone en la mano; arrastrar las ordena |
 | Boton INVENTARIO | Inventario, con pestanas Personaje, Inventario y Recetas; como en PC, arrastrar y mantener |
 | Boton OTROS | Cambiar de vista (el ojo), el HUD y el panel del entorno |

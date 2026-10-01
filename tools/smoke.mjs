@@ -533,12 +533,38 @@ async function desktopPass(browser, baseUrl) {
     'la rueda no recorre la barra de la mano');
   check(lit.join() === passed.join(),
     `la rueda no ilumino las casillas ${passed.map((i) => i + 1)} por las que paso: ${lit.map((i) => i + 1)}`);
+  // Girando deprisa, una sola casilla encendida a la vez (pedido del autor,
+  // 2026-10-01: se veian todas). Se vigila el MAXIMO de encendidas tras cada
+  // cambio de clase: es un invariante, no una cuenta en una ventana de tiempo
+  // (escape 13), y no depende de lo rapida que vaya la maquina.
+  const spin = await page.evaluate(() => new Promise((done) => {
+    const hotbar = document.getElementById('hotbar');
+    let max = 0;
+    const obs = new MutationObserver(() => {
+      max = Math.max(max, hotbar.querySelectorAll('.slot.pass').length);
+    });
+    obs.observe(hotbar, { attributes: true, subtree: true, attributeFilter: ['class'] });
+    const view = document.getElementById('view');
+    for (let i = 0; i < 10; i++) {
+      view.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, deltaMode: 0, bubbles: true, cancelable: true }));
+    }
+    setTimeout(() => { obs.disconnect(); done(max); }, 400);
+  }));
+  console.log(`  rueda deprisa: como mucho ${spin} casilla(s) encendida(s) a la vez`);
+  check(spin === 1, `girando deprisa la rueda se encienden ${spin} casillas a la vez`);
   check(w2.distance === w0.distance, 'la rueda sigue haciendo zoom');
   // El inventario, con su tecla: E lo abre, muestra lo del juego, y E lo
   // cierra. Abrirlo suelta el cursor y NO pausa (decision del autor).
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(250);
   check(await page.isVisible('#invPanel'), 'E no abrio el inventario');
+  // Con las 16 casillas caben las cuatro filas: la barra deslizable no sale.
+  const railIdle = await page.evaluate(() => {
+    const g = document.getElementById('invGrid');
+    return { overflows: g.scrollHeight > g.clientHeight + 0.5,
+      shown: getComputedStyle(g.parentElement.querySelector('.rail')).visibility === 'visible' };
+  });
+  check(!railIdle.overflows && !railIdle.shown, `en PC, sin mochila, la barra deslizable sale: ${JSON.stringify(railIdle)}`);
   const invOpen = await state(page);
   check(!invOpen.pointerLocked && !invOpen.paused, 'abrir el inventario no solto el cursor o pauso');
   // Con el inventario abierto solo se anda (pedido del autor): un clic en el
@@ -677,6 +703,16 @@ async function desktopPass(browser, baseUrl) {
   await page.waitForTimeout(250);
   const m1 = await state(page);
   const icon1 = await modeIcon();
+  // En tercera persona la estocada hace el mismo recorrido que en primera:
+  // nace a un bloque de los ojos, no lejos del jugador (lo vio el autor,
+  // 2026-10-01; nacia en la pantalla de la camara, que va detras).
+  await strike(page);
+  await page.waitForTimeout(300);
+  const stabbed = await state(page);
+  const st = stabbed.lastStab;
+  const stabFrom = st ? Math.hypot(st.from.x - st.eye.x, st.from.y - st.eye.y, st.from.z - st.eye.z) : Infinity;
+  console.log(`  estocada en ${stabbed.projection}: nace a ${stabFrom.toFixed(2)} de los ojos`);
+  check(stabbed.projection !== 'primera' && stabFrom < 1.5, `en tercera persona la estocada nace lejos de los ojos: ${stabFrom}`);
   await page.keyboard.press('Tab');
   await page.waitForTimeout(250);
   const m2 = await state(page);
@@ -1170,6 +1206,34 @@ async function stationsPass(browser, baseUrl) {
     check(shown === 22, `la rejilla no ensena las casillas de la mochila: ${shown}`);
     check(dressed.feed.every((t) => !t.includes('Mochila') || t.startsWith('+')), `equiparse la anoto como perdida: ${dressed.feed}`);
     await page.screenshot({ path: join(SHOTS, '3d-11-panel-mesa.png') });
+
+    // En PC tambien, la barra deslizable (pedido del autor, 2026-10-01): con
+    // la mochila son seis filas y caben cuatro. Se ve al lado de la rejilla,
+    // sin pisar la columna de las recetas, y arrastrar su mando con el raton
+    // desliza la rejilla.
+    const railPc = () => page.evaluate(() => {
+      const g = document.getElementById('invGrid');
+      const rail = g.parentElement.querySelector('.rail');
+      const r = (el) => el.getBoundingClientRect().toJSON();
+      return {
+        shown: getComputedStyle(rail).visibility === 'visible', top: g.scrollTop,
+        grid: r(g), rail: r(rail), thumb: r(rail.querySelector('i')),
+        recipes: r(document.querySelector('.invPage[data-page="recetas"]')),
+      };
+    });
+    const rp0 = await railPc();
+    const grabAt = { x: rp0.thumb.x + rp0.thumb.width / 2, y: rp0.thumb.y + rp0.thumb.height / 2 };
+    await page.mouse.move(grabAt.x, grabAt.y);
+    await page.mouse.down();
+    await page.mouse.move(grabAt.x, grabAt.y + 120, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const rp1 = await railPc();
+    console.log(`  barra en PC: ${rp0.shown ? 'se ve' : 'no se ve'}, deslizado ${rp0.top} -> ${rp1.top.toFixed(0)}`);
+    check(rp0.shown, 'en PC, con la mochila, no se ve la barra de la rejilla');
+    check(rp0.rail.left >= rp0.grid.right && rp0.rail.right <= rp0.recipes.left,
+      `en PC la barra no va entre la rejilla y las recetas: ${JSON.stringify(rp0)}`);
+    check(rp1.top > rp0.top + 10, 'en PC arrastrar el mando de la barra no deslizo la rejilla');
   }
 
   // Alejarse mas de 3 casillas cierra el panel de la mesa. De lado: detras
@@ -1215,7 +1279,7 @@ async function mobilePass(browser, baseUrl) {
   check(await page.evaluate(() => document.body.classList.contains('touch-active')), 'el body no entro en modo tactil');
   // El boceto del autor: arriba OTROS, la barra e INVENTARIO; abajo USAR y el
   // ATAQUE, con CORRER y SALTAR encima. Ni COMER ni SEMBRAR.
-  for (const id of ['#action', '#jump', '#run', '#use', '#others', '#invOpen', '#modeTouch']) {
+  for (const id of ['#action', '#jump', '#run', '#use', '#others', '#invOpen', '#modeTouch', '#inputMode']) {
     check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);
   }
   check(!(await page.isVisible('#modeBar')), 'en el movil se ve el MODO de PC');
@@ -1248,23 +1312,37 @@ async function mobilePass(browser, baseUrl) {
   check(Math.abs(jump.right - atk.right) < 1 && Math.abs(run.right - atk.right) < 1,
     `correr y saltar no van al borde derecho del ataque: ${run.right} / ${jump.right} / ${atk.right}`);
   check(bar.left >= others.right + 8 && bar.right <= invOpen.left - 8, 'la barra de la mano pisa OTROS o INVENTARIO');
-  // MODO: mas pequeno que USAR, en la diagonal de arriba a la izquierda del
-  // ataque y sin pisar a nadie (decision del autor).
+  // MODO y ENTRADA, mas pequenos que USAR, en un arco alrededor del ataque a
+  // la misma distancia de su centro: ENTRADA arriba, hacia SALTAR, y MODO
+  // abajo a la izquierda, encima de USAR (boceto del autor, 2026-10-01). Son
+  // redondos: se mide la holgura entre circulos, no entre cajas.
   const mode = await rect('modeTouch');
+  const entry = await rect('inputMode');
+  const auto = await rect('autoJump');
   const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-  check(mode.width < use.width, `MODO no es mas pequeno que USAR: ${mode.width} / ${use.width}`);
-  check(mode.right <= atk.left + 4 && mode.bottom <= atk.top + 4, `MODO no esta arriba a la izquierda del ataque: ${JSON.stringify(mode)}`);
-  check(![use, jump, run, atk].some((r) => overlap(mode, r)), 'MODO pisa otro boton');
+  const ctr = (r) => ({ x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2, r: r.width / 2 });
+  const gapOf = (a, b) => { const p = ctr(a), q = ctr(b); return Math.hypot(p.x - q.x, p.y - q.y) - p.r - q.r; };
+  const fromAtk = (r) => Math.hypot(ctr(r).x - ctr(atk).x, ctr(r).y - ctr(atk).y);
+  console.log(`  MODO y ENTRADA: a ${fromAtk(mode).toFixed(1)} y ${fromAtk(entry).toFixed(1)} del centro del ataque; holgura minima ` +
+    `${Math.min(...[use, jump, run, atk, auto].flatMap((o) => [gapOf(mode, o), gapOf(entry, o)]), gapOf(mode, entry)).toFixed(1)} px`);
+  check(mode.width < use.width && entry.width === mode.width, `MODO y ENTRADA no son pequenos e iguales: ${mode.width} / ${entry.width} / ${use.width}`);
+  check(Math.abs(fromAtk(mode) - fromAtk(entry)) <= 2, `MODO y ENTRADA no estan a la misma distancia del ataque: ${fromAtk(mode)} / ${fromAtk(entry)}`);
+  check(ctr(entry).y < ctr(mode).y && ctr(entry).x > ctr(mode).x && ctr(mode).x < ctr(atk).x && ctr(entry).y < ctr(atk).y,
+    `ENTRADA no va arriba y MODO abajo a la izquierda, sobre el arco del ataque: ${JSON.stringify({ mode, entry })}`);
+  for (const [name, o] of [['USAR', use], ['SALTAR', jump], ['CORRER', run], ['ATAQUE', atk], ['AUTO SALTO', auto]]) {
+    check(gapOf(mode, o) >= 2 && gapOf(entry, o) >= 2, `MODO o ENTRADA pisan ${name}: ${gapOf(mode, o).toFixed(1)} / ${gapOf(entry, o).toFixed(1)}`);
+  }
+  check(gapOf(mode, entry) >= 2, 'MODO y ENTRADA se pisan');
   // Solo iconos: ningun boton lleva rotulo, y cada uno lleva su nombre para
   // el lector de pantalla.
   const labels = await page.evaluate(() =>
-    ['action', 'use', 'jump', 'run', 'others', 'invOpen', 'modeTouch'].map((id) => {
+    ['action', 'use', 'jump', 'run', 'others', 'invOpen', 'modeTouch', 'inputMode'].map((id) => {
       const b = document.getElementById(id);
       return { id, text: b.textContent.replace(/[\s\u00bb\u2191]/g, ''), label: b.getAttribute('aria-label'), svg: !!b.querySelector('svg') };
     }),
   );
   check(labels.every((l) => l.text === '' && l.label), `hay botones con rotulo: ${JSON.stringify(labels)}`);
-  check(labels.filter((l) => l.svg).length === 5, 'USAR, ATAQUE, OTROS, INVENTARIO o MODO no llevan su icono');
+  check(labels.filter((l) => l.svg).length === 6, 'USAR, ATAQUE, OTROS, INVENTARIO, MODO o ENTRADA no llevan su icono');
   // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
   check(await page.isVisible('#crosshair'), 'la cruz no se ve en el movil');
   const feedR = await rect('pickupFeed');
@@ -1606,6 +1684,63 @@ async function mobilePass(browser, baseUrl) {
   check(await page.isVisible('#statsPanel'), 'el panel no se abrio al tocarlo en movil');
   await page.screenshot({ path: join(SHOTS, '3d-05-movil-panel.png') });
   await page.tap('#statsToggle');
+
+  // ENTRADA (decision del autor, 2026-10-01): MIRA, como siempre, o TAP, que
+  // actua donde se toca el mundo. Arranca en MIRA, alterna con su icono y se
+  // recuerda.
+  const inputIcon = () => page.evaluate(() =>
+    getComputedStyle(document.querySelector('#inputMode .input-tap')).display !== 'none' ? 'tap' : 'mira');
+  const worldAt = { x: 90, y: 380 };
+  check(await page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.id === 'view', worldAt),
+    'el punto del mundo para el TAP cae sobre otra cosa');
+  const tapWorld = async (p) => {
+    await pointers(page, [{ type: 'pointerdown', id: 3, ...p }]);
+    await pointers(page, [{ type: 'pointerup', id: 3, ...p }]);
+    return waitForLoop(page, 10);
+  };
+  const t0 = await state(page);
+  check(t0.tapInput === false && (await inputIcon()) === 'mira', 'la ENTRADA no arranca en MIRA o su icono no lo dice');
+  const inMira = await tapWorld(worldAt);
+  check(inMira.sent.tapUse === t0.sent.tapUse && inMira.sent.tapHarvest === t0.sent.tapHarvest, 'en MIRA tocar el mundo actuo');
+  await tap(page, '#inputMode');
+  await page.waitForTimeout(150);
+  const t1 = await state(page);
+  check(t1.tapInput === true && (await inputIcon()) === 'tap', 'ENTRADA no paso a TAP o su icono no lo dice');
+  const againTap = await context.newPage();
+  check((await open(againTap, baseUrl)).tapInput === true, 'la ENTRADA no se recordo');
+  await againTap.close();
+  // Un toque rapido: usa en el punto tocado y, como en la mano no hay nada que
+  // usar, ataca alli al tick siguiente. Mirando hacia el punto, no a la cruz.
+  const tapOnce = await tapWorld(worldAt);
+  const a1 = tapOnce.lastTapAim;
+  const turned = a1 ? Math.acos(Math.max(-1, Math.min(1, (a1.aimX * tapOnce.crossAim.aimX + a1.aimY * tapOnce.crossAim.aimY) /
+    (Math.hypot(a1.aimX, a1.aimY) * Math.hypot(tapOnce.crossAim.aimX, tapOnce.crossAim.aimY))))) : 0;
+  console.log(`  TAP: toque -> usar ${tapOnce.sent.tapUse - t1.sent.tapUse}, atacar ${tapOnce.sent.tapHarvest - t1.sent.tapHarvest}; mirada a ${turned.toFixed(2)} rad de la cruz`);
+  check(tapOnce.sent.tapUse === t1.sent.tapUse + 1 && tapOnce.sent.tapHarvest === t1.sent.tapHarvest + 1,
+    'en TAP un toque no uso y luego ataco');
+  check(turned > 0.2, `en TAP el toque no apunto hacia el punto tocado: ${turned}`);
+  // Arrastrar sin mantener: solo camara.
+  const dragFrom = await state(page);
+  await pointers(page, [{ type: 'pointerdown', id: 3, ...worldAt }]);
+  for (let i = 1; i <= 6; i++) await pointers(page, [{ type: 'pointermove', id: 3, x: worldAt.x + i * 12, y: worldAt.y }]);
+  await pointers(page, [{ type: 'pointerup', id: 3, x: worldAt.x + 72, y: worldAt.y }]);
+  const dragTo = await waitForLoop(page, 10);
+  check(dragTo.sent.tapUse === dragFrom.sent.tapUse && dragTo.sent.tapHarvest === dragFrom.sent.tapHarvest, 'en TAP arrastrar uso o ataco');
+  check(Math.abs(dragTo.yaw - dragFrom.yaw) > 0.05, 'en TAP arrastrar no giro la camara');
+  // Mantener: ataca en cuanto se reconoce el sostenido y luego cuatro veces
+  // por segundo.
+  // Se espera a que lleguen tres golpes, no un tiempo fijo (escape 13).
+  const h0t = await state(page);
+  await pointers(page, [{ type: 'pointerdown', id: 3, ...worldAt }]);
+  await page.waitForFunction((n) => window.__verdant.sent.tapHarvest >= n, h0t.sent.tapHarvest + 3, { timeout: 8000 }).catch(() => {});
+  const h1t = await state(page);
+  await pointers(page, [{ type: 'pointerup', id: 3, ...worldAt }]);
+  const holdHits = h1t.sent.tapHarvest - h0t.sent.tapHarvest;
+  console.log(`  TAP: mantener -> ${holdHits} ataques, usar ${h1t.sent.tapUse - h0t.sent.tapUse}`);
+  check(holdHits >= 3 && h1t.sent.tapUse === h0t.sent.tapUse, `en TAP mantener no ataco sostenido o uso: ${holdHits}`);
+  await tap(page, '#inputMode');
+  await page.waitForTimeout(150);
+  check((await state(page)).tapInput === false, 'ENTRADA no volvio a MIRA');
 
   // Soltado todo, el jugador se queda quieto.
   const rest0 = await waitForLoop(page, 10);

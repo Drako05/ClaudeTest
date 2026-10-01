@@ -1,12 +1,12 @@
 /**
- * La barra deslizable del movil, en el DOM: se engancha a un contenedor que se
+ * La barra deslizable, en el DOM: se engancha a un contenedor que se
  * desliza (la rejilla del inventario, la lista de recetas) y le pone al lado
  * una pista con su mando. Las cuentas son de `scroll-rail.ts`.
  *
  * - Se ve **siempre que haya mas de lo que cabe**, y solo entonces.
- * - El mando se arrastra con el dedo; tocar la pista lleva el mando alli.
- * - Solo en el movil (`.touch-active`, decision del autor): en PC la envoltura
- *   no cuenta y la barra no se ve, y siguen la rueda y la del navegador.
+ * - El mando se arrastra con el dedo o el raton; tocar la pista lleva el
+ *   mando alli. La rueda sigue deslizando el contenedor, y la barra la sigue.
+ * - En el movil y, desde el 2026-10-01, tambien en PC (decision del autor).
  */
 
 import { scrollFor, thumbFor, type RailMetrics } from './scroll-rail.js';

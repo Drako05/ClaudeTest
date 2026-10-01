@@ -1,8 +1,8 @@
 /**
- * La geometria de la barra deslizable del movil (pedido del autor,
- * 2026-09-30): con mas casillas de las que caben, costaba atinar con el dedo al
- * fondo de la rejilla para deslizarla, porque casi todo es casilla y apoyar el
- * dedo en una empieza un arrastre. La barra va al lado, se ve siempre que haya
+ * La geometria de la barra deslizable (pedido del autor, 2026-09-30, para el
+ * movil; en PC tambien desde el 2026-10-01): con mas casillas de las que
+ * caben, costaba atinar con el dedo al fondo de la rejilla para deslizarla,
+ * porque casi todo es casilla y apoyar el dedo en una empieza un arrastre. La barra va al lado, se ve siempre que haya
  * mas de lo que cabe, y su mando se arrastra.
  *
  * Aqui solo las cuentas, sin DOM, para medirlas en Node (`tests/scroll-rail.test.ts`);

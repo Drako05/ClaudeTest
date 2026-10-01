@@ -139,7 +139,11 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     estado de la `Intent` (`precise`), como correr; se cambia con TAB o el
     boton MODO, y en vez del arco se ve una **estocada** recta que **nace
     abajo a la derecha de la pantalla** y va hasta lo golpeado en el centro de
-    la mira (`stabLine`, con `STAB_SCREEN`). Recorria la linea de la mirada y,
+    la mira (`stabLine`, con `STAB_SCREEN`). Ese punto de pantalla es el de la
+    camara de **primera persona** en las tres vistas —que va siempre en los
+    ojos aunque no se dibuje con ella—, asi que el recorrido en el mundo es el
+    mismo: con la camara activa, en tercera persona nacia lejos del jugador
+    (lo vio el autor, 2026-10-01). Recorria la linea de la mirada y,
     vista de punta, solo se veia al moverse (lo vio el autor); `npm run slash`
     la cuenta en pixeles en ese cuadrante.
 
@@ -537,8 +541,8 @@ marcaba tambien los objetos que el golpe alcanzaba; el autor lo quito.
 
 La congelacion empieza puesta al abrir el panel y solo se aplica con el panel
 abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
-herramientas no sirven para lo que se hicieron: a 64x se pierden unos 13 puntos
-de hambre por segundo real y saltar un dia vacia el hambre entera, asi que el
+herramientas no sirven para lo que se hicieron: a 64x se pierden unos 6,7 puntos
+de hambre por segundo real y saltar un dia vacia la mitad del hambre, asi que el
 boton mas util del panel era el que mataba.
 
 ## Las features son aspas; el jugador, no
@@ -859,11 +863,14 @@ USAR, espada y pico cruzados en ATAQUE, una **mochila de explorador** en
 INVENTARIO (asa, solapa con dos cierres y bolsillos, casi tan ancha como alta
 y mas grande que los otros iconos, como el adjunto del autor del 2026-09-30),
 tres barras en OTROS, y CORRER y SALTAR con su glifo; el nombre va en
-`aria-label`. Los dibujos son mios. Y **MODO** (2026-09-30), mas pequeno que
-USAR y en la diagonal de arriba a la izquierda del ataque: un toque cambia de
-modo de golpe, su icono dice cual —un tajo para el barrido, una mirilla para
+`aria-label`. Los dibujos son mios. Y **MODO** (2026-09-30) y **ENTRADA**
+(2026-10-01), mas pequenos que USAR y en un **arco alrededor del ataque**, a la
+misma distancia de su centro (boceto del autor): ENTRADA arriba, hacia SALTAR,
+y MODO abajo a la izquierda, encima de USAR; radio y tamano, mios. MODO: un
+toque cambia de modo de golpe, su icono dice cual —un tajo para el barrido, una mirilla para
 el preciso— y **se enciende al pulsarlo**, como USAR y SALTAR (en PC tambien,
-y con TAB). Y **AUTO SALTO** (2026-09-30), un redondo pequeno montado sobre la
+y con TAB). ENTRADA alterna **MIRA** y **TAP** (abajo), con la cruz o una
+mano tocando por icono, y se recuerda. Y **AUTO SALTO** (2026-09-30), un redondo pequeno montado sobre la
 esquina de arriba a la izquierda de SALTAR, como el boceto del autor: un toque
 lo enciende o apaga, se ilumina encendido, **arranca apagado y se recuerda**
 en el navegador de cada dispositivo (`localStorage`, como el angulo de
@@ -1034,14 +1041,36 @@ suyos: puede corregirlos, y `tests/jump.test.ts` afirma la relacion que los ata.
 
 **El hambre gasta segun el esfuerzo** (decision del autor, 2026-09-30;
 `systems/survival.ts`): quieto o andando se vacia en `HUNGER_EMPTY_DAYS` dias
-de juego —uno—, y el ritmo **se deriva de `DAY_TICKS`**, para que si el dia
+de juego —dos; fue uno hasta el 2026-10-01—, y el ritmo **se deriva de `DAY_TICKS`**, para que si el dia
 cambia de duracion el hambre lo siga; corriendo y avanzando, por
 `RUN_MULTIPLIER`, el mismo factor que la velocidad, y con la carrera encendida
-pero quieto, como quieto; y cada salto que despega cuesta `JUMP_HUNGER`, un 0,5 %
-(fue un 1 %; lo bajo el autor el mismo dia), el automatico tambien.
+pero quieto, como quieto; y cada salto que despega cuesta `JUMP_HUNGER`, un 0,25 %
+(fue un 1 % y luego un 0,5 %; lo fue bajando el autor), el automatico tambien.
 Lo de «avanzando» se mide en el tick comparando la posicion antes y despues de
 moverse (deduccion mia: empujar contra una pared no es correr). Todo respeta
 `survivalFrozen`, y `skipTime` gasta como quieto.
+
+**La ENTRADA del movil: MIRA o TAP** (decision del autor, 2026-10-01). En
+MIRA se actua hacia la cruz, como siempre. En **TAP**, ademas, tocando el
+mundo (fuera de los botones y del joystick):
+
+- **Un toque rapido** USA en ese punto y, al tick siguiente, ATACA alli **solo
+  si el USAR no hizo nada**: abrir, comer, sembrar o colocar cancelan el
+  ataque (`state.lastUsed`).
+- **Mantenerlo** `HOLD_MS` (300 ms, deduccion mia, lejos de los 500 del toque
+  largo de Chrome) ataca en el acto y luego con la cadencia del boton, hacia
+  donde este el dedo; **arrastrarlo despues gira la camara sin dejar de
+  atacar**. Arrastrar antes es solo camara, y dos dedos son la pinza.
+- **ATAQUE y USAR siguen yendo a la cruz**, y la cruz se queda.
+
+«Ese punto» es el del mundo bajo el dedo: un rayo de la camara activa por el
+punto tocado que choca con el terreno o un hitbox (`rayHit`, el mismo de la
+colision de camara), y la mirada de ese tick va **de los ojos a el**. El nucleo
+no cambia: el golpe, sembrar o abrir salen de los ojos con esa mirada y su
+alcance, y lo que quede lejos no se alcanza. El reparto: `gestures.ts`
+clasifica el dedo (toque, sostenido `'tapHold'`, que gira sin contar para la
+pinza, o arrastre), `controls.ts` lo traduce a peticiones, `tap-input.ts`
+(puro, con su test) pone el orden tick a tick, y `main.ts` calcula la mirada.
 
 **El AUTO SALTO** (decision del autor, 2026-09-30; `systems/autojump.ts`):
 andando hacia un bloque que se sube de un salto, se salta solo **justo antes
@@ -1168,8 +1197,9 @@ Lo que el codigo tiene que respetar:
   la lista de recetas, centradas; las categorias, cuando sean mas, a los
   lados. El humo lo mide pagina por pagina.
 - **Con mas de lo que cabe, una barra deslizable** a la derecha de la
-  rejilla y de la lista de recetas (pedido del autor, 2026-09-30; solo en el
-  movil): con mas casillas, el fondo de la rejilla casi no se encontraba con
+  rejilla y de la lista de recetas (pedido del autor, 2026-09-30 en el movil,
+  2026-10-01 tambien en PC, donde la franja es de 18 px para no pisar la
+  columna de las recetas): con mas casillas, el fondo de la rejilla casi no se encontraba con
   el dedo, porque todo es casilla y apoyar en una empieza un arrastre. Se ve
   **siempre que desborde, y solo entonces**; el mando se arrastra y tocar la
   pista lo lleva alli. Las cuentas son puras (`scroll-rail.ts`, con su test) y
