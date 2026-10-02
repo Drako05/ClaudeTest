@@ -82,6 +82,10 @@ el numero se saca de donde vive, no se copia.
   como invariante por fotograma.
 - **Un clic de prueba que cae en otra cosa** (#12): antes de clicar para
   probar algo, `elementFromPoint` en ese punto tiene que ser lo que se prueba.
+- **Un contador que suma de mas** (#21): si lo que se cuenta tambien lo sube
+  otra cosa en la misma escena —las esquirlas del arbusto de al lado de la
+  presa—, la comprobacion pasa sin lo que afirma. Se aisla la causa (golpe
+  preciso, sitio limpio) o se cuenta solo lo suyo.
 
 ## C. Herramientas fuera de CI — ¿siguen funcionando?
 
