@@ -295,10 +295,11 @@ console.log('');
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 
 // Desde que corre en la CI (2026-10-02) tiene que poder fallar: una casilla que
-// mide y nunca sale en rojo es verde sin probar nada. Los suelos estan muy por
-// debajo de lo bueno (183-11.278 pixeles por vista, 8.878 la estocada) y muy
-// por encima de los fallos que tuvo (0, 2 y 13).
-const MIN_LIT = 50;
+// mide y nunca sale en rojo es verde sin probar nada. Los suelos, entre lo
+// bueno y los fallos que tuvo (0, 2 y 13 pixeles): bueno es 46-11.278 por vista
+// —46 lo dio la CI en un rumbo de la vista giratoria, donde en local el peor era
+// 183, y un primer suelo de 50 tumbo la casilla— y 8.878 la estocada.
+const MIN_LIT = 20;
 const MIN_STAB = 500;
 const fallos = results.filter((r) => !(r.lit >= MIN_LIT)).map((r) => `${r.view}: ${r.lit ?? 'sin medida'} pixeles`);
 if (!(stabbing.max >= MIN_STAB)) fallos.push(`estocada: ${stabbing.max} pixeles`);

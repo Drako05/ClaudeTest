@@ -77,15 +77,17 @@ que nadie toco es justo lo que ninguna tanda mira.
 
 **Metodo**
 1. El escaner lista las herramientas que la CI no ejecuta.
-2. **Se ejecutan todas**: `npm run shots`, `npm run slash` y
-   `npx vite-node tools/analyze-world.ts`. La podredumbre solo la ve la
-   ejecucion: una herramienta que nadie corre deja de funcionar sin que nadie
-   se entere.
+2. **Se ejecutan todas**: hoy `npm run shots` y
+   `npx vite-node tools/analyze-world.ts` (`slash` corre en la CI desde el
+   2026-10-02). La podredumbre solo la ve la ejecucion: una herramienta que
+   nadie corre deja de funcionar sin que nadie se entere. Y **en un clon
+   limpio** si depende del entorno (carpetas, cache): en el arbol de siempre
+   hay restos de otras herramientas que la sostienen (#16).
 3. Si una ha dejado de funcionar, se arregla, y se anota por que se pudrio:
    suele ser un cambio de mandos o de maquetacion que no la tuvo en cuenta.
 
 **Patrones conocidos**: `shots` era de antes del cursor capturado, y `slash`
-miraba `#thumbPad` de 0x0 (#3, #4).
+miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
 
 ## D. Codigo muerto — ¿hay algo que nadie usa?
 

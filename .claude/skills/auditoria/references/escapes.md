@@ -187,6 +187,18 @@ Formato:
   cualquier clase), no la pieza que se cambio.
 - **Donde vive ahora**: lente B.
 
+### 16. `slash` no corria en un repositorio recien clonado (2026-10-02)
+- **Que paso**: el primer dia en la CI, `tools/slash.mjs` revento escribiendo
+  `screenshots/slash.png`: la carpeta no existe en un clon limpio. En local
+  siempre existia, porque el humo la crea, asi que corrida a mano «iba bien».
+- **Por que se escapo**: la lente C manda correr a mano lo que la CI no
+  corre, y se corria; pero en un arbol con restos de otras herramientas. Lo
+  que depende del entorno no se ve corriendo en el entorno de siempre.
+- **Que lo habria visto**: correrla en un clon limpio. Desde el 2026-10-02
+  `slash` es casilla de la CI, que es un clon limpio en cada tanda.
+- **Donde vive ahora**: lente C (patron: herramientas que solo funcionan en
+  un arbol usado).
+
 ---
 
 ## Del proceso del agente
@@ -219,3 +231,13 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
   codigo. Cada variante que se mide va precedida de `npm run build` **en la
   misma orden**, y la sonda comprueba que la variante esta (un valor que solo
   existe con ella) antes de dar numeros.
+
+### P4. Una mutacion que «cae» porque la prueba revienta (2026-10-02)
+- **Que paso**: la mutacion del barrido (`frustumCulled`) salio en verde en
+  su primera tanda de la CI: «cae». Pero `slash` habia reventado antes de
+  medir nada (escape 16), no por el barrido. Se dio por buena una
+  comprobacion sin verla morder.
+- **Metodo**: `tools/mutar.mjs` solo cuenta CAE si la salida trae un `FALLO`
+  (humo, gestos, barrido) o un `×`/`AssertionError` (vitest); en rojo sin
+  eso es ERROR (`cayoDeVerdad`, con su test). Y al mirar una mutacion caida,
+  se lee POR QUE cayo, no solo que cayo.
