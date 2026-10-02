@@ -89,6 +89,7 @@ const SPAWN_ROOM_HALF = 24;
 const SPAWN_LANDING_HALF = 1;
 import { hash2D, hash2DFloat } from './rng.js';
 import { generateChunk, WorldGen } from './worldgen.js';
+import { faunaOf, type Animal } from './fauna.js';
 
 export { chunkKey, localCoord, toChunkCoord } from './coords.js';
 
@@ -143,6 +144,16 @@ export class World {
    * overlay (regla 4): el chunk es cache desechable.
    */
   private readonly facings = new Map<string, number>();
+  /**
+   * El overlay de la fauna (regla 4), por la clave de cada animal: los PV que
+   * ha perdido y los que han muerto. El animal es potencial de su chunk
+   * (`faunaOf`); esto es lo unico que le pasa, y sobrevive a que el chunk se
+   * descarte. Un muerto no vuelve nunca: la vida no surge sola.
+   */
+  private readonly faunaDamage = new Map<string, number>();
+  private readonly faunaDead = new Set<string>();
+  /** Los animales de cada chunk cargado. Cache: `faunaOf` es pura. */
+  private readonly faunaCache = new Map<string, Animal[]>();
   /** Estadisticas de bioma memorizadas; se vacian cuando algo cambia. */
   private readonly biomeCache = new Map<string, BiomeStats>();
 
@@ -248,8 +259,41 @@ export class World {
         Math.abs(chunk.cy - ccy) > keepRadiusChunks
       ) {
         this.chunks.delete(key);
+        this.faunaCache.delete(key);
       }
     }
+  }
+
+  // ----------------------------------------------------------------- fauna
+
+  /** Los animales del chunk, vivos o no: su potencial (`faunaOf`). */
+  faunaOfChunk(cx: number, cy: number): Animal[] {
+    const key = chunkKey(cx, cy);
+    const cached = this.faunaCache.get(key);
+    if (cached) return cached;
+    const chunk = this.getChunk(cx, cy);
+    const animals = faunaOf(this.seed, cx, cy, chunk.terrain, chunk.feature);
+    this.faunaCache.set(key, animals);
+    return animals;
+  }
+
+  /** Los PV que ha perdido un animal. */
+  faunaDamageOf(key: string): number {
+    return this.faunaDamage.get(key) ?? 0;
+  }
+
+  setFaunaDamage(key: string, damage: number): void {
+    this.faunaDamage.set(key, damage);
+  }
+
+  isFaunaDead(key: string): boolean {
+    return this.faunaDead.has(key);
+  }
+
+  /** Mata a un animal para siempre. */
+  killFauna(key: string): void {
+    this.faunaDead.add(key);
+    this.faunaDamage.delete(key);
   }
 
   eachLoadedChunk(fn: (chunk: Chunk) => void): void {

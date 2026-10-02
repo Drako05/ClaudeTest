@@ -5,8 +5,10 @@
 
 export * from './base.js';
 export * from './ecology.js';
+export * from './fauna.js';
 
 import { BiomeKind, CHUNK_SIZE, LifeKind, Terrain } from './base.js';
+import { AnimalClass, animalMass, SPECIES, Species, Stage } from './fauna.js';
 
 /**
  * Que hay sobre un tile.
@@ -292,12 +294,19 @@ export enum Resource {
   /** La ropa: se equipa en PERSONAJE y abre casillas (decision del autor). */
   FiberBag = 20,
   FrameBackpack = 21,
+  // Fauna, primera tanda: lo que sueltan los animales (decision del autor: la
+  // carne se asa en el horno y la asada se come; lo demas espera su uso).
+  RawMeat = 22,
+  CookedMeat = 23,
+  Hide = 24,
+  Feather = 25,
+  Shell = 26,
 }
 /**
  * Cuantos objetos distintos hay. «Recurso» abarca tambien las herramientas:
  * todo lo que ocupa una casilla del inventario.
  */
-export const RESOURCE_COUNT = 22;
+export const RESOURCE_COUNT = 27;
 export const RESOURCE_NAMES: readonly string[] = [
   'Madera',
   'Piedra',
@@ -321,7 +330,20 @@ export const RESOURCE_NAMES: readonly string[] = [
   'Horno',
   'Bolsa de fibra',
   'Mochila de armazon',
+  'Carne cruda',
+  'Carne asada',
+  'Piel',
+  'Pluma',
+  'Caparazon',
 ];
+
+/**
+ * Lo que suelta un animal y aun no sirve para nada, esperando su tanda
+ * (decision del autor, 2026-10-02). El test de «todo recurso tiene destino» lo
+ * acepta solo si esta aqui con su nombre: un objeto nuevo sin uso que no se
+ * anada a esta lista lo sigue haciendo caer.
+ */
+export const AWAITING_USE: readonly Resource[] = [Resource.Hide, Resource.Feather, Resource.Shell];
 
 // ---------------------------------------------------------------- herramientas
 
@@ -613,7 +635,80 @@ export const RECIPES: readonly Recipe[] = [
     ],
     station: Station.Workbench,
   },
+
+  // Fauna, primera tanda: asar en el horno (decision del autor). Las cifras y la
+  // categoria son deduccion mia.
+  {
+    category: 'Cocina',
+    output: Resource.CookedMeat,
+    count: 2,
+    inputs: [
+      { item: Resource.RawMeat, count: 2 },
+      { item: Resource.Coal, count: 1 },
+    ],
+    station: Station.Furnace,
+  },
 ];
+
+// ---------------------------------------------------------------- fauna
+
+/**
+ * El daño de un golpe a algo vivo, en PV (es el primer daño que hay). A mano,
+ * 5; con herramienta, 10 por punto de su poder, y vale cualquier hacha o pico.
+ * **Deduccion mia.** Asi una liebre adulta (38) cae en 8 golpes a mano y en 2
+ * con hierro, y un bisonte adulto (205) en 7 con hierro.
+ */
+export const HAND_DAMAGE = 5;
+export const DAMAGE_PER_POWER = 10;
+
+export function strikeDamage(stats: ToolStats | null): number {
+  return stats ? DAMAGE_PER_POWER * stats.power : HAND_DAMAGE;
+}
+
+/**
+ * La carne cruda que da una masa: `0,6 × √(kg)`, redondeada, 1 como minimo.
+ * **Deduccion mia.** La raiz, como la densidad, conserva el orden sin que un
+ * bisonte llene medio inventario: 15 el adulto, 1 una liebre.
+ */
+export function meatOf(massKg: number): number {
+  return Math.max(1, Math.round(0.6 * Math.sqrt(massKg)));
+}
+
+/**
+ * Lo que suelta un animal de una etapa (todo **deduccion mia**):
+ * - carne cruda segun su masa, salvo el cangrejo, que da su caparazon;
+ * - piel, 1 de cada mamifero joven o adulto y 2 del bisonte adulto;
+ * - plumas de la gaviota, 1, 2 o 3 segun la etapa;
+ * - caparazon del cangrejo joven o adulto.
+ */
+export function animalLoot(species: Species, stage: Stage): { item: Resource; count: number }[] {
+  const info = SPECIES[species];
+  const out: { item: Resource; count: number }[] = [];
+  if (info.cls !== AnimalClass.Crustacean) {
+    out.push({ item: Resource.RawMeat, count: meatOf(animalMass(species, stage)) });
+  }
+  if (info.cls === AnimalClass.Mammal && stage !== Stage.Infant) {
+    const hides = species === Species.Bison && stage === Stage.Adult ? 2 : 1;
+    out.push({ item: Resource.Hide, count: hides });
+  }
+  if (info.cls === AnimalClass.Bird) out.push({ item: Resource.Feather, count: stage + 1 });
+  if (info.cls === AnimalClass.Crustacean && stage !== Stage.Infant) {
+    out.push({ item: Resource.Shell, count: 1 });
+  }
+  return out;
+}
+
+/**
+ * Cuanta hambre llena comer cada cosa, o 0 si no se come. Las bayas, 14, como
+ * siempre; la carne asada, 35 (**deduccion mia**: la carne cocinada tiene unas
+ * cinco veces mas calorias por peso que una baya, rebajado a la mitad). La
+ * cruda no se come.
+ */
+export function foodValue(item: Resource): number {
+  if (item === Resource.Berries) return 14;
+  if (item === Resource.CookedMeat) return 35;
+  return 0;
+}
 
 export interface Harvest {
   resource: Resource;

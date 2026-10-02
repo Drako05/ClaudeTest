@@ -29,7 +29,7 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Los jugadores no son necesarios para el desarrollo de sucesos | **Cumplida** | `sim/world.ts` — la vegetacion evoluciona sin que nadie la mire | «la vida evoluciona igual se observe o no» |
 | Existen el pasar del tiempo y las leyes fisicas fundamentales | **Parcial** | `sim/clock.ts` — tiempo y ciclo dia/noche; `sim/relief.ts` — el mundo tiene altura como campo continuo; `sim/systems/jump.ts` — gravedad, salto y caida | «el ciclo del dia es periodico», «el dia recorre sus cuatro fases», «la altura del suelo es continua al cruzar a un talud», «no se cambia de nivel andando», «salir de un borde es caerse, no bajar de golpe», «un salto sobre el agua acaba en la orilla de la que salio» — la altura ya estorba; falta el resto de la fisica (empuje entre cuerpos, fluidos) |
 | El mundo es abierto para todos | **Cumplida** | `sim/world.ts` — infinito en las cuatro direcciones, sin barreras | «las coordenadas negativas de chunk funcionan» |
-| Toda existencia es justificada por un sistema | **Parcial** | Las plantas existen solo donde el bioma y la vegetacion las sostienen, y cada bioma lleva su cuenta propia **dentro** de cada chunk: un arbol de bosque no puede brotar sobre la hierba de al lado | «un brote solo sale en el terreno de su bioma», «las especies no se mezclan: talar el bosque no toca la pradera» |
+| Toda existencia es justificada por un sistema | **Parcial** | Las plantas existen solo donde el bioma y la vegetacion las sostienen, y cada bioma lleva su cuenta propia **dentro** de cada chunk: un arbol de bosque no puede brotar sobre la hierba de al lado. La fauna, solo en los tiles de su bioma y con la densidad de su especie (`sim/fauna.ts`) | «un brote solo sale en el terreno de su bioma», «las especies no se mezclan: talar el bosque no toca la pradera», «ningun animal pisa nunca un tile de otro bioma» |
 | El entorno cambia por acontecimientos naturales o de las entidades | **Parcial** | Naturales (crecimiento vegetal) y por entidades (recoleccion) | «el ecosistema repone lo recolectado» |
 
 ## Capitulo II: Los recursos
@@ -37,12 +37,12 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Ley | Estado | Donde vive | Prueba |
 |---|---|---|---|
 | Pueden ser finitos, consumibles y renovables | **Cumplida** | La vida se repone via el ecosistema; roca y minerales son inertes y no vuelven | «el ecosistema repone lo recolectado», «la piedra es inerte: ni cuenta como vida ni se repone», «la piedra sigue siendo inerte y de cantidad fija» |
-| Todo recurso tiene origen, transformacion y destino | **Cumplida** | Origen (worldgen), un ciclo cerrado —recolectar deja semillas que se siembran y maduran—, transformacion —fabricar (`tryCraft`) y fundir en el horno— y destino: desde la tanda 2 todo recurso se gasta en algo (la madera en la mesa y la mochila, el carbon y los minerales en el horno, los lingotes en herramientas) | «sembrar consume una semilla y el brote madura a adulto», «algunos recursos se combinan para crear cosas nuevas», «todo recurso tiene destino: se gasta en una receta o se usa» |
+| Todo recurso tiene origen, transformacion y destino | **Cumplida** | Origen (worldgen), un ciclo cerrado —recolectar deja semillas que se siembran y maduran—, transformacion —fabricar (`tryCraft`), fundir y asar en el horno— y destino: desde la tanda 2 todo recurso se gasta en algo (la madera en la mesa y la mochila, el carbon y los minerales en el horno, los lingotes en herramientas, la carne cruda se asa y la asada se come). Piel, plumas y caparazon de la fauna **esperan su uso** por decision del autor, nombrados en `AWAITING_USE` | «sembrar consume una semilla y el brote madura a adulto», «algunos recursos se combinan para crear cosas nuevas», «todo recurso tiene destino: se gasta en una receta o se usa» |
 | Los mas basicos se generan con el terreno | **Cumplida** | `sim/worldgen.ts` — `featureAt` decide segun el bioma | tests de `world-quality` |
 | Deben ser recolectados para usarlos | **Cumplida** | `sim/systems/gathering.ts` | «recolectar un arbol da madera y vacia el tile» |
-| En su mayoria requieren ser procesados | **Parcial** | Los minerales si: solo el horno los usa (`Station.Furnace` en `RECIPES`) y sus lingotes hacen las herramientas de metal. Madera, piedra, ramas y fibra se usan aun en bruto, asi que «la mayoria» todavia no | «los minerales requieren procesarse: solo el horno los usa…» |
+| En su mayoria requieren ser procesados | **Parcial** | Los minerales si: solo el horno los usa (`Station.Furnace` en `RECIPES`) y sus lingotes hacen las herramientas de metal. La carne tambien: cruda no se come, se asa en el horno. Madera, piedra, ramas y fibra se usan aun en bruto, asi que «la mayoria» todavia no | «los minerales requieren procesarse: solo el horno los usa…» |
 | Algunos podran combinarse para crear cosas nuevas | **Cumplida** | `RECIPES` en `shared` y `tryCraft` en `sim/systems/gathering.ts`: ramas, piedra y fibra hacen el hacha y el pico de piedra | «algunos recursos se combinan para crear cosas nuevas», `tests/crafting.test.ts` |
-| Categorias: minerales, quimicos, organicos | **Parcial** | Los minerales existen y viven donde deben: carbon, hierro y cobre solo en la montana. Faltan los quimicos y una taxonomia explicita | «solo aparecen sobre roca», «los tres existen y el carbon es el mas comun» |
+| Categorias: minerales, quimicos, organicos | **Parcial** | Los minerales existen y viven donde deben: carbon, hierro y cobre solo en la montana. Lo organico crece con la fauna: carne, piel, plumas y caparazon. Faltan los quimicos y una taxonomia explicita | «solo aparecen sobre roca», «los tres existen y el carbon es el mas comun» |
 | Se requieren herramientas y experiencia | **Parcial** | Herramientas si: trabajo por golpes (`workOf`, `toolStats`), la roca y los minerales piden pico, un arbol sin hacha no cae, y el hierro pide un pico de cobre o mejor; las de metal piden mesa y lingotes. La experiencia sigue pendiente | «algunos recursos requieren herramientas para recolectarse», `tests/crafting.test.ts` |
 
 ## Capitulo III: La vida
@@ -56,12 +56,12 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 | Existen relaciones naturales entre las entidades vivas | **Pendiente** | — | — |
 | Las interacciones se desarrollan de forma coherente y reactiva | **Pendiente** | — | — |
 | Cada entidad cumple un rol y coexiste con sus vecinos | **Pendiente** | — | — |
-| Ciclo basico: nacimiento, crecimiento, reproduccion y muerte | **Parcial** | Las plantas son instancias que nacen (brote o brote sembrado), maduran y mueren por recoleccion o competencia | «sembrar consume una semilla y el brote madura a adulto», «la mortandad corrige mas al principio que al final» — falta la fauna |
+| Ciclo basico: nacimiento, crecimiento, reproduccion y muerte | **Parcial** | Las plantas son instancias que nacen (brote o brote sembrado), maduran y mueren por recoleccion o competencia. La fauna tiene sus tres etapas (cria, joven y adulto), pero **fijas** hasta la tanda de la reproduccion (decision del autor), y solo muere cazada | «sembrar consume una semilla y el brote madura a adulto», «la mortandad corrige mas al principio que al final», «matarlo da su botin entero, y lo que muere no vuelve» — falta que la fauna nazca, crezca y muera sola |
 | Los ecosistemas tienden a estados dinamicos de equilibrio | **Cumplida** | Crecimiento logistico hacia el referente y mortandad exponencial por saturacion, con los ritmos que fijo el autor | «de cero al rango en 5 horas reales», «del 200 % al rango en 2.5 horas reales», «la vida tiende a su referente sin superarlo nunca» |
-| Existen muchas y diversas formas de vida | **Parcial** | Bosque, pradera y tundra tienen su arbol y su planta propios, cada uno con variante rara. La nieve es la franja extrema de la tundra: sostiene arboles pero no plantas | «cada planta esta en el bioma de su especie, sin cruces», «tiene arbol y planta propios, con sus variantes raras» — falta la fauna y la vida de costa |
+| Existen muchas y diversas formas de vida | **Parcial** | Bosque, pradera y tundra tienen su arbol y su planta propios, cada uno con variante rara. La nieve es la franja extrema de la tundra: sostiene arboles pero no plantas. Desde la primera tanda de fauna, diez especies reales, dos por bioma de tierra —costa y tierras altas incluidas—, cada una en tres etapas y dos sexos (`docs/fauna.md`) | «cada planta esta en el bioma de su especie, sin cruces», «tiene arbol y planta propios, con sus variantes raras», «cada especie sale con su densidad, y las etapas y los sexos en su proporcion» — falta la vida del oceano y la vegetal de costa |
 | Las comunidades de especies desarrollan comportamientos colectivos | **Pendiente** | — | — |
 | El reino vegetal se desarrolla naturalmente y por intervencion | **Cumplida** | Crece solo despacio y el jugador lo acelera sembrando, que es la via principal de equilibrio | «el ecosistema repone lo recolectado», «sembrar consume una semilla y el brote madura a adulto» |
-| Las entidades vivas no surgen automaticamente | **Cumplida** | Con poblacion cero el crecimiento logistico vale exactamente cero; solo la colonizacion desde una fuente cercana lo arranca | «sin fuente cercana no se genera ni una sola unidad de vida», «donde el terreno no sostiene vida, no aparece jamas» |
+| Las entidades vivas no surgen automaticamente | **Cumplida** | Con poblacion cero el crecimiento logistico vale exactamente cero; solo la colonizacion desde una fuente cercana lo arranca. La fauna es potencial de su chunk y su muerte va al overlay: lo que muere no vuelve, y sin reproduccion solo puede ir a menos | «sin fuente cercana no se genera ni una sola unidad de vida», «donde el terreno no sostiene vida, no aparece jamas», «la fauna no reaparece: lo que muere no vuelve, ni pasando el tiempo ni regenerando su chunk» |
 | Todo ser vivo puede desarrollar rasgos diferenciales | **Pendiente** | — | — |
 | Existen muchos tipos de biomas y ecosistemas | **Cumplida** | `sim/worldgen.ts` — ocho biomas calibrados; el bioma es el del **tile**, no el del chunk, asi que la mancha sigue la forma real del terreno | «todos los biomas aparecen», «dos tiles del MISMO chunk pueden dar biomas distintos» |
 | El mundo es abierto para todos (aplicada al relieve) | **Cumplida** | `sim/relief.ts` y `sim/worldgen.ts` — hay cordilleras de hasta cuarenta niveles y mesetas con paredes, y la densidad de las dos cosas esta calibrada contra la conectividad real del mundo, no elegida a ojo | «el relieve no parte el mundo», «hay montanas de verdad, no llanuras onduladas», «existen paredes de dos o mas bloques», «la costa no se ha movido» |
@@ -69,8 +69,9 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 ## Capitulo IV: Las comunidades
 
 Ninguna ley de este capitulo esta implementada todavia: requiere fauna con
-comportamiento propio, que es el paso siguiente. Se documentaran aqui conforme se
-implementen.
+comportamiento propio. La fauna ya existe (primera tanda, 2026-10-02) pero solo
+deambula; su comportamiento por etapa esta escrito en `docs/fauna.md` para la
+tanda que lo implemente.
 
 ---
 
@@ -114,7 +115,10 @@ siempre el del tile que se pisa.
   horno y la madera hace la mesa. Lo que queda para que «la mayoria requiera
   procesarse» es que lo basico —madera, piedra— tambien pase por una estacion
   antes de servir, y eso es decision de diseno del autor.
-- **La fauna** (Capitulos III y IV) no existe. El panel ya reserva su fila para
-  dejar claro que falta. Las comunidades del Capitulo IV dependen de ella.
-- **Las especies** cubren bosque, pradera y tundra. La costa sigue sin vida
-  propia, y la montana es mineral a proposito.
+- **La fauna** (Capitulos III y IV) existe desde el 2026-10-02, pero solo
+  deambula: no come, no huye, no se reproduce ni envejece, y no entra en el
+  equilibrio ni en el panel del bioma, que siguen sin ella por decision del
+  autor. Las comunidades del Capitulo IV dependen de su comportamiento.
+- **Las especies vegetales** cubren bosque, pradera y tundra. La costa sigue
+  sin vegetacion propia, y la montana es mineral a proposito; las dos tienen ya
+  su fauna. El oceano no tiene vida: su fauna espera a la tanda del nado.

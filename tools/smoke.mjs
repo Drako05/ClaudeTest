@@ -1293,6 +1293,8 @@ async function stationsPass(browser, baseUrl) {
   // «Materiales de metal» del panel de desarrollo, y a jugar con el cursor.
   await open(page, baseUrl, '&dev=1');
   await page.click('[data-kit="metal"]');
+  // Y la carne cruda, para asarla en el horno (fauna, primera tanda).
+  await page.click('[data-kit="cocina"]');
   await page.keyboard.press('F3');
   await page.waitForTimeout(300);
   await play(page);
@@ -1410,14 +1412,37 @@ async function stationsPass(browser, baseUrl) {
   const furnaceBox = await panelBox();
   console.log(`  usar el horno: panel ${furnace.inventoryOpen ? 'abierto' : 'cerrado'}, «${await page.textContent('#recipeTitle')}», ${furnaceTabs}`);
   check(furnace.inventoryOpen && furnace.panelStation === 2, 'USAR mirando el horno no abrio su panel');
-  check(furnaceTabs.join() === 'Fundicion', `el horno ensena otras recetas: ${furnaceTabs}`);
+  check(furnaceTabs.join() === 'Fundicion,Cocina', `el horno ensena otras recetas: ${furnaceTabs}`);
   for (let i = 0; i < 5; i++) await craft(1);
   const smelted = await state(page);
   console.log(`  fundir: lingotes de cobre ${smelted.inventory[12]}; registro ${JSON.stringify(smelted.feed)}`);
   check(smelted.inventory[12] === 5, `no se fundieron 5 lingotes de cobre: ${smelted.inventory[12]}`);
+  // Asar (fauna, primera tanda): dos de carne cruda y uno de carbon dan dos
+  // de asada, y la asada se lleva a la barra para comerla.
+  await category('Cocina');
+  await craft(1);
+  const roasted = await state(page);
+  console.log(`  asar: carne cruda ${smelted.inventory[22]} -> ${roasted.inventory[22]}, asada ${roasted.inventory[23]}`);
+  check(roasted.inventory[22] === smelted.inventory[22] - 2 && roasted.inventory[23] === 2, 'el horno no aso la carne');
+  await toBar(23);
   await page.keyboard.press('Escape');
   await page.waitForTimeout(400);
   await play(page);
+
+  // Comerla: mirando de lado y al cielo, que mirando el horno —o la mesa, que
+  // esta justo enfrente— USAR la abriria. Llena 35 de hambre, o hasta 100.
+  await look(page, 628, -300);
+  await page.waitForTimeout(200);
+  await toHand(page, 23);
+  const hungry = await state(page);
+  await useClick(page);
+  await page.waitForTimeout(400);
+  const fed = await state(page);
+  console.log(`  comer carne asada: ${hungry.inventory[23]} -> ${fed.inventory[23]}, hambre ${hungry.hunger.toFixed(1)} -> ${fed.hunger.toFixed(1)}`);
+  check(fed.inventory[23] === hungry.inventory[23] - 1, 'USAR con la carne asada en la mano no se la comio');
+  check(fed.hunger > hungry.hunger + 0.5, 'comer carne asada no lleno el hambre');
+  await look(page, -628, 300);
+  await page.waitForTimeout(200);
 
   // Estorba: andar contra el horno no mete el cuerpo en su casilla.
   await hold(page, 'KeyW', 900);
@@ -2420,8 +2445,107 @@ async function highRefreshPass(browser, baseUrl) {
   await page.close();
 }
 
+// ------------------------------------------------------------------------ fauna
+
+/**
+ * La fauna de la primera tanda (2026-10-02): se dibuja cada animal
+ * materializado y a la medida de su caja de golpe, deambula, y se caza con el
+ * raton y el clic. La presa se elige parada en su punto de paso y con rato por
+ * delante (`calm`), y se vuelve a abrir **en ese mismo tick** (`&t=`) y a su
+ * lado (`&x=&y=`): al cargar, cada animal aparece en el punto de paso de su
+ * periodo, asi que esta donde estaba y no hay que perseguirla. Sin el `&t=`
+ * el tiempo vuelve a empezar, el animal nace en el punto del periodo anterior
+ * y echa a andar en mitad de la caza (paso: fue la primera version). Que asar
+ * y comer funcionan lo mide `stationsPass`, que ya tiene el horno puesto.
+ */
+async function faunaPass(browser, baseUrl) {
+  console.log('\n== fauna (dibujo, deambular y caza) ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'fauna');
+
+  const first = await open(page, baseUrl);
+  console.log(`  fauna materializada ${first.fauna.length}, sprites en escena ${first.faunaInScene}`);
+  check(first.fauna.length >= 5, `casi no hay fauna alrededor del nacimiento: ${first.fauna.length}`);
+  check(first.faunaInScene === first.fauna.length,
+    `no se dibuja cada animal: ${first.faunaInScene} sprites para ${first.fauna.length}`);
+  // Lo dibujado mide lo que la caja de golpe del nucleo: lo que se ve es lo
+  // que se golpea.
+  const off = first.faunaSizes.filter((s) => Math.abs(s.dibujo - s.caja) > 0.03);
+  check(first.faunaSizes.length === 30 && off.length === 0,
+    `el dibujo no mide lo que su caja: ${JSON.stringify(off.slice(0, 3))}`);
+
+  // Deambulan.
+  const later = await waitForLoop(page, 600);
+  const moved = later.fauna.filter((a) => {
+    const b = first.fauna.find((f) => f.key === a.key);
+    return b && Math.hypot(a.x - b.x, a.y - b.y) > 0.5;
+  }).length;
+  console.log(`  en ${later.tick - first.tick} ticks se movieron ${moved} de ${later.fauna.length}`);
+  check(moved >= Math.max(1, Math.floor(later.fauna.length / 5)), `la fauna no deambula: ${moved} se movieron`);
+
+  // Cazar: la presa mas facil que suelte carne, parada en su punto de paso y
+  // con un buen rato quieta por delante.
+  const prey = later.fauna
+    .filter((a) => a.species !== 8 && !a.moving && a.calm > 1000)
+    .sort((p, q) => p.maxHealth - q.maxHealth)[0];
+  check(prey !== undefined, 'no hay ninguna presa quieta a la que ir');
+  if (!prey) return page.close();
+  // A 2,2 casillas de ella, del lado que no sea agua, en el mismo tick.
+  let there = null;
+  for (const [ox, oy] of [[0, 2.2], [0, -2.2], [2.2, 0], [-2.2, 0]]) {
+    there = await open(page, baseUrl, `&t=${later.tick}&x=${(prey.x + ox).toFixed(3)}&y=${(prey.y + oy).toFixed(3)}`);
+    if (!there.terrain.startsWith('Agua')) break;
+  }
+  const target = there.fauna.find((a) => a.key === prey.key);
+  check(target !== undefined && Math.hypot(target.x - there.x, target.y - there.y) < 2.8,
+    `la presa no esta a tiro al llegar: ${JSON.stringify(target)}`);
+  if (!target) return page.close();
+
+  // Encararla: rumbo e inclinacion hacia el centro de su caja, en lazo cerrado
+  // (0,0025 rad por pixel: raton a la derecha sube el angulo, abajo baja la
+  // mirada). La inclinacion se lee de la camara (`pitch`): la del personaje
+  // (`lookZ`) llega un tick despues.
+  const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+  const aimAt = async () => {
+    for (let round = 0; round < 3; round++) {
+      const s = await state(page);
+      const t = s.fauna.find((a) => a.key === prey.key);
+      if (!t) return s;
+      const yaw = Math.atan2(t.y - s.y, t.x - s.x);
+      const size = s.faunaSizes.find((z) => z.species === t.species && z.stage === t.stage);
+      const dz = t.z + (size ? size.caja / 2 : 0.2) - (s.z + 1.75);
+      const pitch = Math.atan2(dz, Math.hypot(t.x - s.x, t.y - s.y));
+      const dYaw = wrap(yaw - Math.atan2(s.aim[1], s.aim[0]));
+      const dPitch = s.pitch - pitch;
+      if (Math.abs(dYaw) < 0.05 && Math.abs(dPitch) < 0.05) return s;
+      await look(page, dYaw / 0.0025, dPitch / 0.0025);
+      await page.waitForTimeout(200);
+    }
+    return state(page);
+  };
+  // Apuntar antes de cada golpe —sale enseguida si ya esta encarada— y
+  // golpear: rapido, que su periodo de quieta se acaba.
+  let now = await state(page);
+  for (let i = 0; i < 30 && now.animalsKilled === 0; i++) {
+    await aimAt();
+    await strike(page);
+    await page.waitForTimeout(260);
+    now = await state(page);
+  }
+  await page.screenshot({ path: join(SHOTS, '3d-14-fauna.png') });
+  console.log(`  caza: especie ${prey.species}, etapa ${prey.stage}, ${prey.maxHealth} PV; muertos ${now.animalsKilled}, ` +
+    `carne cruda ${now.inventory[22] ?? 0}, esquirlas ${now.chipsDrawn}, escombros ${now.debrisDrawn}`);
+  check(now.animalsKilled === 1, 'golpear a la presa no la mato');
+  check((now.inventory[22] ?? 0) >= 1, 'matar a la presa no dio carne cruda');
+  check(!now.fauna.some((a) => a.key === prey.key), 'la presa muerta sigue en el mundo');
+  check(now.chipsDrawn > there.chipsDrawn && now.debrisDrawn > there.debrisDrawn,
+    'golpear y matar a la presa no solto esquirlas ni escombros');
+
+  await page.close();
+}
+
 const only = process.argv[2];
-const passes = { desktopPass, resourcesPass, stationsPass, mobilePass, devToolsPass, lifePass, reliefPass, highRefreshPass };
+const passes = { desktopPass, resourcesPass, stationsPass, mobilePass, devToolsPass, lifePass, reliefPass, highRefreshPass, faunaPass };
 try {
   // Pedir una pasada que no existe no puede salir en verde: con la CI
   // repartida en una casilla por pasada, una errata en el nombre seria una

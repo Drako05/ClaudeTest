@@ -26,3 +26,5 @@ export * from './systems/jump.js';
 export * from './systems/autojump.js';
 export * from './systems/survival.js';
 export * from './systems/gathering.js';
+export * from './fauna.js';
+export * from './systems/wander.js';

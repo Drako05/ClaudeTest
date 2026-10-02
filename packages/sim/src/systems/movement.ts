@@ -80,8 +80,16 @@ export function collides(world: World, cx: number, cy: number): boolean {
  * maximo de las casillas solapadas fuera la propia pared y el personaje se
  * subiria a ella de lado. El centro es lo que de verdad se pisa.
  */
-function blocked(world: World, cx: number, cy: number, feet: number, margin: number): boolean {
+function blocked(
+  world: World,
+  cx: number,
+  cy: number,
+  feet: number,
+  margin: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
   if (collides(world, cx, cy)) return true;
+  if (keep && !keep(cx, cy)) return true;
   // El suelo con sus estaciones: una mesa estorba de lado como una pared de un
   // bloque y se sube saltando (decision del autor, 2026-09-30).
   return world.floorHeightAt(cx, cy) > feet + margin;
@@ -99,15 +107,16 @@ function slide(
   stepX: number,
   stepY: number,
   margin: number,
+  keep?: (x: number, y: number) => boolean,
 ): void {
   const feet = store.z[id];
   const curY = store.y[id];
 
   const nextX = store.x[id] + stepX;
-  if (!blocked(world, nextX, curY, feet, margin)) store.x[id] = nextX;
+  if (!blocked(world, nextX, curY, feet, margin, keep)) store.x[id] = nextX;
 
   const nextY = curY + stepY;
-  if (!blocked(world, store.x[id], nextY, feet, margin)) store.y[id] = nextY;
+  if (!blocked(world, store.x[id], nextY, feet, margin, keep)) store.y[id] = nextY;
 }
 
 /**
@@ -180,4 +189,35 @@ function walk(
   store.vy[id] = dirY * speed;
 
   slide(world, store, id, dirX * speed * dt, dirY * speed * dt, margin);
+}
+
+/**
+ * Andar a una velocidad propia, por el suelo y con la colision de siempre: es
+ * lo de los animales, que pasean cada uno a la suya. `keep` dice que puntos
+ * admite ademas —un animal no sale de los tiles de su bioma—, y lo que no
+ * admite estorba como una pared.
+ */
+export function walkAt(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dirX: number,
+  dirY: number,
+  speed: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  const len = Math.hypot(dirX, dirY);
+  if (len <= 1e-6 || speed <= 0) {
+    store.vx[id] = 0;
+    store.vy[id] = 0;
+    return;
+  }
+  const ux = dirX / len;
+  const uy = dirY / len;
+  store.facingX[id] = ux;
+  store.facingY[id] = uy;
+  store.vx[id] = ux * speed;
+  store.vy[id] = uy * speed;
+  slide(world, store, id, ux * speed * dt, uy * speed * dt, STEP_UP, keep);
 }

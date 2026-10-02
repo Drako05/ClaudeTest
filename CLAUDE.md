@@ -323,6 +323,7 @@ con fecha, o la leccion de un fallo que ya paso.
 | Barrido, estocada, escombros, esquirlas, o una medida de «se ve» | `docs/efectos.md` |
 | Aspas, sombras, tamanos, arboles y sus especies | `docs/arte.md` |
 | El relieve, el salto, el hambre | `docs/relieve.md` |
+| Los animales: especies, puntos de vida, botin, su paseo y su dibujo | `docs/fauna.md` |
 | El panel de desarrollo, las superposiciones, la reticula | `docs/devtools.md` |
 | Una comprobacion del humo, de los gestos o del barrido, la matriz de la CI | `docs/pruebas.md` |
 | Algo que viene del isometrico retirado (reglas 6, 7 y 16-20) | `docs/isometrico.md` |

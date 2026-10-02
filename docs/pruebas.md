@@ -12,7 +12,7 @@ un indice de estos documentos).
 **La CI va repartida** (`.github/workflows/ci.yml`): un trabajo para typecheck
 y tests, y una **matriz con una maquina por pasada del humo** —`desktop`,
 `resources`, `stations`, `mobile`, `devTools`, `life`, `relief`,
-`highRefresh`— mas los gestos y el barrido en pixeles (`slash`, que desde que
+`highRefresh`, `fauna`— mas los gestos y el barrido en pixeles (`slash`, que desde que
 corre aqui **falla** si la vista normal, la camara baja o la primera persona
 bajan de 20 pixeles aclarados, o la estocada de 500; los fallos que tuvo daban
 0, 2 y 13. La vista que gira cerca se mide pero no hace fallar: en la CI dio
@@ -28,9 +28,10 @@ se relanza sola desde GitHub («Re-run failed jobs»).
 
 `npm run smoke` construye el cliente y lo juega en Chromium headless leyendo el
 estado real por `window.__verdant`. Los tests unitarios no detectan que el juego
-no arranque; esto si. Hace ocho pasadas —escritorio, recursos (comer, sembrar,
-minar), estaciones (mesa, horno, fundir y ropa), movil con toques sinteticos,
-panel de desarrollo, muerte y noche, relieve, y pantalla de 144 Hz—; si tocas
+no arranque; esto si. Hace nueve pasadas —escritorio, recursos (comer, sembrar,
+minar), estaciones (mesa, horno, fundir, asar, comer carne y ropa), movil con
+toques sinteticos, panel de desarrollo, muerte y noche, relieve, pantalla de
+144 Hz y fauna (dibujo, paseo y caza)—; si tocas
 los controles, todas tienen que seguir
 pasando. Una sola se corre con `node tools/smoke.mjs <nombre>` tras `npm run
 build`, por ejemplo `node tools/smoke.mjs mobile`.

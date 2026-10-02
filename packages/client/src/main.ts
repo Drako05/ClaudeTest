@@ -29,6 +29,7 @@ import {
   MeshBasicMaterial,
 } from 'three';
 import {
+  animalHeight,
   BIOME_NAMES,
   CHUNK_SIZE,
   Feature,
@@ -47,6 +48,8 @@ import {
   lookVector,
   gazeTarget,
   groundHit,
+  periodOf,
+  WANDER_PERIOD_TICKS,
   sectorRays,
   STRIKE_RANGE,
   strikeOf,
@@ -64,6 +67,8 @@ import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
+import { FaunaView } from './fauna-view.js';
+import { animalPalette, faunaGallery } from './fauna-art.js';
 import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
 import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
@@ -264,9 +269,16 @@ const dev = new DevTools({
   // Lo justo para el hacha y el pico de piedra, o para toda la tanda 2: mesa,
   // horno, cinco lingotes de cobre, tres de hierro, un pico de cada metal, la
   // bolsa y la mochila (propuesta mia).
+  // Y para la fauna, lo de asar sin tener que cazar: carne cruda y carbon; el
+  // horno, de los de metal (propuesta mia).
   onKit: (kit) => {
     const bundle: Array<[Resource, number]> =
-      kit === 'metal'
+      kit === 'cocina'
+        ? [
+            [Resource.RawMeat, 6],
+            [Resource.Coal, 3],
+          ]
+        : kit === 'metal'
         ? [
             [Resource.Wood, 12],
             [Resource.Stone, 10],
@@ -378,6 +390,8 @@ pauseEl.addEventListener('pointerdown', (e) => {
 
 const billboards = new BillboardSet();
 const stations = new StationSet();
+/** La fauna que anda cerca del jugador (`fauna-view.ts`). */
+const faunaView = new FaunaView(scene);
 const player = billboards.spawnPlayer();
 if (player) scene.add(player);
 
@@ -618,11 +632,13 @@ function restart(): void {
   for (const [key, view] of views) dispose(key, view);
   effects.clear();
   overlays.reset();
+  faunaView.clear();
   state = startGame(seed, false, RADIUS);
   // Un mundo nuevo empieza sin nada: eso no es perder lo que se llevaba.
   feed.clear();
   feedBase = state.inventory.totals();
   gathered = 0;
+  animalsKilled = 0;
   jumps = 0;
   airPeak = 0;
   // Se reinicia con un clic o con R, que son gestos: se aprovecha para volver a
@@ -682,6 +698,8 @@ const tapSeq = new TapSequencer<Aim>(ACTION_REPEAT_TICKS);
  * talar un arbol se veria como que el arbol desaparece y ya.
  */
 let gathered = 0;
+/** Animales muertos en esta partida. Para la prueba de humo. */
+let animalsKilled = 0;
 
 function frame(now: number): void {
   const raw = (now - last) / 1000;
@@ -900,6 +918,17 @@ function frame(now: number): void {
         box ? box.z1 - box.z0 : 1,
       );
     }
+    // Un animal golpeado suelta esquirlas de sus colores, y al morir, su
+    // estallido, como lo que se rompe.
+    for (const hit of state.lastAnimalHits) {
+      const colors = animalPalette(hit.species);
+      if (hit.killed) {
+        animalsKilled++;
+        effects.spawnDebris(hit.x - 0.5, hit.y - 0.5, colors, hit.z);
+      } else {
+        effects.spawnChips(hit.x - 0.5, hit.y - 0.5, colors, hit.z, animalHeight(hit.species, hit.stage));
+      }
+    }
     for (const hit of state.lastHarvest) {
       // La rama de un arbol a mano no lo derriba: sus esquirlas ya salieron.
       if (!hit.felled) continue;
@@ -983,6 +1012,10 @@ function frame(now: number): void {
       (tx, ty) => hitboxAt(state.world, tx, ty),
     ),
   );
+  // La fauna, volteada segun ande hacia la derecha o la izquierda de la
+  // pantalla: la derecha de la camara, en el suelo.
+  const camRight = new Vector3().setFromMatrixColumn(camera.active.matrixWorld, 0);
+  faunaView.update(state.fauna, state.entities, camRight.x, camRight.z);
   if (player) {
     billboards.moveTo(player, px, ph, py);
     // Desde dentro no se dibuja el cuerpo: en primera persona, y cuando la
@@ -1099,6 +1132,36 @@ Object.defineProperty(window, '__verdant', {
       trunks: billboards.trunks,
       /** La copa de cada especie, medida del dibujo, junto a la de su especie real. */
       crowns: billboards.crowns,
+      /**
+       * La fauna: los animales materializados (posicion, especie, etapa y PV),
+       * cuantos hay en la escena, cuantos sprites se han colocado, los muertos
+       * de esta partida, y lo que mide cada dibujo junto a su caja de golpe.
+       */
+      fauna: [...state.fauna].map(([key, a]) => ({
+        key,
+        id: a,
+        species: e.animal[a]?.species ?? -1,
+        stage: e.animal[a]?.stage ?? -1,
+        x: e.x[a],
+        y: e.y[a],
+        z: e.z[a],
+        health: e.health[a],
+        maxHealth: e.maxHealth[a],
+        /** Si anda ahora; parado, esta en su punto de paso. */
+        moving: Math.hypot(e.vx[a], e.vy[a]) > 0,
+        /** Ticks que le quedan a su periodo de paseo: lo que tardara en irse. */
+        calm: (() => {
+          const animal = e.animal[a];
+          if (!animal) return 0;
+          return (periodOf(animal, state.tick) + 1) * WANDER_PERIOD_TICKS - (state.tick + animal.phase);
+        })(),
+      })),
+      faunaInScene: faunaView.count,
+      faunaDrawn: faunaView.drawnTotal,
+      animalsKilled,
+      faunaSizes: faunaView.sizes,
+      /** Las diez especies en sus tres etapas, en un lienzo: para mirar el dibujo. */
+      faunaGallery: () => faunaGallery(),
       facing: [e.facingX[id], e.facingY[id]],
       /** Hacia donde mira la camara, que es de donde sale la mirada. */
       aim: [camera.forward().x, camera.forward().y],

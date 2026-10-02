@@ -20,6 +20,7 @@ import {
   WorkState,
   type Blocked,
   type HarvestResult,
+  type AnimalHit,
   type Hit,
   type Opened,
   type Placed,
@@ -27,6 +28,7 @@ import {
 } from './systems/gathering.js';
 import { Inventory } from './inventory.js';
 import { toChunkCoord, World } from './world.js';
+import { settleFauna, stepFauna, syncFauna, type FaunaIndex } from './systems/wander.js';
 
 /** Radio de chunks mantenidos cargados alrededor del jugador. */
 export const STREAM_RADIUS_CHUNKS = 3;
@@ -78,6 +80,10 @@ export interface GameState {
    * o no.
    */
   survivalFrozen: boolean;
+  /** La fauna materializada cerca del jugador, por la clave de cada animal. */
+  readonly fauna: FaunaIndex;
+  /** Lo que golpeo el ultimo golpe en animales vivos, y los que mato. */
+  lastAnimalHits: AnimalHit[];
 }
 
 /**
@@ -115,6 +121,8 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     streamCx: Number.NaN,
     streamCy: Number.NaN,
     survivalFrozen: false,
+    fauna: new Map(),
+    lastAnimalHits: [],
   };
 
   streamChunks(state);
@@ -135,6 +143,7 @@ function streamChunks(state: GameState): void {
   const wy = cy * CHUNK_SIZE;
   world.ensureAround(wx, wy, STREAM_RADIUS_CHUNKS);
   world.pruneFar(wx, wy, PRUNE_RADIUS_CHUNKS);
+  syncFauna(world, entities, state.fauna, entities.x[playerId], entities.y[playerId], state.tick);
 }
 
 /** Avanza la simulacion exactamente un tick. */
@@ -148,10 +157,13 @@ export function step(state: GameState, intent: Intent): void {
   state.lastBlocked = null;
   state.lastBroke = false;
   state.lastCrafted = -1;
+  state.lastAnimalHits = [];
 
   // El tiempo avanza antes que nada: el resto del tick actua sobre el mundo tal
   // y como esta AHORA, con la vegetacion ya puesta al dia.
   world.setNow(state.tick);
+  // Y la fauna da su paso: el golpe del jugador la encuentra donde esta ahora.
+  stepFauna(world, entities, state.fauna, state.tick);
 
   if (entities.alive[playerId]) {
     // En el suelo y en el aire se anda igual; lo unico que cambia es el margen
@@ -211,11 +223,19 @@ export function step(state: GameState, intent: Intent): void {
         state.tick,
         state.work,
         intent.precise,
+        state.fauna.values(),
       );
       state.lastHarvest = swing.results;
       state.lastHits = swing.hits;
       state.lastBlocked = swing.blocked;
       state.lastBroke = swing.broke;
+      state.lastAnimalHits = swing.animals;
+      // Lo que murio deja de ser una entidad: su muerte ya esta en el overlay.
+      for (const hit of swing.animals) {
+        if (!hit.killed) continue;
+        entities.despawn(hit.id);
+        state.fauna.delete(hit.key);
+      }
     }
     if (intent.use) {
       state.lastUsed = tryUse(world, entities, playerId, inventory, {
@@ -263,4 +283,8 @@ export function skipTime(state: GameState, ticks: number): void {
     if (!state.survivalFrozen) updateSurvival(state.entities, state.playerId, TICK_DT);
     state.tick++;
   }
+  // La fauna no se anda tick a tick —un dia saltado serian millones de pasos—:
+  // queda donde la encontraria quien no la miro, en su punto de paso del
+  // periodo en curso (`settleFauna`), que es donde la pone cargar su chunk.
+  settleFauna(state.world, state.entities, state.fauna, state.tick);
 }

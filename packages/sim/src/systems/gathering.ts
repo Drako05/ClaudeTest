@@ -8,8 +8,15 @@
  */
 
 import {
+  animalHalf,
+  animalHeight,
+  animalLoot,
   BALANCED_HARVEST_BONUS,
   biomeOfTerrain,
+  foodValue,
+  Species,
+  Stage,
+  strikeDamage,
   DAY_TICKS,
   densityOfKind,
   Feature,
@@ -39,8 +46,12 @@ import {
   aimSurface,
   EYE_HEIGHT,
   gazeTarget,
+  groundHit,
+  lookVector,
   plantTile,
+  rayBox,
   strike,
+  STRIKE_RANGE,
   type Hitbox,
   type Offset,
   type Strike,
@@ -56,8 +67,8 @@ import { facingToward, stationNear } from '../stations.js';
 import { toChunkCoord, type World } from '../world.js';
 import { BODY_RADIUS } from './movement.js';
 
+/** Cuanto se come de una vez: una unidad. Lo que llena, `foodValue`. */
 export const BERRIES_PER_MEAL = 1;
-export const HUNGER_PER_BERRY = 14;
 
 export interface HarvestResult {
   /**
@@ -278,6 +289,112 @@ export interface Swing {
   blocked: Blocked | null;
   /** True si la herramienta de la mano se rompio con este golpe. */
   broke: boolean;
+  /** Los animales que alcanzo, y si murieron. */
+  animals: AnimalHit[];
+}
+
+/** Un animal alcanzado por un golpe. */
+export interface AnimalHit {
+  /** La entidad que era. Si murio, ya no lo es: `step` la retira. */
+  id: number;
+  key: string;
+  species: Species;
+  stage: Stage;
+  x: number;
+  y: number;
+  z: number;
+  /** Los PV que le quedan, 0 si murio. */
+  health: number;
+  killed: boolean;
+}
+
+/**
+ * La caja de golpe de un animal: vertical, centrada en el y apoyada en sus
+ * pies, con el medio ancho y el alto de su especie y su etapa.
+ */
+export function animalBox(store: EntityStore, id: number): Hitbox | null {
+  const animal = store.animal[id];
+  if (!animal || !store.alive[id]) return null;
+  const half = animalHalf(animal.species, animal.stage);
+  const height = animalHeight(animal.species, animal.stage);
+  const x = store.x[id];
+  const y = store.y[id];
+  const z0 = store.z[id];
+  return { x0: x - half, x1: x + half, y0: y - half, y1: y + half, z0, z1: z0 + height };
+}
+
+/**
+ * Los animales que alcanza un golpe, cada uno con la distancia desde los ojos.
+ * En barrido, todos los que cruza algun rayo del sector ya cortado por el
+ * terreno; en preciso, solo el rayo central, cortado igual.
+ */
+function animalsInReach(
+  world: World,
+  store: EntityStore,
+  id: number,
+  animals: Iterable<number>,
+  precise: boolean,
+): Array<{ id: number; t: number }> {
+  const origin = eyeOf(store, id);
+  const rays = precise
+    ? (() => {
+        const dir = lookVector(store.facingX[id], store.facingY[id], store.lookZ[id]);
+        const hit = groundHit(origin, dir, STRIKE_RANGE, (x, y) => world.groundHeightAt(x, y));
+        return [{ dir, length: hit ? hit.t : STRIKE_RANGE }];
+      })()
+    : strikeOf(world, store, id).rays;
+  const out: Array<{ id: number; t: number }> = [];
+  for (const a of animals) {
+    const reach = STRIKE_RANGE + 2;
+    if (Math.abs(store.x[a] - origin.x) > reach || Math.abs(store.y[a] - origin.y) > reach) continue;
+    const box = animalBox(store, a);
+    if (!box) continue;
+    let best = Infinity;
+    for (const ray of rays) {
+      const t = rayBox(origin, ray.dir, box, ray.length);
+      if (t !== null && t < best) best = t;
+    }
+    if (best < Infinity) out.push({ id: a, t: best });
+  }
+  out.sort((p, q) => p.t - q.t);
+  return out;
+}
+
+/**
+ * Un golpe a un animal: le quita el daño de lo que se lleva en la mano
+ * (`strikeDamage`) y, si llega a cero, suelta su botin y muere para siempre.
+ * **Un botin entra entero o no entra**, como en la recoleccion: si no cabe, el
+ * golpe que lo mataria no completa y el animal sigue con su daño.
+ */
+function hitAnimal(
+  world: World,
+  store: EntityStore,
+  a: number,
+  inventory: Inventory,
+  damage: number,
+): AnimalHit | 'full' {
+  const animal = store.animal[a]!;
+  const left = store.health[a] - damage;
+  const base = {
+    id: a,
+    key: animal.key,
+    species: animal.species,
+    stage: animal.stage,
+    x: store.x[a],
+    y: store.y[a],
+    z: store.z[a],
+  };
+  if (left > 0) {
+    store.health[a] = left;
+    world.setFaunaDamage(animal.key, store.maxHealth[a] - left);
+    return { ...base, health: left, killed: false };
+  }
+  const loot = animalLoot(animal.species, animal.stage);
+  if (!inventory.fits(loot)) return 'full';
+  for (const b of loot) inventory.add(b.item, b.count);
+  store.health[a] = 0;
+  world.killFauna(animal.key);
+  return { ...base, health: 0, killed: true };
 }
 
 /**
@@ -300,13 +417,40 @@ export function tryHarvestArea(
   tick: number,
   work: WorkState,
   precise = false,
+  animals: Iterable<number> = [],
 ): Swing {
-  const swing: Swing = { results: [], hits: [], blocked: null, broke: false };
+  const swing: Swing = { results: [], hits: [], blocked: null, broke: false, animals: [] };
   const held = inventory.held();
   const stats = held === null ? null : toolStats(held);
   let useful = false;
 
-  for (const { x, y } of precise ? preciseReach(world, store, id) : actionReach(world, store, id)) {
+  // Los animales, con el mismo golpe (regla 12). En preciso solo cuenta el
+  // primer objetivo de la mira, sea un animal o un objeto del mundo.
+  const beasts = animalsInReach(world, store, id, animals, precise);
+  let tiles = precise ? preciseReach(world, store, id) : actionReach(world, store, id);
+  if (precise && beasts.length > 0) {
+    const tile = preciseTarget(world, store, id);
+    if (tile && tile.t < beasts[0].t) beasts.length = 0;
+    else tiles = [];
+    beasts.length = Math.min(beasts.length, 1);
+  }
+  for (const { id: a } of beasts) {
+    const hit = hitAnimal(world, store, a, inventory, strikeDamage(stats));
+    if (hit === 'full') {
+      swing.blocked = 'full';
+      const animal = store.animal[a]!;
+      swing.animals.push({
+        id: a, key: animal.key, species: animal.species, stage: animal.stage,
+        x: store.x[a], y: store.y[a], z: store.z[a], health: store.health[a], killed: false,
+      });
+    } else {
+      swing.animals.push(hit);
+    }
+    // Golpear un animal con una herramienta la gasta, sea la que sea.
+    if (stats) useful = true;
+  }
+
+  for (const { x, y } of tiles) {
     const feature = world.featureAt(x, y);
     const need = workOf(feature);
     if (!need) continue;
@@ -540,7 +684,8 @@ export function tryUse(
     return 'opened';
   }
   const item = inventory.inHand();
-  if (item === Resource.Berries) return tryEat(store, id, inventory) ? 'ate' : null;
+  // Lo que se come: las bayas y la carne asada (`foodValue`).
+  if (item !== null && foodValue(item) > 0) return tryEat(store, id, inventory, item) ? 'ate' : null;
   if (item === Resource.TreeSeed || item === Resource.PlantSeed) {
     return tryPlant(world, store, id, inventory, item) ? 'planted' : null;
   }
@@ -660,11 +805,21 @@ export function tryPlant(
   return null;
 }
 
-/** Come bayas del inventario si hay y si hace falta. Devuelve true si comio. */
-export function tryEat(store: EntityStore, id: number, inventory: Inventory): boolean {
-  if (inventory.count(Resource.Berries) < BERRIES_PER_MEAL) return false;
+/**
+ * Come una racion de algo del inventario —bayas, por defecto, o carne asada—
+ * si hay y si hace falta. Llena lo que diga `foodValue`. Devuelve true si comio.
+ */
+export function tryEat(
+  store: EntityStore,
+  id: number,
+  inventory: Inventory,
+  item: Resource = Resource.Berries,
+): boolean {
+  const food = foodValue(item);
+  if (food <= 0) return false;
+  if (inventory.count(item) < BERRIES_PER_MEAL) return false;
   if (store.hunger[id] >= 100) return false;
-  inventory.remove(Resource.Berries, BERRIES_PER_MEAL);
-  store.hunger[id] = Math.min(100, store.hunger[id] + HUNGER_PER_BERRY * BERRIES_PER_MEAL);
+  inventory.remove(item, BERRIES_PER_MEAL);
+  store.hunger[id] = Math.min(100, store.hunger[id] + food * BERRIES_PER_MEAL);
   return true;
 }
