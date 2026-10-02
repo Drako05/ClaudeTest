@@ -52,7 +52,7 @@ import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
 import { NO_RAMP } from '../relief.js';
 import { hash2DFloat } from '../rng.js';
-import { stationNear } from '../stations.js';
+import { facingToward, stationNear } from '../stations.js';
 import { toChunkCoord, type World } from '../world.js';
 import { BODY_RADIUS } from './movement.js';
 
@@ -603,6 +603,8 @@ export function tryPlace(world: World, store: EntityStore, id: number, inventory
   if (touches) return null;
   inventory.spendInHand();
   world.setFeature(x, y, feature);
+  // Su cara principal, hacia quien la pone (pedido del autor, 2026-10-02).
+  world.setStationFacing(x, y, facingToward(x, y, px, py));
   return { x, y, z: Math.max(at.z, world.groundHeightAt(x + 0.5, y + 0.5)) };
 }
 

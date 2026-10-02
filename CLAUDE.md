@@ -781,9 +781,14 @@ muesca mueve en el acto la luz de la seleccion, sin destello aparte ni espera,
 pedido del autor, 2026-10-01), R empieza un mundo nuevo, **+ y - acercan y
 alejan** —solo ellas: la rueda dejo de hacer zoom el 2026-09-29, decision del
 autor—, y P cambia de proyeccion. **Esc con el inventario abierto lo cierra**
-sin pausar. **TAB cambia el modo de golpe** (barrido o preciso) y **CTRL
-mantenido suelta el raton** para pulsar botones sin pausar (las dos, del autor,
-2026-09-30). **Clic izquierdo golpea y clic derecho usa** lo que se
+sin pausar. **TAB cambia el modo de golpe** (barrido o preciso, del autor,
+2026-09-30). **I abre la informacion y B el panel del bioma** (2026-10-02).
+**Cada boton de PC tiene su tecla y la lleva escrita** en su esquina de abajo
+a la izquierda (pedido del autor, 2026-10-02): el ojo P, la informacion I, el
+bioma B, MODO TAB e INVENTARIO E; solo en PC. Los botones de los dialogos
+(«Reiniciar», «Cancelar», «Tirar») no la llevan (deduccion mia). CTRL soltaba
+el raton para pulsar botones hasta el 2026-10-02, y el autor lo retiro.
+**Clic izquierdo golpea y clic derecho usa** lo que se
 lleva en la mano: una baya se come, una semilla se siembra. **Con el inventario
 abierto no se golpea ni se usa**: solo se anda (y se salta, deduccion mia).
 Los controles se leen dentro del boton de informacion (i). Comer (E), sembrar
@@ -811,10 +816,18 @@ arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
 - **Pausa el cursor que suelta el jugador**, no el que suelta el juego. El Esc
   del jugador en pleno juego para el tiempo (escala cero, como la pausa del
   panel de desarrollo), con el aviso «Juego en pausa». **Arranca asi**: el
-  navegador exige un clic para capturar. Con el cursor suelto se pulsan los
-  botones (ojo, HUD, inventario, barra del angulo).
+  navegador exige un clic para capturar. **En pausa no responde nada hasta
+  reanudar** (pedido del autor, 2026-10-02): un escudo a pantalla completa
+  (`#pause`) se traga los punteros —un clic encima de un boton reanuda y no
+  lo pulsa— y un oyente en captura se traga las teclas y la rueda, F3
+  incluida; las teclas que se sueltan pasan, para que no se queden pegadas.
+  El oyente sigue **al escudo visible**, no a `MouseLook.paused`: muerto no
+  se pinta la pausa, y bloqueando por el estado interno se tragaba la R del
+  mundo nuevo (lo cazo el humo de la muerte).
+  Los botones se pulsan con el cursor suelto por el juego (inventario, panel
+  de desarrollo), no en pausa.
 - **El cursor que suelta el juego no pausa** (`MouseLook.free`): el
-  inventario, el panel de desarrollo, CTRL mantenido y la muerte. Al cerrarlos
+  inventario, el panel de desarrollo y la muerte. Al cerrarlos
   se intenta capturar; si el navegador no deja, **se sigue jugando** con el
   cursor suelto —se anda, pero el raton no gira la vista— hasta el primer
   clic, que captura sin golpear.
@@ -823,17 +836,19 @@ arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
   que distinguir. **Esc no reanuda**, y no por gusto: Chrome no cuenta Esc
   como gesto para volver a capturar el cursor, porque es la salida de
   emergencia del jugador. El autor eligio que solo el clic reanude.
-- **Esc con el inventario abierto lo cierra sin pausar, y NO pide capturar
-  el cursor**: queda suelto por el juego (`free`) hasta el primer clic, que
-  captura sin golpear. Dos intentos fallaron antes. Primero se recapturaba
-  dando por hecho que Chrome dejaba, y el autor vio la pausa (2026-09-30).
-  Luego se dio por hecho lo contrario, que Chrome NO deja, y se probo
-  forzando ese fallo; el autor la vio otra vez (2026-10-01). Hipotesis mia:
-  con la activacion de la tecla, Chrome concede la captura y su propio Esc
-  la suelta como si fuera el jugador. Sea cual sea, **no pedir algo sujeto a
-  las politicas del navegador desde un Esc** no depende de como lo resuelva.
-  El humo espia `requestPointerLock` y exige cero llamadas al cerrar con Esc
-  (escape 14). Cerrar con E o con el boton si pide capturar.
+- **Esc con el inventario abierto lo cierra sin pausar y captura el cursor
+  como E** (pedido del autor, 2026-10-02), pero **la captura se pide al
+  SOLTAR la tecla y con red** (`captureSoft`): si el navegador la suelta en
+  menos de `SOFT_GRACE_MS` (1 s, deduccion mia), no fue el jugador y no
+  pausa; el cursor queda suelto por el juego hasta el primer clic, que
+  captura sin golpear. Tres intentos llevo. Primero se recapturaba al
+  apoyar Esc y el autor vio la pausa (2026-09-30); luego se dio por hecho
+  que Chrome no dejaba y se probo forzando ese fallo, y la vio otra vez
+  (2026-10-01); despues se dejo de pedir (escape 14), y el autor la queria.
+  Hipotesis mia, que solo su Chrome confirma: la tecla apoyada soltaba la
+  captura recien concedida. El humo espia `requestPointerLock` (cero
+  llamadas con Esc apoyado, una al soltarlo) y prueba la red soltando la
+  captura en el instante en que llega.
 - **El menu del navegador no sale nunca**: `contextmenu` se anula en todo el
   documento. Con solo el lienzo, el clic derecho que abre una estacion dejaba
   caer el suyo sobre el panel recien abierto bajo el cursor.
@@ -929,8 +944,9 @@ CSS `--above-vitals`.
 
 **El HUD y el inventario arrancan cerrados**, tambien decision suya. El HUD
 (hora, dia, semilla, posicion, FPS y, en PC, los controles) se abre con su
-boton —arriba a la izquierda en PC, dentro de OTROS en el movil— y **no tiene
-tecla**; el inventario, con **E** o el boton INVENTARIO. Cerrados no se escriben: el
+boton —arriba a la izquierda en PC, dentro de OTROS en el movil— o con **I**
+(desde el 2026-10-02; antes no tenia tecla); el inventario, con **E** o el boton
+INVENTARIO. Cerrados no se escriben: el
 DOM se refresca diez veces por segundo y no hay por que pagarlo por lo que no
 se ve.
 
@@ -954,9 +970,13 @@ que tiene fuga, y entrecerrado en ortografica, que lo aplana todo. Lo eligio asi
 el autor entre tres opciones; el simbolo cuenta la diferencia en vez de limitarse
 a senalar que hay un interruptor.
 
-**La vista de arranque es la perspectiva**, que es la que el autor eligio para el
-juego final tras probar las dos en su telefono. El interruptor se queda porque la
-ortografica conserva el aspecto plano del isometrico y sirve para comparar.
+**La vista de arranque es la primera persona** (decision del autor,
+2026-10-02). Fue la perspectiva, que eligio para el juego final tras probar
+perspectiva y ortografica en su telefono, antes de que existiera la primera
+persona. `?view=perspectiva|orto|primera` arranca en otra (`start.ts`): las
+pruebas que dependen de la vista la fijan asi —el humo, los gestos, `slash` y
+`shots` abren en perspectiva— y el humo mide aparte que sin el parametro se
+arranca en primera persona.
 
 **El ojo recorre tres vistas: perspectiva → isometrica → primera persona**, con
 el boton o con P. La primera persona la pidio el autor despues, con estas
@@ -1154,9 +1174,12 @@ Decisiones del autor, que no se tocan sin preguntarle:
   `lastBlocked`, pero nadie lo pinta. Fabricar sin sitio se resolvera en otra
   tanda, con objetos que se tiran al suelo.
 - **Lo que entra y sale del inventario sale escrito**: «+5 Madera», «-1
-  Bayas», en letra pequena debajo del boton INVENTARIO en el movil y abajo a la
-  derecha en PC. Cada linea sube despacio mientras se desvanece, las nuevas
-  van debajo y **nunca hay mas de cinco**: al llegar la quinta, la mas vieja se
+  Bayas», en letra pequena debajo del boton INVENTARIO en el movil, subiendo
+  hacia el, y **en PC encima de ese boton, bajando hacia el** (pedido del
+  autor, 2026-10-02; antes, abajo a la derecha): cada linea se desliza
+  despacio mientras se desvanece, la mas vieja la mas cerca del boton (en
+  PC, que las nuevas vayan encima es deduccion mia, por simetria) y **nunca
+  hay mas de cinco**: al llegar la quinta, la mas vieja se
   apaga deprisa (todo eso, del autor; tiempos y medidas, mios). La logica es
   pura (`pickup-feed.ts`, con sus tests) y sale de **comparar los totales**
   frame a frame, la misma cuenta que el registro del panel de desarrollo, que
@@ -1171,8 +1194,11 @@ Decisiones del autor, que no se tocan sin preguntarle:
 - **La roca a mano no da nada**: la primera piedra son **guijarros** sueltos
   en el suelo, una feature inerte y finita que no estorba el paso.
 - Lo basico se fabrica a mano en cualquier sitio; lo mejor, en la **mesa de
-  trabajo** o el **horno** (tanda 2). Se colocan con USAR, son **cajas**, no
-  aspas, estorban el paso y se desmontan a mano en 3 golpes. **Sus recetas no
+  trabajo** o el **horno** (tanda 2). Se colocan con USAR **con su cara
+  principal hacia quien las pone** (pedido del autor, 2026-10-02: el lado de
+  su casilla que da al jugador, `facingToward`; lo guarda el nucleo en
+  `World.stationFacingAt`, fuera del chunk como el overlay, y desmontarla lo
+  borra), son **cajas**, no aspas, estorban el paso y se desmontan a mano en 3 golpes. **Sus recetas no
   salen con E**: USAR mirando la estacion abre el mismo panel con las suyas, y
   se cierra cuando **su cara** queda mas lejos que el alcance, para todas
   las estaciones sea cual sea su forma, y **la distancia de cierre es siempre
@@ -1231,8 +1257,15 @@ Lo que el codigo tiene que respetar:
   **En PC** (pedido del autor, 2026-10-01): la lista de recetas mide **cuatro
   recetas exactas**, asi que la mesa con sus cuatro herramientas no saca la
   barra; 44 px entre columnas, 32 a los lados, titulos de 15 px y 14 de ellos
-  a su rejilla (numeros mios). **La rejilla no repite la luz de la barra**: la
-  casilla elegida solo se ilumina en la barra de la mano.
+  a su rejilla (numeros mios). Y **mide eso siempre**, haya las recetas que
+  haya (2026-10-02): el panel no cambia de tamano entre E, la mesa y el
+  horno, y el humo compara los tres al pixel. **La rejilla no repite la luz
+  de la barra**: la casilla elegida solo se ilumina en la barra de la mano.
+- **Los botones del juego no toman el foco con el raton** (`mousedown` con
+  `preventDefault` en `main.ts`). Con el foco, una tecla despues de un clic
+  encendia `:focus-visible` y Chrome pintaba su contorno blanco: el autor lo
+  vio en la casilla de la barra tocada con el inventario abierto, al cerrarlo
+  con E (2026-10-02). Y Espacio o Intro habrian vuelto a pulsar ese boton.
 - **En el movil, un toque fuera del inventario lo cierra, y solo eso**
   (decision del autor, 2026-10-01): se escucha en captura y se traga ese dedo
   entero —ni gira la camara, ni ataca, ni pulsa el boton que hubiera debajo—.

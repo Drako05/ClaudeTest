@@ -74,7 +74,7 @@ import { InventoryUi } from './inventory-ui.js';
 import { MouseLook } from './pointer-lock.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
-import { inventoryDelta, opacityOf, PickupFeed, riseOf } from './pickup-feed.js';
+import { aboveButtonY, inventoryDelta, opacityOf, PickupFeed, riseOf } from './pickup-feed.js';
 import {
   berrySpot,
   cliffSpot,
@@ -85,7 +85,7 @@ import {
   stoneOreSpot,
 } from './probes.js';
 import { skyTint, tintCss } from './sky.js';
-import { randomSeed, seedFromLocation, startGame, writeSeedToLocation } from './start.js';
+import { randomSeed, seedFromLocation, startGame, viewFromLocation, writeSeedToLocation } from './start.js';
 
 /** Radio de chunks que se mallan alrededor del jugador. */
 const RADIUS = 3;
@@ -120,6 +120,8 @@ let state: GameState = startGame(seed, true, RADIUS);
 const hud = new Hud(() => state);
 
 const camera = new OrbitCamera();
+const startView = viewFromLocation();
+if (startView) camera.projection = startView;
 const controls = new Controls(
   canvas,
   document.getElementById('stick'),
@@ -136,7 +138,7 @@ const controls = new Controls(
  * tiene tecla anunciada en ninguna parte.
  *
  * Pintar y cambiar van separados **porque el boton tiene que arrancar
- * sincronizado**: la vista de salida es la perspectiva, y llamar al interruptor
+ * sincronizado**: la vista de salida es la primera persona, y llamar al interruptor
  * para poner el icono en su sitio la voltearia al primer frame.
  */
 /** Como se anuncia cada vista, y a cual lleva tocar el ojo. */
@@ -205,13 +207,25 @@ const overlays = new Overlays(scene);
  */
 const feed = new PickupFeed();
 const feedEl = document.getElementById('pickupFeed') as HTMLElement;
+const invButton = document.getElementById('invOpen') as HTMLElement;
+/** En PC, lo que separa la linea mas baja del boton INVENTARIO. Mio. */
+const FEED_GAP = 6;
 const feedEls = new Map<number, HTMLElement>();
 let feedBase = state.inventory.totals();
 
 function drawFeed(): void {
   // En el movil cuelga del boton INVENTARIO y sube hacia el; en PC se apoya
-  // en la franja de salud y hambre y sube desde ahi.
+  // encima de ese mismo boton y baja hacia el (pedido del autor, 2026-10-02).
   const fromTop = document.body.classList.contains('touch-active');
+  if (fromTop) {
+    feedEl.classList.remove('overButton');
+    feedEl.style.left = feedEl.style.top = '';
+  } else if (feed.lines.length > 0) {
+    const r = invButton.getBoundingClientRect();
+    feedEl.classList.add('overButton');
+    feedEl.style.left = `${(r.left + r.width / 2).toFixed(1)}px`;
+    feedEl.style.top = `${(r.top - FEED_GAP).toFixed(1)}px`;
+  }
   const alive = new Set<number>();
   for (const line of feed.lines) {
     alive.add(line.id);
@@ -223,8 +237,9 @@ function drawFeed(): void {
       feedEl.appendChild(el);
       feedEls.set(line.id, el);
     }
-    const y = fromTop ? line.fromTop - riseOf(line) : -(line.fromBottom + riseOf(line));
-    el.style.transform = `translateY(${y.toFixed(1)}px)`;
+    el.style.transform = fromTop
+      ? `translateY(${(line.fromTop - riseOf(line)).toFixed(1)}px)`
+      : `translate(-50%, ${aboveButtonY(line).toFixed(1)}px)`;
     el.style.opacity = opacityOf(line).toFixed(3);
   }
   for (const [id, el] of feedEls) {
@@ -286,30 +301,31 @@ const items = new InventoryUi(() => state);
  */
 const mouseLook = new MouseLook(canvas, () => dev.active || items.open);
 controls.mouseLook = mouseLook;
-/** El inventario se esta cerrando con Esc: no se pide capturar el cursor. */
+/** El inventario se esta cerrando con Esc: la captura espera a soltar la tecla. */
 let closingByEsc = false;
+/** Ese Esc aun no se ha soltado. */
+let escToCapture = false;
 window.addEventListener('keydown', (e) => {
-  // Esc con el inventario abierto lo cierra, sin pausar (pedido del autor), y
-  // **no pide capturar el cursor**: se queda suelto por el juego, que no pausa
-  // (`pointer-lock.ts`), y el primer clic lo captura sin golpear. Lo pedia, y en
-  // el Chrome del autor acababa en pausa aunque el headless no lo hiciera
-  // (escape 14): mejor no pedir nada sujeto a sus politicas sin un gesto claro.
+  // Esc con el inventario abierto lo cierra, sin pausar, y captura el cursor
+  // como E (pedidos del autor, 2026-09-30 y 2026-10-02). Pero la captura se
+  // pide al SOLTAR la tecla y con red (`captureSoft`): pedida con Esc apoyado,
+  // el Chrome del autor la soltaba y el juego se pausaba (escapes 11 y 14).
   if (e.code === 'Escape' && items.open) {
     closingByEsc = true;
     items.toggle();
     closingByEsc = false;
+    escToCapture = true;
     return;
   }
   if (e.code !== 'F3') return;
   if (dev.active) mouseLook.release();
   else if (!items.open) mouseLook.capture();
 });
-// CTRL mantenido suelta el cursor para pulsar botones, sin pausar (decision del
-// autor, 2026-09-30); al soltarlo se intenta capturar otra vez.
-controls.onFreeCursor = (held) => {
-  if (held) mouseLook.release();
-  else if (!dev.active && !items.open) mouseLook.capture();
-};
+window.addEventListener('keyup', (e) => {
+  if (e.code !== 'Escape' || !escToCapture) return;
+  escToCapture = false;
+  if (!dev.active && !items.open) mouseLook.captureSoft();
+});
 items.onToggle = (open) => {
   if (open) mouseLook.release();
   else if (!dev.active && !closingByEsc) mouseLook.capture();
@@ -317,6 +333,41 @@ items.onToggle = (open) => {
 const pauseEl = document.getElementById('pause') as HTMLElement;
 const pauseHint = document.getElementById('pauseHint') as HTMLElement;
 let everLocked = false;
+/**
+ * En pausa no responde nada hasta reanudar (pedido del autor, 2026-10-02): ni
+ * teclas, ni rueda, ni botones. Los punteros se los traga el escudo de la
+ * pausa (`#pause`, por encima de todo), y un clic en el captura el cursor y
+ * reanuda, sin golpear. Las teclas se paran aqui, en captura sobre `window`,
+ * antes que cualquier otro oyente; las que se SUELTAN pasan, para que una
+ * tecla mantenida al pausar no se quede pegada.
+ */
+for (const type of ['keydown', 'keypress', 'wheel'] as const) {
+  window.addEventListener(
+    type,
+    (e) => {
+      // El escudo visible manda: muerto no se pinta la pausa, y la R y
+      // «Reiniciar» tienen que seguir respondiendo.
+      if (!pauseEl.classList.contains('show')) return;
+      e.stopImmediatePropagation();
+      if (e.cancelable) e.preventDefault();
+    },
+    { capture: true, passive: false },
+  );
+}
+/**
+ * Los botones del juego no toman el foco con el raton. Con el foco, una tecla
+ * despues de un clic encendia `:focus-visible` y Chrome pintaba su contorno
+ * blanco: el autor lo vio en la casilla de la barra que habia tocado con el
+ * inventario abierto, al cerrarlo con E (2026-10-02). Y Espacio o Intro
+ * habrian vuelto a «pulsar» ese boton. El clic sigue llegando igual.
+ */
+document.addEventListener('mousedown', (e) => {
+  if (e.target instanceof Element && e.target.closest('button')) e.preventDefault();
+});
+pauseEl.addEventListener('pointerdown', (e) => {
+  e.preventDefault();
+  if (e.pointerType === 'mouse' && e.button === 0) mouseLook.capture();
+});
 
 const billboards = new BillboardSet();
 const stations = new StationSet();
@@ -482,7 +533,7 @@ function buildChunk(cx: number, cy: number): ChunkView {
       const ground = state.world.groundHeightAt(x, y);
       // Las estaciones son cajas, no aspas (decision del autor).
       if (isStation(feature)) {
-        const box = stations.spawn(feature, wx, wy, ground, seed);
+        const box = stations.spawn(feature, wx, wy, ground, seed, state.world.stationFacingAt(wx, wy));
         if (box) {
           scene.add(box);
           props.push(box);
@@ -995,7 +1046,7 @@ Object.defineProperty(window, '__verdant', {
       /** El raton capturado de PC y la pausa que trae soltarlo. */
       paused: mouseLook.paused,
       pointerLocked: mouseLook.locked,
-      /** Cursor suelto por el juego (inventario, CTRL), sin pausa. */
+      /** Cursor suelto por el juego (inventario, panel, muerte), sin pausa. */
       cursorFree: mouseLook.freed,
       /** Golpe en modo preciso (TAB o el boton MODO). */
       precise: controls.precise,
@@ -1095,7 +1146,12 @@ Object.defineProperty(window, '__verdant', {
       /** Estaciones mandadas a la escena. Acumulado. */
       stationsDrawn: stations.drawn,
       /** Las estaciones a 5 casillas o menos del jugador: casilla y feature. */
-      stationTiles: stationTilesAround(state, 5),
+      /** Las estaciones de alrededor, con el frente que guarda el nucleo y el dibujado. */
+      stationTiles: stationTilesAround(state, 5).map((t) => ({
+        ...t,
+        facing: state.world.stationFacingAt(t.x, t.y),
+        turn: stations.turns.get(`${t.x},${t.y}`) ?? null,
+      })),
       selectedSlot: state.inventory.selected,
       itemsSent: { ...items.sent },
       /** Casillas iluminadas al paso de la rueda, en orden. Acumulado. */

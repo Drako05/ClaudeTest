@@ -18,7 +18,7 @@ page.on('pageerror', (e) => problems.push(String(e)));
 // Con el panel de desarrollo abierto (`dev=1`): el cursor queda libre y sin
 // pausa, asi que arrastrar gira la camara y el ojo se puede pulsar. Sin el, el
 // primer clic captura el cursor (`pointer-lock.ts`) y el ojo ya no se alcanza.
-await page.goto(`http://127.0.0.1:${port}/?seed=12345&dev=1`, { waitUntil: 'load' });
+await page.goto(`http://127.0.0.1:${port}/?seed=12345&dev=1&view=perspectiva`, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 console.log('HUD:', await page.textContent('#hud'));
 

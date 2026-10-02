@@ -11,12 +11,14 @@
  *   que el juego lo pidiera. Y al arrancar, porque el navegador exige un clic
  *   para capturar. En pausa sale el aviso.
  * - **Lo que suelta el propio juego no pausa** (`free`): el inventario, el
- *   panel de desarrollo, CTRL mantenido (decision del autor, 2026-09-30) y la
- *   muerte. Al cerrarlos se intenta capturar otra vez; si el navegador no lo
- *   deja —Chrome no deja sin un gesto, y Esc no cuenta como gesto—, **se sigue
- *   jugando** con el cursor suelto, sin girar la vista, hasta el primer clic.
- *   Asi Esc cierra el inventario sin pausar, que es lo que pidio el autor: la
- *   version anterior suponia que Chrome recapturaba sin gesto, y no lo hace.
+ *   panel de desarrollo y la muerte. Al cerrarlos se intenta capturar otra
+ *   vez; si el navegador no lo deja, **se sigue jugando** con el cursor
+ *   suelto, sin girar la vista, hasta el primer clic.
+ * - **Cerrar el inventario con Esc captura como E** (pedido del autor,
+ *   2026-10-02), pero al SOLTAR la tecla y con red (`captureSoft`): si el
+ *   navegador suelta esa captura en menos de `SOFT_GRACE_MS`, no fue el
+ *   jugador y no pausa. Pedirla con Esc apoyado acababa en pausa en el Chrome
+ *   del autor y no en el headless (escapes 11 y 14).
  * - **Un clic en la pantalla lo captura y reanuda**, y ese clic no golpea.
  *
  * El movil no entra aqui: `mouseMode` exige un puntero fino y se apaga al
@@ -40,6 +42,12 @@ export function isPaused({ mouseMode, locked, devOpen, free }: PauseInputs): boo
   return mouseMode && !locked && !devOpen && !free;
 }
 
+/**
+ * Lo que vale la red de `captureSoft`: una captura pedida sin gesto claro que
+ * el navegador suelta antes de esto no la solto el jugador. Deduccion mia.
+ */
+export const SOFT_GRACE_MS = 1000;
+
 export class MouseLook {
   private dx = 0;
   private dy = 0;
@@ -59,6 +67,10 @@ export class MouseLook {
   private free = false;
   /** El juego acaba de pedir soltar: el siguiente `pointerlockchange` es suyo. */
   private releasing = false;
+  /** La captura pendiente se pidio con `captureSoft`. */
+  private softPending = false;
+  /** Hasta cuando una perdida de la captura no la cuenta como del jugador. */
+  private softUntil = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -72,12 +84,19 @@ export class MouseLook {
     document.addEventListener('pointerlockchange', () => {
       if (this.locked) {
         this.free = false;
+        this.softUntil = this.softPending ? performance.now() + SOFT_GRACE_MS : 0;
+        this.softPending = false;
         if (this.devOpen()) this.release();
         return;
       }
       // Suelto sin haberlo pedido el juego: el Esc del jugador, que pausa.
-      if (!this.releasing) this.free = false;
+      // Salvo dentro de la red de `captureSoft`: ahi lo solto el navegador.
+      if (!this.releasing) this.free = performance.now() < this.softUntil;
       this.releasing = false;
+      this.softUntil = 0;
+    });
+    document.addEventListener('pointerlockerror', () => {
+      this.softPending = false;
     });
     document.addEventListener('mousemove', (e) => {
       const first = !this.wasLocked;
@@ -122,6 +141,7 @@ export class MouseLook {
 
   /** Pide capturar el cursor. Tiene que ir dentro de un gesto del usuario. */
   capture(): void {
+    this.softPending = false;
     if (!this.mouseMode || this.locked) return;
     try {
       // Si el navegador lo rechaza —Chrome no deja volver a capturar hasta un
@@ -132,6 +152,17 @@ export class MouseLook {
     } catch {
       // Igual: en pausa hasta el proximo clic.
     }
+  }
+
+  /**
+   * Pide capturar sin un gesto claro (al soltar el Esc que cerro el
+   * inventario), con red: si el navegador la suelta enseguida, no pausa y el
+   * cursor queda suelto por el juego, como si no se hubiera pedido.
+   */
+  captureSoft(): void {
+    if (!this.mouseMode || this.locked) return;
+    this.capture();
+    this.softPending = true;
   }
 
   /** Suelta el cursor sin pausar: lo pide el juego, no el jugador. */

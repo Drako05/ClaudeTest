@@ -63,9 +63,11 @@ export interface FeedLine {
   life: number;
   /** Si se esta apagando deprisa: edad y opacidad al empezar. */
   fast: { at: number; from: number } | null;
-  /** Posicion suavizada contando desde arriba y desde abajo, en pixeles. */
+  /**
+   * Posicion suavizada desde la mas vieja, en pixeles: hacia abajo en el
+   * movil, hacia arriba en PC (`aboveButtonY`).
+   */
   fromTop: number;
-  fromBottom: number;
 }
 
 export class PickupFeed {
@@ -83,7 +85,6 @@ export class PickupFeed {
       life: FEED_SECONDS,
       fast: null,
       fromTop: n * FEED_LINE,
-      fromBottom: 0,
     });
     // Nunca mas de cinco: si llegan muchas de golpe, la mas vieja cae en el acto.
     while (this.lines.length > FEED_MAX) this.lines.shift();
@@ -109,10 +110,8 @@ export class PickupFeed {
       if (this.lines[i].age >= this.lines[i].life) this.lines.splice(i, 1);
     }
     const k = 1 - Math.exp(-SLIDE_RATE * dt);
-    const n = this.lines.length;
     this.lines.forEach((l, i) => {
       l.fromTop += (i * FEED_LINE - l.fromTop) * k;
-      l.fromBottom += ((n - 1 - i) * FEED_LINE - l.fromBottom) * k;
     });
   }
 
@@ -131,4 +130,15 @@ export function opacityOf(l: FeedLine): number {
 /** Lo que ha subido una linea desde que nacio, en pixeles. */
 export function riseOf(l: FeedLine): number {
   return FEED_RISE * Math.min(1, l.age / FEED_SECONDS);
+}
+
+/**
+ * En PC, donde va una linea respecto al borde de arriba del boton INVENTARIO,
+ * en pixeles (negativo es encima): **baja hacia el boton** mientras se
+ * desvanece (pedido del autor, 2026-10-02). Lo mismo que en el movil, que
+ * cuelga debajo y sube hacia el, pero del reves: la mas vieja, la mas cercana
+ * al boton, y las nuevas encima (esa simetria es deduccion mia).
+ */
+export function aboveButtonY(l: FeedLine): number {
+  return -(l.fromTop + FEED_RISE - riseOf(l));
 }

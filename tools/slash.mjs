@@ -79,7 +79,7 @@ const problems = [];
 page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()); });
 page.on('pageerror', (e) => problems.push(String(e)));
 
-await page.goto(`http://127.0.0.1:${port}/?seed=12345`, { waitUntil: 'load' });
+await page.goto(`http://127.0.0.1:${port}/?seed=12345&view=perspectiva`, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 
 const spawn = await page.evaluate(() => window.__verdant);

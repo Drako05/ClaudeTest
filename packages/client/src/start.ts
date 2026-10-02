@@ -6,12 +6,15 @@
  * - `?x=&y=` aparece en un sitio concreto. Nacio de necesitarlo en la prueba de
  *   humo —llegar andando a la montana esquiva arboles y es un via crucis— y
  *   sirve igual para volver a mano a un punto que se quiere mirar dos veces.
+ * - `?view=perspectiva|orto|primera` arranca en esa vista. Las pruebas que
+ *   dependen de la vista la fijan asi, en vez de dar por hecha la de arranque.
  *
  * Todo envuelto en try/catch: en un iframe con sandbox restrictivo el acceso a
  * `location` puede lanzar, y entonces se juega un mundo al azar.
  */
 
 import { createGame, type GameState } from '@verdant/sim';
+import { PROJECTIONS, type Projection } from './camera.js';
 
 function param(name: string): string | null {
   try {
@@ -26,6 +29,12 @@ export function randomSeed(): number {
   // Math.random aqui es legitimo: es el cliente eligiendo que mundo abrir, no la
   // simulacion. Dentro de packages/sim estaria prohibido.
   return (Math.random() * 0xffffffff) >>> 0;
+}
+
+/** La vista de `?view=`, o `null` si no dice ninguna valida. */
+export function viewFromLocation(): Projection | null {
+  const raw = param('view');
+  return (PROJECTIONS as readonly string[]).includes(raw ?? '') ? (raw as Projection) : null;
 }
 
 export function seedFromLocation(): number {

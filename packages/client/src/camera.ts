@@ -115,12 +115,13 @@ export class OrbitCamera {
   /**
    * La vista de arranque.
    *
-   * **Perspectiva**, y es decision del autor: probo las dos en su telefono, vio
-   * los mismos 80+ FPS en ambas y eligio esta para el juego final. El
-   * interruptor se queda porque la ortografica conserva el aspecto plano del
-   * isometrico y sigue siendo util para comparar.
+   * **Primera persona**, decision del autor (2026-10-02). Fue la perspectiva
+   * hasta entonces: la eligio para el juego final tras probar perspectiva y
+   * ortografica en su telefono, antes de que existiera la primera persona.
+   * `?view=` en la URL arranca en otra (`start.ts`), y es lo que usan las
+   * pruebas que dependen de la vista.
    */
-  projection: Projection = 'perspectiva';
+  projection: Projection = 'primera';
 
   /**
    * Plano cercano de 0,1 y no 0,5: con la colision la camara puede quedar a un

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Resource } from '@verdant/shared';
 import {
+  aboveButtonY,
   deltaText,
   FEED_FAST_SECONDS,
   FEED_LINE,
@@ -54,7 +55,24 @@ describe('El registro de objetos: las lineas', () => {
     for (let i = 0; i < 60; i++) feed.advance(1 / 60);
     const [a, b] = feed.lines;
     expect(b.fromTop - a.fromTop).toBeCloseTo(FEED_LINE, 1);
-    expect(a.fromBottom - b.fromBottom).toBeCloseTo(FEED_LINE, 1);
+  });
+
+  it('en PC, encima de INVENTARIO: baja hacia el, y la mas vieja va la mas cerca', () => {
+    // Pedido del autor, 2026-10-02: sobre el boton, bajando hacia el.
+    const feed = new PickupFeed();
+    feed.push('+1 Rama', true);
+    const line = feed.lines[0];
+    const born = aboveButtonY(line);
+    feed.advance(FEED_SECONDS * 0.5);
+    const later = aboveButtonY(line);
+    expect(born).toBeLessThan(0);
+    expect(later).toBeGreaterThan(born);
+    expect(later).toBeLessThanOrEqual(0);
+    feed.push('+1 Fibra', true);
+    for (let i = 0; i < 60; i++) feed.advance(1 / 60);
+    const [a, b] = feed.lines;
+    // La nueva, encima de la vieja (mas negativa).
+    expect(aboveButtonY(b)).toBeLessThan(aboveButtonY(a));
   });
 
   it('al llegar la quinta, la mas vieja se apaga deprisa', () => {

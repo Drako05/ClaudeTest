@@ -5,8 +5,8 @@ para crecer hacia multijugador online y, mas adelante, una version nativa.
 
 **Jugar: https://drako05.github.io/ClaudeTest/**
 
-Un mundo con relieve y camara libre en 3D. Arranca **en perspectiva**, que es la
-vista que eligio el autor; el ojo de la esquina superior derecha recorre
+Un mundo con relieve y camara libre en 3D. Arranca **en primera persona**, que es
+la vista que eligio el autor; el ojo de la esquina superior derecha recorre
 perspectiva, isometrica —que lo aplana todo— y primera persona. La antigua
 direccion `/3d/` redirige aqui.
 
@@ -52,8 +52,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | `WASD` / flechas | Moverse, relativo a la camara |
 | Clic en la pantalla | Capturar el cursor y jugar (el juego arranca en pausa) |
 | Raton | Mirar: la vista va con el cursor, tambien arriba y abajo (en tercera persona se puede mirar al cielo) |
-| `Esc` | Soltar el cursor y **pausar**; con el cursor suelto se pulsan los botones. Con el inventario abierto, lo cierra sin pausar |
-| `Ctrl` (mantener) | Soltar el cursor para pulsar botones, **sin pausar** |
+| `Esc` | Soltar el cursor y **pausar**: en pausa no responde nada hasta que un clic reanuda. Con el inventario abierto, lo cierra sin pausar y vuelve a capturar el cursor |
 | `Tab` | Modo de golpe: barrido (el sector) o preciso (solo lo del centro de la mira) |
 | Rueda | Recorrer la barra de la mano |
 | `+` / `-` | Zoom; en primera persona, catalejo que vuelve al dejar de pulsar |
@@ -63,9 +62,10 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | `Shift` | Correr: interruptor, se queda encendido |
 | `E` | Inventario y recetas (no pausa): arrastrar mueve o apila, soltar fuera tira (pide confirmacion), mantener 1,5 s una receta la fabrica |
 | `1`-`4` | Elegir la casilla de la barra: lo que se lleva en la mano |
+| `I` / `B` | Informacion (HUD y controles) / panel del bioma. Cada boton de PC lleva su tecla escrita abajo a la izquierda |
 | `R` | Mundo nuevo |
 | `P` | Vista: perspectiva → isometrica → primera persona |
-| Raton sobre el ojo (en pausa) | En primera persona, barra del angulo de vision (70-120°); cualquier accion la cierra |
+| Raton sobre el ojo (con el inventario abierto) | En primera persona, barra del angulo de vision (70-120°); cualquier accion la cierra |
 | `F3` | Panel de desarrollo |
 
 **Tactil** (aparece solo en dispositivos de puntero grueso, o al primer toque)

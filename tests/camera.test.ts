@@ -23,9 +23,26 @@ function looking(cam: OrbitCamera): Vector3 {
   return cam.active.getWorldDirection(new Vector3());
 }
 
+/**
+ * Una camara en perspectiva: estos tests se escribieron para ella. La de
+ * arranque es la primera persona (decision del autor, 2026-10-02), y la afirma
+ * su propio test.
+ */
+function orbit(): OrbitCamera {
+  const cam = new OrbitCamera();
+  cam.projection = 'perspectiva';
+  return cam;
+}
+
+describe('La vista de arranque', () => {
+  it('es la primera persona', () => {
+    expect(new OrbitCamera().projection).toBe('primera');
+  });
+});
+
 describe('El ojo recorre las tres vistas', () => {
   it('perspectiva → isometrica → primera persona → perspectiva', () => {
-    const cam = new OrbitCamera();
+    const cam = orbit();
     const seen = [cam.projection];
     for (let i = 0; i < 3; i++) {
       cam.cycleProjection();
@@ -37,7 +54,7 @@ describe('El ojo recorre las tres vistas', () => {
 
 describe('La primera persona', () => {
   function fp(): OrbitCamera {
-    const cam = new OrbitCamera();
+    const cam = orbit();
     cam.cycleProjection();
     cam.cycleProjection();
     return cam;
@@ -79,7 +96,7 @@ describe('La primera persona', () => {
     // la mirada. En las dos, perspectiva e isometrica; y bajando el dedo, al
     // reves.
     for (const n of [0, 1]) {
-      const cam = new OrbitCamera();
+      const cam = orbit();
       for (let i = 0; i < n; i++) cam.cycleProjection();
       cam.follow(0, 0, 0, 800, 600);
       const before = looking(cam).y;
@@ -93,7 +110,7 @@ describe('La primera persona', () => {
   });
 
   it('el giro horizontal va en el mismo sentido en las tres vistas', () => {
-    const orbital = new OrbitCamera();
+    const orbital = orbit();
     const first = fp();
     orbital.orbit(50, 0);
     first.orbit(50, 0);
@@ -113,7 +130,7 @@ describe('La primera persona', () => {
 describe('Una sola mirada para las tres vistas', () => {
   /** La camara en la vista `n` del ciclo (0 perspectiva, 1 isometrica, 2 primera). */
   function view(n: number): OrbitCamera {
-    const cam = new OrbitCamera();
+    const cam = orbit();
     for (let i = 0; i < n; i++) cam.cycleProjection();
     return cam;
   }
@@ -175,7 +192,7 @@ describe('Una sola mirada para las tres vistas', () => {
 
 describe('El catalejo de la primera persona', () => {
   function fp(): OrbitCamera {
-    const cam = new OrbitCamera();
+    const cam = orbit();
     cam.cycleProjection();
     cam.cycleProjection();
     return cam;
@@ -234,14 +251,14 @@ describe('El catalejo de la primera persona', () => {
   });
 
   it('el angulo de la primera persona no toca la perspectiva', () => {
-    const cam = new OrbitCamera();
+    const cam = orbit();
     const fov = cam.fov;
     cam.setFpFov(120);
     expect(cam.fov).toBe(fov);
   });
 
   it('en las otras vistas la pinza sigue siendo el zoom de siempre', () => {
-    const cam = new OrbitCamera();
+    const cam = orbit();
     const d = cam.distance;
     cam.zoom(0.5);
     expect(cam.distance).toBeLessThan(d);
@@ -252,7 +269,7 @@ describe('El catalejo de la primera persona', () => {
 describe('El raton capturado de PC', () => {
   it('raton arriba es mirar arriba en las tres vistas', () => {
     for (let views = 0; views < 3; views++) {
-      const cam = new OrbitCamera();
+      const cam = orbit();
       for (let i = 0; i < views; i++) cam.cycleProjection();
       const pitch = cam.pitch;
       cam.turn(0, -40);
@@ -261,9 +278,9 @@ describe('El raton capturado de PC', () => {
   });
 
   it('raton a la derecha gira el rumbo como arrastrar a la derecha', () => {
-    const start = new OrbitCamera().yaw;
-    const mouse = new OrbitCamera();
-    const drag = new OrbitCamera();
+    const start = orbit().yaw;
+    const mouse = orbit();
+    const drag = orbit();
     mouse.turn(50, 0);
     drag.orbit(50, 0);
     expect(mouse.yaw).toBeCloseTo(start - 50 * MOUSE_TURN, 9);
@@ -271,7 +288,7 @@ describe('El raton capturado de PC', () => {
   });
 
   it('la inclinacion se acota arriba y abajo', () => {
-    const cam = new OrbitCamera();
+    const cam = orbit();
     cam.turn(0, -1e6);
     expect(cam.pitch).toBe(PITCH_LIMIT);
     cam.turn(0, 1e6);

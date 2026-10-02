@@ -89,8 +89,17 @@ async function waitForLoop(page, ticks = 90) {
   return state(page);
 }
 
+/**
+ * La vista de arranque es la primera persona (decision del autor, 2026-10-02),
+ * pero casi todo el humo se escribio mirando en perspectiva: se fija con
+ * `?view=` salvo que la pagina pida otra. Que se arranca en primera persona lo
+ * mide aparte `desktopPass`.
+ */
+const VIEW = '&view=perspectiva';
+
 async function open(page, baseUrl, query) {
-  await page.goto(`${baseUrl}/?seed=${SEED}${query ?? ''}`, { waitUntil: 'load' });
+  const view = (query ?? '').includes('view=') ? '' : VIEW;
+  await page.goto(`${baseUrl}/?seed=${SEED}${query ?? ''}${view}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
   await play(page);
   return waitForLoop(page);
@@ -155,6 +164,23 @@ async function toHand(page, item) {
   if (slot >= 0 && slot < 4) await page.keyboard.press(`Digit${slot + 1}`);
   await page.waitForTimeout(200);
   return slot;
+}
+
+/**
+ * Suelta el cursor SIN pausa, para pulsar botones: el panel de desarrollo lo
+ * suelta como lo haria el juego. En pausa ya no responde nada (pedido del
+ * autor, 2026-10-02), y capturado, el clic va al lienzo y golpea. `unfree`
+ * lo cierra y vuelve a capturar.
+ */
+async function freeCursor(page) {
+  await page.keyboard.press('F3');
+  await page.waitForFunction(() => window.__verdant.dev && !window.__verdant.pointerLocked, null, { timeout: 5000 });
+}
+
+async function unfree(page) {
+  await page.keyboard.press('F3');
+  await page.waitForTimeout(250);
+  await play(page);
 }
 
 async function release(page) {
@@ -303,8 +329,18 @@ async function desktopPass(browser, baseUrl) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   watchProblems(page, 'escritorio');
 
+  // Sin `?view=` se arranca en primera persona (decision del autor,
+  // 2026-10-02). El resto del humo fija la perspectiva.
+  const plain = await browser.newPage({ viewport: { width: 640, height: 360 } });
+  await plain.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
+  await plain.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+  const startView = (await state(plain)).projection;
+  await plain.close();
+  console.log(`  vista de arranque: ${startView}`);
+  check(startView === 'primera', `no se arranca en primera persona: ${startView}`);
+
   // Arranca en pausa: sin cursor capturado el juego se detiene, con el aviso.
-  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
+  await page.goto(`${baseUrl}/?seed=${SEED}${VIEW}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
   await page.waitForTimeout(600);
   const idle = await state(page);
@@ -405,9 +441,9 @@ async function desktopPass(browser, baseUrl) {
   // El hambre ya corre mientras carga la pagina, asi que se pide cerca de 100.
   check(vit.health === 100 && vit.hunger >= 90 && !!vit.arc, `anillos de salida inesperados: ${JSON.stringify(vit)}`);
 
-  // Los botones se pulsan con el cursor suelto, o sea en pausa: capturado, el
-  // clic va al lienzo y golpea.
-  await release(page);
+  // Los botones se pulsan con el cursor suelto por el juego: capturado, el
+  // clic va al lienzo y golpea, y en pausa no responde nada.
+  await freeCursor(page);
   await page.click('#hudToggle');
   await page.waitForTimeout(250);
   const hud = await page.evaluate(() => ({
@@ -425,7 +461,7 @@ async function desktopPass(browser, baseUrl) {
   await page.screenshot({ path: join(SHOTS, '3d-01-spawn.png') });
   await page.click('#hudToggle');
   check(!(await page.isVisible('#hud')), 'el boton no volvio a cerrar el HUD');
-  await play(page);
+  await unfree(page);
 
   // Andar.
   const walked = await walkToOpenGround(page);
@@ -517,6 +553,41 @@ async function desktopPass(browser, baseUrl) {
   // Lo que dice y lo que se pinta, leidos a la vez: una linea vive 3 s.
   const painted = await page.evaluate(() => [window.__verdant.feed.length, document.querySelectorAll('#pickupFeed div').length]);
   check(painted[0] === painted[1], `el registro no se pinta: ${painted}`);
+  // En PC, encima del boton INVENTARIO y bajando hacia el (pedido del autor,
+  // 2026-10-02). Lo mide la propia pagina, porque cada ida y vuelta se come la
+  // vida de la linea (3 s) en este navegador lento: con el registro vacio, un
+  // observador anota la primera linea que nace y donde esta 400 ms despues.
+  // Es la mas vieja, asi que no la desliza ninguna otra: solo se mueve lo que
+  // deriva. Tiene que seguir viva, o no prueba nada.
+  await page.waitForFunction(() => document.getElementById('pickupFeed').children.length === 0, null, { timeout: 8000 })
+    .catch(() => {});
+  await page.evaluate(() => {
+    window.__feedPc = null;
+    const box = document.getElementById('pickupFeed');
+    const watch = new MutationObserver(() => {
+      const el = box.firstElementChild;
+      if (!el) return;
+      watch.disconnect();
+      requestAnimationFrame(() => {
+        const r0 = el.getBoundingClientRect();
+        setTimeout(() => {
+          const button = document.getElementById('invOpen').getBoundingClientRect();
+          const r1 = el.getBoundingClientRect();
+          const mid = r1.left + r1.width / 2;
+          const above = el.isConnected && r1.bottom <= button.top + 0.5 && mid >= button.left && mid <= button.right;
+          window.__feedPc = { above, y0: r0.y, y1: r1.y, alive: el.isConnected };
+        }, 400);
+      });
+    });
+    watch.observe(box, { childList: true });
+  });
+  const feedFrom = sum((await state(page)).inventory);
+  await harvestUntil(page, (s) => sum(s.inventory) > feedFrom);
+  await page.waitForFunction(() => window.__feedPc !== null, null, { timeout: 8000 }).catch(() => {});
+  const feedPc = await page.evaluate(() => window.__feedPc);
+  console.log(`  registro en PC: encima de INVENTARIO ${feedPc?.above}, y ${feedPc?.y0.toFixed(1)} -> ${feedPc?.y1.toFixed(1)}`);
+  check(feedPc !== null && feedPc.above, `el registro no va encima de INVENTARIO: ${JSON.stringify(feedPc)}`);
+  check(feedPc !== null && feedPc.alive && feedPc.y1 > feedPc.y0, `el registro no baja hacia INVENTARIO: ${JSON.stringify(feedPc)}`);
   // La cruz, en el centro exacto de la pantalla.
   const cross = await page.evaluate(() => document.getElementById('crosshair').getBoundingClientRect().toJSON());
   check(await page.isVisible('#crosshair') && Math.abs(cross.x + cross.width / 2 - 640) <= 1 && Math.abs(cross.y + cross.height / 2 - 360) <= 1,
@@ -641,10 +712,10 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  descripcion: «${shown.slice(0, 30)}…» -> «${await desc()}»`);
   check(shown !== '' && (await desc()) === '', 'tocar una casilla vacia no limpio la descripcion');
   await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
-  // Esc lo cierra sin pausar y SIN pedir capturar el cursor (escape 14): en el
-  // Chrome del autor esa peticion acababa en pausa, y el headless no lo
-  // reproduce. Un espia cuenta las peticiones; el cursor queda suelto por el
-  // juego, sin pausa, y el primer clic captura sin golpear.
+  // Esc lo cierra sin pausar y captura el cursor como E (pedido del autor,
+  // 2026-10-02), pero la captura se pide al SOLTAR la tecla: pedida con Esc
+  // apoyado, en el Chrome del autor acababa en pausa y el headless no lo
+  // reproduce (escapes 11 y 14). Un espia cuenta las peticiones.
   await page.evaluate(() => {
     window.__lockCalls = 0;
     window.__lockBackup = HTMLCanvasElement.prototype.requestPointerLock;
@@ -653,28 +724,72 @@ async function desktopPass(browser, baseUrl) {
       return window.__lockBackup.apply(this, args);
     };
   });
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(300);
+  await page.keyboard.down('Escape');
+  await page.waitForTimeout(200);
+  const escDownCalls = await page.evaluate(() => window.__lockCalls);
+  const escDown = await state(page);
+  await page.keyboard.up('Escape');
+  await page.waitForFunction(() => window.__verdant.pointerLocked, null, { timeout: 3000 }).catch(() => {});
   const escClosed = await state(page);
   const escLockCalls = await page.evaluate(() => window.__lockCalls);
-  await page.evaluate(() => { HTMLCanvasElement.prototype.requestPointerLock = window.__lockBackup; });
   check(!(await page.isVisible('#invPanel')), 'Esc no cerro el inventario');
-  console.log(`  Esc: peticiones de captura ${escLockCalls}, pausa ${escClosed.paused}, cursor suelto sin pausa ${escClosed.cursorFree}`);
-  check(escLockCalls === 0, `cerrar el inventario con Esc pidio capturar el cursor (${escLockCalls})`);
-  check(!escClosed.paused && escClosed.cursorFree, 'cerrar el inventario con Esc pauso el juego');
+  console.log(`  Esc: peticiones de captura ${escDownCalls} apoyada y ${escLockCalls} soltada; ` +
+    `capturado ${escClosed.pointerLocked}, pausa ${escDown.paused || escClosed.paused}`);
+  check(escDownCalls === 0, `con Esc apoyado se pidio capturar el cursor (${escDownCalls})`);
+  check(escLockCalls === 1 && escClosed.pointerLocked, 'al soltar Esc no se capturo el cursor');
+  check(!escDown.paused && !escClosed.paused, 'cerrar el inventario con Esc pauso el juego');
+  // La red: si el navegador suelta esa captura enseguida (la hipotesis del
+  // Chrome del autor), no pausa; el cursor queda suelto por el juego y el
+  // primer clic lo captura sin golpear.
+  // Se suelta en el mismo instante en que llega, como haria el Esc de Chrome:
+  // soltarla desde aqui tarda mas de un segundo en este navegador lento.
+  await page.keyboard.press('KeyE');
+  await page.waitForTimeout(250);
+  await page.evaluate(() => {
+    window.__dropped = false;
+    window.__unlockSeen = false;
+    document.addEventListener('pointerlockchange', function drop() {
+      if (document.pointerLockElement && !window.__dropped) {
+        window.__dropped = true;
+        document.exitPointerLock();
+      } else if (!document.pointerLockElement && window.__dropped) {
+        // Despues del oyente del juego, que se registro antes: ya lo ha visto.
+        window.__unlockSeen = true;
+        document.removeEventListener('pointerlockchange', drop);
+      }
+    });
+  });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__unlockSeen, null, { timeout: 8000 }).catch(() => {});
+  const dropped = await state(page);
+  const dropSeen = await page.evaluate(() => window.__unlockSeen);
+  await page.evaluate(() => { HTMLCanvasElement.prototype.requestPointerLock = window.__lockBackup; });
+  console.log(`  Esc con la captura soltada enseguida: pausa ${dropped.paused}, cursor suelto ${dropped.cursorFree}`);
+  check(dropSeen && !dropped.paused && dropped.cursorFree, `una captura de Esc soltada enseguida pauso el juego (vista ${dropSeen})`);
   const clickFrom = await state(page);
   await page.mouse.click(CLICK.x, CLICK.y);
   await page.waitForTimeout(300);
   const clicked = await state(page);
   check(clicked.pointerLocked && clicked.sent.harvest === clickFrom.sent.harvest,
-    'tras cerrar con Esc, el primer clic no capturo o golpeo');
+    'tras soltarse la captura de Esc, el primer clic no capturo o golpeo');
   // Y al reabrirlo no queda nada seleccionado.
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(250);
   check((await desc()) === '' && (await page.locator('#invGrid .slot.picked').count()) === 0,
     'al reabrir el inventario seguia seleccionada la casilla de antes');
+  // Una casilla de la barra tocada con el inventario abierto no se queda con
+  // el foco al cerrarlo con E: con el foco, Chrome le pintaba su contorno
+  // blanco (lo vio el autor, 2026-10-02).
+  await page.click('#hotbar .slot:nth-child(2)');
+  await page.waitForTimeout(150);
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(150);
+  const focused = await page.evaluate(() => {
+    const a = document.activeElement;
+    return a && a !== document.body ? `${a.tagName}#${a.id}.${a.className}` : null;
+  });
+  console.log(`  foco tras tocar la barra y cerrar con E: ${focused ?? 'ninguno'}`);
+  check(focused === null, `un boton se quedo con el foco tras cerrar el inventario: ${focused}`);
   check(!(await page.isVisible('#invPanel')), 'E no volvio a cerrar el inventario');
   // Y los efectos se apagan solos.
   await page.waitForTimeout(1800);
@@ -697,7 +812,7 @@ async function desktopPass(browser, baseUrl) {
   check(z2 < z1, `+ no acerco la camara (${z1} -> ${z2})`);
 
   // El panel del entorno.
-  await release(page);
+  await freeCursor(page);
   await page.click('#statsToggle');
   check(await page.isVisible('#statsPanel'), 'el panel del entorno no se desplego');
   await page.waitForTimeout(300);
@@ -715,19 +830,44 @@ async function desktopPass(browser, baseUrl) {
   await page.screenshot({ path: join(SHOTS, '3d-02-panel.png') });
   await page.click('#statsToggle');
   check(!(await page.isVisible('#statsPanel')), 'el panel no se replego al volver a pulsar');
-  await play(page);
+  await unfree(page);
 
-  // CTRL mantenido suelta el cursor sin pausar, y al soltarlo se recaptura
-  // (decision del autor, 2026-09-30).
+  // Cada boton de PC lleva su tecla escrita en la esquina de abajo a la
+  // izquierda (pedido del autor, 2026-10-02), e I y B pulsan los suyos.
+  const KEYS = { proj: 'P', hudToggle: 'I', statsToggle: 'B', modeBar: 'TAB', invOpen: 'E' };
+  const keyLabels = await page.evaluate((ids) => ids.map((id) => {
+    const b = document.getElementById(id);
+    const k = b.querySelector('.btnKey');
+    if (!k || getComputedStyle(k).display === 'none') return { id, text: null };
+    const br = b.getBoundingClientRect();
+    const kr = k.getBoundingClientRect();
+    const corner = kr.left - br.left < br.width / 2 && br.bottom - kr.bottom < br.height / 2;
+    return { id, text: k.textContent, corner };
+  }), Object.keys(KEYS));
+  console.log(`  teclas en los botones: ${keyLabels.map((k) => `${k.id} ${k.text}`).join(', ')}`);
+  check(keyLabels.every((k) => k.text === KEYS[k.id] && k.corner),
+    `un boton de PC no lleva su tecla abajo a la izquierda: ${JSON.stringify(keyLabels)}`);
+  await page.keyboard.press('KeyI');
+  await page.waitForTimeout(150);
+  const hudByKey = await page.isVisible('#hud');
+  await page.keyboard.press('KeyI');
+  await page.waitForTimeout(150);
+  check(hudByKey && !(await page.isVisible('#hud')), 'la I no abrio y cerro la informacion');
+  await page.keyboard.press('KeyB');
+  await page.waitForTimeout(150);
+  const statsByKey = await page.isVisible('#statsPanel');
+  await page.keyboard.press('KeyB');
+  await page.waitForTimeout(150);
+  check(statsByKey && !(await page.isVisible('#statsPanel')), 'la B no abrio y cerro el panel del bioma');
+
+  // CTRL ya no suelta el cursor (retirado por el autor, 2026-10-02): mantenerlo
+  // deja el cursor capturado y el juego en marcha.
   await page.keyboard.down('Control');
   await page.waitForTimeout(300);
   const ctrlHeld = await state(page);
   await page.keyboard.up('Control');
-  await page.waitForTimeout(400);
-  const ctrlUp = await state(page);
-  console.log(`  CTRL: capturado ${ctrlHeld.pointerLocked} -> ${ctrlUp.pointerLocked}, pausa ${ctrlHeld.paused}`);
-  check(!ctrlHeld.pointerLocked && !ctrlHeld.paused, 'mantener CTRL no solto el cursor o pauso');
-  check(ctrlUp.pointerLocked, 'soltar CTRL no volvio a capturar el cursor');
+  console.log(`  CTRL: capturado ${ctrlHeld.pointerLocked}, pausa ${ctrlHeld.paused}`);
+  check(ctrlHeld.pointerLocked && !ctrlHeld.paused, 'mantener CTRL solto el cursor o pauso');
   // TAB cambia el modo de golpe, y el boton MODO lo dice con su icono.
   const modeIcon = () => page.evaluate(() =>
     getComputedStyle(document.querySelector('#modeBar .mode-precise')).display !== 'none');
@@ -790,11 +930,40 @@ async function desktopPass(browser, baseUrl) {
   check(esc.paused && (await page.isVisible('#pause')), 'soltar el cursor no puso la pausa con su aviso');
   check(escHint === 'Haz clic para continuar', `el aviso de pausa dice «${escHint}»`);
   check(escLater.tick === esc.tick, 'en pausa el juego siguio corriendo');
+  // Y en pausa no responde nada hasta reanudar (pedido del autor,
+  // 2026-10-02): ni las teclas de los botones y del juego, ni la rueda.
+  const frozenUi = () => page.evaluate(() => ({
+    hud: !document.getElementById('hud').hidden && getComputedStyle(document.getElementById('hud')).display !== 'none',
+    stats: !document.getElementById('statsPanel').hidden,
+  }));
+  const frozen0 = { ...(await state(page)), ...(await frozenUi()) };
+  for (const key of ['KeyE', 'KeyP', 'Tab', 'ShiftLeft', 'Digit2', 'KeyI', 'KeyB', 'F3', 'Equal']) {
+    await page.keyboard.press(key);
+  }
+  await page.mouse.move(CLICK.x, CLICK.y);
+  await page.mouse.wheel(0, 240);
+  await page.waitForTimeout(300);
+  const frozen1 = { ...(await state(page)), ...(await frozenUi()) };
+  const pausedMoved = ['inventoryOpen', 'projection', 'precise', 'running', 'selectedSlot', 'dev', 'distance', 'hud', 'stats']
+    .filter((k) => JSON.stringify(frozen0[k]) !== JSON.stringify(frozen1[k]));
+  console.log(`  en pausa, teclas y rueda: ${pausedMoved.length ? 'cambio ' + pausedMoved.join(', ') : 'nada cambio'}`);
+  check(frozen1.paused && pausedMoved.length === 0, `en pausa las teclas o la rueda hicieron algo: ${pausedMoved.join(', ')}`);
   await strike(page);
   await page.waitForTimeout(300);
   const resumed = await state(page);
   check(resumed.pointerLocked && !resumed.paused, 'un clic en la pantalla no reanudo');
   check(resumed.sent.harvest === inGame.sent.harvest, 'el clic que reanuda golpeo');
+  // Un clic sobre un boton, en pausa, reanuda y no pulsa el boton.
+  await release(page);
+  const invAt = await page.evaluate(() => {
+    const r = document.getElementById('invOpen').getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  });
+  await page.mouse.click(invAt.x, invAt.y);
+  await page.waitForTimeout(300);
+  const onButton = await state(page);
+  console.log(`  clic sobre INVENTARIO en pausa: inventario ${onButton.inventoryOpen ? 'abierto' : 'cerrado'}, pausa ${onButton.paused}`);
+  check(!onButton.inventoryOpen && !onButton.paused, 'en pausa un clic sobre INVENTARIO lo abrio o no reanudo');
   // El panel de desarrollo suelta el cursor pero no pausa.
   await page.keyboard.press('F3');
   await page.waitForTimeout(300);
@@ -804,9 +973,13 @@ async function desktopPass(browser, baseUrl) {
   await page.waitForTimeout(300);
   const devClosed = await state(page);
   check(devClosed.pointerLocked || devClosed.paused, 'al cerrar F3 ni se capturo el cursor ni se pauso');
-  if (!devClosed.paused) await release(page);
-
-  // Con el cursor suelto (en pausa) se pulsan los botones.
+  // Con el cursor suelto por el juego —aqui, el panel de desarrollo— se pulsan
+  // los botones. En pausa ya no: no responde nada (pedido del autor,
+  // 2026-10-02).
+  if (devClosed.paused) await play(page);
+  await page.keyboard.press('F3');
+  await page.waitForTimeout(300);
+  check((await state(page)).dev && !(await state(page)).paused, 'F3 no abrio el panel para pulsar los botones');
   // El ojo recorre las tres vistas y lo dice con su forma: perspectiva →
   // isometrica (entrecerrado) → primera persona (con mira) → perspectiva.
   await page.click('#proj');
@@ -1129,6 +1302,13 @@ async function stationsPass(browser, baseUrl) {
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(300);
   const handTabs = await tabs();
+  // El panel de PC mide siempre lo mismo, haya las recetas que haya (pedido del
+  // autor, 2026-10-02): se compara con E, con el horno y con la mesa.
+  const panelBox = () => page.evaluate(() => {
+    const b = document.getElementById('invPanel').getBoundingClientRect();
+    return { w: Math.round(b.width), h: Math.round(b.height) };
+  });
+  const handBox = await panelBox();
   console.log(`  con E: ${handTabs.join(', ')} («${await page.textContent('#recipeTitle')}»)`);
   check((await state(page)).panelStation === 0, 'con E el panel no es el de mano');
   check(handTabs.includes('Estaciones') && !handTabs.includes('Fundicion') && !handTabs.includes('Ropa'),
@@ -1171,6 +1351,16 @@ async function stationsPass(browser, baseUrl) {
   console.log(`  colocar la mesa: mesas ${before.inventory[18]} -> ${placed.inventory[18]}, en ${JSON.stringify(placed.stationTiles)}, cajas dibujadas ${placed.stationsDrawn}`);
   check(placed.inventory[18] === 0 && placed.stationTiles.some((t) => t.feature === 24), 'USAR con la mesa en la mano no la coloco');
   check(placed.stationsDrawn > before.stationsDrawn, 'la mesa colocada no se dibujo');
+  // Su cara principal mira a quien la puso (pedido del autor, 2026-10-02): el
+  // giro dibujado es el lado de su casilla que da al jugador.
+  const placedBench = placed.stationTiles.find((t) => t.feature === 24);
+  if (placedBench) {
+    const dx = placed.x - (placedBench.x + 0.5);
+    const dy = placed.y - (placedBench.y + 0.5);
+    const toward = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy >= 0 ? 0 : 2;
+    console.log(`  frente de la mesa: nucleo ${placedBench.facing}, dibujado ${placedBench.turn}, hacia el jugador ${toward}`);
+    check(placedBench.facing === toward && placedBench.turn === toward, `la mesa no mira a quien la puso: ${JSON.stringify(placedBench)}`);
+  }
 
   // El horno, detras: media vuelta (0,0025 rad por pixel), lejos de la mesa.
   await look(page, 1257, 0);
@@ -1187,6 +1377,7 @@ async function stationsPass(browser, baseUrl) {
   await page.waitForTimeout(400);
   const furnace = await state(page);
   const furnaceTabs = await tabs();
+  const furnaceBox = await panelBox();
   console.log(`  usar el horno: panel ${furnace.inventoryOpen ? 'abierto' : 'cerrado'}, «${await page.textContent('#recipeTitle')}», ${furnaceTabs}`);
   check(furnace.inventoryOpen && furnace.panelStation === 2, 'USAR mirando el horno no abrio su panel');
   check(furnaceTabs.join() === 'Fundicion', `el horno ensena otras recetas: ${furnaceTabs}`);
@@ -1246,6 +1437,10 @@ async function stationsPass(browser, baseUrl) {
   check(layoutPc.recipesCol.left - layoutPc.gridRail.right >= 12 && layoutPc.panel.right - layoutPc.listRailR.right >= 8,
     `las barras van apretadas: ${JSON.stringify(layoutPc)}`);
   check(layoutPc.title >= 15, `los titulos del panel siguen pequenos: ${layoutPc.title}`);
+  const benchBox = await panelBox();
+  console.log(`  panel de PC con E ${handBox.w}x${handBox.h}, horno ${furnaceBox.w}x${furnaceBox.h}, mesa ${benchBox.w}x${benchBox.h}`);
+  check([handBox, furnaceBox].every((b) => Math.abs(b.w - benchBox.w) <= 1 && Math.abs(b.h - benchBox.h) <= 1),
+    `el panel de PC cambia de tamano segun las recetas: ${JSON.stringify({ handBox, furnaceBox, benchBox })}`);
   await page.screenshot({ path: join(SHOTS, '3d-12-panel-pc.png') });
   await craft(2);
   await category('Ropa');
@@ -1397,7 +1592,8 @@ async function mobilePass(browser, baseUrl) {
   const labels = await page.evaluate(() =>
     ['action', 'use', 'jump', 'run', 'others', 'invOpen', 'modeTouch', 'inputMode'].map((id) => {
       const b = document.getElementById(id);
-      return { id, text: b.textContent.replace(/[\s\u00bb\u2191]/g, ''), label: b.getAttribute('aria-label'), svg: !!b.querySelector('svg') };
+      // `innerText` y no `textContent`: la tecla escrita de PC va oculta en el movil.
+      return { id, text: b.innerText.replace(/[\s\u00bb\u2191]/g, ''), label: b.getAttribute('aria-label'), svg: !!b.querySelector('svg') };
     }),
   );
   check(labels.every((l) => l.text === '' && l.label), `hay botones con rotulo: ${JSON.stringify(labels)}`);
@@ -2158,7 +2354,7 @@ async function highRefreshPass(browser, baseUrl) {
   });
   // Arriba al centro: en una ventana pequena la ayuda de teclado tapa el medio.
   const clickAt = { x: 320, y: 110 };
-  await page.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
+  await page.goto(`${baseUrl}/?seed=${SEED}${VIEW}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
   await page.mouse.click(clickAt.x, clickAt.y);
   await page.waitForFunction(() => window.__verdant && !window.__verdant.paused, null, { timeout: 5000 });

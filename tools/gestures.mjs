@@ -23,7 +23,7 @@ const page = await browser.newPage({
   viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
 });
 page.on('pageerror', (e) => { failures++; console.log(`  EXCEPCION: ${e}`); });
-await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904`, { waitUntil: 'load' });
+await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904&view=perspectiva`, { waitUntil: 'load' });
 await page.waitForTimeout(2500);
 
 /** Un gesto multitáctil crudo, que es lo único que reproduce dos pulgares. */
@@ -272,7 +272,7 @@ check(!(await probe()).tapInput, 'el boton ENTRADA no volvio a MIRA');
 // cerrado, arrastrar una casilla a otra y a la barra con el abierto, y mantener
 // una receta 1,5 s para fabricarla (decisiones del autor). Con materiales del
 // panel de desarrollo.
-await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904&dev=1`, { waitUntil: 'load' });
+await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904&dev=1&view=perspectiva`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__verdant && window.__verdant.tick > 0, null, { timeout: 30000 });
 await page.evaluate(() => document.querySelector('[data-kit="piedra"]').click());
 await page.waitForTimeout(300);

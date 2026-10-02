@@ -12,11 +12,12 @@
  * pone la escena sino el dibujo, que la lleva horneada desde el noroeste —las
  * caras oeste y norte mas claras que las otras dos—.
  *
- * El frente —la boca del horno, las herramientas de la mesa— mira a un lado de
- * los cuatro, elegido con `hash2DFloat` de la casilla, como el giro de las
- * aspas: con azar vivo cambiaria cada vez que el chunk se regenera (regla 3).
- * Que mire al jugador que la puso pediria guardarlo en el nucleo, y es
- * propuesta mia no hacerlo.
+ * El frente —la boca del horno, las herramientas de la mesa— mira **hacia quien
+ * la puso** (pedido del autor, 2026-10-02). Lo guarda el nucleo al colocarla
+ * (`World.stationFacingAt`), porque el chunk se descarta y se redibuja
+ * constantemente y el dibujo no puede recordarlo (regla 4). Una estacion sin
+ * frente guardado —ninguna, hoy— cae a un lado elegido con `hash2DFloat` de la
+ * casilla, como el giro de las aspas.
  */
 
 import {
@@ -41,7 +42,8 @@ const LIGHT = { top: 1, lit: 0.95, shade: 0.74, bottom: 0.5 };
  * -Y (abajo), +Z (sur) y -Z (norte). El nucleo es `x, y`; three.js, `x, z`.
  */
 const FACE_LIGHT = [LIGHT.shade, LIGHT.lit, LIGHT.top, LIGHT.bottom, LIGHT.shade, LIGHT.lit];
-/** Las cuatro caras de los lados, por giro: a cual va el frente. */
+/** Las cuatro caras de los lados, por giro: a cual va el frente. Giro 0 = +y del
+ * nucleo (+z de three.js), 1 = +x, 2 = -y, 3 = -x, como `facingToward`. */
 const SIDES = [4, 0, 5, 1];
 
 type Painter = (ctx: CanvasRenderingContext2D, w: number, h: number, faces: readonly string[]) => void;
@@ -174,6 +176,8 @@ export class StationSet {
   private readonly falling = new Map<string, { from: number; ground: number; since: number; mesh: Mesh | null }>();
   /** Estaciones mandadas a la escena, para el humo. Acumulado. */
   drawn = 0;
+  /** El giro del frente con que se dibujo cada casilla, para el humo. */
+  readonly turns = new Map<string, number>();
   /** Caidas empezadas, para el humo. Acumulado. */
   drops = 0;
 
@@ -214,11 +218,15 @@ export class StationSet {
     }
   }
 
-  /** Una caja para la estacion de la casilla `(tx, ty)`, apoyada en su suelo. */
-  spawn(feature: Feature, tx: number, ty: number, ground: number, seed: number): Mesh | null {
+  /**
+   * Una caja para la estacion de la casilla `(tx, ty)`, apoyada en su suelo,
+   * con el frente hacia `facing` (el del nucleo, mismo convenio que `SIDES`).
+   */
+  spawn(feature: Feature, tx: number, ty: number, ground: number, seed: number, facing: number | null): Mesh | null {
     const kind = this.kinds.get(feature);
     if (!kind) return null;
-    const turn = Math.floor(hash2DFloat(seed ^ 0x51a7, tx, ty) * 4) % 4;
+    const turn = facing ?? Math.floor(hash2DFloat(seed ^ 0x51a7, tx, ty) * 4) % 4;
+    this.turns.set(`${tx},${ty}`, turn);
     const mesh = new Mesh(kind.geometry, kind.byTurn[turn]);
     mesh.position.set(tx + 0.5, ground + kind.height / 2, ty + 0.5);
     mesh.userData.half = kind.height / 2;

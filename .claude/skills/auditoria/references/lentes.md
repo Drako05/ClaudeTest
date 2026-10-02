@@ -62,6 +62,11 @@ que nadie toco es justo lo que ninguna tanda mira.
   a mano (hacer que la API falle) y se mira que el juego lo aguante. Y mejor
   aun (#14): **no pedirla** desde un contexto dudoso, y que la prueba espie
   la API y exija cero llamadas, que cubre todos los casos a la vez.
+- **Medir algo que ya no existe**: el rectangulo de un elemento retirado del
+  DOM es todo ceros, y una comprobacion de «se movio» con un `||` que lo
+  perdona pasa sin probar nada (la del registro de PC, 7.ª ronda, cazada al
+  escribirla). Se exige que siga vivo (`isConnected`) y se mide uno recien
+  nacido.
 - **Medir la pieza tocada en vez del requisito** (#15): si el autor pide
   «una sola encendida», se cuenta todo lo encendido, de cualquier clase,
   como invariante por fotograma.

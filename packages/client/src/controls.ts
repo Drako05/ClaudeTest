@@ -45,11 +45,6 @@ export class Controls {
   onToggleInventory: (() => void) | null = null;
   /** La rueda recorre la barra de la mano: `+1` la siguiente, `-1` la anterior. */
   onHotbarStep: ((delta: number) => void) | null = null;
-  /**
-   * CTRL mantenido en PC (decision del autor, 2026-09-30): `true` al pulsarlo,
-   * que suelta el cursor sin pausar, y `false` al soltarlo.
-   */
-  onFreeCursor: ((held: boolean) => void) | null = null;
   /** El raton capturado de PC, si lo hay: decide los clics antes que los gestos. */
   mouseLook: MouseLook | null = null;
 
@@ -107,7 +102,6 @@ export class Controls {
         e.preventDefault();
         if (!e.repeat) this.modeKey();
       }
-      if (!e.repeat && (e.code === 'ControlLeft' || e.code === 'ControlRight')) this.onFreeCursor?.(true);
       this.keys.add(e.code);
       if (e.repeat) return;
       switch (e.code) {
@@ -122,6 +116,15 @@ export class Controls {
           break;
         case 'KeyR':
           this.onRestart?.();
+          break;
+        // Cada boton de PC tiene su tecla (pedido del autor, 2026-10-02): la
+        // informacion, I, y el panel del bioma, B. Pulsan el boton, asi que
+        // hacen exactamente lo mismo que el clic.
+        case 'KeyI':
+          document.getElementById('hudToggle')?.click();
+          break;
+        case 'KeyB':
+          document.getElementById('statsToggle')?.click();
           break;
         // El zoom es solo con + y - desde que la rueda recorre la barra de la
         // mano (pedido del autor). El paso es el de la rueda de antes: 1.25.
@@ -141,7 +144,6 @@ export class Controls {
     });
     window.addEventListener('keyup', (e) => {
       this.keys.delete(e.code);
-      if (e.code === 'ControlLeft' || e.code === 'ControlRight') this.onFreeCursor?.(false);
     });
     window.addEventListener('blur', () => {
       this.keys.clear();

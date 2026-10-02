@@ -69,14 +69,19 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Categorias: a mano **Herramientas y Estaciones**; mesa **Herramientas y Ropa**; horno **Fundicion** | Recoleccion y fabricacion, tanda 2 | texto en `RECIPES` |
 | Las estaciones se apilan **hasta 100** como un material; herramientas y prendas, de una en una | Recoleccion y fabricacion, tanda 2 | `stackMax` |
 | Nivel de las herramientas: **piedra 1, cobre 2, hierro 3** (el hierro pide 2) | Recoleccion y fabricacion, tanda 2 | `toolStats` |
-| El **dibujo** de la mesa (tablas, cuadricula arriba, patas, sierra y martillo) y del horno (ladrillo, boca con brasa, tiro arriba); el frente mira a un lado **al azar de la casilla**, no hacia quien la puso | Recoleccion y fabricacion, tanda 2 | `stations-view.ts` |
+| El **dibujo** de la mesa (tablas, cuadricula arriba, patas, sierra y martillo) y del horno (ladrillo, boca con brasa, tiro arriba); el frente mira **hacia quien la puso** desde la 7.ª ronda (en la diagonal exacta gana el eje y, deduccion mia) | Recoleccion y fabricacion, tanda 2 | `stations-view.ts` |
 | Nombres cortos y descripciones de los objetos nuevos; los huecos de ropa vacios dicen «Espalda» y «Cintura» | Recoleccion y fabricacion, tanda 2 | texto en `inventory-ui.ts` |
 | «Materiales de metal» en el panel de desarrollo: lo justo para toda la tanda 2 | Recoleccion y fabricacion, tanda 2 | quitarlo |
 | Con el inventario abierto **se salta** (tu dijiste «solo moverse») | Ajustes de la tanda 2 | una linea en `main.ts` |
 | El modo de golpe **arranca en barrido** y no se recuerda entre partidas | Ajustes de la tanda 2 | una linea |
 | La estacion puesta contra una pared cae con la **gravedad del salto** (62), y la caida solo se ve | Ajustes de la tanda 2 | `stations-view.ts` |
 | La rueda **no tiene destello aparte**: la luz es la de la seleccion, que se mueve en el acto (antes, un destello de 140 ms junto a la luz vieja, y se veian dos) | Ajustes de la tanda 2, 6.ª ronda | `inventory-ui.ts` |
-| Cerrar el inventario con **Esc no pide capturar el cursor**; la causa de la pausa es hipotesis mia (Chrome concede la captura y su propio Esc la suelta) | Ajustes de la tanda 2, 6.ª ronda | una linea en `main.ts` |
+| Cerrar el inventario con Esc **captura al soltar la tecla**, con una red de **1 s** (`SOFT_GRACE_MS`): si Chrome la suelta antes, no pausa. La causa de la pausa sigue siendo hipotesis mia (la tecla apoyada soltaba la captura); **solo tu Chrome lo confirma** | Ajustes de la tanda 2, 7.ª ronda | `main.ts` y `pointer-lock.ts` |
+| `?view=` en la URL para que las pruebas arranquen en perspectiva | Ajustes de la tanda 2, 7.ª ronda | `start.ts` |
+| Los botones de los dialogos («Reiniciar», «Cancelar», «Tirar») **no llevan tecla escrita**; las teclas, en 8 px abajo a la izquierda | Ajustes de la tanda 2, 7.ª ronda | `index.html` |
+| La pausa bloquea **tambien F3**, y deja pasar las teclas que se sueltan | Ajustes de la tanda 2, 7.ª ronda | `main.ts` |
+| El registro en PC, centrado sobre INVENTARIO a 6 px: la mas vieja abajo, las nuevas encima | Ajustes de la tanda 2, 7.ª ronda | `main.ts`, `pickup-feed.ts` |
+| Con la pausa que lo bloquea todo, la **barra del angulo** en PC se abre pasando el raton por el ojo **con el inventario abierto** (antes, en pausa) | Ajustes de la tanda 2, 7.ª ronda | — |
 | La distancia a una estacion se mide **de los ojos al punto mas cercano de su caja, en 3D** | Ajustes de la tanda 2, 6.ª ronda | `sim/stations.ts` |
 | No cuentan como «fuera» del inventario: la **barra de la mano**, el boton **INVENTARIO** y el **dialogo de tirar** | Ajustes de la tanda 2, 6.ª ronda | un selector en `inventory-ui.ts` |
 | Panel de PC: **44 px** entre columnas, **32** a los lados, titulos de **15 px** a **14** de su rejilla | Ajustes de la tanda 2, 6.ª ronda | CSS |
@@ -475,6 +480,26 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Ajustes de la tanda 2, 7.ª ronda — HECHO (2026-10-02)
+
+La CI de la 6.ª ronda (`313db40`) salio en verde. Lo que pediste:
+- **Se arranca en primera persona.**
+- **El panel de PC mide siempre lo mismo**, el de cuatro recetas, con E, la
+  mesa o el horno.
+- **Esc cierra el inventario y vuelve a capturar el cursor, como E**: la
+  captura se pide al soltar la tecla, y si el navegador la suelta enseguida
+  no pausa. Es lo que puedo hacer sin tu Chrome; si aun ves la pausa, dimelo.
+- **Las estaciones miran a quien las pone**: el nucleo guarda su frente.
+- **Cada boton de PC lleva su tecla escrita** abajo a la izquierda: el ojo P,
+  la informacion I (nueva), el bioma B (nueva), MODO TAB, INVENTARIO E.
+- **Fuera CTRL.**
+- **En pausa no responde nada** hasta que un clic reanuda.
+- **El contorno blanco** de la casilla tocada con el inventario abierto era
+  el foco del navegador: los botones ya no lo toman con el raton.
+- **El registro de objetos en PC**, encima de INVENTARIO, bajando hacia el.
+
+Lo que decidi yo va arriba, en «Esperando tu juicio».
 
 ## Ajustes de la tanda 2, 6.ª ronda — HECHO (2026-10-02)
 

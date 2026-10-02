@@ -21,6 +21,7 @@ import {
   DENSITY_CAP,
   densityOfKind,
   Feature,
+  isStation,
   growthStep,
   isFeatureSolid,
   isOvercrowded,
@@ -136,6 +137,12 @@ export class World {
   private readonly records = new Map<string, ChunkRecord>();
   /** Brotes sembrados y el instante en que se plantaron, por clave de tile. */
   private readonly saplings = new Map<string, number>();
+  /**
+   * Hacia donde mira el frente de cada estacion colocada, por clave de tile:
+   * 0 = +y, 1 = +x, 2 = -y, 3 = -x (`facingToward`). Fuera del chunk, como el
+   * overlay (regla 4): el chunk es cache desechable.
+   */
+  private readonly facings = new Map<string, number>();
   /** Estadisticas de bioma memorizadas; se vacian cuando algo cambia. */
   private readonly biomeCache = new Map<string, BiomeStats>();
 
@@ -353,6 +360,16 @@ export class World {
     );
   }
 
+  /** Hacia donde mira el frente de la estacion de `(wx, wy)`, o `null`. */
+  stationFacingAt(wx: number, wy: number): number | null {
+    return this.facings.get(`${wx},${wy}`) ?? null;
+  }
+
+  /** Fija el frente de la estacion de `(wx, wy)`, de 0 a 3 (`facingToward`). */
+  setStationFacing(wx: number, wy: number, facing: number): void {
+    this.facings.set(`${wx},${wy}`, ((Math.round(facing) % 4) + 4) % 4);
+  }
+
   /** Cambia lo que hay en un tile y mantiene la contabilidad al dia. */
   setFeature(wx: number, wy: number, next: Feature): void {
     const cx = toChunkCoord(wx);
@@ -402,10 +419,12 @@ export class World {
       if (isKind !== null) record.count[lifeSlot(biome, isKind)]++;
     }
 
-    if (isSapling(before)) {
+    if (isSapling(before) || isStation(before)) {
       const wx = chunk.cx * CHUNK_SIZE + (idx % CHUNK_SIZE);
       const wy = chunk.cy * CHUNK_SIZE + Math.floor(idx / CHUNK_SIZE);
       this.saplings.delete(`${wx},${wy}`);
+      // Desmontar una estacion se lleva su frente.
+      this.facings.delete(`${wx},${wy}`);
     }
 
     chunk.revision++;

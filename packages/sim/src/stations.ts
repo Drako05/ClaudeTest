@@ -50,3 +50,17 @@ export function stationNear(
   }
   return false;
 }
+
+/**
+ * El lado de la casilla `(tx, ty)` que da al punto `(px, py)`: hacia donde
+ * mira el frente de una estacion que se coloca ahi desde ese punto (pedido del
+ * autor, 2026-10-02: la cara principal, hacia quien la pone). 0 = +y, 1 = +x,
+ * 2 = -y, 3 = -x, el mismo convenio que el dibujo. En la diagonal exacta gana
+ * el eje y (deduccion mia: hacia algun lado tiene que caer).
+ */
+export function facingToward(tx: number, ty: number, px: number, py: number): number {
+  const dx = px - (tx + 0.5);
+  const dy = py - (ty + 0.5);
+  if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 1 : 3;
+  return dy >= 0 ? 0 : 2;
+}

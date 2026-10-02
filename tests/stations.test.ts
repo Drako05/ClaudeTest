@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createGame,
   EYE_HEIGHT,
+  facingToward,
   EQUIP_BACK,
   EQUIP_WAIST,
   hitboxAt,
@@ -78,6 +79,30 @@ describe('Colocar una estacion', () => {
     expect(state.lastUsed).toBe('placed');
     expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.Workbench);
     expect(state.inventory.count(Resource.Workbench)).toBe(0);
+  });
+
+  it('su cara principal mira a quien la pone, desde cualquiera de los cuatro lados', () => {
+    // Pedido del autor, 2026-10-02. 0 = +y, 1 = +x, 2 = -y, 3 = -x.
+    const sides: Array<[number, number, number]> = [
+      [1, 0, 3], // al este del jugador: el frente mira al oeste, hacia el
+      [-1, 0, 1],
+      [0, 1, 2],
+      [0, -1, 0],
+    ];
+    for (const [dx, dy, facing] of sides) {
+      const { state, tx, ty } = atSpawn();
+      state.inventory.add(Resource.Workbench, 1);
+      use(state, dx, dy, 60);
+      expect(state.world.featureAt(tx + dx, ty + dy)).toBe(Feature.Workbench);
+      expect(state.world.stationFacingAt(tx + dx, ty + dy)).toBe(facing);
+    }
+  });
+
+  it('el lado que da al jugador: el eje en que esta mas lejos', () => {
+    expect(facingToward(0, 0, 3.5, 1.2)).toBe(1);
+    expect(facingToward(0, 0, -2.5, 0.9)).toBe(3);
+    expect(facingToward(0, 0, 1.2, 4.5)).toBe(0);
+    expect(facingToward(0, 0, 0.2, -3)).toBe(2);
   });
 
   it('estorba de lado, como una pared de su altura', () => {
@@ -241,6 +266,8 @@ describe('Desmontar una estacion', () => {
     hit(state, 1, 0, 30);
     expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.None);
     expect(state.inventory.count(Resource.Workbench)).toBe(1);
+    // Y se lleva su frente: la proxima que se ponga ahi mirara a quien la ponga.
+    expect(state.world.stationFacingAt(tx + 1, ty)).toBeNull();
   });
 
   it('con el inventario lleno se queda donde esta', () => {
