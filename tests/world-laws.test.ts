@@ -14,8 +14,10 @@ import {
   World,
 } from '@verdant/sim';
 import {
+  AWAITING_USE,
   BiomeKind,
   CHUNK_SIZE,
+  foodValue,
   DAY_TICKS,
   DENSITY_CAP,
   emptyIntent,
@@ -189,6 +191,28 @@ describe('Capitulo III — «Las entidades vivas no surgen automaticamente»', (
     world.setNow(LIFE_STEP_TICKS * 1200);
     expect(world.populationOf(cx, cy, biome, LifeKind.Tree)).toBeGreaterThan(0);
     expect(world.countOf(cx, cy, biome, LifeKind.Tree)).toBeGreaterThan(0);
+  });
+
+  it('la fauna no reaparece: lo que muere no vuelve, ni pasando el tiempo ni regenerando su chunk', () => {
+    // El animal es potencial de su chunk y su muerte va al overlay (regla 4):
+    // el chunk lo sigue «generando», pero no vuelve a existir. Sin
+    // reproduccion (otra tanda), la fauna solo puede ir a menos.
+    const state = createGame(1);
+    const before = state.fauna.size;
+    const [key] = state.fauna.keys();
+    state.world.killFauna(key);
+
+    const { entities, playerId } = state;
+    const home = [entities.x[playerId], entities.y[playerId]];
+    entities.x[playerId] += 40 * CHUNK_SIZE; // lejos: se descargan su chunk y su fauna
+    step(state, emptyIntent());
+    skipTime(state, DAY_TICKS);
+    entities.x[playerId] = home[0];
+    entities.y[playerId] = home[1];
+    step(state, emptyIntent());
+
+    expect(state.fauna.has(key)).toBe(false);
+    expect(state.fauna.size).toBe(before - 1);
   });
 });
 
@@ -629,17 +653,26 @@ describe('Capitulo II: combinar y herramientas', () => {
 
   it('todo recurso tiene destino: se gasta en una receta o se usa', () => {
     // Desde la tanda 2 no queda nada que solo se acumule: la madera hace la
-    // mesa, el carbon y los minerales van al horno, los lingotes a la mesa.
+    // mesa, el carbon y los minerales van al horno, los lingotes a la mesa. Con
+    // la fauna, la carne cruda se asa y la asada se come. Piel, plumas y
+    // caparazon esperan su uso (decision del autor, 2026-10-02) y solo pasan
+    // por estar nombrados en `AWAITING_USE`: un objeto nuevo sin destino que
+    // no este ahi sigue haciendo caer esto.
     const spent = new Set(RECIPES.flatMap((r) => r.inputs.map((i) => i.item)));
-    const eatenOrSown = [Resource.Berries, Resource.TreeSeed, Resource.PlantSeed];
+    const sown = [Resource.TreeSeed, Resource.PlantSeed];
     for (let item = 0 as Resource; item < RESOURCE_COUNT; item++) {
       const destiny =
         spent.has(item) ||
-        eatenOrSown.includes(item) ||
+        foodValue(item) > 0 ||
+        sown.includes(item) ||
         toolStats(item) !== null ||
         garmentOf(item) !== null ||
         placedFeatureOf(item) !== Feature.None;
-      expect(destiny, RESOURCE_NAMES[item]).toBe(true);
+      const awaiting = AWAITING_USE.includes(item);
+      expect(destiny || awaiting, RESOURCE_NAMES[item]).toBe(true);
+      // Y lo que espera, espera de verdad: si ya tuviera destino, sobraria en
+      // la lista y la lista dejaria de decir lo que falta.
+      if (awaiting) expect(destiny, `${RESOURCE_NAMES[item]} ya tiene uso`).toBe(false);
     }
   });
 

@@ -86,6 +86,11 @@ const DESCRIPTIONS: Record<number, string> = {
   [Resource.Furnace]: 'En la mano, clic derecho (o USAR) mirando al suelo para ponerlo. Usalo para fundir.',
   [Resource.FiberBag]: 'Arrastrala a la cintura, en PERSONAJE: +2 casillas.',
   [Resource.FrameBackpack]: 'Arrastrala a la espalda, en PERSONAJE: +6 casillas.',
+  [Resource.RawMeat]: 'De los animales. Cruda no se come: asala en el horno.',
+  [Resource.CookedMeat]: 'Del horno. En la mano, clic derecho (o USAR) para comer: alimenta mas que las bayas.',
+  [Resource.Hide]: 'De los mamiferos. Aun no tiene uso.',
+  [Resource.Feather]: 'De las gaviotas. Aun no tiene uso.',
+  [Resource.Shell]: 'Del cangrejo. Aun no tiene uso.',
 };
 
 /** Nombre corto para una casilla, que es estrecha. Sin iconos (decision del autor). */

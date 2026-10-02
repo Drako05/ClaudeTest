@@ -22,14 +22,14 @@ Formato (el escaner lo lee):
 - `toDataURL` — API de canvas del navegador. En: `tools/slash.mjs`.
 - `preserveDrawingBuffer` — opcion de WebGL. En: `tools/slash.mjs`.
 - `pixi.js` — la biblioteca del isometrico, que se retiro. En: `docs/pendiente.md`.
-- `highRefresh` — prefijo de la pasada `highRefreshPass` del humo, como se escribe en la linea de ordenes. En: `CLAUDE.md`.
-- `devTools` — prefijo de la pasada `devToolsPass`, que es el nombre de su casilla en la matriz de CI. En: `CLAUDE.md`.
+- `highRefresh` — prefijo de la pasada `highRefreshPass` del humo, como se escribe en la linea de ordenes. En: `docs/pruebas.md`.
+- `devTools` — prefijo de la pasada `devToolsPass`, que es el nombre de su casilla en la matriz de CI. En: `docs/pruebas.md`.
 
 ## Historia que se cuenta a proposito
 
 - `AIR_CONTROL` — la desviacion en el aire del salto, retirada el 2026-09-30 y tachada en su tabla de numeros. En: `docs/pendiente.md`.
-- `effectLayer` — la capa de pantalla del isometrico, que explica por que el barrido va encima. En: `CLAUDE.md`, `packages/client/src/effects-view.ts`.
-- `fpPitch` — la inclinacion aparte de la primera persona, antes de compartir la mirada. En: `CLAUDE.md`.
+- `effectLayer` — la capa de pantalla del isometrico, que explica por que el barrido va encima. En: `docs/efectos.md`, `packages/client/src/effects-view.ts`.
+- `fpPitch` — la inclinacion aparte de la primera persona, antes de compartir la mirada. En: `docs/controles.md`.
 - `levelStep` — la auditoria del 2026-09-29 lo cita como resto retirado. En: `docs/pendiente.md`.
 - `actionArea` — la fase 2 del relieve lo cuenta; ya no existe. En: `docs/pendiente.md`.
 - `regrowTicksOf` — la auditoria del 2026-09-29 lo cuenta como escape: `CLAUDE.md` lo citaba sin existir. En: `docs/pendiente.md`.

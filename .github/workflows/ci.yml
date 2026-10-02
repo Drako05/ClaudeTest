@@ -40,7 +40,7 @@ jobs:
         # de su nombre), los gestos con toques de verdad y el barrido en
         # pixeles. Si se anade una pasada al humo, va aqui tambien: el escaner
         # de la auditoria lo cruza.
-        pasada: [desktop, resources, stations, mobile, devTools, life, relief, highRefresh, gestures, slash]
+        pasada: [desktop, resources, stations, mobile, devTools, life, relief, highRefresh, fauna, gestures, slash]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/preparar

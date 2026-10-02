@@ -179,7 +179,7 @@ cambio al pasar de cenital a isometrica, ni de isometrica a 3D.
 
 **Los elementos del mundo son aspas de dos laminas**, no sprites que giran con
 la camara: asi el bosque tiene lados. El jugador si es un sprite que mira a la
-camara, por decision del autor. El detalle esta en `CLAUDE.md`.
+camara, por decision del autor. El detalle esta en `docs/arte.md`.
 
 **El input tactil no rompe la frontera del nucleo.** El joystick y los botones
 son una segunda fuente que produce la misma `Intent` que el teclado; el nucleo

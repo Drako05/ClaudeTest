@@ -34,7 +34,7 @@ export interface DevActions {
    * probar la fabricacion y la mineria sin juntarlo todo a mano. Da
    * materiales, no herramientas, para que fabricar se siga probando de verdad.
    */
-  onKit: (kit: 'piedra' | 'metal') => void;
+  onKit: (kit: 'piedra' | 'metal' | 'cocina') => void;
 }
 
 export class DevTools {
@@ -191,6 +191,7 @@ export class DevTools {
           <button data-toggle="survival" type="button">Sin hambre</button>
           <button data-kit="piedra" type="button">Materiales de piedra</button>
           <button data-kit="metal" type="button">Materiales de metal</button>
+          <button data-kit="cocina" type="button">Materiales de cocina</button>
         </div>
         <p class="devNote">Un salto no simula el movimiento de esas horas.</p>
       </div>
@@ -221,7 +222,8 @@ export class DevTools {
         this.speed = Number(button.dataset.speed);
         this.paused = false;
       } else if (button.dataset.kit) {
-        const kit = button.dataset.kit === 'metal' ? 'metal' : 'piedra';
+        const want = button.dataset.kit;
+        const kit = want === 'metal' || want === 'cocina' ? want : 'piedra';
         this.actions.onKit(kit);
         this.push(`materiales de ${kit}`);
       } else if (button.dataset.jump) {

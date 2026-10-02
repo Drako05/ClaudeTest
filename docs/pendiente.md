@@ -4,7 +4,8 @@ Este fichero existe porque las notas de trabajo del agente viven en un contenedo
 efimero y **mueren con la sesion**. Lo que hay aqui son decisiones del autor y
 deuda tecnica que ninguna sesion nueva podria reconstruir leyendo el codigo.
 
-Lo permanente del *como* esta en `CLAUDE.md`; las leyes del mundo, en
+Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
+indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
 **Ultima auditoria: commit `8396b7f`, 2026-10-02** (la tanda 2 entera, con sus
@@ -53,8 +54,8 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Sin `?seed` se juega un mundo al azar (el 3D usaba siempre el 12345) | El isometrico se retira | una linea |
 | Salud y hambre **sin numero** en los anillos | La franja de salud y hambre | CSS |
 | Los iconos de los botones y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y los cubiertos | La franja de salud y hambre | SVG |
-| El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `CLAUDE.md`, racimo del pulgar | un numero |
-| Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 70-120, 70 por defecto) | `CLAUDE.md`, las tres vistas | un numero en `camera.ts` |
+| El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `docs/controles.md`, el dedo de ACCION | un numero |
+| Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 70-120, 70 por defecto) | `docs/controles.md`, las tres vistas | un numero en `camera.ts` |
 | Sensibilidad del raton capturado: **0,0025 rad por pixel** (unos 0,14 grados) | El raton lleva la mirada | un numero en `camera.ts` |
 | Con el cursor capturado **un clic es un golpe** y mantener no repite | El raton lleva la mirada | un temporizador |
 | Al morir el cursor **se suelta** para pulsar «Reiniciar», y reiniciar lo vuelve a capturar | El raton lleva la mirada | una linea |
@@ -143,7 +144,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | En PC la abre solo el **raton** al pasar; un dedo que toca el ojo no cuenta como pasar por encima | Angulo de vision ajustable | una linea en `fov-panel.ts` |
 | **Cualquier tecla** la cierra, flechas incluidas (con la barra enfocada no la mueven: se anda) | Angulo de vision ajustable | una linea |
 | Los grados son **verticales**, como el 70 de siempre: a 120, un movil apaisado ve unos 150 en horizontal | Angulo de vision ajustable | una conversion |
-| Con teclado el catalejo vuelve **0,8 s** despues de la ultima pulsacion de + o - | `CLAUDE.md`, las tres vistas | un numero |
+| Con teclado el catalejo vuelve **0,8 s** despues de la ultima pulsacion de + o - | `docs/controles.md`, las tres vistas | un numero |
 | Una roca vista desde arriba se lee como **dos cartas cruzadas** | Las features ya son aspas | darles modelo propio |
 | Tronco = el tramo **desnudo** hasta la copa, que se apoya encima | Arboles altos | redibujar el arte |
 | El tronco desnudo **por especie** (μ ± σ): picea comun 2,5 ± 0,35, alerce 4 ± 0,5, roble 2,4 ± 0,3, cerezo 2,2 ± 0,2, picea negra 2,1 ± 0,1, picea azul 2,2 ± 0,2; **truncada** en `[max(2, μ−2σ), μ+2σ]` | Troncos por especie | numeros en `sim/trunk.ts` |
@@ -524,10 +525,50 @@ golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
 
+## `CLAUDE.md` adelgazado: cada parte en su documento — HECHO (2026-10-02)
+
+La propuesta 3, que pediste tras las 2 y 4. `CLAUDE.md` se carga **entero en
+cada turno** y cada llamada a una herramienta lo reenvia, asi que lo que pesa
+se paga muchas veces por sesion. Ahora lleva solo lo que vale para cualquier
+tarea —arranque, reglas duras, la regla de trabajo contigo, el libro, el
+procedimiento de pruebas y la auditoria— y un **indice**, «Donde esta cada
+cosa: leer antes de tocar», que dice que documento leer antes de tocar cada
+parte. Medido: de 87.978 bytes (1.378 lineas) a 21.940 (364), una cuarta
+parte.
+
+- **Nada se reescribio: se movio literal.** Cada linea con texto del
+  `CLAUDE.md` de antes esta, identica, en el nuevo o en uno de los documentos
+  (comprobado con un guion, contando repeticiones); solo cambiaron cuatro
+  titulos, que pasaron a ser el de su documento, y una referencia interna
+  («ver «Efectos visuales»», ahora `docs/efectos.md`).
+- **El reparto**: `docs/reglas.md` (las reglas 12, 21 y 22 enteras),
+  `docs/controles.md`, `docs/recoleccion.md`, `docs/efectos.md`,
+  `docs/arte.md` (aspas y proporciones), `docs/relieve.md` (con el salto y el
+  hambre), `docs/devtools.md` y `docs/pruebas.md` (el humo, la CI y sus
+  lecciones).
+- **Las reglas 12, 21 y 22 llevan un resumen** en `CLAUDE.md` con su mismo
+  numero, que es el que cita el codigo; el texto entero va en
+  `docs/reglas.md`. Es lo unico duplicado, y la lente F de la auditoria lo
+  vigila.
+- **El escaner tiene una categoria nueva**: un documento de `docs/` que el
+  indice no nombra sale como aviso, con su fallo sembrado en la autoprueba. Un
+  documento sin fila no lo lee nadie, y es perder la informacion por otro
+  camino. Las listas de permitidos del escaner (`retirados.md`, `ignorar.md`)
+  apuntan a los documentos nuevos, y el escaner da los mismos 20 avisos que
+  antes del cambio.
+- **A partir de ahora**, lo que cambie en una parte se escribe en su documento,
+  no en `CLAUDE.md`, salvo que cambie una regla dura, el procedimiento o el
+  indice.
+
+Las referencias a «`CLAUDE.md`, tal seccion» de las secciones de historia de
+este fichero se quedan como estaban: eran ciertas cuando se escribieron, y el
+indice dice donde vive hoy cada seccion.
+
 ## Las pruebas pesadas a la CI, y las mutaciones en paralelo — HECHO (2026-10-02)
 
 Lo pediste tras ver lo que tardaba cada ronda (propuestas 2 y 4; la 3,
-adelgazar `CLAUDE.md`, va despues):
+adelgazar `CLAUDE.md`, va despues; *Luego*: hecha el mismo dia, ver la
+seccion de arriba):
 - **Lo pesado se verifica en la CI, en la rama `pruebas`**, que no despliega:
   `tools/a-pruebas.sh` lleva alli el arbol de trabajo tal cual, sin tocar
   `main`. A `main` solo va lo que sale verde ahi. En local, solo lo barato y la

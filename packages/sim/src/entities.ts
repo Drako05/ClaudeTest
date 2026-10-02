@@ -7,8 +7,11 @@
  * objetos, y es deliberado: es la diferencia entre escalar y no escalar.
  */
 
+import type { Animal } from './fauna.js';
+
 export enum EntityKind {
   Player = 0,
+  /** Un animal de la fauna (`fauna.ts`). */
   Critter = 1,
 }
 
@@ -52,6 +55,20 @@ export class EntityStore {
   readonly hunger: Float32Array;
   readonly kind: Uint8Array;
   readonly alive: Uint8Array;
+  /**
+   * El animal que es cada entidad de fauna, o `null`. Quien es —especie, etapa,
+   * sexo, territorio— sale de su chunk (`faunaOf`); la entidad solo lo lleva
+   * mientras anda materializado cerca del jugador.
+   */
+  readonly animal: (Animal | null)[];
+  /** Los PV completos de cada animal. Para el jugador, `health` va de 0 a 100. */
+  readonly maxHealth: Float32Array;
+  /** El periodo de paseo y el punto de paso calculados, para no repetirlos. */
+  readonly wanderPeriod: Float64Array;
+  readonly wanderX: Float64Array;
+  readonly wanderY: Float64Array;
+  /** Huecos de entidades retiradas, que `spawn` reutiliza antes de crecer. */
+  private readonly free: number[] = [];
 
   constructor(capacity = 4096) {
     this.capacity = capacity;
@@ -70,11 +87,18 @@ export class EntityStore {
     this.hunger = new Float32Array(capacity);
     this.kind = new Uint8Array(capacity);
     this.alive = new Uint8Array(capacity);
+    this.animal = new Array<Animal | null>(capacity).fill(null);
+    this.maxHealth = new Float32Array(capacity);
+    this.wanderPeriod = new Float64Array(capacity).fill(Number.NaN);
+    this.wanderX = new Float64Array(capacity);
+    this.wanderY = new Float64Array(capacity);
   }
 
   spawn(kind: EntityKind, x: number, y: number): number {
-    if (this.count >= this.capacity) return INVALID_ENTITY;
-    const id = this.count++;
+    let id: number;
+    if (this.free.length > 0) id = this.free.pop()!;
+    else if (this.count < this.capacity) id = this.count++;
+    else return INVALID_ENTITY;
     this.x[id] = x;
     this.y[id] = y;
     this.vx[id] = 0;
@@ -92,6 +116,20 @@ export class EntityStore {
     this.hunger[id] = 100;
     this.kind[id] = kind;
     this.alive[id] = 1;
+    this.animal[id] = null;
+    this.maxHealth[id] = 100;
+    this.wanderPeriod[id] = Number.NaN;
     return id;
+  }
+
+  /**
+   * Retira una entidad y deja su hueco para la siguiente. Es lo de la fauna,
+   * que entra y sale con los chunks; el jugador no se retira nunca.
+   */
+  despawn(id: number): void {
+    if (id < 0 || id >= this.count || this.kind[id] === EntityKind.Player) return;
+    this.alive[id] = 0;
+    this.animal[id] = null;
+    this.free.push(id);
   }
 }
