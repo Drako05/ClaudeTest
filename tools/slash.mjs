@@ -20,9 +20,13 @@
 
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
+
+// En un repositorio recien clonado (la CI) la carpeta de capturas no existe, y
+// sin ella la herramienta revienta antes de medir nada.
+await mkdir(new URL('../screenshots/', import.meta.url), { recursive: true });
 
 const WIDTH = 1280;
 const HEIGHT = 720;

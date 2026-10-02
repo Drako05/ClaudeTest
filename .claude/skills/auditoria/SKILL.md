@@ -107,20 +107,21 @@ Lo que falto la primera vez que se audito este repo.
 
 ## Fase 4 — Verificacion
 
-Todo, aunque la auditoria «solo toque comentarios». Las pruebas de navegador
-se corren **de una en una**, nunca a la vez que otras (`escapes.md`, P2).
+Todo, aunque la auditoria «solo toque comentarios». Lo pesado va a la CI, en la
+rama `pruebas` (`CLAUDE.md`, «Antes de dar algo por bueno»): en local solo lo
+barato y lo que la CI no corre.
 
 ```bash
 npm run typecheck && npm test
-npm run smoke          # en segundo plano, esperando su fichero de fin (P1)
-npm run gestures
-npm run shots
-npm run slash
-python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"   # si se toco CI
+node tools/mutar.mjs --comprobar        # si la tanda tiene mutaciones
+npm run shots                           # la unica herramienta de navegador fuera de CI
+python3 -c "import yaml; [yaml.safe_load(open(f)) for f in ['.github/workflows/ci.yml', '.github/workflows/mutaciones.yml']]"   # si se toco CI
+FIRMA="…" tools/a-pruebas.sh "auditoria"   # y esperar «CI completa» y «Mutaciones completas» en verde
 ```
 
-Para esperar una prueba larga, se espera un fichero de fin, nunca el proceso
-por su nombre:
+Si una prueba de navegador hay que correrla aqui (la CI no esta, o se depura
+una pasada), **de una en una**, nunca a la vez que otras (`escapes.md`, P2), y
+esperando un fichero de fin, nunca el proceso por su nombre (P1):
 
 ```bash
 ( node tools/smoke.mjs > LOG 2>&1; echo "fin: $?" >> LOG )   # en segundo plano

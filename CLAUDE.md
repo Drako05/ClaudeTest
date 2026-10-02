@@ -338,23 +338,68 @@ donde se fue el gasto.
 
 ## Antes de dar algo por bueno
 
-```bash
-npm run typecheck && npm test && npm run smoke
-```
+**Lo pesado se verifica en la CI, en la rama `pruebas`** (decision del autor,
+2026-10-02). En local el humo va en serie —humo, gestos y barrido, unos 22
+minutos, y cada mutacion 4-5 mas— y la CI lo reparte en maquinas a la vez: unos
+5 minutos todo, mutaciones incluidas. Pero **a `main` no se empuja para
+probar**: `deploy.yml` publica el juego en cada push a `main` sin esperar a la
+CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
 
-**La CI confirma, pero no se espera** (decision del autor, 2026-09-29). Lo que
-valida un cambio son estas pruebas en local, antes de empujar. Tras empujar se
-informa al autor en el acto, diciendo que la CI esta en marcha, y la CI se mira
-**al empezar el siguiente turno de trabajo**: si salio en rojo, se dice y se
-arregla antes que nada. Esperarla costaba ~19 minutos de conversacion parada en
-cada entrega. La skill `auditoria` si la espera, porque cierra una tanda.
+1. **En local, mientras se trabaja**: `npm run typecheck && npm test` (~20 s) y
+   **solo la pasada que se esta escribiendo o tocando**
+   (`npm run build && node tools/smoke.mjs <pasada>`), las veces que haga falta.
+2. **La ronda de mutaciones** en `tools/mutaciones.mjs`: cada comprobacion
+   nueva, con lo que la rompe (ver abajo).
+3. **`tools/a-pruebas.sh "que se prueba"`**, con `FIRMA` puesta a las lineas de
+   atribucion de la sesion. Lleva el arbol de trabajo tal cual, cambios sin
+   commit incluidos, a la rama `pruebas`: commit con un indice temporal encima
+   de su punta, avance rapido, sin tocar `main` ni el indice. Antes comprueba
+   que la lista de mutaciones aplica.
+4. **Esperar las dos tandas en verde**: «CI completa» (`ci.yml`) y «Mutaciones
+   completas» (`mutaciones.yml`). Sin `gh` ni API: un temporizador en segundo
+   plano (`sleep 300` con `run_in_background`) y despues las herramientas MCP
+   de GitHub: `actions_list` con `list_workflow_runs` filtrando la rama
+   `pruebas` (el SHA que imprimio el guion) da el estado y la conclusion de
+   las dos tandas; si alguna sale en rojo, `get_job_logs` con su `run_id`,
+   `failed_only` y `tail_lines` ~40 da solo lo que fallo —el resumen de
+   `mutar.mjs` y los `FALLO` del humo quedan unas 20 lineas antes del final—.
+   **No listar los trabajos** (`list_workflow_jobs`) salvo que haga falta: con
+   veinte trabajos son ~10.000 tokens de pasos. Mientras la CI esta en cola
+   —son unos 25 trabajos para 20 maquinas— se sigue con otra cosa, como la
+   documentacion. Lo que falle se arregla y se vuelve al 3.
+5. **Solo entonces**, commit y push a `main`. Esa CI **confirma, pero no se
+   espera** (decision del autor, 2026-09-29): se informa al autor en el acto,
+   diciendo que esta en marcha, y se mira **al empezar el siguiente turno**; si
+   salio en rojo, se dice y se arregla antes que nada.
+
+El humo completo en local (`npm run smoke`, mas `gestures` y `slash`) queda para
+cuando la CI no este disponible. La rama `pruebas` se queda en el remoto para
+siempre —el proxy no deja borrar ramas, y no hace falta— y un push nuevo cancela
+la tanda anterior que siguiera en marcha.
+
+**Las mutaciones** (`tools/mutar.mjs`, con lo puro en `mutar-lib.mjs` y su
+test): cada comprobacion nueva se ve **caer** rompiendo a proposito lo que
+afirma; si no cae, no comprueba nada (lente B). La lista de la ronda es
+`tools/mutaciones.mjs` —nombre, fichero, el texto `de` que tiene que aparecer
+exactamente una vez, el `a` que lo rompe, y la `prueba`: `smoke:<pasada>`,
+`gestures`, `slash` o `test:<fichero de vitest>`—; se reescribe en cada ronda y
+la de antes queda en la historia. En la CI cada mutacion es un trabajo con su
+nombre, que sale en verde si su prueba CAE. En local:
+`node tools/mutar.mjs --comprobar` (segundos) o `node tools/mutar.mjs [nombre…]`
+(en serie; restaura siempre, tambien con Ctrl-C). **Una mutacion cuyo build sale
+identico al limpio es un error, no un «no cae»**: no llego a lo que se mide, que
+es justo el escape P3 —se midio una vez con el build viejo—. Asi que una
+mutacion de un comentario, que el minificador borra, sale en rojo.
 
 **La CI va repartida** (`.github/workflows/ci.yml`): un trabajo para typecheck
 y tests, y una **matriz con una maquina por pasada del humo** —`desktop`,
 `resources`, `stations`, `mobile`, `devTools`, `life`, `relief`,
-`highRefresh`— mas otra
-para los gestos, todas a la vez; y un trabajo final, «CI completa», que solo sale
-verde si todo lo esta. Cada pasada se lanza por el prefijo de su nombre
+`highRefresh`— mas los gestos y el barrido en pixeles (`slash`, que desde que
+corre aqui **falla** si alguna vista baja de 50 pixeles aclarados o la estocada
+de 500), todas a la vez; y un trabajo final, «CI completa», que solo sale
+verde si todo lo esta. La preparacion —Node, dependencias y Chromium con su
+cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
+tandas. Cada pasada se lanza por el prefijo de su nombre
 (`node tools/smoke.mjs life`). **Si anades una pasada al humo, anadela a la
 matriz**, o no correra nunca en CI: el escaner de la auditoria lo cruza. Y el
 humo sale en rojo si se le pide una pasada que no existe, para que una errata

@@ -86,6 +86,20 @@ export function validar(lista, leer, pasadas) {
   return errores;
 }
 
+/**
+ * Si una prueba que salio en rojo cayo POR SU COMPROBACION y no por romperse:
+ * el humo, los gestos y el barrido escriben `FALLO:`; vitest, sus `×`
+ * y `AssertionError` (un fichero que no compila tambien dice `FAIL`, y no
+ * cuenta). Una prueba que revienta por otra cosa —un fichero que
+ * falta, un error de sintaxis— tambien sale en rojo, y contarlo como «cae»
+ * daria por buena una comprobacion sin haberla visto morder: la primera vez
+ * que corrieron en la CI, la mutacion del barrido «cayo» porque `slash` no
+ * encontraba su carpeta de capturas.
+ */
+export function cayoDeVerdad(salida, navegador) {
+  return navegador ? /FALLO/.test(salida) : /AssertionError|×/.test(salida);
+}
+
 /** Las lineas que explican por que cayo: los `FALLO` del humo y lo que falla en vitest. */
 export function motivos(salida, max = 4) {
   return salida

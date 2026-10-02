@@ -92,21 +92,6 @@ export default [
     a: '      mesh.frustumCulled = true;',
     prueba: 'slash',
   },
-  // TRAMPAS TEMPORALES para probar el sistema: las dos tienen que salir en rojo.
-  {
-    nombre: 'TRAMPA comentario',
-    fichero: 'packages/client/src/main.ts',
-    de: '/** Un punto de three.js, en pixeles de la pantalla. */',
-    a: '/** Un punto de three.js, en pixeles. */',
-    prueba: 'smoke:desktop',
-  },
-  {
-    nombre: 'TRAMPA registro 1 px mas arriba',
-    fichero: 'packages/client/src/main.ts',
-    de: 'const FEED_GAP = 6;',
-    a: 'const FEED_GAP = 7;',
-    prueba: 'smoke:desktop',
-  },
   {
     nombre: 'registro sube',
     fichero: 'packages/client/src/pickup-feed.ts',

@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { aplicar, motivos, orden, pasadasDelHumo, validar } from './mutar-lib.mjs';
+import { aplicar, cayoDeVerdad, motivos, orden, pasadasDelHumo, validar } from './mutar-lib.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST = join(ROOT, 'packages/client/dist/index.html');
@@ -118,9 +118,15 @@ for (const m of elegidas) {
       r = { estado: 'ERROR', motivos: ['la mutacion no llego al build: sale identico al limpio'] };
     } else {
       const c = correr(cmd);
-      r = c.codigo !== 0
-        ? { estado: 'CAE', motivos: motivos(c.salida) }
-        : { estado: 'NO CAE', motivos: ['la prueba paso con la mutacion puesta: no comprueba nada'] };
+      if (c.codigo === 0) {
+        r = { estado: 'NO CAE', motivos: ['la prueba paso con la mutacion puesta: no comprueba nada'] };
+      } else if (cayoDeVerdad(c.salida, conBuild)) {
+        r = { estado: 'CAE', motivos: motivos(c.salida) };
+      } else {
+        // En rojo, pero sin un FALLO: se rompio por otra cosa (cayoDeVerdad).
+        const cola = c.salida.trim().split('\n').slice(-6).map((l) => l.trim());
+        r = { estado: 'ERROR', motivos: ['la prueba se rompio sin un FALLO; no se vio morder la comprobacion', ...cola] };
+      }
     }
   } finally {
     restaurar();

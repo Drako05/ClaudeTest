@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 // @ts-expect-error: modulo de las herramientas, en JavaScript.
-import { aplicar, motivos, orden, pasadasDelHumo, validar } from '../tools/mutar-lib.mjs';
+import { aplicar, cayoDeVerdad, motivos, orden, pasadasDelHumo, validar } from '../tools/mutar-lib.mjs';
 
 const PASADAS = ['desktop', 'resources', 'stations', 'mobile'];
 
@@ -97,6 +97,14 @@ describe('Validar la lista', () => {
 });
 
 describe('Por que cayo', () => {
+  it('cae de verdad solo si la comprobacion lo dice, no si la prueba revienta', () => {
+    expect(cayoDeVerdad('  FALLO: no se arranca en primera persona', true)).toBe(true);
+    // Lo que paso la primera vez en la CI: `slash` sin su carpeta de capturas.
+    expect(cayoDeVerdad("Error: ENOENT: no such file or directory, open 'screenshots/slash.png'", true)).toBe(false);
+    expect(cayoDeVerdad(' × un test\nAssertionError: expected 1 to be 3', false)).toBe(true);
+    expect(cayoDeVerdad('SyntaxError: Unexpected token', false)).toBe(false);
+  });
+
   it('se queda con los FALLO del humo y los fallos de vitest', () => {
     const salida = 'ok\n  FALLO: no se arranca en primera persona\nnada\n × un test\n FAIL tests/x.test.ts\n';
     expect(motivos(salida)).toEqual(['FALLO: no se arranca en primera persona', '× un test', 'FAIL tests/x.test.ts']);
