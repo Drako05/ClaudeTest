@@ -106,7 +106,7 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     bloques** (eran 2; los subio a 2,5 el 2026-09-29 y a 3 el 2026-10-01) **y 90 grados** (±45) en el plano de la mirada —la direccion en que se mira,
     con su inclinacion, y la horizontal a su derecha—, y **el terreno lo
     corta**: no se golpea a traves del suelo ni de una pared. Se recorre con 33
-    rayos (a 3 bloques, un hueco de 0,147, menos que el tronco mas fino, 0,22), cada uno
+    rayos (a 3 bloques, un hueco de 0,147, menos que el tronco mas fino, 0,21), cada uno
     cortado donde entra en el terreno; cae todo objeto cuyo hitbox cruce alguno.
     **Sembrar** va donde la mirada toca la cara de arriba del suelo, a menos de
     3 bloques **en horizontal** —el mismo alcance, decision del autor— (lo de
@@ -412,7 +412,10 @@ se relanza sola desde GitHub («Re-run failed jobs»).
 **Y al cerrar cada tanda, la auditoria**: la skill `auditoria`
 (`.claude/skills/auditoria/`, se invoca con `/auditoria`). Tiene un proceso fijo
 por fases, diez lentes, un escaner automatico con autoprueba y un **registro de
-escapes**. Parte del commit que marca «Ultima auditoria» en `docs/pendiente.md`.
+escapes**. Parte del commit que marca «Ultima auditoria» en `docs/pendiente.md`. **Lo
+que un cambio retire —un valor, una tecla, un nombre— entra en
+`.claude/skills/auditoria/references/retirados.md` en ese mismo cambio**, no en
+la auditoria: si no, nadie lo busca hasta entonces (escape 19).
 Cada fallo que aparezca despues y que una auditoria pudo ver se anade a ese
 registro, con el metodo que lo habria detectado, y ese metodo pasa al escaner o
 a una lente: asi la skill mejora con cada cosa que se le escapa. Vive en el repo

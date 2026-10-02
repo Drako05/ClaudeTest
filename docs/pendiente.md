@@ -7,9 +7,9 @@ deuda tecnica que ninguna sesion nueva podria reconstruir leyendo el codigo.
 Lo permanente del *como* esta en `CLAUDE.md`; las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `912c3d7`, 2026-09-29** (mas el escaner de la skill
-`auditoria`, que salio despues y encontro cuatro restos mas, corregidos en el
-commit que la crea). La proxima parte de aqui: ver `.claude/skills/auditoria/`.
+**Ultima auditoria: commit `8396b7f`, 2026-10-02** (la tanda 2 entera, con sus
+siete rondas de ajustes y las pruebas pesadas a la CI). La proxima parte de
+aqui: ver `.claude/skills/auditoria/`.
 
 **Como leerlo.** Va de lo mas urgente a lo mas historico:
 
@@ -40,6 +40,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Los ojos a **1,75** para las tres vistas y el golpe (la orbital miraba a 1,6) | Golpe por hitbox y una sola mirada | un numero en `sim/aim.ts` |
 | Inclinacion de arranque **−0,62** tambien en primera persona (antes entraba a −0,2) y tope de **±83 grados** | Golpe por hitbox y una sola mirada | numeros en `camera.ts` |
 | Sembrar a menos de 3 bloques (el alcance es tuyo) **en horizontal**, no a lo largo de la mirada (asi basta mirar 35 grados abajo, no 44) | Golpe por hitbox y una sola mirada | una linea |
+| El tronco que se golpea es una **caja del grosor del pie**, y el que se ve estrecha hacia la copa: a media altura la picea negra se dibuja de 0,16 y su caja mide 0,21 | Auditoria al cerrar la tanda 2 | estrechar la caja o no estrechar el dibujo |
 | Hitboxes: arbusto 0,9 de ancho × 1,1, roca y minerales 0,9 × 1,0, brote 0,3 × 0,85 | Golpe por hitbox y una sola mirada | numeros en `gathering.ts` |
 | Colision de camara: se para **0,3** antes, la isometrica a **60** como mucho, y el jugador se oculta con la camara a menos de **1** | Golpe por hitbox y una sola mirada | numeros en `camera*.ts` |
 | Grosor del barrido en primera persona: medio ancho **0,04** a 3 bloques | Golpe por hitbox y una sola mirada | un numero en `effects.ts` |
@@ -62,8 +63,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Casillas iniciales y tope: **16 y 100**, ya decididos por el autor (antes, 8 y 20 mios) | Recoleccion y fabricacion | — |
 | Mesa de **1 × 1 × 1** bloques y horno de **1,25** de alto: la caja que se ve es la que estorba y se golpea | Recoleccion y fabricacion, tanda 2 | numeros en `gathering.ts` (`STATION_BOXES`) |
 | Una estacion **no se coloca en un talud** (quedaria colgando) **ni donde pise el cuerpo** del jugador | Recoleccion y fabricacion, tanda 2 | dos lineas en `tryPlace` |
-| Los 3 de la estacion se miden **del centro del jugador al centro de su casilla** | Recoleccion y fabricacion, tanda 2 | una linea en `stations.ts` |
-| USAR abre lo que toca **el rayo central** de la mirada, a 2,5 como el golpe; lo que haya detras de otra cosa no se abre | Recoleccion y fabricacion, tanda 2 | `gazeTarget` en `aim.ts` |
+| USAR abre lo que toca **el rayo central** de la mirada, al alcance del golpe (3); lo que haya detras de otra cosa no se abre | Recoleccion y fabricacion, tanda 2 | `gazeTarget` en `aim.ts` |
 | La ropa abre **tramos fijos**: la cintura las casillas 17-18, la espalda las 19-24, aunque solo se lleve una | Recoleccion y fabricacion, tanda 2 | `inventory.ts` |
 | Una prenda se quita **solo a una casilla vacia** de fuera de su tramo; tirarla puesta, solo con el tramo vacio | Recoleccion y fabricacion, tanda 2 | `inventory.ts` |
 | Categorias: a mano **Herramientas y Estaciones**; mesa **Herramientas y Ropa**; horno **Fundicion** | Recoleccion y fabricacion, tanda 2 | texto en `RECIPES` |
@@ -160,6 +160,48 @@ Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
 al encadenarlos, pulsados en pleno vuelo. La causa esta localizada y el plan
 escrito, y el 2026-09-28 decidiste **seguir sin margen de espera ni coyote
 time** hasta ver si basta el arreglo de los pestillos (abajo).
+
+---
+
+## Auditoria al cerrar la tanda 2 (2026-10-02)
+
+A peticion tuya, de `912c3d7` a `8396b7f`. No aparecio ningun fallo del juego;
+si restos de cosas que cambiaron por el camino y una comprobacion que afirmaba
+de mas:
+
+- **El alcance de 2,5 seguia escrito en cinco comentarios** (el golpe, el
+  barrido, un test y dos del humo) y en una fila de «Esperando tu juicio»,
+  con el alcance ya en 3. Nadie lo buscaba: el valor viejo no se anadio a la
+  lista de retirados al cambiarlo. Desde ahora se anade en el mismo cambio.
+- **Diez comentarios de documentacion sueltos**, colgando encima de otro: el
+  de `lookZ` quedo encima de `lookRoll` al meter el giro del TAP, el de
+  `rollFor` encima de `tiltOf`, y uno de la sonda seguia diciendo que la
+  reticula marca lo que el golpe alcanza, que quitaste el 2026-09-30. Otro
+  decia que el ojo era «el unico control sin tecla anunciada», y desde la
+  7.ª ronda todos la llevan. El escaner los busca ya solo.
+- **Un test afirmaba de mas**: «entre dos rayos no cabe ni el tronco mas
+  fino» comparaba con el grosor medio de la picea negra (0,22), no con el de
+  la mas baja (0,21). Ahora lo saca de las especies, y se vio caer.
+- **Restos de texto**: el hambre «en un dia» en un test (son dos); las
+  recetas de estacion «a menos de 3 casillas» en un test y en el humo (es el
+  alcance, de los ojos a su caja); un comentario del nucleo que hablaba del
+  cursor apuntando, del isometrico; el README decia que USAR del movil solo
+  come y siembra; el anillo, que era solo de PC.
+- **Una fila de «Esperando tu juicio» que ya no existe**: «los 3 de la
+  estacion se miden del centro del jugador al centro de su casilla». Lo
+  sustituyo tu decision del 2026-10-01 (de los ojos a su caja, al alcance).
+
+Se ejecuto lo que la CI no corre: `npm run shots` y `analyze-world`
+funcionan; el relieve cuesta 0,61 puntos sobre la linea base, dentro del
+presupuesto.
+
+Se dejo a proposito:
+- `lastBlocked`, `lastBroke` y `lastCrafted`, como en la auditoria anterior.
+- El tronco que se golpea es una caja del grosor del pie, y el que se ve
+  **estrecha hacia la copa**: a media altura, la picea negra se dibuja de 0,16
+  y su caja mide 0,21. Es anterior a la tanda y es tuyo decidir si importa.
+- En el modo TAP, dos toques en dos ticks seguidos darian el ataque del
+  primero con la mirada del segundo. Un dedo no puede hacerlo en 17 ms.
 
 ---
 

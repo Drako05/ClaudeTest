@@ -8,6 +8,11 @@ import {
   STRIKE_RANGE,
   STRIKE_RAYS,
   strike,
+  TREE_TRUNKS,
+  trunkBucket,
+  trunkRange,
+  trunkWidthFor,
+  bucketBlocks,
   type Ground,
   type Hitbox,
 } from '@verdant/sim';
@@ -64,10 +69,17 @@ describe('el golpe: numeros del autor', () => {
   });
 
   it('en la punta del alcance, entre dos rayos no cabe ni el tronco mas fino', () => {
-    // La cuerda entre dos rayos vecinos a 3 bloques: 0,147. El tronco mas fino
-    // (picea negra) mide 0,22 en su media; con el alcance a 2,5 era 0,12.
+    // La cuerda entre dos rayos vecinos a 3 bloques: 0,147 (con el alcance a 2,5
+    // era 0,12). El tronco mas fino es el de la picea negra mas baja, 0,21: se
+    // saca de las especies, no de un numero suelto, para que siga valiendo si
+    // una cambia de grosor.
+    const thinnest = Math.min(
+      ...Object.values(TREE_TRUNKS).map((t) =>
+        trunkWidthFor(t, bucketBlocks(trunkBucket(trunkRange(t)[0]))),
+      ),
+    );
     const gap = 2 * STRIKE_RANGE * Math.sin((2 * STRIKE_HALF_ANGLE) / (STRIKE_RAYS - 1) / 2);
-    expect(gap).toBeLessThan(0.22);
+    expect(gap).toBeLessThan(thinnest);
   });
 
   it('los rayos estan en el plano de la mirada, a ±45 grados, y el central ES la mirada', () => {

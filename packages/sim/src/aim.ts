@@ -4,8 +4,8 @@
  * Geometria pura: el suelo y los hitboxes entran como funciones, asi que se
  * mide en Node sin mundo. `systems/gathering.ts` le pone el mundo.
  *
- * **Regla 12, del autor (2026-09-28).** El golpe es un sector de **2,5 bloques**
- * y **90 grados** (±45 alrededor de la mirada) **en el plano de la mirada**: el
+ * **Regla 12, del autor (2026-09-28).** El golpe es un sector de **3 bloques**
+ * (`STRIKE_RANGE`) y **90 grados** (±45 alrededor de la mirada) **en el plano de la mirada**: el
  * que forman la direccion en que se mira —con su inclinacion— y la horizontal a
  * su derecha. Cuenta **solo si toca un hitbox**, y **el terreno lo corta**: no se
  * golpea a traves de una pared ni del suelo.
@@ -17,7 +17,7 @@
  *
  * El sector se recorre con **`STRIKE_RAYS` rayos** a lo ancho: cada uno se corta
  * donde entra en el terreno, y un objeto cae si algun rayo cruza su hitbox antes
- * de ese corte. Con 33 rayos, a 2,5 bloques queda un hueco de 0,12 entre dos
+ * de ese corte. Con 33 rayos, a 3 bloques queda un hueco de 0,147 entre dos
  * vecinos, menos que el tronco mas fino (0,21 el de la picea negra mas baja):
  * nada que el sector toque se cuela entre rayos.
  *

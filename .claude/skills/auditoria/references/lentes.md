@@ -29,7 +29,11 @@ que nadie toco es justo lo que ninguna tanda mira.
    zoom. Un nombre falso es documentacion falsa que ademas compila.
 5. Anade lo retirado a `retirados.md` para que el escaner lo vigile siempre.
 
-**Patrones conocidos**: el humo con alcance 2 cuando era 2,5 (`escapes.md` #1).
+**Patrones conocidos**: el humo con alcance 2 cuando era 2,5 (`escapes.md` #1);
+el alcance 2,5 en cinco comentarios cuando ya era 3, porque nadie lo anadio a
+`retirados.md` al cambiarlo (#19); un test que comparaba con el grosor MEDIO de
+la picea negra, 0,22, cuando lo que afirma es «el tronco mas fino», 0,21 (#20):
+el numero se saca de donde vive, no se copia.
 
 ## B. Comprobaciones — ¿puede fallar?
 
@@ -127,6 +131,10 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
 
 **Patrones conocidos**: `aimZ` citaba `levelStep` (#5), y la cabecera de
 `hud.ts` decia que llevaba el inventario.
+- **Comentarios sueltos** (#18): al meter un campo o una funcion entre una doc
+  y lo que documenta, o al mover lo documentado, la doc se queda encima de
+  otra cosa. El escaner los da (dos `/** */` seguidos); la lente mira ademas
+  que cada doc hable de lo que tiene debajo.
 
 ## F. Documentacion contra documentacion — ¿cuentan todas lo mismo?
 

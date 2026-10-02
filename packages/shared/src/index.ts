@@ -221,7 +221,6 @@ export function lifeKindOf(f: Feature): LifeKind | null {
   }
 }
 
-/** Terrenos que bloquean el paso. */
 /**
  * Terrenos que no se pueden pisar.
  *

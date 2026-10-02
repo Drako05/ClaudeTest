@@ -753,15 +753,6 @@ export class World {
   }
 
   /**
-   * Cuantas casillas se alcanzan desde una, sin salir de una ventana pequena.
-   *
-   * Es la inundacion de `debug.reachableArea` con la ventana acotada, repetida
-   * aqui y no importada porque `world.ts` no puede depender de `debug.ts`: ese
-   * es el ciclo de importacion que revienta el bundle del navegador y que solo
-   * ve la prueba de humo. Corta en cuanto tiene bastante, asi que en terreno
-   * normal termina enseguida.
-   */
-  /**
    * True si en ese terreno puede crecer algo.
    *
    * Corrige un sesgo que metio el rellano llano: en este mundo **lo llano son
@@ -794,6 +785,15 @@ export class World {
     return true;
   }
 
+  /**
+   * Cuantas casillas se alcanzan desde una, sin salir de una ventana pequena.
+   *
+   * Es la inundacion de `debug.reachableArea` con la ventana acotada, repetida
+   * aqui y no importada porque `world.ts` no puede depender de `debug.ts`: ese
+   * es el ciclo de importacion que revienta el bundle del navegador y que solo
+   * ve la prueba de humo. Corta en cuanto tiene bastante, asi que en terreno
+   * normal termina enseguida.
+   */
   private roamRoom(sx: number, sy: number, climbing: boolean): number {
     const cap = climbing ? SPAWN_MIN_ROOM : SPAWN_MIN_FLOOR;
     const seen = new Set<number>();

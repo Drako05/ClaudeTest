@@ -128,6 +128,7 @@ export function scan(root) {
     scripts: [],
     fueraDeCi: [],
     matriz: [],
+    docSuelta: [],
   };
 
   // 1. Rutas citadas entre comillas invertidas que no existen.
@@ -293,6 +294,39 @@ export function scan(root) {
     }
   }
 
+  // 10. Comentarios de documentacion sueltos: dos `/** */` seguidos, sin codigo
+  // entre ellos. El primero no documenta nada —el editor y TypeScript se lo
+  // atribuyen al segundo, o a nadie— y suele ser un resto: lo que explicaba se
+  // movio o se sustituyo y el comentario se quedo (el de `rollFor` encima de
+  // `tiltOf`; «el movimiento analogico existe» encima de los tests que lo
+  // sustituyeron). La cabecera del fichero —su primer bloque, vaya antes o
+  // despues de los imports— no cuenta: la sigue la doc de lo primero que hay.
+  for (const f of code) {
+    const lines = text.get(f).split('\n');
+    let open = -1;
+    let lastClose = -1;
+    let lastStart = -1;
+    let blocks = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (open < 0 && t.startsWith('/**')) {
+        const between = lastClose >= 0 ? lines.slice(lastClose + 1, i) : null;
+        if (between && between.every((l) => l.trim() === '') && blocks > 1) {
+          report.docSuelta.push(`${f}:${lastStart + 1}  documenta lo mismo que el bloque de la linea ${i + 1}`);
+        }
+        open = i;
+        blocks++;
+      }
+      if (open >= 0 && t.includes('*/')) {
+        lastStart = open;
+        lastClose = i;
+        open = -1;
+      } else if (open < 0 && t !== '' && !t.startsWith('/**')) {
+        lastClose = -1;
+      }
+    }
+  }
+
   return report;
 }
 
@@ -321,6 +355,7 @@ const TITLES = {
   scripts: 'Scripts y pasos de CI que apuntan a ficheros inexistentes',
   fueraDeCi: 'Herramientas que la CI no ejecuta: correrlas a mano (lente C)',
   matriz: 'Pasadas del humo y casillas de la matriz de CI que no casan',
+  docSuelta: 'Comentarios de documentacion sueltos, sin nada que documentar (lente E)',
 };
 
 function print(report) {
@@ -359,6 +394,11 @@ function selfTest() {
     "const a = document.getElementById('vivo');\nconst b = document.getElementById('fantasma');\n" +
     "import { usada } from './lib.js';\nusada();\n// ver `funcionRetirada` y `existeDeVerdad`\nexisteDeVerdad();\n" +
     'function existeDeVerdad() {}\n');
+  // Una cabecera seguida de la doc de su primera funcion (bien), y una doc
+  // suelta encima de otra (mal).
+  put('packages/client/src/docs.ts',
+    '/**\n * Cabecera.\n */\n\n/** Bien. */\nfunction bien() {}\n\n' +
+    '/**\n * Suelta: lo que explicaba se fue.\n */\n/** La de verdad. */\nfunction otra() {}\nbien(); otra();\n');
   put('packages/client/src/lib.ts', 'export function usada() {}\nexport function huerfana() {}\n');
   put('docs/notas.md',
     '# Notas\n\nVer `packages/client/src/main.ts` y `docs/fantasma.md`.\n' +
@@ -386,6 +426,7 @@ function selfTest() {
       r.matriz.some((x) => x.includes('fantasma'))],
     ['retirados', (r) => r.retirados.some((x) => !x.startsWith('[historia]') && x.includes('zoom.ts')) &&
       r.retirados.some((x) => x.startsWith('[historia]') && x.includes('notas.md'))],
+    ['doc suelta', (r) => r.docSuelta.length === 1 && r.docSuelta[0].includes('docs.ts:8')],
     ['ignorados con ambito', (r) => r.identificadores.some((x) => x.includes('zoom.ts') && x.includes('nombreJuzgado')) &&
       !r.identificadores.some((x) => x.includes('otra.md'))],
   ];

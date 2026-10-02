@@ -215,6 +215,48 @@ Formato:
 - **Donde vive ahora**: lente G (patron: estado que sigue a un evento pero se
   pinta en el fotograma siguiente).
 
+### 18. Comentarios de documentacion sueltos (2026-10-02)
+- **Que paso**: la auditoria de la tanda 2 encontro diez, empezando por uno
+  visto a mano: al meter `lookRoll` en `entities.ts` la doc de `lookZ` se
+  quedo encima de la de `lookRoll`; la de `rollFor` acabo encima de `tiltOf`;
+  la de `roamRoom` encima de `sustainsLife`; y en `main.ts` la sonda seguia
+  diciendo «casillas que marca la reticula: las que la accion alcanza», del
+  modelo retirado el 2026-09-30, encima de la doc buena; y la del ojo decia
+  que era «el unico control sin tecla anunciada», cuando desde la 7.ª ronda
+  todos la llevan. Dos tests llevaban la doc del modelo anterior encima de la
+  del actual.
+- **Por que se escapo**: el escaner mira los nombres que cita un comentario,
+  y un comentario huerfano no cita nada roto. Leyendo un diff, insertar un
+  campo entre una doc y su campo es una linea verde mas.
+- **Que lo habria visto**: buscar dos `/** */` seguidos sin codigo entre
+  ellos (salvo la cabecera del fichero).
+- **Donde vive ahora**: escaner, categoria «Comentarios de documentacion
+  sueltos», con su fallo sembrado; lente E.
+
+### 19. El alcance 2,5 en comentarios con el alcance a 3 (2026-10-02)
+- **Que paso**: `STRIKE_RANGE` paso de 2,5 a 3 en la 6.ª ronda y cinco
+  comentarios (`aim.ts`, `effects.ts`, un test y dos del humo) siguieron
+  diciendo 2,5, mas una fila de «Esperando tu juicio».
+- **Por que se escapo**: lo retirado solo entra en `retirados.md` en la fase 0
+  de una auditoria, y entre la 6.ª ronda y esta no hubo ninguna: durante
+  cuatro dias nadie buscaba «2,5».
+- **Que lo habria visto**: anadir el valor viejo a `retirados.md` **en el
+  mismo cambio** que lo retira, no esperar a la auditoria. La fase 0 lo hizo
+  y el escaner los dio todos de golpe.
+- **Donde vive ahora**: `retirados.md` y lente A.
+
+### 20. Un test comparaba con la media donde decia «el mas fino» (2026-10-02)
+- **Que paso**: «entre dos rayos no cabe ni el tronco mas fino» comparaba el
+  hueco con 0,22, el grosor de la picea negra **media**; la mas baja, la mas
+  fina de verdad, mide 0,21. Con un hueco entre las dos el test pasaba
+  afirmando algo falso.
+- **Por que se escapo**: un numero copiado al test en vez de sacado de donde
+  vive (`TREE_TRUNKS`). Es el escape #1 en un test.
+- **Que lo habria visto**: lente A, paso 3, tambien sobre los tests. Ahora
+  lo calcula de las especies, y la mutacion «tronco mas fino que el hueco»
+  lo ve caer donde el 0,22 no caia.
+- **Donde vive ahora**: lente A.
+
 ---
 
 ## Del proceso del agente
