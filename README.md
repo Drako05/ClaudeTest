@@ -223,6 +223,10 @@ Encima de eso, lo que vino despues:
 - **Recolectar y fabricar**: de las manos a las herramientas de piedra (tanda
   1), y de ahi a la mesa, el horno, los metales y la ropa (tanda 2), con
   inventario por casillas.
+- **Fauna, primera tanda**: diez especies reales, dos por bioma de tierra, en
+  tres etapas, con puntos de vida que salen de su masa. Deambulan por su
+  territorio y se cazan con el mismo golpe; su carne se asa en el horno
+  (`docs/fauna.md`).
 
 **Antes del multijugador quedan cabos de la camara nueva:** los sprites de
 varias direcciones para el personaje y agrupar las aspas para bajar las draw
@@ -237,6 +241,7 @@ Despues, y en este orden:
   partidas pequenas, no mundo persistente masivo: el coste de servidor es el
   verdadero limite comercial de este genero.
 - **M3 — Mundo vivo**: simulacion por niveles de detalle (los chunks cercanos
-  entidad por entidad, los lejanos de forma estadistica agregada), fauna y clima
-  (el ciclo dia/noche ya existe).
+  entidad por entidad, los lejanos de forma estadistica agregada), el
+  comportamiento de la fauna (ya existe y deambula) y clima (el ciclo dia/noche
+  ya existe).
 - **M4 — Comercial**: persistencia, contenido, pulido y empaquetado nativo.

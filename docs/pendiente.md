@@ -31,6 +31,15 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
+| Fauna: el **daño de un golpe** a algo vivo, 5 a mano y 10 por punto de poder de la herramienta (cualquier hacha o pico); golpear un animal gasta un uso | `docs/fauna.md`, el sistema de PV | dos numeros |
+| Fauna: la **masa de cada etapa**, cria 15 % y joven 60 % del adulto (de ahi PV, alto y botin), y su **proporcion en el mundo**, 20 / 25 / 55 % | `docs/fauna.md` | numeros en `shared/src/fauna.ts` |
+| Fauna: **densidad en el juego = 0,45 × √(densidad real)**, para que un chunk tenga animales | `docs/fauna.md`, aparicion | un numero |
+| Fauna: el **botin** — carne 0,6 × √(masa), piel 1 (2 el bisonte adulto, ninguna la cria), plumas 1-3, caparazon 1; el cangrejo no da carne | `docs/fauna.md`, botin | numeros en `animalLoot` |
+| Fauna: **asar** 2 de carne cruda + 1 de carbon da 2 de asada; la asada llena **35** de hambre | `docs/fauna.md`, botin | dos numeros |
+| Fauna: el **paseo** — un punto de paso cada 20 s, territorio de 6 a 16 casillas, de 0,6 a 1,2 bloques por segundo, sin salir de su bioma y sin chocar con nadie | `docs/fauna.md`, la ley del observador | numeros en `SPECIES` |
+| Fauna: **los animales no se curan** en esta tanda | `docs/fauna.md`, el sistema de PV | una regla |
+| Fauna: el **ciervo adulto se dibuja sin astas**, porque el dibujo aun no distingue sexos | `docs/fauna.md`, las especies | un dibujo |
+| Fauna: los **dibujos y colores** de las diez especies y sus crias; el **alto minimo** de 0,22 bloques (el cangrejo); el medio ancho de cada caja | `docs/fauna.md`, las especies | dibujo y numeros |
 | `GRAVITY = 62` y `JUMP_SPEED = 12`, deducidos de tu enunciado del salto | Fase 2 del relieve | dos numeros |
 | Los arboles siguen frenando tambien en el aire | Fase 2 del relieve | una linea |
 | **El mundo es empinado**: de cuatro direcciones solo una lleva a alguna parte, y saltando | Fase 2 del relieve | calibracion del relieve (regla 14) |
@@ -524,6 +533,47 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Fauna, primera tanda: diez especies que deambulan — HECHO (2026-10-02)
+
+Pediste dos animales reales por bioma, con tres etapas y dos sexos, sus
+ratios, puntos de vida y botin, y un sistema de PV con bases claras; que de
+momento solo deambulen y que el boton del bioma no se toque. Decidiste PV por
+masa, los cinco biomas de tierra, etapa fija hasta la reproduccion, y asar la
+carne con el resto del botin en espera. Todo esta en **`docs/fauna.md`**:
+especies, numeros, el comportamiento escrito de cada etapa, el oceano para la
+tanda del nado y como se aplica la ley del observador.
+
+- **Hecho**:
+  - diez especies en pradera, bosque, tundra, tierras altas y costa, con sus
+    30 dibujos;
+  - PV = 100 × (masa / 70 kg)^(1/3), el jugador de referencia;
+  - aparicion por densidad real comprimida, en grupos;
+  - se golpean con el mismo golpe que el resto (barrido y preciso);
+  - sueltan su botin entero o no mueren;
+  - la carne se asa en el horno («Cocina») y la asada se come;
+  - un muerto no vuelve.
+  - En el panel de desarrollo, «Materiales de cocina».
+- **Lo que no**:
+  - no comen, no huyen, no envejecen ni se reproducen;
+  - no entran en el equilibrio ni en el panel del bioma;
+  - piel, plumas y caparazon no sirven aun para nada.
+- **Medido**:
+  - cada especie sale cerca de su densidad (el ibice, un 30 % por debajo, por
+    la roca);
+  - las etapas, 19 / 26 / 56 %;
+  - unos 50-60 animales alrededor del nacimiento, a 0,15 ms por tick;
+  - cada dibujo mide exactamente su caja de golpe.
+- **Lo que destapo el humo**:
+  - Los puntos de paso eran un punto cualquiera de su casilla. Junto a la
+    orilla, la caja del cuerpo rozaba el agua, el animal nacia en su origen y
+    echaba a andar. Ahora son el centro de la casilla.
+  - Y el propio humo: recargar la pagina reinicia el tiempo, asi que la presa
+    nacia en el punto del periodo anterior. Se recarga en el mismo tick (`&t=`).
+- La tabla del plan llevaba 38 PV para liebre y zorro y 10 para el cangrejo,
+  redondeados a mano; la formula aprobada da 39 y 9.
+- Las casillas del inventario no llevan iconos (decision tuya), asi que los
+  objetos nuevos solo tienen su nombre y su descripcion: el plan decia iconos.
 
 ## `CLAUDE.md` adelgazado: cada parte en su documento — HECHO (2026-10-02)
 

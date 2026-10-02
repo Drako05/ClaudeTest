@@ -257,6 +257,19 @@ Formato:
   lo ve caer donde el 0,22 no caia.
 - **Donde vive ahora**: lente A.
 
+### 21. Las esquirlas de la presa, contadas con las de su alrededor (2026-10-02)
+- **Que paso**: el humo de la fauna afirmaba que cazar suelta esquirlas
+  comparando `chipsDrawn` antes y despues. Con el barrido, el golpe alcanzaba
+  tambien el arbusto y los guijarros de al lado, que sueltan las suyas, y la
+  comprobacion pasaba igual sin las de la presa: la mutacion «caza sin
+  esquirlas» no cayo en la CI.
+- **Por que se escapo**: el contador mide una clase entera de efecto, no el
+  del objeto que se prueba. Es el escape #15 en otra forma: lo que se cuenta
+  tiene que ser solo lo que se afirma.
+- **Que lo habria visto**: la mutacion, que es para eso. Ahora se caza en modo
+  preciso, que golpea solo el centro de la mira, y la mutacion cae.
+- **Donde vive ahora**: lente B (abajo, «un contador que suma de mas»).
+
 ---
 
 ## Del proceso del agente

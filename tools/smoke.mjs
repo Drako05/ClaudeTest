@@ -2523,6 +2523,13 @@ async function faunaPass(browser, baseUrl) {
     }
     return state(page);
   };
+  // En modo preciso (TAB): solo cuenta lo que cruza el centro de la mira, la
+  // presa. Con el barrido, el arbusto o los guijarros de al lado soltaban sus
+  // esquirlas y la comprobacion de las de la presa pasaba sin ellas (la
+  // mutacion «caza sin esquirlas» no cayo en la CI).
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(200);
+  check((await state(page)).precise, 'TAB no puso el golpe en modo preciso');
   // Apuntar antes de cada golpe —sale enseguida si ya esta encarada— y
   // golpear: rapido, que su periodo de quieta se acaba.
   let now = await state(page);
