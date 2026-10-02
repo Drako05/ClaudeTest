@@ -871,7 +871,12 @@ arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
   incluida; las teclas que se sueltan pasan, para que no se queden pegadas.
   El oyente sigue **al escudo visible**, no a `MouseLook.paused`: muerto no
   se pinta la pausa, y bloqueando por el estado interno se tragaba la R del
-  mundo nuevo (lo cazo el humo de la muerte).
+  mundo nuevo (lo cazo el humo de la muerte). Y el escudo se pone **en el
+  propio `pointerlockchange`**, no en el bucle de dibujo: un fotograma tarde,
+  un clic en medio pulsaba el boton de debajo (lo cazo la CI en una maquina
+  lenta; escape 17). El humo mira que hay encima de INVENTARIO dentro de ese
+  mismo evento, con `requestAnimationFrame` retenido: si corre un fotograma
+  entre soltar y el evento, lo tapa, y la comprobacion no mordia.
   Los botones se pulsan con el cursor suelto por el juego (inventario, panel
   de desarrollo), no en pausa.
 - **El cursor que suelta el juego no pausa** (`MouseLook.free`): el

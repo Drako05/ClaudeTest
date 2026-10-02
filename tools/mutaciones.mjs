@@ -93,6 +93,15 @@ export default [
     prueba: 'slash',
   },
   {
+    // La carrera del escudo de la pausa, que cazo la CI: sin pintarlo en el
+    // mismo evento, llega un fotograma tarde.
+    nombre: 'escudo un fotograma tarde',
+    fichero: 'packages/client/src/main.ts',
+    de: "  pauseEl.classList.toggle('show', mouseLook.paused && state.entities.alive[state.playerId] !== 0);",
+    a: '  void 0;',
+    prueba: 'smoke:desktop',
+  },
+  {
     nombre: 'registro sube',
     fichero: 'packages/client/src/pickup-feed.ts',
     de: '  return -(l.fromTop + FEED_RISE - riseOf(l));',

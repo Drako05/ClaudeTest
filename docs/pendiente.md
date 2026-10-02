@@ -504,6 +504,12 @@ Lo que destapo el primer dia, y por eso habia que probarlo con trampas:
   CAE (escape P4).
 - Las dos trampas salieron en rojo, cada una por su motivo: un comentario
   («no llego al build») y mover 1 px el registro («no cae»).
+- **Una carrera de la 7.ª ronda**: el escudo de la pausa se pintaba un
+  fotograma tarde, y en una maquina lenta un clic en medio pulsaba
+  INVENTARIO (escape 17). Ahora se pone en el propio evento. Tambien lo
+  notarias tu en un equipo lento.
+- La vista que gira cerca de `slash` dio 46, 12 y ~190 sobre el mismo
+  codigo: se sigue midiendo, pero no hace fallar.
 
 Medido: la CI completa en ~5 min y las doce mutaciones en ~7, contra ~22 min
 de humo, gestos y barrido en serie mas ~45 de mutaciones en local. Son unos

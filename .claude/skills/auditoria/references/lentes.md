@@ -158,6 +158,10 @@ el codigo delante.
   frame lento. ¿Se duplica o se pierde algo?
 - **Ritmo de fotogramas**: ¿depende de que haya tick en el frame? Se mide
   con el reloj fingido (`highRefreshPass`), nunca con el del headless.
+- **Del evento al fotograma**: un estado de la interfaz que sigue a un
+  evento (soltar el cursor, cerrar un panel) pero se pinta en el bucle llega
+  un fotograma tarde, y en ese hueco un clic hace lo que no debe (#17). Se
+  pinta en el propio evento, y se prueba mirando la interfaz dentro de el.
 - **Entre dos pasos del usuario**: confirmaciones, arrastres y esperas. ¿Que
   pasa si el estado cambia en medio? (Tirar comprueba que la casilla sigue
   teniendo lo mismo al confirmar.)

@@ -364,6 +364,13 @@ for (const type of ['keydown', 'keypress', 'wheel'] as const) {
 document.addEventListener('mousedown', (e) => {
   if (e.target instanceof Element && e.target.closest('button')) e.preventDefault();
 });
+// El escudo se pone en el mismo instante en que se suelta el cursor, no en el
+// fotograma siguiente: en una maquina lenta, un clic que caia entre los dos
+// pasaba por debajo y pulsaba el boton (lo cazo la CI, 2026-10-02). Este oyente
+// va despues del de `MouseLook`, asi que `paused` ya esta al dia.
+document.addEventListener('pointerlockchange', () => {
+  pauseEl.classList.toggle('show', mouseLook.paused && state.entities.alive[state.playerId] !== 0);
+});
 pauseEl.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   if (e.pointerType === 'mouse' && e.button === 0) mouseLook.capture();

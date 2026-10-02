@@ -199,6 +199,22 @@ Formato:
 - **Donde vive ahora**: lente C (patron: herramientas que solo funcionan en
   un arbol usado).
 
+### 17. El escudo de la pausa llegaba un fotograma tarde (2026-10-02)
+- **Que paso**: la 7.ª ronda puso un escudo que se traga los clics en pausa,
+  pero se pintaba en el bucle de dibujo, un fotograma despues de soltarse el
+  cursor. En un runner lento de la CI, el clic de la prueba cayo en medio y
+  pulso INVENTARIO. En local no se vio nunca, y en dos tandas de CI tampoco.
+- **Por que se escapo**: la prueba esperaba a `paused`, que cambia en el
+  evento, y daba por hecho que el escudo cambiaba a la vez. Un estado de la
+  interfaz que sigue a un evento pero se pinta por fotogramas tiene un hueco.
+- **Que lo habria visto**: mirar la interfaz EN el mismo evento, no despues,
+  **con el bucle de dibujo congelado**: la primera version miraba dentro del
+  `pointerlockchange` pero dejaba correr fotogramas, y casi siempre corria
+  uno entre soltar y el evento que pintaba el escudo igual; su mutacion NO
+  CAIA. Retenido `requestAnimationFrame`, cae.
+- **Donde vive ahora**: lente G (patron: estado que sigue a un evento pero se
+  pinta en el fotograma siguiente).
+
 ---
 
 ## Del proceso del agente
@@ -241,3 +257,11 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
   (humo, gestos, barrido) o un `×`/`AssertionError` (vitest); en rojo sin
   eso es ERROR (`cayoDeVerdad`, con su test). Y al mirar una mutacion caida,
   se lee POR QUE cayo, no solo que cayo.
+
+### P5. `node --check` no ve los errores de ejecucion (2026-10-02)
+- **Que paso**: al reescribir el final de `slash.mjs` se perdio la
+  constante `MIN_STAB`. `node --check` paso, y la herramienta revento en la
+  CI con un `ReferenceError`. Una tanda entera de CI para una errata.
+- **Metodo**: la herramienta que se toca se CORRE una vez en local antes de
+  empujar, aunque su casilla este en la CI: el procedimiento ya lo dice
+  («solo la pasada que se esta escribiendo o tocando»).

@@ -305,6 +305,7 @@ console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` :
 // 12 cae justo donde caian los fallos. Como puerta fallaria a suertes; se mide
 // y se imprime para mirarla a mano.
 const MIN_LIT = 20;
+const MIN_STAB = 500;
 const SIN_PUERTA = new Set(['de cerca, girando']);
 const fallos = results
   .filter((r) => !SIN_PUERTA.has(r.view) && !(r.lit >= MIN_LIT))

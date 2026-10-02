@@ -953,8 +953,39 @@ async function desktopPass(browser, baseUrl) {
   const resumed = await state(page);
   check(resumed.pointerLocked && !resumed.paused, 'un clic en la pantalla no reanudo');
   check(resumed.sent.harvest === inGame.sent.harvest, 'el clic que reanuda golpeo');
-  // Un clic sobre un boton, en pausa, reanuda y no pulsa el boton.
-  await release(page);
+  // Un clic sobre un boton, en pausa, reanuda y no pulsa el boton. Y el
+  // escudo tiene que estar puesto EN EL INSTANTE en que se suelta el cursor:
+  // si llega un fotograma tarde, un clic en medio pulsa el boton de debajo
+  // (lo cazo la CI en una maquina lenta, 2026-10-02). Aqui casi siempre corre
+  // un fotograma entre soltar y el evento, y ese fotograma lo tapaba (la
+  // mutacion no caia), asi que el bucle de dibujo se CONGELA mientras se
+  // suelta: solo el oyente del evento puede poner el escudo. Se mira que hay
+  // encima de INVENTARIO dentro de ese mismo evento.
+  const shieldAtRelease = await page.evaluate(() => new Promise((resolve) => {
+    const raf = window.requestAnimationFrame;
+    const held = [];
+    window.requestAnimationFrame = (cb) => { held.push(cb); return 0; };
+    const restore = (ok) => {
+      window.requestAnimationFrame = raf;
+      for (const cb of held.splice(0)) raf(cb);
+      resolve(ok);
+    };
+    setTimeout(() => restore(null), 5000);
+    // Se suelta cuando el bucle ya esta retenido, sin un fotograma por medio.
+    const soltar = () => {
+      if (held.length === 0) return setTimeout(soltar, 20);
+      document.addEventListener('pointerlockchange', function once() {
+        if (document.pointerLockElement) return;
+        document.removeEventListener('pointerlockchange', once);
+        const r = document.getElementById('invOpen').getBoundingClientRect();
+        restore(!!document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('#pause'));
+      });
+      document.exitPointerLock();
+    };
+    soltar();
+  }));
+  await page.waitForFunction(() => window.__verdant.paused, null, { timeout: 5000 });
+  check(shieldAtRelease === true, `al soltarse el cursor, el escudo de la pausa no estaba ya encima de INVENTARIO (${shieldAtRelease})`);
   const invAt = await page.evaluate(() => {
     const r = document.getElementById('invOpen').getBoundingClientRect();
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
