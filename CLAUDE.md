@@ -396,8 +396,10 @@ mutacion de un comentario, que el minificador borra, sale en rojo.
 y tests, y una **matriz con una maquina por pasada del humo** —`desktop`,
 `resources`, `stations`, `mobile`, `devTools`, `life`, `relief`,
 `highRefresh`— mas los gestos y el barrido en pixeles (`slash`, que desde que
-corre aqui **falla** si alguna vista baja de 20 pixeles aclarados o la estocada
-de 500; los fallos que tuvo daban 0, 2 y 13, y lo bueno, de 46 en adelante), todas a la vez; y un trabajo final, «CI completa», que solo sale
+corre aqui **falla** si la vista normal, la camara baja o la primera persona
+bajan de 20 pixeles aclarados, o la estocada de 500; los fallos que tuvo daban
+0, 2 y 13. La vista que gira cerca se mide pero no hace fallar: en la CI dio
+46, 12 y ~190 sobre el mismo codigo, y como puerta fallaria a suertes), todas a la vez; y un trabajo final, «CI completa», que solo sale
 verde si todo lo esta. La preparacion —Node, dependencias y Chromium con su
 cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
 tandas. Cada pasada se lanza por el prefijo de su nombre
