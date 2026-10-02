@@ -20,9 +20,13 @@
 
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
+
+// En un repositorio recien clonado (la CI) la carpeta de capturas no existe, y
+// sin ella la herramienta revienta antes de medir nada.
+await mkdir(new URL('../screenshots/', import.meta.url), { recursive: true });
 
 const WIDTH = 1280;
 const HEIGHT = 720;
@@ -289,6 +293,29 @@ console.log('el PEOR de los cuatro rumbos. Con «recogido» a cero no hay escomb
 console.log('medio y todo lo aclarado es del barrido.');
 console.log('');
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
+
+// Desde que corre en la CI (2026-10-02) tiene que poder fallar: una casilla que
+// mide y nunca sale en rojo es verde sin probar nada. Los suelos, entre lo
+// bueno y los fallos que tuvo (0, 2 y 13 pixeles): la vista normal da ~190 y
+// el fallo del frustum 0; la camara baja ~8.000 y los de orientacion 2 y 13;
+// la primera persona ~10.000 y la estocada ~8.900.
+//
+// La vista que gira cerca NO hace fallar: en la CI dio 46, 12 y ~190 sobre el
+// mismo codigo, segun el instante en que la captura pilla un trazo de 0,22 s, y
+// 12 cae justo donde caian los fallos. Como puerta fallaria a suertes; se mide
+// y se imprime para mirarla a mano.
+const MIN_LIT = 20;
+const MIN_STAB = 500;
+const SIN_PUERTA = new Set(['de cerca, girando']);
+const fallos = results
+  .filter((r) => !SIN_PUERTA.has(r.view) && !(r.lit >= MIN_LIT))
+  .map((r) => `${r.view}: ${r.lit ?? 'sin medida'} pixeles`);
+if (!(stabbing.max >= MIN_STAB)) fallos.push(`estocada: ${stabbing.max} pixeles`);
+if (problems.length) fallos.push('errores de consola');
+if (fallos.length) {
+  console.log(`FALLO: el barrido no llega a verse: ${fallos.join(' | ')}`);
+  process.exitCode = 1;
+}
 
 await browser.close();
 server.close();

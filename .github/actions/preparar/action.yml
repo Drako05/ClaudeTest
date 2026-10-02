@@ -1,0 +1,35 @@
+name: Preparar
+description: >
+  Node con su cache, las dependencias y, si hace falta, Chromium. La comparten
+  la CI y las mutaciones para que no se copien los pasos ni se separen.
+
+inputs:
+  navegador:
+    description: Si instalar Chromium para el humo, los gestos o el barrido.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+    - run: npm ci
+      shell: bash
+    - name: Cache de Chromium
+      id: chromium
+      if: inputs.navegador == 'true'
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: chromium-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+    - name: Instalar Chromium
+      if: inputs.navegador == 'true' && steps.chromium.outputs.cache-hit != 'true'
+      run: npx playwright install --with-deps chromium
+      shell: bash
+    - name: Librerias del sistema para Chromium
+      if: inputs.navegador == 'true' && steps.chromium.outputs.cache-hit == 'true'
+      run: npx playwright install-deps chromium
+      shell: bash

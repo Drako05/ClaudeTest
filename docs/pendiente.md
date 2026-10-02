@@ -77,6 +77,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La estacion puesta contra una pared cae con la **gravedad del salto** (62), y la caida solo se ve | Ajustes de la tanda 2 | `stations-view.ts` |
 | La rueda **no tiene destello aparte**: la luz es la de la seleccion, que se mueve en el acto (antes, un destello de 140 ms junto a la luz vieja, y se veian dos) | Ajustes de la tanda 2, 6.ª ronda | `inventory-ui.ts` |
 | Cerrar el inventario con Esc **captura al soltar la tecla**, con una red de **1 s** (`SOFT_GRACE_MS`): si Chrome la suelta antes, no pausa. La causa de la pausa sigue siendo hipotesis mia (la tecla apoyada soltaba la captura); **solo tu Chrome lo confirma** | Ajustes de la tanda 2, 7.ª ronda | `main.ts` y `pointer-lock.ts` |
+| La rama de pruebas se llama **`pruebas`**; `slash` falla por debajo de **20 pixeles** en la vista normal, la camara baja y la primera persona (lo bueno, ~190 a ~10.000; los fallos, 0-13), y la vista que gira cerca **no hace fallar** (en la CI dio 46, 12 y ~190 sobre el mismo codigo) y **500** la estocada; a la CI se le da un temporizador de **5 min** antes de mirarla | Las pruebas pesadas a la CI | `ci.yml`, `slash.mjs`, `CLAUDE.md` |
 | `?view=` en la URL para que las pruebas arranquen en perspectiva | Ajustes de la tanda 2, 7.ª ronda | `start.ts` |
 | Los botones de los dialogos («Reiniciar», «Cancelar», «Tirar») **no llevan tecla escrita**; las teclas, en 8 px abajo a la izquierda | Ajustes de la tanda 2, 7.ª ronda | `index.html` |
 | La pausa bloquea **tambien F3**, y deja pasar las teclas que se sueltan | Ajustes de la tanda 2, 7.ª ronda | `main.ts` |
@@ -480,6 +481,41 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Las pruebas pesadas a la CI, y las mutaciones en paralelo — HECHO (2026-10-02)
+
+Lo pediste tras ver lo que tardaba cada ronda (propuestas 2 y 4; la 3,
+adelgazar `CLAUDE.md`, va despues):
+- **Lo pesado se verifica en la CI, en la rama `pruebas`**, que no despliega:
+  `tools/a-pruebas.sh` lleva alli el arbol de trabajo tal cual, sin tocar
+  `main`. A `main` solo va lo que sale verde ahi. En local, solo lo barato y la
+  pasada que se esta escribiendo. El procedimiento entero, en `CLAUDE.md`
+  («Antes de dar algo por bueno»).
+- **Las mutaciones de cada ronda en una orden** (`tools/mutar.mjs`, con la
+  lista en `tools/mutaciones.mjs`), y en la CI **todas a la vez**, una maquina
+  por mutacion (`.github/workflows/mutaciones.yml`).
+- **`slash` entro en la CI**, y ahora falla si el barrido no llega a verse.
+
+Lo que destapo el primer dia, y por eso habia que probarlo con trampas:
+- `slash` no corria en un clon limpio: no creaba su carpeta de capturas
+  (escape 16). En local siempre existia.
+- Y por eso mismo, la mutacion del barrido «cayo» sin que el barrido tuviera
+  nada que ver. Ahora una prueba que revienta sin un `FALLO` es ERROR, no
+  CAE (escape P4).
+- Las dos trampas salieron en rojo, cada una por su motivo: un comentario
+  («no llego al build») y mover 1 px el registro («no cae»).
+- **Una carrera de la 7.ª ronda**: el escudo de la pausa se pintaba un
+  fotograma tarde, y en una maquina lenta un clic en medio pulsaba
+  INVENTARIO (escape 17). Ahora se pone en el propio evento. Tambien lo
+  notarias tu en un equipo lento.
+- La vista que gira cerca de `slash` dio 46, 12 y ~190 sobre el mismo
+  codigo: se sigue midiendo, pero no hace fallar.
+
+Medido: la CI completa en ~5 min y las doce mutaciones en ~7, contra ~22 min
+de humo, gestos y barrido en serie mas ~45 de mutaciones en local. Son unos
+25 trabajos para las 20 maquinas que da GitHub, asi que algunos esperan cola.
+Cabo suelto: las acciones `@v4` de GitHub avisan de que Node 20 esta
+obsoleto; subirlas cuando toque.
 
 ## Ajustes de la tanda 2, 7.ª ronda — HECHO (2026-10-02)
 

@@ -1,0 +1,65 @@
+name: Mutaciones
+
+# Cada comprobacion nueva, rota a proposito, tiene que CAER: si no cae, no
+# comprueba nada. La lista de la ronda esta en `tools/mutaciones.mjs` y aqui
+# corre entera a la vez, una maquina por mutacion (`tools/mutar.mjs --solo`).
+# Solo en la rama `pruebas`, donde se verifica el trabajo antes de llevarlo a
+# `main` (`tools/a-pruebas.sh`), o a mano.
+on:
+  push:
+    branches: ['pruebas']
+  workflow_dispatch:
+
+concurrency:
+  group: mutaciones-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lista:
+    name: Lista de mutaciones
+    runs-on: ubuntu-latest
+    outputs:
+      matriz: ${{ steps.lista.outputs.matriz }}
+      hay: ${{ steps.lista.outputs.hay }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+        with:
+          navegador: 'false'
+      - name: Comprobar que la lista aplica
+        run: node tools/mutar.mjs --comprobar
+      - name: Matriz
+        id: lista
+        run: |
+          matriz=$(node tools/mutar.mjs --matriz)
+          echo "matriz=$matriz" >> "$GITHUB_OUTPUT"
+          if [ "$matriz" = "[]" ]; then echo "hay=false" >> "$GITHUB_OUTPUT"; else echo "hay=true" >> "$GITHUB_OUTPUT"; fi
+
+  mutacion:
+    name: ${{ matrix.mutacion }}
+    needs: lista
+    if: needs.lista.outputs.hay == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      # Que una no caiga no cancela las demas: se ve de una vez cuales fallan.
+      fail-fast: false
+      matrix:
+        mutacion: ${{ fromJSON(needs.lista.outputs.matriz) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/preparar
+      # Sale en verde si la comprobacion CAE con la mutacion puesta; en rojo si
+      # pasa igual (no comprueba nada) o si la mutacion no llega al build.
+      - name: Mutar y ver caer
+        run: node tools/mutar.mjs --solo "${{ matrix.mutacion }}"
+
+  todas:
+    name: Mutaciones completas
+    runs-on: ubuntu-latest
+    needs: [lista, mutacion]
+    if: always()
+    steps:
+      - name: Comprobar que todas cayeron
+        run: |
+          test "${{ needs.lista.result }}" = success
+          test "${{ needs.mutacion.result }}" = success || test "${{ needs.lista.outputs.hay }}" = false

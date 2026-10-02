@@ -62,6 +62,12 @@ que nadie toco es justo lo que ninguna tanda mira.
   a mano (hacer que la API falle) y se mira que el juego lo aguante. Y mejor
   aun (#14): **no pedirla** desde un contexto dudoso, y que la prueba espie
   la API y exija cero llamadas, que cubre todos los casos a la vez.
+- **Un umbral sacado de una sola medida local**: el suelo de `slash` se puso
+  en 50 pixeles mirando un peor caso local de 183, y la CI dio 46 en un
+  rumbo y tumbo la casilla; la siguiente tanda dio 12, sobre el mismo
+  codigo. El umbral va entre lo bueno medido en varias maquinas y lo malo
+  conocido, no pegado a una medida; y una medida que en la CI salta de 12 a
+  190 no sirve de puerta: se imprime, pero no hace fallar.
 - **Medir algo que ya no existe**: el rectangulo de un elemento retirado del
   DOM es todo ceros, y una comprobacion de «se movio» con un `||` que lo
   perdona pasa sin probar nada (la del registro de PC, 7.ª ronda, cazada al
@@ -77,15 +83,17 @@ que nadie toco es justo lo que ninguna tanda mira.
 
 **Metodo**
 1. El escaner lista las herramientas que la CI no ejecuta.
-2. **Se ejecutan todas**: `npm run shots`, `npm run slash` y
-   `npx vite-node tools/analyze-world.ts`. La podredumbre solo la ve la
-   ejecucion: una herramienta que nadie corre deja de funcionar sin que nadie
-   se entere.
+2. **Se ejecutan todas**: hoy `npm run shots` y
+   `npx vite-node tools/analyze-world.ts` (`slash` corre en la CI desde el
+   2026-10-02). La podredumbre solo la ve la ejecucion: una herramienta que
+   nadie corre deja de funcionar sin que nadie se entere. Y **en un clon
+   limpio** si depende del entorno (carpetas, cache): en el arbol de siempre
+   hay restos de otras herramientas que la sostienen (#16).
 3. Si una ha dejado de funcionar, se arregla, y se anota por que se pudrio:
    suele ser un cambio de mandos o de maquetacion que no la tuvo en cuenta.
 
 **Patrones conocidos**: `shots` era de antes del cursor capturado, y `slash`
-miraba `#thumbPad` de 0x0 (#3, #4).
+miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
 
 ## D. Codigo muerto — ¿hay algo que nadie usa?
 
@@ -150,6 +158,10 @@ el codigo delante.
   frame lento. ¿Se duplica o se pierde algo?
 - **Ritmo de fotogramas**: ¿depende de que haya tick en el frame? Se mide
   con el reloj fingido (`highRefreshPass`), nunca con el del headless.
+- **Del evento al fotograma**: un estado de la interfaz que sigue a un
+  evento (soltar el cursor, cerrar un panel) pero se pinta en el bucle llega
+  un fotograma tarde, y en ese hueco un clic hace lo que no debe (#17). Se
+  pinta en el propio evento, y se prueba mirando la interfaz dentro de el.
 - **Entre dos pasos del usuario**: confirmaciones, arrastres y esperas. ¿Que
   pasa si el estado cambia en medio? (Tirar comprueba que la casilla sigue
   teniendo lo mismo al confirmar.)
