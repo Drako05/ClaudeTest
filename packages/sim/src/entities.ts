@@ -41,12 +41,12 @@ export class EntityStore {
    */
   readonly facingX: Float32Array;
   readonly facingY: Float32Array;
-  /** Componente vertical de la mirada (ver `Intent.aimZ`). */
   /**
    * Giro del plano del sector alrededor de la mirada (modo TAP), en radianes.
    * Con 0, el plano de la mirada y la horizontal a su derecha.
    */
   readonly lookRoll: Float32Array;
+  /** Componente vertical de la mirada (ver `Intent.aimZ`). */
   readonly lookZ: Float32Array;
   readonly health: Float32Array;
   readonly hunger: Float32Array;

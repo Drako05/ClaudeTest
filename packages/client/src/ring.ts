@@ -1,6 +1,6 @@
 /**
  * Los anillos de salud y hambre de la barra de PC (boceto del autor,
- * 2026-09-30): se vacian **en sentido horario**, y lo gastado crece desde las
+ * 2026-09-30), que son tambien los del movil desde ese mismo dia: se vacian **en sentido horario**, y lo gastado crece desde las
  * 12.
  *
  * Es un `stroke-dasharray` sobre un circulo girado -90 grados, cuyo trazo

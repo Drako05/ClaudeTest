@@ -79,14 +79,6 @@ export interface Vec3Like {
   z: number;
 }
 
-/**
- * El giro del plano del barrido alrededor de la mirada `dir` (unitaria) para
- * que contenga la derecha de la camara `camRight` (horizontal), que es lo que
- * lo hace verse horizontal en pantalla y centrado en el toque (pedido del
- * autor, 2026-10-01). En primera persona es exacto; en tercera, casi, porque
- * la camara no esta en los ojos. Es el `aimRoll` de la `Intent`: positivo, su
- * derecha sube, como en `sectorRays`.
- */
 /** Lo torcido que se ve un trazo en pantalla: su alto entre su ancho. */
 export function tiltOf(points: ReadonlyArray<{ x: number; y: number }>): number {
   let x0 = Infinity;
@@ -143,6 +135,14 @@ export function flattestRoll(
   return best;
 }
 
+/**
+ * El giro del plano del barrido alrededor de la mirada `dir` (unitaria) para
+ * que contenga la derecha de la camara `camRight` (horizontal), que es lo que
+ * lo hace verse horizontal en pantalla y centrado en el toque (pedido del
+ * autor, 2026-10-01). En primera persona es exacto; en tercera, casi, porque
+ * la camara no esta en los ojos. Es el `aimRoll` de la `Intent`: positivo, su
+ * derecha sube, como en `sectorRays`.
+ */
 export function rollFor(dir: Vec3Like, camRight: Vec3Like): number {
   const flat = Math.hypot(dir.x, dir.y);
   if (flat < 1e-9) return 0;

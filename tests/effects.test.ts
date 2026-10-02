@@ -12,6 +12,7 @@ import {
   CHIPS_PER_HIT,
   desaturate,
 } from '../packages/client/src/effects.js';
+import { debrisPalette, LOOKS, ROCK_FACES } from '../packages/client/src/palette.js';
 
 describe('La estocada del modo preciso', () => {
   it('va recta de un extremo al otro: del borde de la pantalla a lo golpeado', () => {
@@ -27,7 +28,6 @@ describe('La estocada del modo preciso', () => {
     expect(mid.z).toBeCloseTo(5);
   });
 });
-import { debrisPalette, LOOKS, ROCK_FACES } from '../packages/client/src/palette.js';
 
 /**
  * Los efectos del golpe y de lo derribado.
@@ -196,7 +196,7 @@ describe('El slash de la accion', () => {
       expect(edge[i].y).toBeCloseTo(eye.z + ray.dir.z * ray.length, 9);
       expect(edge[i].z).toBeCloseTo(eye.y + ray.dir.y * ray.length, 9);
     });
-    // Los rayos que no tocan suelo llegan a los 2,5 bloques del alcance; los del
+    // Los rayos que no tocan suelo llegan a los 3 bloques del alcance; los del
     // lado del escalon se quedan antes.
     expect(Math.max(...hit.rays.map((r) => r.length))).toBeCloseTo(STRIKE_RANGE, 9);
     expect(Math.min(...hit.rays.map((r) => r.length))).toBeLessThan(STRIKE_RANGE);

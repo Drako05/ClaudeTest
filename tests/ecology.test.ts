@@ -152,14 +152,6 @@ describe('Ritmo de mortandad: del 200 % al rango en 2.5 horas reales', () => {
 
 describe('El ciclo de la siembra', () => {
   /**
-   * Coloca al jugador al norte del tile indicado y mirando al sur, de forma que
-   * la casilla apuntada sea exactamente esa.
-   *
-   * Antes se le ponia encima con la mirada a cero, porque asi el tile apuntado
-   * era el propio. Ya no: una accion siempre afecta a casillas adyacentes, nunca
-   * a la que se pisa.
-   */
-  /**
    * Un jugador en la casilla al norte de `(x, y)`, de pie en su suelo y mirando
    * al centro del suelo de esa casilla: es donde siembra (regla 12).
    */

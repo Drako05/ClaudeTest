@@ -24,7 +24,7 @@ export const SLASH_SECONDS = 0.22;
 export const SLASH_HALF_WIDTH = 0.06;
 
 /**
- * Medio ancho en PRIMERA persona. El trazo pasa a 2,5 bloques de los ojos, y a esa
+ * Medio ancho en PRIMERA persona. El trazo pasa a 3 bloques de los ojos, y a esa
  * distancia la cinta de tercera persona —que se mira desde lejos— se veria
  * gruesa; esta se ve del grueso que aquella. Deduccion mia, a juzgar a ojo.
  */

@@ -176,9 +176,10 @@ export function step(state: GameState, intent: Intent): void {
     const advanced = entities.x[playerId] !== fromX || entities.y[playerId] !== fromY;
     const effort = intent.run && advanced ? RUN_MULTIPLIER : 1;
 
-    // El apuntado manda sobre la mirada que acaba de fijar el movimiento: con
-    // raton se mira a donde apunta el cursor aunque se ande en otra direccion.
-    // Sin apuntado la mirada sigue al movimiento, que es lo de siempre.
+    // La mirada de la Intent —la de la camara (regla 5)— manda sobre la que
+    // acaba de fijar el movimiento: se mira hacia donde mira la camara aunque se
+    // ande en otra direccion. Sin ella (una Intent vacia, como la de `skipTime`
+    // o la de muchos tests) la mirada sigue al movimiento.
     // La mirada entra tal cual, sin encajarla en ocho direcciones: es el eje del
     // sector del golpe (`sim/aim.ts`), y redondearla era justo lo que hacia que
     // en primera persona se golpeara lo que no estaba delante de los ojos.

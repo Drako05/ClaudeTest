@@ -133,21 +133,14 @@ const controls = new Controls(
  *
  * La tecla P no existe en un telefono, y el telefono es justo donde hay que
  * juzgar esto: sin boton, la mitad del experimento —comparar ortografica contra
- * perspectiva— quedaba fuera de alcance en el unico sitio donde importa. Es
- * ademas el unico control que se ve tambien en PC, porque es el unico que no
- * tiene tecla anunciada en ninguna parte.
+ * perspectiva— quedaba fuera de alcance en el unico sitio donde importa. En
+ * PC se ve siempre, arriba a la derecha, con su tecla (P) escrita como los
+ * demas botones.
  *
  * Pintar y cambiar van separados **porque el boton tiene que arrancar
  * sincronizado**: la vista de salida es la primera persona, y llamar al interruptor
  * para poner el icono en su sitio la voltearia al primer frame.
  */
-/** Como se anuncia cada vista, y a cual lleva tocar el ojo. */
-const VIEW_LABELS: Record<Projection, string> = {
-  perspectiva: 'Vista en perspectiva; tocar para isométrica',
-  orto: 'Vista isométrica; tocar para primera persona',
-  primera: 'Vista en primera persona; tocar para perspectiva',
-};
-
 function renderProjButton(): void {
   // El ojo dice la vista con su forma: abierto en perspectiva, entrecerrado en
   // la isometrica —que lo aplana todo— y con punto de mira en primera persona.
@@ -157,6 +150,13 @@ function renderProjButton(): void {
   projButton.setAttribute('aria-label', label);
   projButton.title = label;
 }
+
+/** Como se anuncia cada vista, y a cual lleva tocar el ojo. */
+const VIEW_LABELS: Record<Projection, string> = {
+  perspectiva: 'Vista en perspectiva; tocar para isométrica',
+  orto: 'Vista isométrica; tocar para primera persona',
+  primera: 'Vista en primera persona; tocar para perspectiva',
+};
 
 /** La barra del angulo de vision de la primera persona, detras del ojo. */
 const fovPanel = new FovPanel(
@@ -654,9 +654,9 @@ let airPeak = 0;
  * Es lo que permite a la prueba de humo afirmar que un boton llega a la Intent
  * sin depender del paisaje: que sembrar plante algo depende de tener semillas y
  * una casilla que lo admita, y eso ya lo miden los tests del nucleo. Aqui se
- * mide la otra mitad, que el toque llega.
+ * mide la otra mitad, que el toque llega. Cuenta pulsaciones, y ticks con el
+ * auto salto puesto.
  */
-/** Lo que ha salido en la Intent: pulsaciones, y ticks con el auto salto puesto. */
 const sent = { harvest: 0, jump: 0, use: 0, autoJump: 0, tapUse: 0, tapHarvest: 0 };
 
 /**
@@ -1084,7 +1084,6 @@ Object.defineProperty(window, '__verdant', {
       gridChunks: overlays.gridCount,
       borderSegments: overlays.borderSegmentCount,
       misplacedBorders: overlays.misplacedBorderCount,
-      /** Casillas que marca la reticula: las que la accion alcanza. */
       /** Lo que marca la reticula: 'suelo', 'pared' o null. */
       reticle: overlays.reticle,
       /** Lo recolectado, para poder comprobar la accion desde fuera. */
@@ -1152,8 +1151,10 @@ Object.defineProperty(window, '__verdant', {
       panelStation: items.station,
       /** Estaciones mandadas a la escena. Acumulado. */
       stationsDrawn: stations.drawn,
-      /** Las estaciones a 5 casillas o menos del jugador: casilla y feature. */
-      /** Las estaciones de alrededor, con el frente que guarda el nucleo y el dibujado. */
+      /**
+       * Las estaciones a 5 casillas o menos del jugador: casilla, feature, el
+       * frente que guarda el nucleo y el giro con que se dibujo.
+       */
       stationTiles: stationTilesAround(state, 5).map((t) => ({
         ...t,
         facing: state.world.stationFacingAt(t.x, t.y),

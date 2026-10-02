@@ -213,11 +213,6 @@ describe('simulacion', () => {
 });
 
 /**
- * El movimiento analogico existe para el joystick tactil: apenas desplazado,
- * el personaje camina despacio. El teclado tiene que seguir comportandose
- * exactamente igual que antes, y eso es lo que mas importa proteger aqui.
- */
-/**
  * Dos velocidades y nada entre medias.
  *
  * Esto sustituye a los tests del movimiento ANALOGICO, que afirmaban justo lo
@@ -341,7 +336,7 @@ describe('Congelar la supervivencia', () => {
 
 /**
  * El hambre gasta segun el esfuerzo (decision del autor, 2026-09-30): quieto o
- * andando se vacia en un dia de juego; corriendo y avanzando, por el mismo
+ * andando se vacia en dos dias de juego (`HUNGER_EMPTY_DAYS`); corriendo y avanzando, por el mismo
  * factor que la velocidad; y cada salto que despega cuesta un 0,25 %.
  */
 describe('El hambre segun el esfuerzo', () => {

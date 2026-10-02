@@ -31,7 +31,8 @@ import {
 /**
  * La tanda 2 de fabricacion: mesa, horno, metales y ropa. Decisiones del autor
  * (2026-09-29): la estacion se coloca con USAR llevandola en la mano, USAR
- * mirandola la abre siempre, sus recetas solo sirven a menos de 3 casillas, y
+ * mirandola la abre siempre, sus recetas solo sirven al alcance —de los ojos a
+ * su caja, `stationNear`, desde el 2026-10-01; antes, 3 casillas a su centro—, y
  * la ropa abre casillas que no se pueden cerrar llenas.
  */
 

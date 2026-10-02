@@ -494,10 +494,9 @@ async function desktopPass(browser, baseUrl) {
   check(turned.sent.harvest === before.sent.harvest, 'mover el raton acciono');
 
   // Lo que el golpe alcanza (regla 12) esta delante y al alcance: todo objeto
-  // cuyo hitbox toca el sector cae en una casilla a menos de 2,5 bloques mas su
+  // cuyo hitbox toca el sector cae en una casilla a menos del alcance mas su
   // media diagonal, hacia donde se mira. Los numeros exactos del sector los
-  // miden los tests del nucleo; aqui, que el que llega al juego es ese. Y la
-  // reticula marca exactamente eso.
+  // miden los tests del nucleo; aqui, que el que llega al juego es ese.
   for (const [tx, ty] of turned.reach) {
     const dx = tx + 0.5 - turned.x;
     const dy = ty + 0.5 - turned.y;
@@ -1123,7 +1122,7 @@ async function resourcesPass(browser, baseUrl) {
     const seeds = seeded.inventory[3] + seeded.inventory[4];
     console.log(`  semillas tras recolectar: ${seeds}`);
     let planted = seeded;
-    // Se siembra donde la mirada toca el suelo, a menos de 2,5 bloques en
+    // Se siembra donde la mirada toca el suelo, a menos de 3 bloques en
     // horizontal (regla 12): con los ojos a 1,75 hay que mirar unos 35 grados
     // hacia abajo, justo lo que da la camara de arranque; se baja algo mas para
     // sembrar con margen. Bajar el raton baja la mirada.
@@ -1521,10 +1520,11 @@ async function stationsPass(browser, baseUrl) {
     check(rp1.top > rp0.top + 10, 'en PC arrastrar el mando de la barra no deslizo la rejilla');
   }
 
-  // Alejarse mas de 3 casillas cierra el panel de la mesa. De lado: detras
+  // Alejarse mas del alcance (3, de los ojos a su caja) cierra el panel de la
+  // mesa. De lado: detras
   // esta el horno.
   // El rellano del nacimiento es pequeno y lo rodean escalones: se prueba a
-  // cada lado, saltando, hasta pasar de 3 casillas.
+  // cada lado, saltando, hasta pasar del alcance.
   const near = await state(page);
   const bench0 = near.stationTiles.find((t) => t.feature === 24);
   let away = near;
