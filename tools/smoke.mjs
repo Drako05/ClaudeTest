@@ -102,10 +102,21 @@ async function open(page, baseUrl, query) {
  * soltar con Esc, asi que para soltar se usa `document.exitPointerLock()`.
  */
 async function play(page) {
+  // Sin pausa pero con el cursor suelto por el juego tras cerrar el inventario
+  // con Esc, el raton no gira la vista hasta el primer clic, que captura. Con
+  // un panel abierto el cursor va suelto a proposito y no hay que capturar.
+  const wantsLock = (v) => v.mouseMode && !v.inventoryOpen && !v.devOpen;
   const s = await state(page);
-  if (!s.paused) return;
+  if (!s.paused && (!wantsLock(s) || s.pointerLocked)) return;
   await page.mouse.click(CLICK.x, CLICK.y);
-  await page.waitForFunction(() => window.__verdant && !window.__verdant.paused, null, { timeout: 5000 });
+  await page.waitForFunction(
+    () => {
+      const v = window.__verdant;
+      return v && !v.paused && (!(v.mouseMode && !v.inventoryOpen && !v.devOpen) || v.pointerLocked);
+    },
+    null,
+    { timeout: 5000 },
+  );
 }
 
 /**
@@ -455,9 +466,10 @@ async function desktopPass(browser, baseUrl) {
     const dx = tx + 0.5 - turned.x;
     const dy = ty + 0.5 - turned.y;
     const d = Math.hypot(dx, dy);
-    // El alcance es el del nucleo (2,5 desde el 2026-09-29): con el 2 de antes
-    // esta comprobacion habria dado por malo un golpe legitimo a 2,3.
-    check(d <= 2.5 + Math.SQRT1_2 + 1e-6, `se alcanza la casilla ${tx},${ty}, a ${d.toFixed(2)}`);
+    // El alcance es el del nucleo (3 desde el 2026-10-01), leido del juego: con
+    // un numero copiado aqui, el 2 de antes habria dado por malo un golpe
+    // legitimo a 2,3 (escape 1).
+    check(d <= turned.strikeRange + Math.SQRT1_2 + 1e-6, `se alcanza la casilla ${tx},${ty}, a ${d.toFixed(2)}`);
     check(d < 0.8 || (dx * turned.aim[0] + dy * turned.aim[1]) / d > 0, `se alcanza la casilla ${tx},${ty}, que queda detras`);
   }
   // La reticula ya no marca lo que se alcanza (pedido del autor): marca donde
@@ -533,22 +545,26 @@ async function desktopPass(browser, baseUrl) {
     'la rueda no recorre la barra de la mano');
   check(lit.join() === passed.join(),
     `la rueda no ilumino las casillas ${passed.map((i) => i + 1)} por las que paso: ${lit.map((i) => i + 1)}`);
-  // Girando deprisa, una sola casilla encendida a la vez (pedido del autor,
-  // 2026-10-01: se veian todas). Se vigila el MAXIMO de encendidas tras cada
-  // cambio de clase: es un invariante, no una cuenta en una ventana de tiempo
-  // (escape 13), y no depende de lo rapida que vaya la maquina.
+  // Girando deprisa, una sola casilla encendida a la vez y sin espera (pedido
+  // del autor, 2026-10-01: se veian dos, la del destello y la elegida de antes,
+  // que no se apagaba hasta que el nucleo aplicaba la seleccion). Se cuentan
+  // las encendidas EN CADA FOTOGRAMA, que es lo que se ve, con una muesca por
+  // fotograma y veinte fotogramas mas: es un invariante, no una cuenta en una
+  // ventana de tiempo (escape 13).
   const spin = await page.evaluate(() => new Promise((done) => {
     const hotbar = document.getElementById('hotbar');
-    let max = 0;
-    const obs = new MutationObserver(() => {
-      max = Math.max(max, hotbar.querySelectorAll('.slot.pass').length);
-    });
-    obs.observe(hotbar, { attributes: true, subtree: true, attributeFilter: ['class'] });
     const view = document.getElementById('view');
-    for (let i = 0; i < 10; i++) {
-      view.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, deltaMode: 0, bubbles: true, cancelable: true }));
-    }
-    setTimeout(() => { obs.disconnect(); done(max); }, 400);
+    let max = 0;
+    let frames = 0;
+    const tick = () => {
+      if (frames < 10) view.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, deltaMode: 0, bubbles: true, cancelable: true }));
+      requestAnimationFrame(() => {
+        max = Math.max(max, hotbar.querySelectorAll('.slot.on, .slot.pass').length);
+        if (++frames < 30) tick();
+        else done(max);
+      });
+    };
+    tick();
   }));
   console.log(`  rueda deprisa: como mucho ${spin} casilla(s) encendida(s) a la vez`);
   check(spin === 1, `girando deprisa la rueda se encienden ${spin} casillas a la vez`);
@@ -558,6 +574,10 @@ async function desktopPass(browser, baseUrl) {
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(250);
   check(await page.isVisible('#invPanel'), 'E no abrio el inventario');
+  // La rejilla no repite la luz de la casilla elegida de la barra (pedido del
+  // autor, 2026-10-01), aunque su primera fila sean esas casillas.
+  const gridLit = await page.evaluate(() => document.querySelectorAll('#invGrid .slot.on').length);
+  check(gridLit === 0, `con el inventario abierto la rejilla enciende ${gridLit} casilla(s)`);
   // Con las 16 casillas caben las cuatro filas: la barra deslizable no sale.
   const railIdle = await page.evaluate(() => {
     const g = document.getElementById('invGrid');
@@ -621,20 +641,33 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  descripcion: «${shown.slice(0, 30)}…» -> «${await desc()}»`);
   check(shown !== '' && (await desc()) === '', 'tocar una casilla vacia no limpio la descripcion');
   await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
-  // Esc lo cierra sin pausar. Y SIN poder recapturar, que es lo que pasa en un
-  // Chrome de verdad —Esc no cuenta como gesto— y el headless no reproduce: se
-  // le quita la captura a mano para probar justo ese caso.
+  // Esc lo cierra sin pausar y SIN pedir capturar el cursor (escape 14): en el
+  // Chrome del autor esa peticion acababa en pausa, y el headless no lo
+  // reproduce. Un espia cuenta las peticiones; el cursor queda suelto por el
+  // juego, sin pausa, y el primer clic captura sin golpear.
   await page.evaluate(() => {
+    window.__lockCalls = 0;
     window.__lockBackup = HTMLCanvasElement.prototype.requestPointerLock;
-    HTMLCanvasElement.prototype.requestPointerLock = () => Promise.reject(new Error('sin gesto'));
+    HTMLCanvasElement.prototype.requestPointerLock = function (...args) {
+      window.__lockCalls++;
+      return window.__lockBackup.apply(this, args);
+    };
   });
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
   const escClosed = await state(page);
+  const escLockCalls = await page.evaluate(() => window.__lockCalls);
   await page.evaluate(() => { HTMLCanvasElement.prototype.requestPointerLock = window.__lockBackup; });
   check(!(await page.isVisible('#invPanel')), 'Esc no cerro el inventario');
-  console.log(`  Esc sin poder recapturar: pausa ${escClosed.paused}, cursor suelto sin pausa ${escClosed.cursorFree}`);
+  console.log(`  Esc: peticiones de captura ${escLockCalls}, pausa ${escClosed.paused}, cursor suelto sin pausa ${escClosed.cursorFree}`);
+  check(escLockCalls === 0, `cerrar el inventario con Esc pidio capturar el cursor (${escLockCalls})`);
   check(!escClosed.paused && escClosed.cursorFree, 'cerrar el inventario con Esc pauso el juego');
+  const clickFrom = await state(page);
+  await page.mouse.click(CLICK.x, CLICK.y);
+  await page.waitForTimeout(300);
+  const clicked = await state(page);
+  check(clicked.pointerLocked && clicked.sent.harvest === clickFrom.sent.harvest,
+    'tras cerrar con Esc, el primer clic no capturo o golpeo');
   // Y al reabrirlo no queda nada seleccionado.
   await page.keyboard.press('KeyE');
   await page.waitForTimeout(250);
@@ -1188,6 +1221,32 @@ async function stationsPass(browser, baseUrl) {
   console.log(`  usar la mesa: «${await page.textContent('#recipeTitle')}», ${benchTabs}`);
   check(bench.inventoryOpen && bench.panelStation === 1, 'USAR mirando la mesa no abrio su panel');
   check(benchTabs.join() === 'Herramientas,Ropa', `la mesa ensena otras recetas: ${benchTabs}`);
+  // El panel de PC (pedido del autor, 2026-10-01): las cuatro herramientas de
+  // la mesa caben sin barra; las barras no van apretadas contra lo de al lado;
+  // los titulos, mas grandes.
+  const layoutPc = await page.evaluate(() => {
+    const r = (el) => el.getBoundingClientRect().toJSON();
+    const list = document.getElementById('recipeList');
+    const grid = document.getElementById('invGrid');
+    return {
+      recipes: list.querySelectorAll('.recipe').length,
+      overflows: list.scrollHeight > list.clientHeight + 0.5,
+      listRail: getComputedStyle(list.parentElement.querySelector('.rail')).visibility,
+      gridRail: r(grid.parentElement.querySelector('.rail')),
+      listRailR: r(list.parentElement.querySelector('.rail')),
+      recipesCol: r(document.querySelector('.invPage[data-page="recetas"]')),
+      panel: r(document.getElementById('invPanel')),
+      title: parseFloat(getComputedStyle(document.querySelector('.invPage h2')).fontSize),
+    };
+  });
+  console.log(`  panel de PC: ${layoutPc.recipes} recetas ${layoutPc.overflows ? 'desbordan' : 'caben'}, ` +
+    `barra a ${(layoutPc.recipesCol.left - layoutPc.gridRail.right).toFixed(0)} px de las recetas, titulos de ${layoutPc.title} px`);
+  check(layoutPc.recipes === 4 && !layoutPc.overflows && layoutPc.listRail === 'hidden',
+    `cuatro recetas no caben sin barra: ${JSON.stringify(layoutPc)}`);
+  check(layoutPc.recipesCol.left - layoutPc.gridRail.right >= 12 && layoutPc.panel.right - layoutPc.listRailR.right >= 8,
+    `las barras van apretadas: ${JSON.stringify(layoutPc)}`);
+  check(layoutPc.title >= 15, `los titulos del panel siguen pequenos: ${layoutPc.title}`);
+  await page.screenshot({ path: join(SHOTS, '3d-12-panel-pc.png') });
   await craft(2);
   await category('Ropa');
   await craft(2);
@@ -1719,6 +1778,30 @@ async function mobilePass(browser, baseUrl) {
   check(tapOnce.sent.tapUse === t1.sent.tapUse + 1 && tapOnce.sent.tapHarvest === t1.sent.tapHarvest + 1,
     'en TAP un toque no uso y luego ataco');
   check(turned > 0.2, `en TAP el toque no apunto hacia el punto tocado: ${turned}`);
+  // Y el barrido se ve horizontal, centrado en el toque, aunque el toque caiga
+  // a un lado (pedido del autor, 2026-10-01: a la izquierda de CORRER salia
+  // casi vertical). Se mide el trazo entero en pantalla: su alto entre su
+  // ancho. Lo que queda es la curva propia del arco, ~0,2; sin el giro, a un
+  // lado del jugador pasaba de 1,5.
+  const flatness = async (p) => {
+    const before = (await state(page)).sent.tapHarvest;
+    await tapWorld(p);
+    await page.waitForFunction((n) => window.__verdant.sent.tapHarvest > n, before, { timeout: 5000 }).catch(() => {});
+    const pts = (await state(page)).lastSweep?.points;
+    if (!pts) return Infinity;
+    const xs = pts.map((q) => q.x);
+    const ys = pts.map((q) => q.y);
+    return (Math.max(...ys) - Math.min(...ys)) / Math.max(1, Math.max(...xs) - Math.min(...xs));
+  };
+  const sides = [worldAt, { x: 330, y: 450 }, { x: 250, y: 600 }];
+  for (const p of sides) {
+    check(await page.evaluate((q) => document.elementFromPoint(q.x, q.y)?.id === 'view', p),
+      `el punto ${p.x},${p.y} para medir el barrido cae sobre otra cosa`);
+  }
+  const tilts = [];
+  for (const p of sides) tilts.push(await flatness(p));
+  console.log(`  TAP: barrido inclinado ${tilts.map((t) => t.toFixed(2)).join(', ')} (alto/ancho en pantalla)`);
+  check(tilts.every((t) => t < 0.6), `en TAP el barrido no se ve horizontal: ${tilts}`);
   // Arrastrar sin mantener: solo camara.
   const dragFrom = await state(page);
   await pointers(page, [{ type: 'pointerdown', id: 3, ...worldAt }]);

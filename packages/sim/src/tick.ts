@@ -188,6 +188,7 @@ export function step(state: GameState, intent: Intent): void {
       entities.facingY[playerId] = intent.aimY / aimLen;
     }
     entities.lookZ[playerId] = intent.aimZ ?? 0;
+    entities.lookRoll[playerId] = intent.aimRoll ?? 0;
 
     // El inventario antes que el golpe: elegir la herramienta y golpear en el
     // mismo tick golpea ya con ella.

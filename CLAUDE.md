@@ -102,17 +102,35 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
     que ningun test evidente lo delate.
 12. **El golpe es un SECTOR PLANO que sale de los ojos y cuenta solo si toca
-    un hitbox** (`sim/aim.ts`), decision del autor del 2026-09-28: **2,5
-    bloques** (eran 2; los subio el 2026-09-29) **y 90 grados** (±45) en el plano de la mirada —la direccion en que se mira,
+    un hitbox** (`sim/aim.ts`), decision del autor del 2026-09-28: **3
+    bloques** (eran 2; los subio a 2,5 el 2026-09-29 y a 3 el 2026-10-01) **y 90 grados** (±45) en el plano de la mirada —la direccion en que se mira,
     con su inclinacion, y la horizontal a su derecha—, y **el terreno lo
     corta**: no se golpea a traves del suelo ni de una pared. Se recorre con 33
-    rayos (a 2,5 bloques, un hueco de 0,12, menos que el tronco mas fino), cada uno
+    rayos (a 3 bloques, un hueco de 0,147, menos que el tronco mas fino, 0,22), cada uno
     cortado donde entra en el terreno; cae todo objeto cuyo hitbox cruce alguno.
     **Sembrar** va donde la mirada toca la cara de arriba del suelo, a menos de
-    2,5 bloques **en horizontal** —el mismo alcance, decision del autor— (lo de
+    3 bloques **en horizontal** —el mismo alcance, decision del autor— (lo de
     horizontal es deduccion mia: a lo largo de la mirada habria que mirar 44
     grados abajo para sembrar en llano; asi, 35); ni en la cara de una pared ni
     mirando al cielo.
+
+    **El plano del sector puede girar alrededor de la mirada** (`aimRoll` en
+    la `Intent`, `lookRoll` en las entidades; positivo, su derecha sube). Con
+    0 es el de siempre, y asi va con MIRA y el teclado. Lo usa el modo **TAP**
+    del movil (pedido del autor, 2026-10-01: al tocar a un lado del jugador el
+    barrido salia casi vertical): el cliente lo gira para que **contenga la
+    derecha de la camara** (`rollFor`), que es el «primero Y y luego X» que
+    propuso el autor —girar hacia el lado con el abanico plano y despues
+    inclinarlo sobre la derecha de la camara—. En primera persona eso es
+    exacto: el trazo sale horizontal y centrado en el toque. En tercera, la
+    camara no esta en los ojos, y un arco en el aire a un lado del jugador se
+    ve de frente y torcido; ahi se elige, en la media vuelta alrededor, el
+    giro con el que el trazo **se ve** menos alto para lo ancho que es
+    (`flattestRoll`, con cinco de los rayos ya cortados por el terreno;
+    deduccion mia). Medido: de hasta 2,75 de alto/ancho a 0,42 como mucho, y
+    lo que queda es la curva propia del arco. El nucleo no se entera de por
+    que: golpea con el giro que le llega, asi que lo que se ve es lo que se
+    golpea.
 
     **Hitboxes** (`hitboxAt` en `systems/gathering.ts`): cajas verticales
     centradas en su casilla y apoyadas en su suelo. **El del arbol es solo su
@@ -135,7 +153,7 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     **Dos modos de golpe** (decision del autor, 2026-09-30): el **barrido**,
     que es todo lo de arriba, y el **preciso**, que golpea **solo el primer
     objetivo que cruza el centro de la mira**, cortado por el terreno y a
-    menos de 2,5 (`preciseTarget`, el mismo rayo que abre una estacion). Es un
+    menos de 3 (`preciseTarget`, el mismo rayo que abre una estacion). Es un
     estado de la `Intent` (`precise`), como correr; se cambia con TAB o el
     boton MODO, y en vez del arco se ve una **estocada** recta que **nace
     abajo a la derecha de la pantalla** y va hasta lo golpeado en el centro de
@@ -450,7 +468,7 @@ Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
   pared el trazo se pega a el (`slashEdge` en `effects.ts`, puro). No se
   recalcula nada: es el mismo golpe que decidio la simulacion. Sale de los ojos
   en las tres vistas, siempre, haya algo que golpear o no —es el gesto, no el
-  resultado—, y se congela en el mundo al nacer. En primera persona, a 2,5
+  resultado—, y se congela en el mundo al nacer. En primera persona, a 3
   bloques de los ojos, lleva medio ancho 0,04 (deduccion mia); en tercera, 0,06:
   los 3 px del isometrico con la casilla a 32, redondeados al alza desde 0,094
   porque PixiJS suavizaba el trazo y este lienzo va sin antialias. Antes fue un
@@ -758,7 +776,9 @@ sustituirlas, para no mover el mundo llano ni un tile.
 Las teclas: WASD o flechas andan, **Espacio salta** (decision del autor en la
 fase 2), Shift enciende la carrera, **E abre el inventario**, 1-4 eligen lo
 que se lleva en la mano, y tambien la **rueda del raton**, que la recorre (hacia
-abajo, la siguiente; da la vuelta), R empieza un mundo nuevo, **+ y - acercan y
+abajo, la siguiente; da la vuelta; **una sola casilla encendida, siempre**: cada
+muesca mueve en el acto la luz de la seleccion, sin destello aparte ni espera,
+pedido del autor, 2026-10-01), R empieza un mundo nuevo, **+ y - acercan y
 alejan** —solo ellas: la rueda dejo de hacer zoom el 2026-09-29, decision del
 autor—, y P cambia de proyeccion. **Esc con el inventario abierto lo cierra**
 sin pausar. **TAB cambia el modo de golpe** (barrido o preciso) y **CTRL
@@ -803,12 +823,17 @@ arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
   que distinguir. **Esc no reanuda**, y no por gusto: Chrome no cuenta Esc
   como gesto para volver a capturar el cursor, porque es la salida de
   emergencia del jugador. El autor eligio que solo el clic reanude.
-- **Esc con el inventario abierto lo cierra sin pausar.** Se intenta
-  recapturar, pero **Chrome no deja**: Esc no cuenta como gesto. Esto decia lo
-  contrario —«el cursor lo solto el juego y Chrome deja»— y el autor vio el
-  juego pausarse (2026-09-30); el headless SI recaptura, y por eso el humo
-  nunca lo vio. Ahora el humo le quita la captura a mano antes del Esc para
-  probar justo ese caso. De ahi el cursor suelto sin pausa de arriba.
+- **Esc con el inventario abierto lo cierra sin pausar, y NO pide capturar
+  el cursor**: queda suelto por el juego (`free`) hasta el primer clic, que
+  captura sin golpear. Dos intentos fallaron antes. Primero se recapturaba
+  dando por hecho que Chrome dejaba, y el autor vio la pausa (2026-09-30).
+  Luego se dio por hecho lo contrario, que Chrome NO deja, y se probo
+  forzando ese fallo; el autor la vio otra vez (2026-10-01). Hipotesis mia:
+  con la activacion de la tecla, Chrome concede la captura y su propio Esc
+  la suelta como si fuera el jugador. Sea cual sea, **no pedir algo sujeto a
+  las politicas del navegador desde un Esc** no depende de como lo resuelva.
+  El humo espia `requestPointerLock` y exige cero llamadas al cerrar con Esc
+  (escape 14). Cerrar con E o con el boton si pide capturar.
 - **El menu del navegador no sale nunca**: `contextmenu` se anula en todo el
   documento. Con solo el lienzo, el clic derecho que abre una estacion dejaba
   caer el suyo sobre el panel recien abierto bajo el cursor.
@@ -1071,6 +1096,9 @@ alcance, y lo que quede lejos no se alcanza. El reparto: `gestures.ts`
 clasifica el dedo (toque, sostenido `'tapHold'`, que gira sin contar para la
 pinza, o arrastre), `controls.ts` lo traduce a peticiones, `tap-input.ts`
 (puro, con su test) pone el orden tick a tick, y `main.ts` calcula la mirada.
+Y el **giro del barrido**, para que se vea horizontal y centrado en el toque:
+ver la regla 12 (`aimRoll`). El humo mide el trazo en pantalla en tres toques;
+sin el giro, a un lado del jugador da 2,24.
 
 **El AUTO SALTO** (decision del autor, 2026-09-30; `systems/autojump.ts`):
 andando hacia un bloque que se sube de un salto, se salta solo **justo antes
@@ -1146,8 +1174,12 @@ Decisiones del autor, que no se tocan sin preguntarle:
   trabajo** o el **horno** (tanda 2). Se colocan con USAR, son **cajas**, no
   aspas, estorban el paso y se desmontan a mano en 3 golpes. **Sus recetas no
   salen con E**: USAR mirando la estacion abre el mismo panel con las suyas, y
-  se cierra solo al alejarse a mas de 3 casillas. Fundir es una receta mas del
-  horno.
+  se cierra cuando **su cara** queda mas lejos que el alcance, para todas
+  las estaciones sea cual sea su forma, y **la distancia de cierre es siempre
+  el alcance** (`STRIKE_RANGE`, decision del autor, 2026-10-01). Se mide de
+  los ojos al punto mas cercano de su caja (`stationNear`; en 3D, deduccion
+  mia), y es la misma cuenta con la que el nucleo acepta la receta. Fundir es
+  una receta mas del horno.
 
 Lo que el codigo tiene que respetar:
 
@@ -1196,6 +1228,17 @@ Lo que el codigo tiene que respetar:
   de recetas se quedan fijas, y solo se deslizan la rejilla del inventario o
   la lista de recetas, centradas; las categorias, cuando sean mas, a los
   lados. El humo lo mide pagina por pagina.
+  **En PC** (pedido del autor, 2026-10-01): la lista de recetas mide **cuatro
+  recetas exactas**, asi que la mesa con sus cuatro herramientas no saca la
+  barra; 44 px entre columnas, 32 a los lados, titulos de 15 px y 14 de ellos
+  a su rejilla (numeros mios). **La rejilla no repite la luz de la barra**: la
+  casilla elegida solo se ilumina en la barra de la mano.
+- **En el movil, un toque fuera del inventario lo cierra, y solo eso**
+  (decision del autor, 2026-10-01): se escucha en captura y se traga ese dedo
+  entero —ni gira la camara, ni ataca, ni pulsa el boton que hubiera debajo—.
+  No cuentan como fuera la barra de la mano, que es parte del arrastre, el
+  boton INVENTARIO, que ya alterna, ni el dialogo de tirar (deduccion mia).
+  Los gestos lo prueban con toques de verdad.
 - **Con mas de lo que cabe, una barra deslizable** a la derecha de la
   rejilla y de la lista de recetas (pedido del autor, 2026-09-30 en el movil,
   2026-10-01 tambien en PC, donde la franja es de 18 px para no pisar la

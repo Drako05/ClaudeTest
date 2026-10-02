@@ -39,10 +39,10 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El grosor del barrido: 0,12 casillas, redondeado al alza por el antialias | El barrido del 3D | un numero |
 | Los ojos a **1,75** para las tres vistas y el golpe (la orbital miraba a 1,6) | Golpe por hitbox y una sola mirada | un numero en `sim/aim.ts` |
 | Inclinacion de arranque **−0,62** tambien en primera persona (antes entraba a −0,2) y tope de **±83 grados** | Golpe por hitbox y una sola mirada | numeros en `camera.ts` |
-| Sembrar a menos de 2,5 bloques (el alcance es tuyo) **en horizontal**, no a lo largo de la mirada (asi basta mirar 35 grados abajo, no 44) | Golpe por hitbox y una sola mirada | una linea |
+| Sembrar a menos de 3 bloques (el alcance es tuyo) **en horizontal**, no a lo largo de la mirada (asi basta mirar 35 grados abajo, no 44) | Golpe por hitbox y una sola mirada | una linea |
 | Hitboxes: arbusto 0,9 de ancho × 1,1, roca y minerales 0,9 × 1,0, brote 0,3 × 0,85 | Golpe por hitbox y una sola mirada | numeros en `gathering.ts` |
 | Colision de camara: se para **0,3** antes, la isometrica a **60** como mucho, y el jugador se oculta con la camara a menos de **1** | Golpe por hitbox y una sola mirada | numeros en `camera*.ts` |
-| Grosor del barrido en primera persona: medio ancho **0,04** a 2,5 bloques | Golpe por hitbox y una sola mirada | un numero en `effects.ts` |
+| Grosor del barrido en primera persona: medio ancho **0,04** a 3 bloques | Golpe por hitbox y una sola mirada | un numero en `effects.ts` |
 | El barrido se **congela en el mundo** al nacer: girar la camara despues no lo arrastra | La accion es un cono | una linea |
 | En tercera persona **el personaje tapa el centro de la pantalla**, que es hacia donde se golpea | Golpe por hitbox y una sola mirada | un encuadre por encima del hombro |
 | El cuarto de vuelta propio de cada aspa | Las features ya son aspas | un numero |
@@ -75,7 +75,12 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Con el inventario abierto **se salta** (tu dijiste «solo moverse») | Ajustes de la tanda 2 | una linea en `main.ts` |
 | El modo de golpe **arranca en barrido** y no se recuerda entre partidas | Ajustes de la tanda 2 | una linea |
 | La estacion puesta contra una pared cae con la **gravedad del salto** (62), y la caida solo se ve | Ajustes de la tanda 2 | `stations-view.ts` |
-| La rueda ilumina cada casilla **140 ms**, **una a la vez** y en el acto (antes, escalonadas 40 ms) | Ajustes de la tanda 2 | dos numeros en `inventory-ui.ts` |
+| La rueda **no tiene destello aparte**: la luz es la de la seleccion, que se mueve en el acto (antes, un destello de 140 ms junto a la luz vieja, y se veian dos) | Ajustes de la tanda 2, 6.ª ronda | `inventory-ui.ts` |
+| Cerrar el inventario con **Esc no pide capturar el cursor**; la causa de la pausa es hipotesis mia (Chrome concede la captura y su propio Esc la suelta) | Ajustes de la tanda 2, 6.ª ronda | una linea en `main.ts` |
+| La distancia a una estacion se mide **de los ojos al punto mas cercano de su caja, en 3D** | Ajustes de la tanda 2, 6.ª ronda | `sim/stations.ts` |
+| No cuentan como «fuera» del inventario: la **barra de la mano**, el boton **INVENTARIO** y el **dialogo de tirar** | Ajustes de la tanda 2, 6.ª ronda | un selector en `inventory-ui.ts` |
+| Panel de PC: **44 px** entre columnas, **32** a los lados, titulos de **15 px** a **14** de su rejilla | Ajustes de la tanda 2, 6.ª ronda | CSS |
+| El barrido del TAP en **tercera persona** gira lo que haga falta para **verse** mas horizontal (en primera, tu «primero Y y luego X», exacto); se mira con 5 rayos y 19 giros | Ajustes de la tanda 2, 6.ª ronda | `flattestRoll` en `tap-input.ts` |
 | Los dibujos del **tajo** y la **mirilla**; los anillos de PC de **56 px** y trazo 5 | Ajustes de la tanda 2 | SVG y CSS en `index.html` |
 | La **mochila** redibujada como tu adjunto, casi cuadrada, a **34 px** en el boton (antes 28) | Ajustes de la tanda 2, 2.ª ronda | SVG y CSS en `index.html` |
 | MODO en el movil de **44 px**, a 72 px (en cada eje) del centro del ataque | Ajustes de la tanda 2 | CSS |
@@ -471,6 +476,42 @@ golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
 
+## Ajustes de la tanda 2, 6.ª ronda — HECHO (2026-10-02)
+
+La CI de la 5.ª ronda (`4458d9b`) salio en verde. Lo que pediste, y lo que
+respondiste:
+- **La rueda enciende una sola casilla, siempre**: cada muesca mueve en el
+  acto la luz de la seleccion. Se veian dos porque el destello iba aparte y
+  la luz vieja no se movia hasta el tick siguiente.
+- **La rejilla del inventario no repite la luz de la barra.**
+- **El panel de PC**: la lista de recetas cabe cuatro sin barra, mas aire
+  entre columnas y a los lados, y titulos mas grandes y mas separados.
+- **Esc cierra el inventario sin pausar**: ya no pide capturar el cursor; el
+  primer clic lo captura sin golpear.
+- **El alcance es 3** para golpear, sembrar, colocar y abrir; y **el panel de
+  una estacion se cierra cuando su cara queda mas lejos que el alcance**, sea
+  cual sea su forma («la distancia de cierre siempre sera igual al
+  alcance»).
+- **En el movil, un toque fuera del inventario lo cierra, y solo eso.**
+- **El barrido del TAP se ve horizontal y centrado en el toque**, con el
+  origen en los ojos. Tu «primero Y y luego X» es justo el giro que hace
+  falta: girar hacia el lado con el abanico plano y despues inclinarlo sobre
+  la derecha de la camara. En primera persona es exacto. En tercera, la
+  camara no esta en los ojos, y se afina eligiendo el giro con el que el
+  trazo se ve mas plano. Medido en ocho puntos de la pantalla (alto entre
+  ancho del trazo; 0 es plano):
+
+  | Vista | Sin giro | Primero Y y luego X | Afinado |
+  |---|---|---|---|
+  | Perspectiva, peor punto | 2,02 | 2,75 | **0,36** |
+  | Isometrica, peor punto | 1,85 | 2,14 | **0,42** |
+  | Primera persona, peor punto | 0,17 | **0,00** | **0,00** |
+
+  Lo que queda en tercera persona (~0,2 de media) es la curva propia del
+  arco de 90 grados visto de frente.
+
+Lo que decidi yo va arriba, en «Esperando tu juicio».
+
 ## Ajustes de la tanda 2, 5.ª ronda — HECHO (2026-10-01)
 
 La CI de la 4.ª ronda (`36e683f`) salio en verde. Lo que pediste, y lo que
@@ -636,6 +677,8 @@ empezarla (F ya no existia):
   no salen**: solo se ven usandola.
 - **El panel de una estacion se cierra solo a mas de 3 casillas** de ella. El
   nucleo usa la misma cuenta (`stationNear`) para aceptar la receta.
+  (*Hoy*, desde la 6.ª ronda de ajustes: cuando su cara queda mas lejos que
+  el alcance.)
 - **Fundir es una receta mas del horno**: mantener 1,5 s. 2 cobre + 1 carbon
   dan un lingote de cobre; 2 hierro + 2 carbon, uno de hierro.
 - **Herramientas de metal**, en la mesa:

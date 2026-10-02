@@ -433,8 +433,10 @@
       #invPanel {
         position: fixed; z-index: 15;
         left: 50%; top: 50%; transform: translate(-50%, -54%);
-        display: grid; grid-template-columns: auto auto auto; gap: 22px;
-        padding: 16px 18px; border-radius: 12px; max-width: calc(100vw - 24px);
+        /* Aire entre columnas y a los lados para que las barras deslizables no
+           vayan apretadas (pedido del autor, 2026-10-01; antes 22 y 18). */
+        display: grid; grid-template-columns: auto auto auto; gap: 44px;
+        padding: 22px 32px; border-radius: 12px; max-width: calc(100vw - 24px);
         font-size: 12px; line-height: 1.4;
         background: rgba(8, 14, 28, 0.9);
         border: 1px solid rgba(140, 190, 255, 0.28);
@@ -442,7 +444,7 @@
       }
       #invPanel[hidden] { display: none; }
       .invPage h2 {
-        margin: 0 0 6px; font-size: 11px; letter-spacing: .14em; text-align: center;
+        margin: 0 0 14px; font-size: 15px; letter-spacing: .14em; text-align: center;
         text-transform: uppercase; color: #8fc4ff; font-weight: 600;
       }
       .slots { display: grid; grid-template-columns: repeat(4, 60px); gap: 6px; }
@@ -466,8 +468,6 @@
       }
       .slot.on { border-color: rgba(170, 214, 255, .85); background: rgba(60, 104, 168, .72); }
       .slot.picked { outline: 2px solid #ffe89a; outline-offset: -3px; }
-      /* La casilla por la que pasa la rueda, un instante. */
-      .slot.pass { border-color: rgba(170, 214, 255, .85); background: rgba(60, 104, 168, .5); }
       .slot.dragging { opacity: .35; }
       .slot.drop { border-color: #ffe89a; }
       .slot.off { opacity: .4; cursor: default; }
@@ -510,9 +510,12 @@
         overflow-x: auto; scrollbar-width: none;
       }
       #recipeTabs .slot { flex: none; width: 60px; height: 60px; padding: 4px 2px; font-size: 8px; letter-spacing: -.02em; }
+      /* Caben CUATRO recetas sin barra (pedido del autor, 2026-10-01): cuatro
+         filas de 66 (ingredientes de 56 con su relleno y su borde) y tres
+         huecos de 8, mas dos de holgura para el redondeo. */
       #recipeList {
         display: grid; gap: 8px; justify-items: center; align-content: start;
-        max-height: calc(4 * 70px); overflow-y: auto;
+        max-height: calc(4 * 66px + 3 * 8px + 2px); overflow-y: auto;
       }
       /* La fila mide lo que su contenido, para que la carga acabe en el borde
          derecho de los ingredientes y no en el del panel (pedido del autor). */

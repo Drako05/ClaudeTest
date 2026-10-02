@@ -57,10 +57,11 @@ export interface Hitbox {
  */
 export const EYE_HEIGHT = 1.75;
 /**
- * Alcance del golpe, en bloques, y el de sembrar (en horizontal). Del autor:
- * 2 el 2026-09-28, 2,5 el 2026-09-29, los dos.
+ * Alcance del golpe, en bloques, el de sembrar (en horizontal), el de abrir
+ * una estacion mirandola y el de usarla (`stationNear`). Del autor: 2 el
+ * 2026-09-28, 2,5 el 2026-09-29 y 3 el 2026-10-01.
  */
-export const STRIKE_RANGE = 2.5;
+export const STRIKE_RANGE = 3;
 /** Medio angulo del sector: 90 grados en total. Del autor. */
 export const STRIKE_HALF_ANGLE = Math.PI / 4;
 /** Rayos con los que se recorre el sector, de su borde derecho al izquierdo. */
@@ -86,20 +87,32 @@ export function lookVector(fx: number, fy: number, lookZ: number): Vec3 {
 
 /**
  * Las direcciones de los rayos del sector, unitarias, de la derecha a la
- * izquierda. Estan en el plano de la mirada y de la horizontal a su derecha.
+ * izquierda. Estan en el plano de la mirada y de la horizontal a su derecha,
+ * **girado `roll` alrededor de la mirada** (positivo: la derecha sube). Sin
+ * giro, el de siempre. El giro lo pide el modo TAP (decision del autor,
+ * 2026-10-01): tocando a un lado de la pantalla la mirada va de lado respecto
+ * a la camara, y el plano de siempre se veia de canto, como un trazo casi
+ * vertical; girado para contener la derecha de la camara, se ve horizontal y
+ * centrado en el toque, con el origen en los ojos igual.
  */
-export function sectorRays(fx: number, fy: number, lookZ: number): Vec3[] {
+export function sectorRays(fx: number, fy: number, lookZ: number, roll = 0): Vec3[] {
   const f = lookVector(fx, fy, lookZ);
   const len = Math.hypot(fx, fy) || 1;
   // A la derecha de la mirada, en horizontal (con `y` hacia el sur, es (-fy, fx)).
-  const rx = -(fy / len);
-  const ry = fx / len;
+  const hx = -(fy / len);
+  const hy = fx / len;
+  // Girada alrededor de la mirada: r = h·cos + (f × h)·sen, porque h ⟂ f.
+  const c0 = Math.cos(roll);
+  const s0 = Math.sin(roll);
+  const rx = hx * c0 + -f.z * hy * s0;
+  const ry = hy * c0 + f.z * hx * s0;
+  const rz = (f.x * hy - f.y * hx) * s0;
   const out: Vec3[] = [];
   for (let i = 0; i < STRIKE_RAYS; i++) {
     const theta = STRIKE_HALF_ANGLE * (1 - (2 * i) / (STRIKE_RAYS - 1));
     const c = Math.cos(theta);
     const s = Math.sin(theta);
-    out.push({ x: f.x * c + rx * s, y: f.y * c + ry * s, z: f.z * c });
+    out.push({ x: f.x * c + rx * s, y: f.y * c + ry * s, z: f.z * c + rz * s });
   }
   return out;
 }
@@ -183,7 +196,8 @@ export interface Strike {
 
 /**
  * El golpe desde `origin` —los ojos— mirando hacia `(fx, fy)` con inclinacion
- * `lookZ`. `boxAt` da el hitbox del objeto de una casilla, o `null`.
+ * `lookZ`, y el plano del sector girado `roll` alrededor de la mirada.
+ * `boxAt` da el hitbox del objeto de una casilla, o `null`.
  */
 export function strike(
   origin: Vec3,
@@ -192,8 +206,9 @@ export function strike(
   lookZ: number,
   ground: Ground,
   boxAt: (tx: number, ty: number) => Hitbox | null,
+  roll = 0,
 ): Strike {
-  const rays = sectorRays(fx, fy, lookZ).map((dir) => {
+  const rays = sectorRays(fx, fy, lookZ, roll).map((dir) => {
     const hit = groundHit(origin, dir, STRIKE_RANGE, ground);
     return { dir, length: hit ? hit.t : STRIKE_RANGE };
   });

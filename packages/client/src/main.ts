@@ -46,6 +46,8 @@ import {
   hitboxAt,
   lookVector,
   gazeTarget,
+  groundHit,
+  sectorRays,
   STRIKE_RANGE,
   strikeOf,
   targetTile,
@@ -57,7 +59,7 @@ import {
 import { DevTools } from './devtools.js';
 import { Effects, SLASH_FP_HALF_WIDTH, SLASH_HALF_WIDTH, slashEdge, STAB_SCREEN, stabLine } from './effects.js';
 import { cameraClearance, rayHit } from './camera-collision.js';
-import { TapSequencer } from './tap-input.js';
+import { flattestRoll, rollFor, TapSequencer } from './tap-input.js';
 import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
@@ -284,13 +286,18 @@ const items = new InventoryUi(() => state);
  */
 const mouseLook = new MouseLook(canvas, () => dev.active || items.open);
 controls.mouseLook = mouseLook;
+/** El inventario se esta cerrando con Esc: no se pide capturar el cursor. */
+let closingByEsc = false;
 window.addEventListener('keydown', (e) => {
-  // Esc con el inventario abierto lo cierra, sin pausar (pedido del autor): al
-  // cerrar se intenta capturar el cursor. Chrome no lo deja —Esc no cuenta como
-  // gesto—, y por eso el cursor que suelta el juego no pausa (`pointer-lock.ts`):
-  // se sigue jugando y el primer clic lo captura.
+  // Esc con el inventario abierto lo cierra, sin pausar (pedido del autor), y
+  // **no pide capturar el cursor**: se queda suelto por el juego, que no pausa
+  // (`pointer-lock.ts`), y el primer clic lo captura sin golpear. Lo pedia, y en
+  // el Chrome del autor acababa en pausa aunque el headless no lo hiciera
+  // (escape 14): mejor no pedir nada sujeto a sus politicas sin un gesto claro.
   if (e.code === 'Escape' && items.open) {
+    closingByEsc = true;
     items.toggle();
+    closingByEsc = false;
     return;
   }
   if (e.code !== 'F3') return;
@@ -305,7 +312,7 @@ controls.onFreeCursor = (held) => {
 };
 items.onToggle = (open) => {
   if (open) mouseLook.release();
-  else if (!dev.active) mouseLook.capture();
+  else if (!dev.active && !closingByEsc) mouseLook.capture();
 };
 const pauseEl = document.getElementById('pause') as HTMLElement;
 const pauseHint = document.getElementById('pauseHint') as HTMLElement;
@@ -352,11 +359,15 @@ function screenPoint(at: { x: number; y: number }, depthOf: Vector3): { x: numbe
   return { x: p.x, y: p.y, z: p.z };
 }
 
-/** Una mirada para la Intent: rumbo horizontal unitario y el seno de la inclinacion. */
+/**
+ * Una mirada para la Intent: rumbo horizontal unitario, el seno de la
+ * inclinacion y el giro del plano del barrido (`rollFor`).
+ */
 interface Aim {
   aimX: number;
   aimY: number;
   aimZ: number;
+  aimRoll: number;
 }
 
 /** Hasta donde se busca el punto tocado en el modo TAP. Mas alla, el cielo. */
@@ -397,9 +408,34 @@ function aimAt(p: { x: number; y: number }): Aim {
   // Justo encima o debajo de los ojos no hay rumbo: el de la camara.
   if (flat < 1e-6) {
     const f = camera.forward();
-    return { aimX: f.x, aimY: f.y, aimZ: dz / len };
+    return { aimX: f.x, aimY: f.y, aimZ: dz / len, aimRoll: 0 };
   }
-  return { aimX: dx / flat, aimY: dy / flat, aimZ: dz / len };
+  // El barrido, girado para contener la derecha de la camara: asi se ve
+  // horizontal y centrado en el toque (pedido del autor, 2026-10-01). Es su
+  // «primero Y y luego X»: girar hacia el lado y despues inclinar sobre la
+  // derecha de la camara. En tercera persona se afina mirando como se veria.
+  const camRight = camera.right();
+  const aim = { aimX: dx / flat, aimY: dy / flat, aimZ: dz / len };
+  const base = rollFor({ x: dx / len, y: dy / len, z: dz / len }, { x: camRight.x, y: camRight.y, z: 0 });
+  if (camera.projection === 'primera') return { ...aim, aimRoll: base };
+  const eye = { x: e.x[id], y: e.y[id], z: e.z[id] + EYE_HEIGHT };
+  const ground = (x: number, y: number) => state.world.groundHeightAt(x, y);
+  // Uno de cada ocho rayos basta para ver la forma (los dos bordes, el centro
+  // y dos intermedios), y cuesta una sexta parte.
+  const look = (roll: number) =>
+    sectorRays(aim.aimX, aim.aimY, aim.aimZ, roll)
+      .filter((_, i) => i % 8 === 0)
+      .map((dir) => {
+        const t = groundHit(eye, dir, STRIKE_RANGE, ground)?.t ?? STRIKE_RANGE;
+        return toScreen({ x: eye.x + dir.x * t, y: eye.z + dir.z * t, z: eye.y + dir.y * t });
+      });
+  return { ...aim, aimRoll: flattestRoll(base, look) };
+}
+
+/** Un punto de three.js, en pixeles de la pantalla. */
+function toScreen(p: { x: number; y: number; z: number }): { x: number; y: number } {
+  const v = new Vector3(p.x, p.y, p.z).project(camera.active);
+  return { x: ((v.x + 1) / 2) * canvas.clientWidth, y: ((1 - v.y) / 2) * canvas.clientHeight };
 }
 
 /** La ultima mirada de un toque o sostenido del modo TAP, para el humo. */
@@ -565,6 +601,11 @@ let airPeak = 0;
 /** Lo que ha salido en la Intent: pulsaciones, y ticks con el auto salto puesto. */
 const sent = { harvest: 0, jump: 0, use: 0, autoJump: 0, tapUse: 0, tapHarvest: 0 };
 
+/**
+ * El ultimo barrido en pixeles de pantalla, punto a punto, y cuales de sus
+ * rayos los corto el suelo: para que el humo vea si se dibuja horizontal.
+ */
+let lastSweep: { points: Array<{ x: number; y: number }>; cut: boolean[] } | null = null;
 /** La ultima estocada, en coordenadas de three.js, para el humo. */
 let lastStab: { from: Vector3Like; to: Vector3Like; eye: Vector3Like } | null = null;
 type Vector3Like = { x: number; y: number; z: number };
@@ -657,7 +698,7 @@ function frame(now: number): void {
     tapSeq.clear();
   }
   // La mirada de siempre, la de la camara; un toque la cambia solo en su tick.
-  const crossAim: Aim = { aimX: intent.aimX, aimY: intent.aimY, aimZ: intent.aimZ };
+  const crossAim: Aim = { aimX: intent.aimX, aimY: intent.aimY, aimZ: intent.aimZ, aimRoll: 0 };
   // Las peticiones del inventario (mano, intercambiar, tirar, fabricar) no se
   // tiran en pausa: esperan al primer frame con tick.
   let asked = accumulator >= TICK_DT ? items.take() : null;
@@ -715,8 +756,9 @@ function frame(now: number): void {
     intent.aimX = aim.aimX;
     intent.aimY = aim.aimY;
     intent.aimZ = aim.aimZ;
+    intent.aimRoll = aim.aimRoll;
     // Lo que de verdad lleva la Intent en el tick del toque, para el humo.
-    if (tapped.aim) lastTapAim = { aimX: intent.aimX, aimY: intent.aimY, aimZ: intent.aimZ };
+    if (tapped.aim) lastTapAim = { aimX: intent.aimX, aimY: intent.aimY, aimZ: intent.aimZ, aimRoll: intent.aimRoll };
 
     // La Intent se guarda en vez de pasarse en linea: hace falta saber si se
     // acciono para lanzar el barrido, aunque no se derribara nada.
@@ -781,7 +823,11 @@ function frame(now: number): void {
         lastStab = { from, to, eye: { x: eye.x, y: eye.z, z: eye.y } };
         effects.spawnSlash(stabLine(from, to), width);
       } else {
-        effects.spawnSlash(slashEdge(eye, strikeOf(state.world, e, id).rays), width);
+        const rays = strikeOf(state.world, e, id).rays;
+        const edge = slashEdge(eye, rays);
+        effects.spawnSlash(edge, width);
+        // En pantalla, para que el humo vea si se dibuja horizontal.
+        lastSweep = { points: edge.map(toScreen), cut: rays.map((r) => r.length < STRIKE_RANGE - 1e-6) };
       }
     }
     // Lo golpeado que siguio en pie suelta esquirlas: mas pequenas, apagadas y
@@ -967,10 +1013,13 @@ Object.defineProperty(window, '__verdant', {
       running: controls.running,
       autoJump: controls.autoJump,
       lastStab,
+      lastSweep,
+      /** El alcance del nucleo, para que el humo no copie el numero. */
+      strikeRange: STRIKE_RANGE,
       tapInput: controls.tapInput,
       lastTapAim,
       /** La mirada de la cruz, la que lleva la Intent sin toque del modo TAP. */
-      crossAim: { aimX: camera.forward().x, aimY: camera.forward().y, aimZ: Math.sin(camera.lookPitch) },
+      crossAim: { aimX: camera.forward().x, aimY: camera.forward().y, aimZ: Math.sin(camera.lookPitch), aimRoll: 0 },
       dev: dev.active,
       timeScale: dev.timeScale,
       survivalFrozen: dev.survivalFrozen,
@@ -1025,6 +1074,7 @@ Object.defineProperty(window, '__verdant', {
       deadShown: hud.deadShown,
       hudOpen: hud.hudOpen,
       inventoryOpen: items.open,
+      devOpen: dev.active,
       inventory: state.inventory.totals(),
       /**
        * Las casillas: objeto (o -1), cuantos, usos que le quedan y si existen

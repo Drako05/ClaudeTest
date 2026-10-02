@@ -42,6 +42,11 @@ export class EntityStore {
   readonly facingX: Float32Array;
   readonly facingY: Float32Array;
   /** Componente vertical de la mirada (ver `Intent.aimZ`). */
+  /**
+   * Giro del plano del sector alrededor de la mirada (modo TAP), en radianes.
+   * Con 0, el plano de la mirada y la horizontal a su derecha.
+   */
+  readonly lookRoll: Float32Array;
   readonly lookZ: Float32Array;
   readonly health: Float32Array;
   readonly hunger: Float32Array;
@@ -60,6 +65,7 @@ export class EntityStore {
     this.facingX = new Float32Array(capacity);
     this.facingY = new Float32Array(capacity);
     this.lookZ = new Float32Array(capacity);
+    this.lookRoll = new Float32Array(capacity);
     this.health = new Float32Array(capacity);
     this.hunger = new Float32Array(capacity);
     this.kind = new Uint8Array(capacity);
@@ -81,6 +87,7 @@ export class EntityStore {
     this.facingX[id] = 0;
     this.facingY[id] = 1;
     this.lookZ[id] = 0;
+    this.lookRoll[id] = 0;
     this.health[id] = 100;
     this.hunger[id] = 100;
     this.kind[id] = kind;

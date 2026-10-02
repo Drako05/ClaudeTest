@@ -449,7 +449,7 @@ export function workOf(f: Feature): Work | null {
 /**
  * Donde se fabrica: lo basico, a mano en cualquier sitio; lo mejor, en una mesa
  * o un horno (decision del autor). Las recetas de una estacion solo se ven al
- * usarla, y solo se fabrican a menos de `STATION_RANGE` de ella.
+ * usarla, y solo se fabrican con ella al alcance (`stationNear`).
  */
 export enum Station {
   Hand = 0,
@@ -457,8 +457,6 @@ export enum Station {
   Furnace = 2,
 }
 
-/** Distancia a la que una estacion sirve, en casillas (plan aprobado: 3). */
-export const STATION_RANGE = 3;
 
 export const STATION_NAMES: readonly string[] = ['A mano', 'Mesa de trabajo', 'Horno'];
 
@@ -758,6 +756,13 @@ export interface Intent {
    * sembrar (regla 12, `sim/aim.ts`). Sale de la camara, como `aimX`/`aimY`.
    */
   aimZ: number;
+  /**
+   * Giro del plano del sector del barrido alrededor de la mirada, en radianes
+   * (positivo: su derecha sube). 0 es el de siempre; lo usa el modo TAP para
+   * que el barrido se vea horizontal en pantalla tocando a un lado (decision
+   * del autor, 2026-10-01). El golpe preciso, sembrar y abrir no lo miran.
+   */
+  aimRoll: number;
   /** Casilla de la barra que se quiere en la mano, o -1 si no cambia. */
   select: number;
   /** Receta que se quiere fabricar (indice en `RECIPES`), o -1. */
@@ -787,6 +792,7 @@ export function emptyIntent(): Intent {
     aimX: 0,
     aimY: 0,
     aimZ: 0,
+    aimRoll: 0,
     select: -1,
     craft: -1,
     moveFrom: -1,

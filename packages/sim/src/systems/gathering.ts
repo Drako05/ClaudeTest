@@ -210,6 +210,7 @@ export function strikeOf(world: World, store: EntityStore, id: number): Strike {
     store.lookZ[id],
     (x, y) => world.groundHeightAt(x, y),
     (tx, ty) => hitboxAt(world, tx, ty),
+    store.lookRoll[id],
   );
 }
 
@@ -613,7 +614,7 @@ export function craftNear(
   inventory: Inventory,
   recipe: number,
 ): 'ok' | 'missing' | 'full' {
-  return tryCraft(inventory, recipe, (s) => stationNear(world, store.x[id], store.y[id], s));
+  return tryCraft(inventory, recipe, (s) => stationNear(world, eyeOf(store, id), s, (tx, ty) => hitboxAt(world, tx, ty)));
 }
 
 /**

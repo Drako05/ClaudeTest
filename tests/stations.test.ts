@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createGame,
+  EYE_HEIGHT,
   EQUIP_BACK,
   EQUIP_WAIST,
   hitboxAt,
@@ -10,6 +11,7 @@ import {
   stationNear,
   step,
   STATION_BOXES,
+  STRIKE_RANGE,
   type GameState,
 } from '@verdant/sim';
 import {
@@ -19,7 +21,6 @@ import {
   RECIPES,
   Resource,
   Station,
-  STATION_RANGE,
   Terrain,
   toolStats,
   Wear,
@@ -294,7 +295,9 @@ describe('Abrir una estacion', () => {
 });
 
 describe('Fabricar junto a una estacion', () => {
-  it('una receta de mesa pide la mesa a 3 casillas o menos', () => {
+  it('una receta de mesa pide la mesa al alcance, medido hasta su cara', () => {
+    // Decision del autor (2026-10-01): de los ojos al punto mas cercano de la
+    // caja de la estacion, y la distancia es siempre la del alcance.
     const { state, tx, ty } = atSpawn();
     const axe = recipeOf(Resource.CopperAxe);
     const give = () => {
@@ -305,21 +308,47 @@ describe('Fabricar junto a una estacion', () => {
     act(state, { craft: axe });
     expect(state.lastCrafted).toBe(-1);
 
-    state.world.setFeature(tx + 3, ty, Feature.Workbench);
-    // Del centro del jugador al centro de la mesa, exactamente 3: vale.
-    expect(stationNear(state.world, tx + 0.5, ty + 0.5, Station.Workbench)).toBe(true);
+    state.world.setFeature(tx + 4, ty, Feature.Workbench);
+    const box = hitboxAt(state.world, tx + 4, ty)!;
+    const id = state.playerId;
+    const boxes = (x: number, y: number) => hitboxAt(state.world, x, y);
+    // Los ojos a la altura de siempre; lo que separa de la cara es horizontal
+    // y vertical (los ojos van por encima de la mesa).
+    const eyeZ = state.entities.z[id] + EYE_HEIGHT;
+    const dz = Math.max(0, eyeZ - box.z1);
+    const flat = Math.sqrt(STRIKE_RANGE * STRIKE_RANGE - dz * dz);
+    const eyeAt = (gap: number) => ({ x: box.x0 - gap, y: ty + 0.5, z: eyeZ });
+    expect(stationNear(state.world, eyeAt(flat - 0.01), Station.Workbench, boxes)).toBe(true);
+    expect(stationNear(state.world, eyeAt(flat + 0.01), Station.Workbench, boxes)).toBe(false);
+
+    // Y el nucleo acepta o no la receta con esa misma cuenta.
+    state.entities.x[id] = box.x0 - (flat - 0.01);
     act(state, { craft: axe });
     expect(state.lastCrafted).toBe(axe);
     expect(state.inventory.count(Resource.CopperAxe)).toBe(1);
-
-    // Un pelo mas lejos, ya no.
-    expect(stationNear(state.world, tx + 0.5 - 0.01, ty + 0.5, Station.Workbench)).toBe(false);
-    // Y el horno no sirve de mesa.
-    state.world.setFeature(tx + 3, ty, Feature.Furnace);
     give();
+    state.entities.x[id] = box.x0 - (flat + 0.05);
     act(state, { craft: axe });
     expect(state.lastCrafted).toBe(-1);
-    expect(STATION_RANGE).toBe(3);
+
+    // Y el horno no sirve de mesa.
+    state.entities.x[id] = box.x0 - 1;
+    state.world.setFeature(tx + 4, ty, Feature.Furnace);
+    act(state, { craft: axe });
+    expect(state.lastCrafted).toBe(-1);
+  });
+
+  it('el horno, mas alto, tambien se mide hasta su caja', () => {
+    const { state, tx, ty } = atSpawn();
+    state.world.setFeature(tx + 4, ty, Feature.Furnace);
+    const box = hitboxAt(state.world, tx + 4, ty)!;
+    const boxes = (x: number, y: number) => hitboxAt(state.world, x, y);
+    const eyeZ = state.entities.z[state.playerId] + EYE_HEIGHT;
+    const dz = Math.max(0, eyeZ - box.z1);
+    const flat = Math.sqrt(STRIKE_RANGE * STRIKE_RANGE - dz * dz);
+    expect(box.z1 - box.z0).toBeCloseTo(1.25, 9);
+    expect(stationNear(state.world, { x: box.x0 - flat + 0.01, y: ty + 0.5, z: eyeZ }, Station.Furnace, boxes)).toBe(true);
+    expect(stationNear(state.world, { x: box.x0 - flat - 0.01, y: ty + 0.5, z: eyeZ }, Station.Furnace, boxes)).toBe(false);
   });
 
   it('fundir es una receta mas del horno, instantanea', () => {

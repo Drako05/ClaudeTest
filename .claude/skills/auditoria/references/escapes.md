@@ -158,6 +158,35 @@ Formato:
   encenderse) y el humo **espera a que llegue** y lo compara entero.
 - **Donde vive ahora**: lente B.
 
+### 14. Esc volvia a pausar, con el arreglo del #11 puesto (2026-10-01)
+- **Que paso**: el arreglo del #11 suponia que Chrome **rechaza** recapturar
+  el cursor al cerrar con Esc, y el humo lo probaba forzando ese rechazo. En
+  el Chrome del autor el juego se seguia pausando. Hipotesis: la captura se
+  **concede** (la tecla deja activacion) y el propio Esc de Chrome la suelta
+  como si fuera el jugador. El headless no hace ninguna de las dos cosas.
+- **Por que se escapo**: se forzo **un** caso adverso, el que se supuso, y la
+  politica del navegador tiene mas de uno. Probar que el juego aguanta que la
+  API falle no dice nada de lo que pasa si sale bien y luego se deshace.
+- **Que lo habria visto**: no buscar el caso adverso bueno, sino **no pedir**
+  algo sujeto a politicas del navegador desde un contexto dudoso (un Esc). La
+  prueba espia la API y exige **cero llamadas**: eso vale para todos los
+  casos a la vez.
+- **Donde vive ahora**: lente B (politicas del navegador: mejor no pedir que
+  forzar un fallo).
+
+### 15. La rueda «de una en una» encendia dos (2026-10-01)
+- **Que paso**: el arreglo del #13 media las casillas por las que pasaba el
+  **destello** (`.pass`), una a una y en orden, y la comprobacion pasaba. Pero
+  la luz de la seleccion (`.on`) seguia en la casilla vieja hasta el tick
+  siguiente, asi que en pantalla habia dos. Lo vio el autor.
+- **Por que se escapo**: se midio lo que se acababa de tocar, no lo que ve
+  el jugador. El autor pidio «una sola encendida»: la medida tenia que contar
+  **todo lo que se enciende**, sea cual sea la clase.
+- **Que lo habria visto**: medir el requisito tal como lo dice el autor, con
+  un invariante por fotograma (el maximo de casillas encendidas a la vez, de
+  cualquier clase), no la pieza que se cambio.
+- **Donde vive ahora**: lente B.
+
 ---
 
 ## Del proceso del agente
@@ -180,3 +209,13 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
   Parecio un fallo del juego y no lo era.
 - **Metodo**: las pruebas de navegador se corren solas. Si una falla por
   tiempo, se repite sola antes de investigar.
+
+### P3. Comparar dos variantes con un build viejo (2026-10-01)
+- **Que paso**: para medir el giro del barrido del TAP, el agente comparo
+  «con giro» y «sin giro», pero habia restaurado el codigo tras una mutacion
+  **sin recompilar**: las dos pasadas usaban el mismo `dist` sin giro, y la
+  conclusion («el giro no ayuda») era falsa.
+- **Metodo**: el humo y las sondas leen `packages/client/dist`, no el
+  codigo. Cada variante que se mide va precedida de `npm run build` **en la
+  misma orden**, y la sonda comprueba que la variante esta (un valor que solo
+  existe con ella) antes de dar numeros.

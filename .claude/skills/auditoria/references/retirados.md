@@ -44,6 +44,7 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `50-100|50 a 100` — el rango viejo del angulo de vision; hoy 70-120. Permitido en: `tests/fov-panel.test.ts`, `packages/client/src/camera.ts`, `CLAUDE.md`.
 - `mantener (pulsado )?2 s` — fabricar en 2 s; hoy 1,5.
 - `mas de 1 s` — sostener el ojo 1 s; hoy 0,5.
+- `STATION_RANGE|flashPass|PASS_MS|litPass|lastSweepEnds` — la distancia propia de las estaciones (hoy el alcance), el destello aparte de la rueda y los extremos del barrido para el humo (hoy `lastSweep`).
 
 ## Proporciones y camara
 

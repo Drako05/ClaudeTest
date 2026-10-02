@@ -59,7 +59,12 @@ que nadie toco es justo lo que ninguna tanda mira.
 - **Politicas del navegador que el headless no aplica** (#11): recapturar el
   cursor sin gesto, pantalla completa, audio. Una comprobacion que pasa en
   headless puede ser falsa en el Chrome del jugador: se fuerza el caso adverso
-  a mano (hacer que la API falle) y se mira que el juego lo aguante.
+  a mano (hacer que la API falle) y se mira que el juego lo aguante. Y mejor
+  aun (#14): **no pedirla** desde un contexto dudoso, y que la prueba espie
+  la API y exija cero llamadas, que cubre todos los casos a la vez.
+- **Medir la pieza tocada en vez del requisito** (#15): si el autor pide
+  «una sola encendida», se cuenta todo lo encendido, de cualquier clase,
+  como invariante por fotograma.
 - **Un clic de prueba que cae en otra cosa** (#12): antes de clicar para
   probar algo, `elementFromPoint` en ese punto tiene que ser lo que se prueba.
 

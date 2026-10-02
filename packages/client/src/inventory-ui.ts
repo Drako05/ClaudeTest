@@ -18,8 +18,8 @@
  *   se llena de izquierda a derecha como una barra de carga.
  * - **Cada estacion tiene sus recetas** (decision del autor, tanda 2): con E se
  *   ven las de mano; al USAR una mesa o un horno se abre este mismo panel con
- *   las suyas, bajo su nombre, y se cierra solo al alejarse a mas de 3
- *   casillas (`stationNear`, la misma cuenta con que el nucleo acepta).
+ *   las suyas, bajo su nombre, y se cierra solo al salir del alcance, medido
+ *   hasta su cara (`stationNear`, la misma cuenta con que el nucleo acepta).
  * - **La ropa** se arrastra a su hueco de PERSONAJE —la mochila en el centro
  *   de la columna derecha, el cinturon abajo a la derecha— y abre sus casillas
  *   en la rejilla; las de una prenda que no se lleva no se ven.
@@ -29,7 +29,7 @@
  * 5). Estas peticiones no se tiran en pausa, al reves que las del mundo.
  */
 
-import { EQUIP_BACK, EQUIP_WAIST, HOTBAR_SLOTS, stationNear, type GameState } from '@verdant/sim';
+import { EQUIP_BACK, EQUIP_WAIST, EYE_HEIGHT, HOTBAR_SLOTS, hitboxAt, stationNear, type GameState } from '@verdant/sim';
 import {
   RECIPES,
   RESOURCE_NAMES,
@@ -44,8 +44,6 @@ import { ScrollRail } from './scroll-rail-view.js';
 
 /** Lo que se tarda en fabricar manteniendo pulsado (decision del autor). */
 export const CRAFT_HOLD_MS = 1500;
-/** Lo que dura iluminada una casilla por la que pasa la rueda. **Propuesta mia.** */
-const PASS_MS = 140;
 /** Lo que hay que mover el puntero para que un toque sea un arrastre. **Propuesta mia.** */
 const DRAG_SLOP = 6;
 /** Casillas de equipables: tres a cada lado del personaje y cuatro debajo (boceto del autor). */
@@ -183,6 +181,7 @@ export class InventoryUi {
     // (pedido del autor, 2026-09-30).
     new ScrollRail(this.grid);
     new ScrollRail(this.recipeList);
+    this.bindTouchOutside();
     // La barra de la mano: tocar elige; arrastrar mueve (decision del autor).
     for (let i = 0; i < HOTBAR_SLOTS; i++) {
       const b = this.slotButton(i);
@@ -272,39 +271,94 @@ export class InventoryUi {
   step(delta: number): void {
     const from = this.pending.select >= 0 ? this.pending.select : this.current().inventory.selected;
     this.pending.select = (((from + delta) % HOTBAR_SLOTS) + HOTBAR_SLOTS) % HOTBAR_SLOTS;
-    this.flashPass(this.pending.select);
+    this.showSelected(this.pending.select);
+    this.passes.push(this.pending.select);
   }
 
   /**
-   * Ilumina un instante la casilla por la que pasa la rueda (pedido del autor:
-   * al girar varias muescas se ven todas, no solo la de llegada). **Una sola
-   * a la vez y en el acto** (pedido del autor, 2026-10-01): encender una apaga
-   * la anterior, asi que girando deprisa la luz va pegada a la rueda y no se
-   * quedan todas encendidas. Antes se escalonaban 40 ms y, deprisa, se
-   * acumulaban. El tiempo, mio.
+   * Enciende en el acto la casilla elegida de la barra y apaga las demas. La
+   * rueda ilumina cada casilla por la que pasa (pedido del autor) y **solo una
+   * a la vez, sin espera** (2026-10-01): la luz es la de la seleccion, que se
+   * mueve con cada muesca. Hubo un destello aparte que se apagaba a los
+   * 140 ms, y mientras el nucleo no aplicaba la seleccion seguia encendida la
+   * de antes: dos a la vez.
    */
-  private flashPass(slot: number): void {
-    const el = this.hotbar.children[slot] as HTMLElement | undefined;
-    if (!el) return;
-    this.litPass?.classList.remove('pass');
-    window.clearTimeout(this.passTimer);
-    el.classList.add('pass');
-    this.litPass = el;
-    this.passes.push(slot);
-    this.passTimer = window.setTimeout(() => {
-      el.classList.remove('pass');
-      this.litPass = null;
-    }, PASS_MS);
+  private showSelected(slot: number): void {
+    Array.from(this.hotbar.children).forEach((el, i) => el.classList.toggle('on', i === slot));
   }
-
-  private litPass: HTMLElement | null = null;
-  private passTimer = 0;
   /**
    * Las casillas que la rueda ha encendido, en orden, anotadas al encenderse.
    * Acumulado, para el humo: asi afirma cuales sin depender de cuanto tarde
    * la maquina (escape 13).
    */
   readonly passes: number[] = [];
+
+  /**
+   * En el movil, con el inventario abierto, **un toque fuera de su interfaz lo
+   * cierra, y solo eso** (decisiones del autor, 2026-10-01): ni gira la camara,
+   * ni mueve el joystick, ni pulsa el boton que hubiera debajo. Se escucha en
+   * la fase de captura del documento, antes que nadie, y se traga ese dedo
+   * entero —sus eventos de puntero, de toque y el clic que le sigue— hasta que
+   * se levanta. No cuentan como fuera el panel, la barra de la mano (se
+   * arrastra entre las dos), el boton INVENTARIO (ya alterna) y el dialogo de
+   * tirar (deduccion mia).
+   */
+  private bindTouchOutside(): void {
+    let swallowing: number | null = null;
+    let swallowClickUntil = 0;
+    const inside = (t: EventTarget | null) =>
+      t instanceof Element && !!t.closest('#invPanel, #hotbar, #invOpen, #discardAsk');
+    document.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (e.pointerType !== 'touch' || !this.open || inside(e.target)) return;
+        if (!document.body.classList.contains('touch-active')) return;
+        swallowing = e.pointerId;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.toggle();
+      },
+      { capture: true },
+    );
+    const swallowPointer = (e: PointerEvent) => {
+      if (swallowing === null || e.pointerId !== swallowing) return;
+      e.stopImmediatePropagation();
+      if (e.type === 'pointerup' || e.type === 'pointercancel') {
+        swallowing = null;
+        swallowClickUntil = performance.now() + 500;
+      }
+    };
+    for (const type of ['pointermove', 'pointerup', 'pointercancel'] as const) {
+      document.addEventListener(type, swallowPointer, { capture: true });
+    }
+    // Los eventos de toque llegan aparte de los de puntero, y algunos botones
+    // escuchan esos (`touchstart`): tambien se tragan, y con `preventDefault`
+    // el navegador no fabrica el clic.
+    for (const type of ['touchstart', 'touchmove', 'touchend', 'touchcancel'] as const) {
+      document.addEventListener(
+        type,
+        (e) => {
+          // El que empieza o se mueve, solo mientras dura el dedo que cerro; el
+          // que acaba llega justo despues de su `pointerup`.
+          const ending = e.type === 'touchend' || e.type === 'touchcancel';
+          if (swallowing === null && !(ending && performance.now() <= swallowClickUntil)) return;
+          if (inside(e.target)) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        },
+        { capture: true, passive: false },
+      );
+    }
+    document.addEventListener(
+      'click',
+      (e) => {
+        if (performance.now() > swallowClickUntil || inside(e.target)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      },
+      { capture: true },
+    );
+  }
 
   toggle(): void {
     const open = this.panel.hidden;
@@ -407,7 +461,8 @@ export class InventoryUi {
     if (this.mode !== Station.Hand && this.open) {
       const s = this.current();
       const id = s.playerId;
-      if (!stationNear(s.world, s.entities.x[id], s.entities.y[id], this.mode)) this.toggle();
+      const eye = { x: s.entities.x[id], y: s.entities.y[id], z: s.entities.z[id] + EYE_HEIGHT };
+      if (!stationNear(s.world, eye, this.mode, (tx, ty) => hitboxAt(s.world, tx, ty))) this.toggle();
     }
     if (this.hold) {
       const t = Math.min(1, (performance.now() - this.hold.since) / CRAFT_HOLD_MS);
@@ -660,15 +715,18 @@ export class InventoryUi {
     const inv = state.inventory;
     Array.from(this.hotbar.children).forEach((el, i) => {
       this.paint(el as HTMLElement, inv.itemAt(i), inv.counts[i], inv.wear[i]);
-      el.classList.toggle('on', inv.selected === i);
     });
+    // La pedida y aun sin aplicar manda: si no, entre la muesca y el tick se
+    // volveria a encender la de antes.
+    this.showSelected(this.pending.select >= 0 ? this.pending.select : inv.selected);
     if (this.panel.hidden) return;
 
     // Las casillas de una prenda que no se lleva no existen, y no se ven.
     Array.from(this.grid.children).forEach((el, i) => {
       (el as HTMLElement).hidden = !inv.isOpen(i);
       this.paint(el as HTMLElement, inv.itemAt(i), inv.counts[i], inv.wear[i]);
-      el.classList.toggle('on', inv.selected === i);
+      // La rejilla no repite la luz de la barra (pedido del autor, 2026-10-01):
+      // aunque su primera fila sean esas mismas casillas.
       el.classList.toggle('picked', this.picked === i);
     });
     for (const worn of this.wornSlots) {

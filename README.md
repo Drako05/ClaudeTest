@@ -87,7 +87,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Sostener el ojo mas de 0,5 s | En primera persona, barra del angulo de vision; tocar fuera la cierra |
 
 **La mirada es una sola** en las tres vistas: el centro de la pantalla es hacia
-donde mira el jugador. Se golpea con un sector plano de 2,5 bloques y 90 grados
+donde mira el jugador. Se golpea con un sector plano de 3 bloques y 90 grados
 que sale de sus ojos y solo cuenta si toca un objeto —de un arbol, su tronco—;
 el terreno lo tapa. Se siembra donde la mirada toca el suelo. Una cruz en el
 centro de la pantalla marca ese punto. La camara no atraviesa bloques ni

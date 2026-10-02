@@ -314,6 +314,8 @@ const afterAtk = await probe();
 console.log(`  ATAQUE con el inventario abierto: boton a tiro ${atkFree}, golpes ${beforeAtk.sent.harvest} -> ${afterAtk.sent.harvest}`);
 check(atkFree, 'el panel tapa el boton de ataque: la comprobacion no probaria nada');
 check(afterAtk.sent.harvest === beforeAtk.sent.harvest, 'con el inventario abierto el boton de ataque golpeo');
+// Ese toque, fuera del panel, lo cierra (2026-10-01): se vuelve a abrir.
+if (!afterAtk.inventoryOpen) await tapReal(invBtn);
 const slotAt = (n) => at(`#invGrid .slot:nth-child(${n})`);
 const beforeDrag = await probe();
 const moving = beforeDrag.slots[0].item;
@@ -399,6 +401,38 @@ await dragReal(await at('#hotbar .slot:nth-child(2)'), await at('#charGrid [data
 const belted = await probe();
 console.log(`  bolsa a la cintura: ${JSON.stringify(belted.worn)}, casillas ${belted.openSlots}`);
 check(belted.worn[0] === 20 && belted.openSlots === 18, 'arrastrar la bolsa a la cintura con el dedo no la puso');
+
+// Con el inventario abierto, un toque fuera de su interfaz lo cierra y nada
+// mas (decisiones del autor, 2026-10-01): ni gira la camara, ni ataca, ni pulsa
+// el boton de debajo. Dentro del panel, no lo cierra.
+const outside = await page.evaluate(() => {
+  for (let y = 600; y > 380; y -= 10) {
+    for (let x = 30; x < 360; x += 10) if (document.elementFromPoint(x, y)?.id === 'view') return { x, y };
+  }
+  return null;
+});
+check(outside !== null, 'no hay un punto del mundo fuera del inventario para tocar');
+const o0 = await probe();
+check(o0.inventoryOpen, 'el inventario no estaba abierto para probar el toque fuera');
+if (outside) await tapReal(outside);
+await page.waitForTimeout(300);
+const o1 = await probe();
+await tapReal(invBtn);
+const atkBtn = await center('action');
+const o2 = await probe();
+await tapReal(atkBtn);
+await page.waitForTimeout(400);
+const o3 = await probe();
+await tapReal(invBtn);
+await tapReal(await at('#invTabs button:nth-child(3)'));
+const o4 = await probe();
+console.log(`  toque fuera: cierra ${o0.inventoryOpen} -> ${o1.inventoryOpen} (giro ${(o1.yaw - o0.yaw).toFixed(3)}, golpes ${o1.sent.harvest - o0.sent.harvest}); ` +
+  `sobre ATAQUE ${o2.inventoryOpen} -> ${o3.inventoryOpen} (golpes ${o3.sent.harvest - o2.sent.harvest}); dentro ${o4.inventoryOpen}`);
+check(!o1.inventoryOpen && o1.yaw === o0.yaw && o1.sent.harvest === o0.sent.harvest,
+  'tocar el mundo con el inventario abierto no lo cerro, o giro o ataco');
+check(o2.inventoryOpen && !o3.inventoryOpen && o3.sent.harvest === o2.sent.harvest,
+  'tocar ATAQUE con el inventario abierto no lo cerro, o ataco');
+check(o4.inventoryOpen, 'tocar dentro del panel cerro el inventario');
 await page.screenshot({ path: 'screenshots/movil-personaje-ropa.png' });
 
 // La barra deslizable (pedido del autor, 2026-09-30): en un telefono mas bajo
