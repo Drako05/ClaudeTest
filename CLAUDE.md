@@ -358,9 +358,10 @@ CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
 4. **Esperar las dos tandas en verde**: «CI completa» (`ci.yml`) y «Mutaciones
    completas» (`mutaciones.yml`). Sin `gh` ni API: un temporizador en segundo
    plano (`sleep 300` con `run_in_background`) y despues las herramientas MCP
-   de GitHub: `actions_list` con `list_workflow_runs` filtrando la rama
-   `pruebas` (el SHA que imprimio el guion) da el estado y la conclusion de
-   las dos tandas; si alguna sale en rojo, `get_job_logs` con su `run_id`,
+   de GitHub: `actions_list` con `list_workflow_runs`, `resource_id` `ci.yml`
+   o `mutaciones.yml` y una sola por pagina, da el estado y la conclusion de cada
+   tanda (se comprueba que su SHA es el que imprimio el guion; filtrar por la
+   rama devolvio una vez la lista vacia); si alguna sale en rojo, `get_job_logs` con su `run_id`,
    `failed_only` y `tail_lines` ~40 da solo lo que fallo —el resumen de
    `mutar.mjs` y los `FALLO` del humo quedan unas 20 lineas antes del final—.
    **No listar los trabajos** (`list_workflow_jobs`) salvo que haga falta: con

@@ -62,6 +62,10 @@ que nadie toco es justo lo que ninguna tanda mira.
   a mano (hacer que la API falle) y se mira que el juego lo aguante. Y mejor
   aun (#14): **no pedirla** desde un contexto dudoso, y que la prueba espie
   la API y exija cero llamadas, que cubre todos los casos a la vez.
+- **Un umbral sacado de una sola medida local**: el suelo de `slash` se puso
+  en 50 pixeles mirando un peor caso local de 183, y la CI dio 46 en un
+  rumbo y tumbo la casilla. El umbral va entre lo bueno medido en varias
+  maquinas y lo malo conocido, no pegado a una medida.
 - **Medir algo que ya no existe**: el rectangulo de un elemento retirado del
   DOM es todo ceros, y una comprobacion de «se movio» con un `||` que lo
   perdona pasa sin probar nada (la del registro de PC, 7.ª ronda, cazada al

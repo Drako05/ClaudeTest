@@ -63,7 +63,7 @@ export default [
     prueba: 'test:tests/stations.test.ts',
   },
   {
-    nombre: 'sin tecla I',
+    nombre: 'sin la I de la informacion',
     fichero: 'packages/client/src/controls.ts',
     de: "          document.getElementById('hudToggle')?.click();",
     a: '',
