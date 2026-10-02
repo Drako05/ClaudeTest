@@ -129,6 +129,7 @@ export function scan(root) {
     fueraDeCi: [],
     matriz: [],
     docSuelta: [],
+    sinIndice: [],
   };
 
   // 1. Rutas citadas entre comillas invertidas que no existen.
@@ -327,6 +328,17 @@ export function scan(root) {
     }
   }
 
+  // 11. Documentos de `docs/` que el indice de `CLAUDE.md` no nombra. Desde el
+  // 2026-10-02 `CLAUDE.md` lleva solo lo operativo y cada parte del juego vive
+  // en su documento: uno que el indice no nombra no lo lee nadie antes de
+  // tocar su parte, y lo que cuenta se pierde igual que si no estuviera.
+  const claude = text.get('CLAUDE.md');
+  if (claude) {
+    for (const f of all.filter((p) => /^docs\/[^/]+\.md$/.test(p))) {
+      if (!claude.includes(`\`${f}\``)) report.sinIndice.push(`${f}  no sale en el indice de CLAUDE.md`);
+    }
+  }
+
   return report;
 }
 
@@ -356,6 +368,7 @@ const TITLES = {
   fueraDeCi: 'Herramientas que la CI no ejecuta: correrlas a mano (lente C)',
   matriz: 'Pasadas del humo y casillas de la matriz de CI que no casan',
   docSuelta: 'Comentarios de documentacion sueltos, sin nada que documentar (lente E)',
+  sinIndice: 'Documentos de docs/ que el indice de CLAUDE.md no nombra (lente F)',
 };
 
 function print(report) {
@@ -407,6 +420,8 @@ function selfTest() {
   // ambito: fuera de su fichero tiene que seguir saliendo.
   put('packages/client/src/zoom.ts', 'export const x = 1;\nlet wheelZoom = 1;\nx; wheelZoom;\n// ver `nombreJuzgado`\n');
   put('docs/otra.md', '# Otra\n\nCita `nombreJuzgado` aqui tambien.\n');
+  // El indice nombra un documento y se deja el otro.
+  put('CLAUDE.md', '# Notas\n\n| Si tocas | Lee |\n|---|---|\n| Algo | `docs/notas.md` |\n');
   put('.claude/skills/auditoria/references/retirados.md', '- `wheelZoom` — la rueda hacia zoom\n');
   put('.claude/skills/auditoria/references/ignorar.md', '- `nombreJuzgado` — juzgado. En: `docs/otra.md`.\n');
   const report = scan(root);
@@ -427,6 +442,7 @@ function selfTest() {
     ['retirados', (r) => r.retirados.some((x) => !x.startsWith('[historia]') && x.includes('zoom.ts')) &&
       r.retirados.some((x) => x.startsWith('[historia]') && x.includes('notas.md'))],
     ['doc suelta', (r) => r.docSuelta.length === 1 && r.docSuelta[0].includes('docs.ts:8')],
+    ['sin indice', (r) => r.sinIndice.length === 1 && r.sinIndice[0].includes('docs/otra.md')],
     ['ignorados con ambito', (r) => r.identificadores.some((x) => x.includes('zoom.ts') && x.includes('nombreJuzgado')) &&
       !r.identificadores.some((x) => x.includes('otra.md'))],
   ];

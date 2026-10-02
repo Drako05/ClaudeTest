@@ -140,8 +140,11 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
 
 **Metodo**
 1. Toma cada decision de la tanda y encuentrala en cada documento que la
-   cuente: `CLAUDE.md`, `README.md`, `docs/pendiente.md`, `docs/leyes.md`,
-   `docs/isometrico.md` y la ayuda del HTML. Deben decir lo mismo.
+   cuente: `CLAUDE.md` y el documento de su parte en `docs/` (el indice de
+   `CLAUDE.md` dice cual), `README.md`, `docs/pendiente.md`, `docs/leyes.md`,
+   `docs/isometrico.md` y la ayuda del HTML. Deben decir lo mismo. Ojo con los
+   **resumenes**: las reglas 12, 21 y 22 estan resumidas en `CLAUDE.md` y
+   enteras en `docs/reglas.md`, asi que lo que cambie en una cambia en las dos.
 2. `docs/pendiente.md`, «Esperando tu juicio»: cada fila **sigue existiendo en
    el juego**. Una deduccion sobre un boton que ya no existe no espera el
    juicio de nadie.

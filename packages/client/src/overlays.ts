@@ -39,8 +39,8 @@ function lines(color: number, opacity: number): LineSegments {
   );
   // La geometria se reescribe entera a menudo, y three.js calcula la esfera
   // envolvente una sola vez: sin esto la reticula se recortaria en cuanto el
-  // jugador se alejara de donde se dibujo por primera vez (ver CLAUDE.md,
-  // «Efectos visuales»).
+  // jugador se alejara de donde se dibujo por primera vez (ver
+  // `docs/efectos.md`).
   mesh.frustumCulled = false;
   return mesh;
 }
