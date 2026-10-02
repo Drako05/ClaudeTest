@@ -259,9 +259,22 @@ export function scan(root) {
 
   // 8. Herramientas que la CI no ejecuta: la podredumbre solo la ve correrlas.
   const ciText = ci.map((f) => text.get(f)).join('\n');
-  for (const f of files.filter((x) => /^tools\/[\w-]+\.(mjs|ts)$/.test(x))) {
-    if (!ciText.includes(f)) report.fueraDeCi.push(f);
+  const tools = files.filter((x) => /^tools\/[\w-]+\.(mjs|ts)$/.test(x));
+  const enCi = new Set(tools.filter((f) => ciText.includes(f)));
+  // Lo que importa una herramienta que corre en la CI tambien corre: sus
+  // modulos (`tools/mutar-lib.mjs`, la lista de mutaciones) no son podredumbre.
+  for (let crecio = true; crecio; ) {
+    crecio = false;
+    for (const f of tools) {
+      if (enCi.has(f)) continue;
+      const base = f.slice('tools/'.length);
+      if ([...enCi].some((g) => (text.get(g) ?? '').includes(`./${base}`) || (text.get(g) ?? '').includes(`tools/${base}`))) {
+        enCi.add(f);
+        crecio = true;
+      }
+    }
   }
+  for (const f of tools) if (!enCi.has(f)) report.fueraDeCi.push(f);
 
   // 9. Pasadas del humo sin casilla en la matriz de la CI, y casillas sin
   // pasada. La CI lanza cada pasada por el prefijo de su nombre; una pasada
@@ -275,7 +288,8 @@ export function scan(root) {
       if (!cells.some((c) => p.startsWith(c))) report.matriz.push(`tools/smoke.mjs  ${p} no tiene casilla en la matriz de CI`);
     }
     for (const c of cells) {
-      if (c !== 'gestures' && !passes.some((p) => p.startsWith(c))) report.matriz.push(`CI  la casilla «${c}» no coincide con ninguna pasada`);
+      // Las casillas de herramientas propias, no del humo.
+      if (!['gestures', 'slash'].includes(c) && !passes.some((p) => p.startsWith(c))) report.matriz.push(`CI  la casilla «${c}» no coincide con ninguna pasada`);
     }
   }
 
@@ -333,8 +347,10 @@ function selfTest() {
     writeFileSync(join(root, p), s);
   };
   put('package.json', JSON.stringify({ scripts: { roto: 'node tools/no-existe.mjs', bien: 'node tools/bien.mjs' } }));
-  put('tools/bien.mjs', 'export {};\n');
-  put('.github/workflows/ci.yml', 'matrix:\n  pasada: [alfa, fantasma, gestures]\nsteps:\n  - run: node tools/bien.mjs\n  - run: node tools/smoke.mjs\n');
+  put('tools/bien.mjs', "import './lib-usada.mjs';\nexport {};\n");
+  put('tools/lib-usada.mjs', 'export {};\n');
+  put('tools/suelta.mjs', 'export {};\n');
+  put('.github/workflows/ci.yml', 'matrix:\n  pasada: [alfa, fantasma, gestures, slash]\nsteps:\n  - run: node tools/bien.mjs\n  - run: node tools/smoke.mjs\n');
   put('tools/smoke.mjs', 'const passes = { alfaPass, betaPass };\n');
   put('packages/client/index.html',
     '<style>#vivo { color: #fff; } #muerto { top: 0; } .viva { x: 1; } .clase-sin-uso { x: 2.5; }</style>\n' +
@@ -364,6 +380,8 @@ function selfTest() {
     ['ids', (r) => r.ids.length === 1 && r.ids[0].includes('#fantasma')],
     ['exports', (r) => r.exports.length === 1 && r.exports[0].includes('huerfana')],
     ['scripts', (r) => r.scripts.length === 1 && r.scripts[0].includes('no-existe')],
+    ['fuera de CI', (r) => r.fueraDeCi.includes('tools/suelta.mjs') && !r.fueraDeCi.includes('tools/lib-usada.mjs') &&
+      !r.fueraDeCi.includes('tools/bien.mjs')],
     ['matriz', (r) => r.matriz.length === 2 && r.matriz.some((x) => x.includes('betaPass')) &&
       r.matriz.some((x) => x.includes('fantasma'))],
     ['retirados', (r) => r.retirados.some((x) => !x.startsWith('[historia]') && x.includes('zoom.ts')) &&

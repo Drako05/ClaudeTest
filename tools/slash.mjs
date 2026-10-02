@@ -290,6 +290,20 @@ console.log('medio y todo lo aclarado es del barrido.');
 console.log('');
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 
+// Desde que corre en la CI (2026-10-02) tiene que poder fallar: una casilla que
+// mide y nunca sale en rojo es verde sin probar nada. Los suelos estan muy por
+// debajo de lo bueno (183-11.278 pixeles por vista, 8.878 la estocada) y muy
+// por encima de los fallos que tuvo (0, 2 y 13).
+const MIN_LIT = 50;
+const MIN_STAB = 500;
+const fallos = results.filter((r) => !(r.lit >= MIN_LIT)).map((r) => `${r.view}: ${r.lit ?? 'sin medida'} pixeles`);
+if (!(stabbing.max >= MIN_STAB)) fallos.push(`estocada: ${stabbing.max} pixeles`);
+if (problems.length) fallos.push('errores de consola');
+if (fallos.length) {
+  console.log(`FALLO: el barrido no llega a verse: ${fallos.join(' | ')}`);
+  process.exitCode = 1;
+}
+
 await browser.close();
 server.close();
 
