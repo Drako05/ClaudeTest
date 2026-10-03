@@ -2466,16 +2466,15 @@ async function faunaPass(browser, baseUrl) {
   watchProblems(page, 'fauna');
 
   const first = await open(page, baseUrl);
-  console.log(`  fauna materializada ${first.fauna.length}, sprites en escena ${first.faunaInScene}`);
+  console.log(`  fauna materializada ${first.fauna.length}, modelos en escena ${first.faunaInScene}`);
   check(first.fauna.length >= 5, `casi no hay fauna alrededor del nacimiento: ${first.fauna.length}`);
   check(first.faunaInScene === first.fauna.length,
-    `no se dibuja cada animal: ${first.faunaInScene} sprites para ${first.fauna.length}`);
-  // Lo dibujado mide lo que la caja de golpe del nucleo: lo que se ve es lo
-  // que se golpea.
-  // En las cinco vistas de cada uno, que salen por separado (`fauna-art.ts`).
-  const off = first.faunaSizes.filter((s) => Math.abs(s.dibujo - s.caja) > 0.03);
-  check(first.faunaSizes.length === 150 && off.length === 0,
-    `el dibujo no mide lo que su caja: ${JSON.stringify(off.slice(0, 3))}`);
+    `no se dibuja cada animal: ${first.faunaInScene} modelos para ${first.fauna.length}`);
+  // Cada modelo mide de alto su `animalHeight`: el plano del cuerpo que
+  // dibuja el cliente es el mismo con que golpea y choca el nucleo.
+  const off = first.faunaSizes.filter((s) => Math.abs(s.modelo - s.caja) > 0.03);
+  check(first.faunaSizes.length === 30 && off.length === 0,
+    `el modelo no mide su alto: ${JSON.stringify(off.slice(0, 3))}`);
 
   // Deambulan.
   const later = await waitForLoop(page, 600);
@@ -2485,6 +2484,13 @@ async function faunaPass(browser, baseUrl) {
   }).length;
   console.log(`  en ${later.tick - first.tick} ticks se movieron ${moved} de ${later.fauna.length}`);
   check(moved >= Math.max(1, Math.floor(later.fauna.length / 5)), `la fauna no deambula: ${moved} se movieron`);
+  // Y giran hacia donde van: su rumbo cambia.
+  const turned = later.fauna.filter((a) => {
+    const b = first.fauna.find((f) => f.key === a.key);
+    return b && a.facingX * b.facingX + a.facingY * b.facingY < 0.9;
+  }).length;
+  console.log(`  giraron ${turned} de ${later.fauna.length}`);
+  check(turned >= 1, 'ningun animal giro mientras paseaba');
 
   // Cazar: la presa mas facil que suelte carne, parada en su punto de paso y
   // con un buen rato quieta por delante.
@@ -2556,25 +2562,29 @@ async function faunaPass(browser, baseUrl) {
     `golpear y matar a la presa solto fragmentos: esquirlas ${there.chipsDrawn} -> ${now.chipsDrawn}, escombros ${there.debrisDrawn} -> ${now.debrisDrawn}`);
   check(now.impactsDrawn > there.impactsDrawn, 'golpear a la presa no dibujo ningun impacto');
 
-  // Paseando, los animales se dibujan desde varias de sus ocho direcciones
-  // (`fauna-facing.ts`): uno que se viera siempre de perfil no las usaria.
-  console.log(`  direcciones dibujadas ${now.faunaDirections} de 8`);
-  check(now.faunaDirections >= 3, `los animales se dibujan casi siempre desde la misma direccion: ${now.faunaDirections}`);
+  // Cada modelo, girado con el rumbo de su animal (`fauna-view.ts`): uno que
+  // no girara andaria de lado o de espaldas.
+  const yawOff = now.fauna.filter((a) => {
+    const m = now.faunaYaws.find((y) => y.key === a.key);
+    const want = -Math.atan2(a.facingY, a.facingX);
+    return !m || Math.abs(Math.atan2(Math.sin(m.yaw - want), Math.cos(m.yaw - want))) > 0.01;
+  });
+  check(now.fauna.length > 0 && yawOff.length === 0,
+    `${yawOff.length} modelos no miran a donde mira su animal: ${JSON.stringify(yawOff.slice(0, 2))}`);
 
-  // Cada pixel con la profundidad de la caja del cuerpo (`sprite-depth.ts`),
-  // medido en una escena fuera de pantalla con la vista de la fauna real: cinco
-  // casos de terreno, ocho rumbos y tres alturas, contra el rayo en JS.
+  // La profundidad del sprite del jugador, el unico que queda (`sprite-depth.ts`),
+  // medida en una escena fuera de pantalla: cinco casos de terreno y tres
+  // alturas, contra el rayo en JS.
   const depth = await page.evaluate(() => window.__verdant.spriteDepthProbe());
-  check(depth !== null && depth.cases.length === 10, `la sonda de profundidad no se pudo montar: ${JSON.stringify(depth)}`);
+  check(depth !== null && depth.cases.length === 5, `la sonda de profundidad no se pudo montar: ${JSON.stringify(depth)}`);
   check(depth !== null && depth.misses === 0, 'el shader del sprite no trae las lineas que reescribe sprite-depth.ts');
   for (const c of depth?.cases ?? []) {
     const pct = (v) => `${(v * 100).toFixed(1)} %`;
-    console.log(`  ${c.name.padEnd(15)} tinta ${String(c.ink).padStart(6)}  mal tapado ${pct(c.wrongHidden)}  ` +
+    console.log(`  jugador ${c.name.padEnd(8)} tinta ${String(c.ink).padStart(6)}  mal tapado ${pct(c.wrongHidden)}  ` +
       `mal visto ${pct(c.wrongShown)}  fuera ${pct(c.outside)}`);
-    check(c.ink > 1500, `la sonda no dibujo el animal en ${c.name}: ${c.ink} px`);
+    check(c.ink > 1500, `la sonda no dibujo al jugador en ${c.name}: ${c.ink} px`);
     check(c.wrongHidden <= 0.05, `${c.name}: el terreno tapa del dibujo lo que no taparia del cuerpo (${pct(c.wrongHidden)}, peor ${c.worstView})`);
     check(c.wrongShown <= 0.05, `${c.name}: el dibujo se ve a traves del terreno que tapa su cuerpo (${pct(c.wrongShown)})`);
-    check(c.outside <= 0.16, `${c.name}: demasiado dibujo fuera de su cuerpo (${pct(c.outside)}), como un perfil visto de frente`);
   }
 
   await page.close();

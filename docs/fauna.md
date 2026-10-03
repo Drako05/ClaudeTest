@@ -2,8 +2,9 @@
 
 Lee esto antes de tocar los animales: las especies (`shared/src/fauna.ts`),
 su generacion y su paseo (`sim/src/fauna.ts`, `sim/src/systems/wander.ts`),
-el golpe a algo vivo (`systems/gathering.ts`), su dibujo (`client/src/fauna-art.ts`)
-o su vista (`client/src/fauna-view.ts`).
+el golpe a algo vivo (`systems/gathering.ts`), **el plano de su cuerpo**
+(`shared/src/fauna-body.ts`), su choque (`sim/src/body.ts`, `walkAnimal`), su
+modelo (`client/src/fauna-model.ts`) o su vista (`client/src/fauna-view.ts`).
 
 ## Primera tanda (2026-10-02): diez especies que deambulan
 
@@ -89,24 +90,21 @@ la formula da 39 y 9.
   - Por etapa escala con la raiz cubica de su masa, como los PV.
   - Nada baja de **0,22 bloques** *(deduccion)*: el cangrejo real mediria 0,1 y
     se sube al minimo visible.
-- **La caja de golpe** mide ese alto, centrada en el animal. Su medio ancho es
-  *(deduccion)* por especie, escalado igual.
-- **El dibujo mide exactamente su caja**: el cliente lo escala por la tinta
-  medida, no por la figura que se pidio. Lo que se ve es lo que se golpea, y el
-  humo lo afirma.
-- **Dos sexos**, al 50 % y por hash, sin cambiar el dibujo ni los numeros.
-- **El ciervo adulto se dibuja sin astas**, como una cierva *(deduccion)*:
-  solo el macho las lleva, y el dibujo aun no distingue sexos. Reno e ibice
-  llevan cuernos los dos sexos en la vida real, y su adulto los lleva.
-- **El dibujo** es procedural, como el resto del arte, y mira a camara como el
-  jugador; se voltea segun ande hacia la derecha o la izquierda de la pantalla.
-  - Las crias llevan su librea real: el cervato moteado, el rayon a rayas, el
-    bisonte rojizo, el reno pardo sin astas, el zorrito pardo, y el pollo de
-    gaviota pardo y moteado.
-  - Los jovenes, proporciones de adulto y cuernos a medias; el jabali joven,
-    rojizo y sin rayas.
-  - Los dibujos y sus colores son mios.
-  - `window.__verdant.faunaGallery()` devuelve los 30 en un lienzo.
+- **El cuerpo es de bloques** desde el 2026-10-03 (decision del autor): el
+  plano de cada especie, sus cajas, golpea, choca y se dibuja (ver «El cuerpo
+  de bloques», abajo). Mide de alto justo ese alto, y el humo lo afirma.
+- **Dos sexos**, al 50 % y por hash, sin cambiar el modelo ni los numeros.
+- **El ciervo adulto va sin astas**, como una cierva *(deduccion)*: solo el
+  macho las lleva, y el modelo aun no distingue sexos. Reno e ibice llevan
+  cuernos los dos sexos en la vida real, y su adulto los lleva.
+- **Las crias llevan su librea real**: el cervato moteado, el rayon a rayas, el
+  bisonte rojizo y sin joroba, el reno pardo sin astas, el zorrito pardo, y el
+  pollo de gaviota pardo. Sin cuernos, astas, colmillos ni barba; el joven,
+  con cuernos y sin barba ni colmillos. La cabeza de la cria es un 30 % mas
+  grande de lo que le toca, y la del joven un 10 % *(deduccion)*.
+- Los modelos y sus colores son mios.
+- `window.__verdant.faunaGallery()` devuelve los 30 modelos en una rejilla,
+  vistos en tres cuartos desde arriba.
 
 ## Aparicion
 
@@ -311,108 +309,99 @@ Interpretacion mia, aprobada con el plan:
     pared, igual que un brote solo sale en el suyo (regla 10);
   - no chocan entre ellos ni con el jugador.
 
-## El dibujo: ocho direcciones y la profundidad de su cuerpo
+## El cuerpo de bloques (2026-10-03)
 
-### Lo que se vio y lo que se midio
+### Por que
 
-- **Primer aviso del autor (2026-10-03)**: un animal pegado a una pared o a un
-  tronco se metia detras. `e3d3de6` le dio a la lamina entera la profundidad
-  de un solo punto, el centro del cuerpo adelantado medio largo del dibujo.
-- **Segundo aviso, con dos capturas**: una liebre «metida en la pared».
-- **La sonda** (`spriteDepthProbe`) reprodujo las capturas, en el caso
-  `cornisa`: el jugador en lo alto de un escalon, la liebre al pie.
-  - **El corte era verdadero.** El rayo de los ojos a la mitad cercana de la
-    liebre cruza el bloque antes de llegar a ella, asi que un cuerpo 3D en ese
-    sitio queda cortado por la misma arista.
-  - Lo enseña la sonda con `box`: la caja maciza del cuerpo en lugar del sprite
-    sale cortada igual.
-  - **Lo que estaba mal era lo contrario.** Para no cortar su perfil, el
-    bisonte se adelantaba 1,45 bloques, y se veia **a traves** de cornisas y
-    esquinas que tapan su cuerpo: el 100 % y el 21 % de lo que deberian tapar.
-- **Decision del autor: A+B tal cual**, sin tolerancia que deje ver a traves
-  del terreno. Con el resultado delante decide entre inclinar la lamina (C) o
-  pasar a animales de bloques.
+- **Los billboards no llegaban.** El autor vio un animal «metido en la pared»
+  y se probaron dos arreglos en lamina:
+  - una sola profundidad adelantada (`e3d3de6`);
+  - ocho direcciones con profundidad por pixel (`ff73508`).
+- La sonda demostro que **sus capturas eran un corte verdadero**: desde lo
+  alto de un escalon, un cuerpo 3D al pie queda cortado por la misma arista.
+- Pero una lamina cortada se lee como «dentro de la pared», y un volumen como
+  «detras de la cornisa».
+- Decision del autor, tras probarlo: «no siento que por ese camino podamos
+  llegar a un juego pulido». **Animales de bloques**:
+  - detalle medio, de 10 a 16 cajas;
+  - estaticos de momento: se desplazan y giran, el modelo no se mueve;
+  - **la caja de golpe es la de su modelo**: «un bisonte tiene un cuello y
+    cabeza grande que ameritan que tengan hitbox, pero su pequeña cola puede
+    quedar fuera de la caja para que la colision sea directamente en su
+    trasero».
 
-### A: ocho direcciones (`fauna-facing.ts`, `fauna-art.ts`)
+### El plano (`shared/src/fauna-body.ts`)
 
-- Decision del autor: **8 direcciones**.
-- El dibujo sale del angulo, en el suelo, entre hacia donde mira el animal y la
-  camara.
-- Son **5 dibujos**: de frente, tres cuartos de frente, perfil, tres cuartos de
-  espaldas y de espaldas. Los tres de en medio, en espejo segun el lado.
-- **Frente y espaldas** se dibujan aparte con los mismos rasgos de cada
-  especie: orejas, cuernos y astas abiertos a los dos lados, el hocico hacia la
-  camara, la grupa y la cola.
-- **Los tres cuartos** son el perfil encogido a lo ancho alrededor del ancla,
-  hasta lo que mide la caja girada 45°, `(largo + ancho)·cos 45°`. De frente se
-  le ven el pecho y los dos ojos; de espaldas, ningun ojo.
-- **El cangrejo anda de lado**: su perfil, el ancho, es el que se ve mirando
-  su marcha de lado.
-- Cada vista se escala por su tinta para medir `animalHeight`.
-- **Histeresis de 8°** *(deduccion)*: el dibujo solo cambia cuando el angulo
-  pasa el borde de su sector por mas de eso, y asi no parpadea.
-- **Desde arriba** se ve el dibujo de su angulo en el suelo, de pie y entero:
-  la lamina mira a la camara. No enseña el lomo ni se acorta; es lo que C o los
-  bloques cambiarian.
-- **El ancho de cada cuerpo** es dibujo mio *(deduccion)*, con proporciones de
-  la especie real: `wide` en `fauna-art.ts`, de 0,27 (reno) a 0,5 (bisonte,
-  marmota) del alto. El cangrejo, 0,8; la gaviota, 0,33.
+- **Un solo sitio dice como es cada animal.** Es una lista de cajas, cada una
+  con:
+  - su largo a lo largo del rumbo, su alto y su ancho;
+  - su centro en el marco del animal;
+  - su papel de color;
+  - si **golpea y choca** (`hit`).
+- **Lo que es `hit`**: el tronco, el cuello, la cabeza, el hocico, el pecho,
+  la joroba y la crin.
+- **Lo que no**: las patas finas, la cola, las orejas, los cuernos, las astas,
+  la barba, los ojos, las alas plegadas y el pico. Es la regla del autor (la
+  cola fuera) extendida a lo fino *(deduccion)*.
+- **Las medidas son mias**, de la especie real. Se escalan para que el plano
+  mida justo `animalHeight`, con los pies en el suelo.
+- **El nucleo golpea y choca con las partes `hit`**, y el cliente dibuja todas.
+  Lo que se ve es lo que se golpea, como el tronco de los arboles (regla 12).
 
-### B: la profundidad de la caja del cuerpo (`sprite-depth.ts`)
+### El golpe
 
-- **Cada pixel toma la profundidad del cuerpo.** El fragment shader corta el
-  rayo de la camara por ese pixel con la caja y escribe en `gl_FragDepth` el
-  punto donde entra.
-- **La caja** es la misma que mide la sonda en JS (`body-ray.ts`):
-  - largo: el de la tinta del perfil, medido desde el ancla;
-  - ancho: el `wide` de su especie;
-  - alto: `animalHeight`;
-  - orientada con el **rumbo real** del animal *(deduccion)*. El dibujo va de
-    45 en 45°, asi que pueden diferir hasta 22,5°.
-  - No es la caja de golpe, que sigue cuadrada (regla 12).
-- **Tinta cuyo rayo no toca la caja** (una oreja, unas astas): toma el punto de
-  la caja mas cercano a su rayo *(deduccion)*. Asi es siempre la profundidad
-  del cuerpo, nunca la de la lamina.
-- **Cada animal tiene su material**, porque su rumbo es suyo; las texturas son
-  de la clase.
-- **El jugador tambien**, con la caja de colision: medio lado `BODY_RADIUS` y
-  el alto de su dibujo.
-- Reescribe una linea del vertex shader y otra del fragment de three.js 0.170.
-  Si una version nueva las cambia, se avisa en consola y el humo falla.
-- **Lo que B no arregla**:
-  - El cuerpo dibujado es mas largo que su radio de colision. Un bisonte mide
-    unos 2,9 y choca con 0,34, como el jugador.
-  - De cara a una pared su cabeza esta, en 3D, dentro de ella, y B la tapa
-    como la taparia un modelo de bloques.
-  - Que cada animal choque con su cuerpo seria cambio del nucleo, y espera al
-    autor.
+- Cada rayo del sector (o el central, en preciso) se corta con cada parte
+  `hit`, girada con el rumbo del animal (`rayOrientedBox`).
+- El impacto va donde entra en la parte que toca.
+- La cabeza de un bisonte se golpea aunque quede lejos del tronco; su cola, no.
 
-### La sonda, antes y despues
+### El choque con el terreno (`sim/src/body.ts`, `walkAnimal`)
 
-Las cifras van por caso, en la suma de 8 rumbos × 3 alturas:
+Decision del autor: **las cajas de sus partes giran con el rumbo y no entran
+en un bloque**. Un bisonte no cabe por un pasillo de un bloque, y si al girar
+su cabeza entrara en una pared, no gira.
 
-- **mal tapado**: lo que tapa el terreno sin tapar al cuerpo;
-- **mal visto**: lo que se ve a traves de lo que tapa al cuerpo;
-- **fuera**: la tinta que no cae sobre el cuerpo.
+- **Solidos**: ninguna parte `hit` solapa en el suelo una casilla solida.
+- **Escalones** *(deduccion, la regla 21 extendida a las partes)*:
+  - una casilla estorba a una parte si, entre ella y su vecina hacia los pies,
+    hay un escalon de mas de `STEP_UP` cuya cima pasa de la base de la parte;
+  - **una rampa no tiene escalon y deja pasar**, aunque un cuerpo que no se
+    inclina asome sobre su pendiente;
+  - se probo primero con «el suelo mas bajo de la casilla», y una liebre no
+    terminaba de subir una rampa;
+  - los pies, como siempre: centro y `STEP_UP`.
+- **El giro**: hacia su destino a **180°/s** *(deduccion)*. Un paso de giro que
+  meteria una parte en el terreno no se da.
+- **El avance**: a lo largo de su rumbo, eje a eje, cuando el rumbo esta a
+  menos de **45°** de su destino *(deduccion)*. No anda de lado.
+- **La indulgencia** *(deduccion)*: un cuerpo que no cabe —nacio asi, o crecio
+  algo a su lado— anda sin que sus partes le estorben, solo con sus pies,
+  hasta que vuelve a caber. Asi nunca se queda clavado.
+- **Al ponerlo** (al nacer o tras un salto de tiempo), prueba 8 rumbos desde el
+  de su origen a su punto de paso, y se queda con el primero en que cabe.
+  - Sale lo mismo lo mire alguien o no: la ley del observador.
+- **No choca con otros animales ni con el jugador** (decision del autor, de
+  momento).
+- **Lo que cuesta**: hasta cuatro posturas por tick, sobre casi las mismas
+  casillas.
+  - Cada ronda (`groundRound`) lee cada casilla una vez, y su suelo sale del
+    nivel y la rampa (`World.floorRangeAt`).
+  - Con 63 animales el tick paso de 0,17 ms a 2,2 ms sin la ronda, y a
+    0,26 ms con ella.
 
-| Caso | Mal tapado, antes → ahora | Mal visto, antes → ahora | Fuera, antes → ahora |
-|---|---|---|---|
-| lado / liebre | 0 → 0 % | 0 → 0 % | 18,5 → 14,6 % |
-| lado / bisonte | 0 → 0 % | **92,9 → 0,1 %** | 10,4 → 9,4 % |
-| esquina / liebre | 0 → 0 % | 0,4 → 0,5 % | 18,5 → 10,7 % |
-| esquina / bisonte | 0,1 → 0 % | **21,5 → 0,1 %** | 10,4 → 6,1 % |
-| cornisa / liebre | 0 → 0 % | 0 → 0 % | 20,4 → 11,9 % |
-| cornisa / bisonte | 0 → 0 % | **100 → 0 %** | 8,3 → 3,9 % |
-| detras / liebre | 0 → 0 % | 0 → 0 % | 26,5 → 8,1 % |
-| detras / bisonte | 0 → 0 % | **100 → 0 %** | 12,4 → 4,7 % |
-| delante / liebre | 0 → 0 % | 0 → 0 % | 26,5 → 8,1 % |
-| delante / bisonte | 0 → 0 % | 0 → 0 % | 12,4 → 4,7 % |
+### El modelo (`client/src/fauna-model.ts`, `fauna-view.ts`)
 
-**Listones** *(deduccion)*, en cada caso:
+- Una geometria por (especie, etapa), con todas sus cajas y el color de cada
+  papel por vertice.
+- Material Lambert, como el terreno, con normales planas: la luz es la del
+  mundo, asi que al girar cambia la cara iluminada.
+- Un `Mesh` por animal, en sus pies y girado con su rumbo.
 
-- mal tapado ≤ 5 %;
-- mal visto ≤ 5 %;
-- fuera ≤ 16 %. Con el perfil de siempre la liebre pasaba del 26 %.
+### Lo que quedo de la lamina
+
+El jugador sigue siendo un sprite, con la profundidad de la caja de su cuerpo
+pixel a pixel (`sprite-depth.ts`). La sonda (`spriteDepthProbe`) lo mide en
+cinco casos de terreno: nada mal tapado ni mal visto.
 
 ## Lo que mide cada prueba
 
@@ -428,14 +417,19 @@ Las cifras van por caso, en la suma de 8 rumbos × 3 alturas:
   - que con el inventario lleno el golpe que mataria no completa.
 - **`tests/world-laws.test.ts`**: que la fauna no reaparece, y el destino de
   los recursos con su lista de pendientes.
+- **`tests/fauna-body.test.ts`** mide:
+  - el plano: su alto, los pies en el suelo, y que es `hit`;
+  - la cabeza del bisonte se golpea y su cola no, y girado;
+  - el choque en mundos hechos a mano: el pasillo, la pared al girar, el
+    escalon y la rampa, y la indulgencia al girar y al avanzar.
+- **`tests/body-ray.test.ts`**: el rayo contra la caja del cuerpo y contra el
+  terreno, la verdad de la sonda.
 - **La pasada `fauna` del humo** afirma:
-  - cada animal materializado tiene su sprite en la escena;
-  - deambulan;
+  - cada animal materializado tiene su modelo en la escena;
+  - cada modelo mide su alto;
+  - deambulan y giran;
+  - cada modelo mira a donde mira su animal;
   - una presa se caza con el raton y el clic, suelta carne cruda y deja
     impactos, sin una sola esquirla ni escombro;
-  - cada dibujo mide su caja, en sus cinco vistas;
-  - paseando, se dibujan desde 3 direcciones o mas;
-  - la sonda de profundidad, con los listones de arriba en los diez casos.
-- **`tests/fauna-facing.test.ts`**: los ocho sectores, el espejo, la
-  histeresis, y el rayo contra la caja del cuerpo y contra el terreno.
+  - la sonda de profundidad del jugador, en los cinco casos.
 - **La pasada `stations`** asa en el horno y come la carne asada.

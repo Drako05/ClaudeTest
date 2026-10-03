@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  animalBox,
+  animalBoxes,
   collides,
   createGame,
   EYE_HEIGHT,
@@ -81,10 +81,11 @@ function aimAt(state: GameState, id: number): Intent {
     entities.z[playerId] = world.floorHeightAt(px, py);
     break;
   }
-  const box = animalBox(entities, id)!;
-  const dx = (box.x0 + box.x1) / 2 - entities.x[playerId];
-  const dy = (box.y0 + box.y1) / 2 - entities.y[playerId];
-  const dz = (box.z0 + box.z1) / 2 - (entities.z[playerId] + EYE_HEIGHT);
+  // La primera parte que golpea es su tronco.
+  const box = animalBoxes(entities, id)[0];
+  const dx = box.cx - entities.x[playerId];
+  const dy = box.cy - entities.y[playerId];
+  const dz = box.cz - (entities.z[playerId] + EYE_HEIGHT);
   const len = Math.hypot(dx, dy, dz);
   return { ...emptyIntent(), aimX: dx, aimY: dy, aimZ: dz / len, harvest: true, precise: true };
 }
@@ -344,17 +345,23 @@ describe('Fauna: cazar', () => {
   });
 
   it('el impacto cae sobre la caja de lo golpeado, uno por objetivo, en preciso y en barrido', () => {
-    const near = (p: { x: number; y: number; z: number }, box: ReturnType<typeof animalBox>) =>
-      !!box &&
-      p.x >= box.x0 - 1e-6 && p.x <= box.x1 + 1e-6 &&
-      p.y >= box.y0 - 1e-6 && p.y <= box.y1 + 1e-6 &&
-      p.z >= box.z0 - 1e-6 && p.z <= box.z1 + 1e-6;
+    // Dentro de alguna de sus partes, en los ejes de cada una.
+    const near = (p: { x: number; y: number; z: number }, boxes: ReturnType<typeof animalBoxes>) =>
+      boxes.some((b) => {
+        const dx = p.x - b.cx;
+        const dy = p.y - b.cy;
+        return (
+          Math.abs(dx * b.ux + dy * b.uy) <= b.hl + 1e-6 &&
+          Math.abs(-dx * b.uy + dy * b.ux) <= b.hw + 1e-6 &&
+          Math.abs(p.z - b.cz) <= b.hh + 1e-6
+        );
+      });
     for (const precise of [true, false]) {
       const state = createGame(1);
       const id = someAnimal(state, (a) => state.entities.maxHealth[a] > 30);
       const intent = { ...aimAt(state, id), precise };
       step(state, intent);
-      const box = animalBox(state.entities, id);
+      const box = animalBoxes(state.entities, id);
       const hit = state.lastAnimalHits.find((h) => h.id === id);
       expect(hit, `modo ${precise ? 'preciso' : 'barrido'}`).toBeDefined();
       // Uno por cosa golpeada: animales y objetos del mundo.

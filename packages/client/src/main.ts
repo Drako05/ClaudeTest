@@ -67,7 +67,7 @@ import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { FaunaView } from './fauna-view.js';
-import { faunaGallery } from './fauna-art.js';
+import { faunaGallery } from './fauna-gallery.js';
 import { spriteDepthProbe, type ProbeView } from './sprite-depth-probe.js';
 import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
@@ -1007,8 +1007,8 @@ function frame(now: number): void {
       (tx, ty) => hitboxAt(state.world, tx, ty),
     ),
   );
-  // La fauna, con el dibujo de la direccion desde la que la mira la camara.
-  faunaView.update(state.fauna, state.entities, camera.active.position.x, camera.active.position.z);
+  // La fauna, cada modelo en sus pies y girado con su rumbo.
+  faunaView.update(state.fauna, state.entities);
   if (player) {
     billboards.moveTo(player, px, ph, py);
     // Desde dentro no se dibuja el cuerpo: en primera persona, y cuando la
@@ -1128,9 +1128,10 @@ Object.defineProperty(window, '__verdant', {
       /** La copa de cada especie, medida del dibujo, junto a la de su especie real. */
       crowns: billboards.crowns,
       /**
-       * La fauna: los animales materializados (posicion, especie, etapa y PV),
-       * cuantos hay en la escena, cuantos sprites se han colocado, los muertos
-       * de esta partida, y lo que mide cada dibujo junto a su caja de golpe.
+       * La fauna: los animales materializados (posicion, rumbo, especie, etapa
+       * y PV), cuantos hay en la escena, cuantos modelos se han colocado, los
+       * muertos de esta partida, lo que mide cada modelo junto a su alto, y el
+       * giro de cada modelo en la escena.
        */
       fauna: [...state.fauna].map(([key, a]) => ({
         key,
@@ -1140,6 +1141,8 @@ Object.defineProperty(window, '__verdant', {
         x: e.x[a],
         y: e.y[a],
         z: e.z[a],
+        facingX: e.facingX[a],
+        facingY: e.facingY[a],
         health: e.health[a],
         maxHealth: e.maxHealth[a],
         /** Si anda ahora; parado, esta en su punto de paso. */
@@ -1155,7 +1158,7 @@ Object.defineProperty(window, '__verdant', {
       faunaDrawn: faunaView.drawnTotal,
       animalsKilled,
       faunaSizes: faunaView.sizes,
-      faunaDirections: faunaView.directionsSeen,
+      faunaYaws: faunaView.yaws,
       /** Las diez especies en sus tres etapas, en un lienzo: para mirar el dibujo. */
       faunaGallery: () => faunaGallery(),
       /** Cuanto se ve de un sprite pegado de lado a un bloque y con uno delante. */
