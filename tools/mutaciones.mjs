@@ -10,73 +10,57 @@
  * - `gestures` o `slash`: esas herramientas;
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: ajustes de la fauna (2026-10-03).
+ * Ronda: los animales con ocho direcciones y la profundidad de su cuerpo
+ * (2026-10-03).
  */
 export default [
   {
-    nombre: 'el animal recargado no se cura',
-    fichero: 'packages/sim/src/systems/wander.ts',
-    de: '        store.health[id] = full;',
-    a: '        store.health[id] = full - 5;',
-    prueba: 'test:tests/fauna.test.ts',
-  },
-  {
-    nombre: 'el daño de un arbol no se olvida',
-    fichero: 'packages/sim/src/tick.ts',
-    de: '  forgetUnloadedDamage(state.work, world);',
-    a: '  void forgetUnloadedDamage;',
-    prueba: 'test:tests/fauna.test.ts',
-  },
-  {
-    nombre: 'el golpe no deja impacto en el animal',
-    fichero: 'packages/sim/src/systems/gathering.ts',
-    de: '    swing.impacts.push(at);\n    const hit = hitAnimal(',
-    a: '    const hit = hitAnimal(',
-    prueba: 'test:tests/fauna.test.ts',
-  },
-  {
-    nombre: 'impacto que muere sin verse',
-    fichero: 'packages/client/src/effects.ts',
-    de: '    // El impacto, con la misma garantia que el barrido: dura menos que un\n    // fotograma de una maquina lenta.\n    for (let i = this.impactList.length - 1; i >= 0; i--) {\n      const s = this.impactList[i];\n      if (s.fresh) {\n        s.fresh = false;\n        continue;\n      }',
-    a: '    // El impacto, con la misma garantia que el barrido: dura menos que un\n    // fotograma de una maquina lenta.\n    for (let i = this.impactList.length - 1; i >= 0; i--) {\n      const s = this.impactList[i];\n      s.fresh = false;',
-    prueba: 'test:tests/effects.test.ts',
-  },
-  {
-    nombre: 'el cliente no lanza impactos',
-    fichero: 'packages/client/src/main.ts',
-    de: '    for (const p of state.lastImpacts) effects.spawnImpact({ x: p.x, y: p.z, z: p.y });',
-    a: '    void state.lastImpacts;',
-    prueba: 'smoke:fauna',
-  },
-  {
-    nombre: 'impactos sin dibujar',
-    fichero: 'packages/client/src/effects-view.ts',
-    de: '      mesh.visible = alpha > 0;\n      if (mesh.visible) this.impactsDrawn++;',
-    a: '      mesh.visible = false;\n      if (mesh.visible) this.impactsDrawn++;',
-    prueba: 'smoke:desktop',
-  },
-  {
-    nombre: 'animales con esquirlas',
-    fichero: 'packages/client/src/main.ts',
-    de: '    for (const hit of state.lastAnimalHits) if (hit.killed) animalsKilled++;',
-    a: '    for (const hit of state.lastAnimalHits) { if (hit.killed) animalsKilled++; effects.spawnChips(hit.x, hit.y, [0xffffff], hit.z); }',
-    prueba: 'smoke:fauna',
-  },
-  {
-    nombre: 'sprite sin la profundidad del cuerpo',
+    nombre: 'sprite con la profundidad de la lamina',
     fichero: 'packages/client/src/sprite-depth.ts',
-    de: "      .replace(PROJECT_LINE, DEPTH_FROM_CORE);",
-    a: "      .replace(PROJECT_LINE, PROJECT_LINE);",
+    de: 'gl_FragDepth = clamp( bodyClip.z / bodyClip.w * 0.5 + 0.5, 0.0, 1.0 );',
+    a: 'gl_FragDepth = gl_FragCoord.z;',
     prueba: 'smoke:fauna',
   },
   {
-    nombre: 'sprite adelantado de mas',
+    nombre: 'caja adelantada de mas',
     fichero: 'packages/client/src/sprite-depth.ts',
-    de: '  return Math.max(halfLength, halfBody);',
-    // Lo justo para pasar por delante del bloque de la sonda (cara a 3, camara
-    // a 5): con mas, el punto quedaria detras de la camara y el sprite caeria
-    // por otra razon.
-    a: '  return Math.max(halfLength, halfBody) + 2.2;',
+    de: '  bodyHit = bodyO + bodyD * bodyNear;',
+    a: '  bodyHit = bodyO + bodyD * max( bodyNear - 1.5, 0.0 );',
     prueba: 'smoke:fauna',
+  },
+  {
+    nombre: 'caja sin el rumbo del animal',
+    fichero: 'packages/client/src/fauna-view.ts',
+    de: '      material.facing.set(fx, fy);',
+    a: '      material.facing.set(1, 0);',
+    prueba: 'smoke:fauna',
+  },
+  {
+    nombre: 'siempre de perfil',
+    fichero: 'packages/client/src/fauna-view.ts',
+    de: '      const { view, mirror } = viewOfSector(sector);',
+    a: '      const { view, mirror } = viewOfSector(2);',
+    prueba: 'smoke:fauna',
+  },
+  {
+    nombre: 'una vista que no mide su caja',
+    fichero: 'packages/client/src/fauna-view.ts',
+    de: '    const perPx = height / rows;',
+    a: '    const perPx = ((v === View.Front ? 1.2 : 1) * height) / rows;',
+    prueba: 'smoke:fauna',
+  },
+  {
+    nombre: 'vista sin histeresis',
+    fichero: 'packages/client/src/fauna-facing.ts',
+    de: '<= 22.5 + VIEW_HYSTERESIS_DEG) return previous;',
+    a: '<= 22.5) return previous;',
+    prueba: 'test:tests/fauna-facing.test.ts',
+  },
+  {
+    nombre: 'espejo al reves',
+    fichero: 'packages/client/src/fauna-facing.ts',
+    de: 'mirror: sector < 0 };',
+    a: 'mirror: sector > 0 };',
+    prueba: 'test:tests/fauna-facing.test.ts',
   },
 ];

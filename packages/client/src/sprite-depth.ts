@@ -1,90 +1,133 @@
 /**
- * Sprites que no se meten detras de lo que tienen al lado.
+ * Sprites con la profundidad de su cuerpo, pixel a pixel.
  *
  * Un sprite de three.js es una lamina plana de cara a la camara, y cada pixel
- * de la lamina usa su propia profundidad. Pegado a una pared o a un tronco, la
- * mitad que sobresale de lado entra en el bloque o el aspa de al lado y la
- * cara de esa cosa la tapa: el animal «se mete detras» (lo vio el autor,
- * 2026-10-03). No es un fallo del dibujo sino de la profundidad.
+ * de la lamina usa su propia profundidad: la de la lamina. Pegado a una pared,
+ * la parte que sobresale de lado entra en el bloque de al lado y la cara de
+ * ese bloque la tapa (lo vio el autor, 2026-10-03).
  *
- * El arreglo: **la lamina entera toma la profundidad de un solo punto**, el
- * centro del cuerpo adelantado hacia la camara medio largo de su dibujo
- * (`depthNearOf`). Asi solo la tapa lo que este de verdad delante del cuerpo
- * —un arbol entre la camara y el animal lo sigue ocultando—, y no lo que tenga
- * al lado o detras. Es el criterio de los juegos de sprites en 3D.
+ * **Cada pixel toma la profundidad que tendria el cuerpo de verdad.** El
+ * cuerpo es una caja (`body-ray.ts`): su largo a lo largo de hacia donde mira,
+ * su ancho y su alto. En el fragment shader, el rayo de la camara que pasa por
+ * ese pixel se corta contra la caja, y la profundidad del punto donde entra es
+ * la que se escribe en `gl_FragDepth`. Asi el terreno tapa del dibujo justo lo
+ * que taparia de un cuerpo: ni lo que tiene al lado ni lo que tiene detras, y
+ * si lo que esta de verdad delante. La tinta cuyo rayo no toca la caja —una
+ * oreja, una cornamenta— toma la del punto de la caja mas cercano a su rayo:
+ * siempre la del cuerpo, nunca la de la lamina.
  *
- * Se hace en el vertex shader del sprite: tras proyectar el vertice, su `z` se
- * sustituye por la del punto central, multiplicada por la `w` del vertice para
- * que la division de perspectiva la deje en su sitio. Vale igual en
- * perspectiva y en ortografica. Lo usan los animales (`fauna-view.ts`) y el
- * jugador (`billboards.ts`): decision del autor, el jugador tambien.
+ * Sustituye a «la lamina entera con la profundidad de un punto adelantado»
+ * (`e3d3de6`), que dejaba ver a un bisonte a traves de una cornisa: para no
+ * cortar su dibujo de perfil se adelantaba 1,45 bloques. La sonda
+ * (`sprite-depth-probe.ts`) mide los dos.
+ *
+ * Lo usan los animales (`fauna-view.ts`), cada uno con su material porque su
+ * rumbo es suyo, y el jugador (`billboards.ts`), con su caja cuadrada.
  */
 
-import { SpriteMaterial, type SpriteMaterialParameters } from 'three';
+import { SpriteMaterial, Vector2, Vector3, type SpriteMaterialParameters } from 'three';
 
-/** La linea del shader de three.js 0.170 que se reescribe. */
+/** La linea del vertex shader de three.js 0.170 tras la que se calcula la caja. */
 export const PROJECT_LINE = 'gl_Position = projectionMatrix * mvPosition;';
+/** La linea del fragment shader tras la que se escribe la profundidad: despues del descarte. */
+export const ALPHA_TEST_LINE = '#include <alphatest_fragment>';
 
-/**
- * El sustituto: la misma proyeccion, y la profundidad de un punto fijo. El
- * ancla del sprite (`modelViewMatrix[3]`) son sus pies; se sube medio alto en
- * la vertical del mundo y se acerca a la camara `depthNear` en el eje de la
- * vista, que en espacio de vista es +z.
- */
-const DEPTH_FROM_CORE = `
-gl_Position = projectionMatrix * mvPosition;
-vec4 verdantCore = modelViewMatrix[ 3 ];
-verdantCore.xyz += ( viewMatrix * vec4( 0.0, depthLift, 0.0, 0.0 ) ).xyz;
-verdantCore.z += depthNear;
-vec4 verdantCoreClip = projectionMatrix * verdantCore;
-gl_Position.z = verdantCoreClip.z / verdantCoreClip.w * gl_Position.w;
+const VARYINGS = `
+varying vec3 vBodyView;
+varying vec3 vBodyCenter;
+varying vec3 vBodyLong;
+varying vec3 vBodyUp;
+varying vec3 vBodySide;
 `;
 
 /**
- * Cuanto se adelanta hacia la camara el punto de profundidad: **medio largo
- * del dibujo**, y nunca menos que medio ancho de su caja de golpe. **Deduccion
- * mia.** La lamina sobresale de lado medio largo de su dibujo, que en un animal
- * es mucho mas que su cuerpo de colision (un bisonte mide 2,6 de largo con un
- * cuerpo de 0,34 de radio): pegado de lado a un bloque, la cara de ese bloque
- * mas cercana a la camara queda hasta medio bloque por delante de su centro. Lo
- * que este mas cerca de la camara que eso —un arbol entre ella y el animal— lo
- * sigue tapando.
+ * El vertex shader entrega, en espacio de vista, el punto de la lamina y la
+ * caja: su centro (el ancla del sprite mas `bodyLift` en la vertical) y sus
+ * tres ejes (el rumbo, la vertical y el costado).
  */
-export function depthNearOf(halfLength: number, halfBody: number): number {
-  return Math.max(halfLength, halfBody);
-}
-
-/** Los materiales cuya reescritura no encontro la linea: el humo lo lee. */
-export const depthPatchMisses: string[] = [];
+const BODY_VERTEX = `
+gl_Position = projectionMatrix * mvPosition;
+vBodyView = mvPosition.xyz;
+vBodyCenter = modelViewMatrix[ 3 ].xyz + ( viewMatrix * vec4( 0.0, bodyLift, 0.0, 0.0 ) ).xyz;
+vBodyLong = ( viewMatrix * vec4( bodyFacing.x, 0.0, bodyFacing.y, 0.0 ) ).xyz;
+vBodyUp = ( viewMatrix * vec4( 0.0, 1.0, 0.0, 0.0 ) ).xyz;
+vBodySide = ( viewMatrix * vec4( - bodyFacing.y, 0.0, bodyFacing.x, 0.0 ) ).xyz;
+`;
 
 /**
- * Un `SpriteMaterial` con la profundidad del cuerpo. `lift` es cuanto sube el
- * centro sobre los pies (medio alto) y `near`, cuanto se adelanta hacia la
- * camara (medio ancho de su caja), los dos en bloques.
+ * El fragment shader corta el rayo con la caja (slab test en sus ejes), como
+ * `rayBodyBox`, y si no la toca usa `nearestOnBox`. En perspectiva el rayo
+ * sale del ojo; en ortografica, del plano de la camara y en paralelo.
  */
-export function depthSafeSpriteMaterial(
-  params: SpriteMaterialParameters,
-  lift: number,
-  near: number,
-): SpriteMaterial {
-  const material = new SpriteMaterial(params);
+const BODY_FRAGMENT = `
+#include <alphatest_fragment>
+vec3 bodyO = isOrthographic ? vec3( vBodyView.xy, 0.0 ) : vec3( 0.0 );
+vec3 bodyD = isOrthographic ? vec3( 0.0, 0.0, - 1.0 ) : normalize( vBodyView );
+vec3 bodyP = bodyO - vBodyCenter;
+vec3 bodyLo = vec3( dot( bodyP, vBodyLong ), dot( bodyP, vBodyUp ), dot( bodyP, vBodySide ) );
+vec3 bodyLd = vec3( dot( bodyD, vBodyLong ), dot( bodyD, vBodyUp ), dot( bodyD, vBodySide ) );
+bodyLd = mix( bodyLd, vec3( 1e-6 ), vec3( lessThan( abs( bodyLd ), vec3( 1e-6 ) ) ) );
+vec3 bodyT0 = ( - bodyHalf - bodyLo ) / bodyLd;
+vec3 bodyT1 = ( bodyHalf - bodyLo ) / bodyLd;
+vec3 bodyTn = min( bodyT0, bodyT1 );
+vec3 bodyTf = max( bodyT0, bodyT1 );
+float bodyNear = max( max( bodyTn.x, bodyTn.y ), max( bodyTn.z, 0.0 ) );
+float bodyFar = min( min( bodyTf.x, bodyTf.y ), bodyTf.z );
+vec3 bodyHit;
+if ( bodyNear <= bodyFar ) {
+  bodyHit = bodyO + bodyD * bodyNear;
+} else {
+  vec3 bodyQ = bodyO + bodyD * max( 0.0, dot( vBodyCenter - bodyO, bodyD ) ) - vBodyCenter;
+  vec3 bodyK = clamp( vec3( dot( bodyQ, vBodyLong ), dot( bodyQ, vBodyUp ), dot( bodyQ, vBodySide ) ), - bodyHalf, bodyHalf );
+  bodyHit = vBodyCenter + vBodyLong * bodyK.x + vBodyUp * bodyK.y + vBodySide * bodyK.z;
+}
+vec4 bodyClip = projectionMatrix * vec4( bodyHit, 1.0 );
+gl_FragDepth = clamp( bodyClip.z / bodyClip.w * 0.5 + 0.5, 0.0, 1.0 );
+`;
+
+/** Lo que mide un cuerpo, en bloques. */
+export interface BodySize {
+  /** Cuanto sube el centro de la caja sobre el ancla del sprite. */
+  lift: number;
+  halfLength: number;
+  halfHeight: number;
+  halfWidth: number;
+}
+
+/** Un `SpriteMaterial` con su cuerpo: `facing` es su rumbo en el suelo (`x`, `z`). */
+export type BodySpriteMaterial = SpriteMaterial & { readonly facing: Vector2 };
+
+/** Los materiales cuya reescritura no encontro sus lineas: el humo lo lee. */
+export const depthPatchMisses: string[] = [];
+
+/** Un `SpriteMaterial` con la profundidad de la caja de su cuerpo. */
+export function bodySpriteMaterial(params: SpriteMaterialParameters, size: BodySize): BodySpriteMaterial {
+  const material = new SpriteMaterial(params) as BodySpriteMaterial;
+  const facing = new Vector2(1, 0);
+  Object.defineProperty(material, 'facing', { value: facing });
+  const lift = { value: size.lift };
+  const half = { value: new Vector3(size.halfLength, size.halfHeight, size.halfWidth) };
+  const facingUniform = { value: facing };
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.depthLift = { value: lift };
-    shader.uniforms.depthNear = { value: near };
-    if (!shader.vertexShader.includes(PROJECT_LINE)) {
+    if (!shader.vertexShader.includes(PROJECT_LINE) || !shader.fragmentShader.includes(ALPHA_TEST_LINE)) {
       // Una version de three.js con otro shader: se queda como un sprite normal
       // y se avisa, en vez de romper el dibujo.
       depthPatchMisses.push(material.uuid);
-      console.warn('sprite-depth: el shader del sprite no trae la linea esperada; sin arreglo de profundidad');
+      console.warn('sprite-depth: el shader del sprite no trae las lineas esperadas; sin profundidad del cuerpo');
       return;
     }
+    shader.uniforms.bodyLift = lift;
+    shader.uniforms.bodyHalf = half;
+    shader.uniforms.bodyFacing = facingUniform;
     shader.vertexShader = shader.vertexShader
-      .replace('void main() {', 'uniform float depthLift;\nuniform float depthNear;\nvoid main() {')
-      .replace(PROJECT_LINE, DEPTH_FROM_CORE);
+      .replace('void main() {', `uniform float bodyLift;\nuniform vec2 bodyFacing;\n${VARYINGS}\nvoid main() {`)
+      .replace(PROJECT_LINE, BODY_VERTEX);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', `uniform mat4 projectionMatrix;\nuniform vec3 bodyHalf;\n${VARYINGS}\nvoid main() {`)
+      .replace(ALPHA_TEST_LINE, BODY_FRAGMENT);
   };
-  // Un solo programa para todos los sprites con el arreglo, distinto del de un
-  // sprite normal; los numeros de cada uno van en sus uniformes, que three.js
-  // guarda por material.
-  material.customProgramCacheKey = () => 'verdant-sprite-depth';
+  // Un solo programa para todos los sprites con cuerpo; los numeros de cada
+  // uno van en sus uniformes, que three.js guarda por material.
+  material.customProgramCacheKey = () => 'verdant-sprite-body';
   return material;
 }

@@ -39,7 +39,8 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Fauna: el **paseo** — un punto de paso cada 20 s, territorio de 6 a 16 casillas, de 0,6 a 1,2 bloques por segundo, sin salir de su bioma y sin chocar con nadie | `docs/fauna.md`, la ley del observador | numeros en `SPECIES` |
 | Fauna: **los animales no se curan** mientras estan cerca (al recargarse si: tu decision) | `docs/fauna.md`, el sistema de PV | una regla |
 | El **impacto**: estrella de 0,18 a 0,42 bloques en 0,2 s, blanca y sin prueba de profundidad | `docs/efectos.md`, el impacto | tres numeros |
-| La **profundidad de los sprites**: el centro del cuerpo adelantado medio largo de su dibujo (el jugador, medio bloque) | `docs/fauna.md`, el dibujo no se mete detras | un numero |
+| Fauna, el dibujo: la **histeresis de 8°** antes de cambiar de direccion; el **ancho de cada cuerpo** (`wide`, de 0,27 a 0,5 del alto; cangrejo 0,8); la **caja orientada con el rumbo real** aunque el dibujo vaya de 45 en 45°; la tinta que **no cae sobre la caja toma el punto de la caja mas cercano**; los tres cuartos como **perfil encogido** | `docs/fauna.md`, el dibujo | numeros en `fauna-art.ts` y `fauna-facing.ts` |
+| Fauna: los **listones de la sonda** de profundidad — mal tapado y mal visto ≤ 5 %, dibujo fuera del cuerpo ≤ 16 % | `docs/fauna.md`, la sonda | tres numeros del humo |
 | Fauna: el **ciervo adulto se dibuja sin astas**, porque el dibujo aun no distingue sexos | `docs/fauna.md`, las especies | un dibujo |
 | Fauna: los **dibujos y colores** de las diez especies y sus crias; el **alto minimo** de 0,22 bloques (el cangrejo); el medio ancho de cada caja | `docs/fauna.md`, las especies | dibujo y numeros |
 | `GRAVITY = 62` y `JUMP_SPEED = 12`, deducidos de tu enunciado del salto | Fase 2 del relieve | dos numeros |
@@ -535,6 +536,28 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Fauna: ocho direcciones y la profundidad del cuerpo — HECHO (2026-10-03)
+
+Me mandaste dos capturas de una liebre «metida en la pared» y elegiste A+B.
+
+- **Tus dos capturas eran un corte verdadero.** La sonda las reproduce
+  (`cornisa`): estabas en lo alto de un escalon y la liebre, al pie. Una caja
+  3D en su sitio queda cortada por la misma arista; te mando las dos imagenes.
+  Lo elegiste: **A+B tal cual**, sin tolerancia.
+- **Lo que si estaba mal** era el bisonte. Se adelantaba 1,45 bloques y se veia
+  a traves de cornisas y esquinas (100 % y 21 %). Ahora, 0 % y 0,1 %.
+- **A, ocho direcciones:**
+  - de frente, tres cuartos, perfil, tres cuartos de espaldas y de espaldas;
+  - los de lado van en espejo, y la histeresis evita el parpadeo;
+  - la galeria (`__verdant.faunaGallery()`) las enseña todas.
+- **B, profundidad de la caja del cuerpo**, pixel a pixel, para animales y
+  jugador.
+- **Desde arriba** se ve el dibujo de pie y entero. No enseña el lomo: eso es
+  lo que cambiarian C o los bloques, y **es tu decision**.
+- **Pregunta abierta, del nucleo:** que cada animal choque con su cuerpo y no
+  con 0,34. De cara a una pared, la cabeza de un bisonte esta en 3D dentro de
+  ella, y B la tapa, como la taparia un modelo de bloques.
 
 ## Fauna, ajustes: el daño se olvida, impacto, sprites enteros — HECHO (2026-10-03)
 
