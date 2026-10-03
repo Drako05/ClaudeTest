@@ -34,6 +34,7 @@ import {
 } from 'three';
 import { Feature } from '@verdant/shared';
 import {
+  BODY_RADIUS,
   bucketBlocks,
   hash2DFloat,
   treeTrunkAt,
@@ -46,7 +47,7 @@ import {
 import { LOOKS } from './palette.js';
 import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
 import { TREE_SHAPES, treeShapeOf } from './tree-shapes.js';
-import { depthNearOf, depthSafeSpriteMaterial } from './sprite-depth.js';
+import { bodySpriteMaterial } from './sprite-depth.js';
 
 /** Las especies de arbol adulto, las que tienen forma propia. */
 const TREES = Object.keys(TREE_SHAPES).map(Number) as Feature[];
@@ -603,16 +604,19 @@ export class BillboardSet {
 
 /**
  * El sprite de algo que se apoya en el suelo, con la profundidad de su cuerpo
- * (`sprite-depth.ts`): pegado a una pared o a un tronco, no se mete detras. El
- * sprite se coloca por su centro, que esta a `h/2 - lift` de los pies; el
- * centro del cuerpo, a la mitad de lo que mide su dibujo. Se adelanta medio
- * bloque, lo que queda por delante de su centro la cara de un bloque al que se
- * arrima, y mas que su cuerpo (`BODY_RADIUS`, 0,34). **Deduccion mia.**
+ * (`sprite-depth.ts`): el terreno le tapa lo que taparia a un cuerpo, ni mas
+ * ni menos. El sprite se coloca por su centro, que esta a `h/2 - lift` de los
+ * pies; el centro del cuerpo, a la mitad de lo que mide su dibujo. La caja es
+ * la de colision, con medio lado `BODY_RADIUS` en los dos ejes: al ser
+ * cuadrada, el rumbo no la cambia y se queda en el de partida.
  */
 function place(art: Billboard, wx: number, height: number, wy: number): Sprite {
   const toCore = art.visible / 2 - (art.h / 2 - art.lift);
   const sprite = new Sprite(
-    depthSafeSpriteMaterial({ map: art.texture, transparent: true }, toCore, depthNearOf(0.5, 0.34)),
+    bodySpriteMaterial(
+      { map: art.texture, transparent: true },
+      { lift: toCore, halfLength: BODY_RADIUS, halfHeight: art.visible / 2, halfWidth: BODY_RADIUS },
+    ),
   );
   sprite.scale.set(art.w, art.h, 1);
   sprite.userData.lift = art.lift;

@@ -68,7 +68,7 @@ import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { FaunaView } from './fauna-view.js';
 import { faunaGallery } from './fauna-art.js';
-import { spriteDepthProbe } from './sprite-depth-probe.js';
+import { spriteDepthProbe, type ProbeView } from './sprite-depth-probe.js';
 import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
 import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
@@ -1007,10 +1007,8 @@ function frame(now: number): void {
       (tx, ty) => hitboxAt(state.world, tx, ty),
     ),
   );
-  // La fauna, volteada segun ande hacia la derecha o la izquierda de la
-  // pantalla: la derecha de la camara, en el suelo.
-  const camRight = new Vector3().setFromMatrixColumn(camera.active.matrixWorld, 0);
-  faunaView.update(state.fauna, state.entities, camRight.x, camRight.z);
+  // La fauna, con el dibujo de la direccion desde la que la mira la camara.
+  faunaView.update(state.fauna, state.entities, camera.active.position.x, camera.active.position.z);
   if (player) {
     billboards.moveTo(player, px, ph, py);
     // Desde dentro no se dibuja el cuerpo: en primera persona, y cuando la
@@ -1157,10 +1155,11 @@ Object.defineProperty(window, '__verdant', {
       faunaDrawn: faunaView.drawnTotal,
       animalsKilled,
       faunaSizes: faunaView.sizes,
+      faunaDirections: faunaView.directionsSeen,
       /** Las diez especies en sus tres etapas, en un lienzo: para mirar el dibujo. */
       faunaGallery: () => faunaGallery(),
       /** Cuanto se ve de un sprite pegado de lado a un bloque y con uno delante. */
-      spriteDepthProbe: () => spriteDepthProbe(),
+      spriteDepthProbe: (snap?: ProbeView) => spriteDepthProbe(snap),
       facing: [e.facingX[id], e.facingY[id]],
       /** Hacia donde mira la camara, que es de donde sale la mirada. */
       aim: [camera.forward().x, camera.forward().y],

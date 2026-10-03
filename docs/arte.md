@@ -21,10 +21,12 @@ rumbos — sin ese contraste seria una comprobacion que no puede fallar.
 
 **El jugador sigue siendo billboard**, y es decision del autor: un aspa en un
 humanoide es verlo de frente y de perfil a la vez, dos figuras atravesadas. Su
-solucion son los sprites de cuatro u ocho direcciones, que siguen pendientes.
-Desde el 2026-10-03 su lamina toma **la profundidad de su cuerpo**, como los
-animales (`sprite-depth.ts`, ver `docs/fauna.md`): arrimado a una pared o a un
-tronco en tercera persona, ya no se mete detras.
+solucion son los sprites de cuatro u ocho direcciones: **los animales ya las
+tienen**, ocho, decision del autor del 2026-10-03 (`fauna-facing.ts`, ver
+`docs/fauna.md`); el jugador sigue con una. Desde ese dia, cada pixel de su
+lamina toma **la profundidad de la caja de su cuerpo**, como los animales
+(`sprite-depth.ts`): el terreno le tapa lo que taparia a un cuerpo, ni lo que
+tiene al lado ni menos de lo que tiene delante.
 
 **El aspa obliga a recortar por alfa, y eso decide dos cosas mas.** Dos laminas
 que se cruzan se atraviesan, y con `transparent` a secas el orden de pintado

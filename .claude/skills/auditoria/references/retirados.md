@@ -64,4 +64,6 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `EYE = 1\.6|EYE\` de la camara` — la altura de ojos de la camara; hoy `EYE_HEIGHT = 1,75`.
 - `spike3d` — el nombre del cliente 3D cuando era un prototipo.
 - `faunaDamageOf|setFaunaDamage|faunaDamage` — el daño de los animales en el overlay de `World`; desde el 2026-10-03 se olvida al recargarse (decision del autor) y vive solo en la entidad.
+- `depthNearOf|depthSafeSpriteMaterial|verdant-sprite-depth|besideShare|frontShare` — la lamina entera con la profundidad de un punto adelantado (`e3d3de6`); desde el 2026-10-03 cada pixel toma la de la caja del cuerpo (`bodySpriteMaterial`), y la sonda mide casos de terreno.
+- `inkColumns` y el voltear por la derecha de la camara (`update(fauna, store, rightX, rightZ)`) — la fauna elige uno de ocho dibujos por el angulo a la camara (`fauna-facing.ts`) y recibe la posicion de la camara.
 - `animalPalette` — los colores de las esquirlas y escombros de los animales; desde el 2026-10-03 no sueltan fragmentos, solo el impacto.

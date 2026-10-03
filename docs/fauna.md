@@ -106,7 +106,11 @@ la formula da 39 y 9.
   - Los jovenes, proporciones de adulto y cuernos a medias; el jabali joven,
     rojizo y sin rayas.
   - Los dibujos y sus colores son mios.
-  - `window.__verdant.faunaGallery()` devuelve los 30 en un lienzo.
+  - `window.__verdant.faunaGallery()` devuelve los 30 en un lienzo, cada uno
+    en sus cinco vistas, de frente a espaldas.
+  - `spriteDepthProbe({ caso, species, heading, elevation, box })` saca como
+    imagen una vista de la sonda, con el sprite o con la caja maciza del
+    cuerpo.
 
 ## Aparicion
 
@@ -311,26 +315,108 @@ Interpretacion mia, aprobada con el plan:
     pared, igual que un brote solo sale en el suyo (regla 10);
   - no chocan entre ellos ni con el jugador.
 
-## El dibujo no se mete detras de lo que tiene al lado
+## El dibujo: ocho direcciones y la profundidad de su cuerpo
 
-Lo vio el autor (2026-10-03): un animal pegado a una pared o a un tronco se
-metia detras. Es el billboard: una lamina plana de cara a la camara, que
-sobresale de lado medio largo del dibujo —un bisonte mide 2,6 de largo con un
-cuerpo de colision de 0,34 de radio— y se clava en el bloque de al lado, cuya
-cara la tapa.
+### Lo que se vio y lo que se midio
 
-- **La lamina entera toma la profundidad de un solo punto** (`sprite-depth.ts`):
-  el centro del cuerpo, a medio alto de los pies, adelantado hacia la camara
-  **medio largo de su dibujo** (`depthNearOf`, *deduccion*).
-- Lo que este a menos de eso no lo tapa; lo que este mas cerca de la camara
-  —un arbol entre ella y el animal— lo sigue tapando.
-- Se hace reescribiendo una linea del vertex shader del sprite de three.js
-  0.170. Si una version nueva la cambia, se avisa en consola y el humo falla.
-- **El jugador tambien** (decision del autor), adelantado medio bloque
-  *(deduccion)*.
-- **Medido** (`spriteDepthProbe`): pegado de lado a un bloque se ve el 100 %
-  del sprite, contra unos dos tercios sin el arreglo; con un bloque delante,
-  el 0 %.
+- **Primer aviso del autor (2026-10-03)**: un animal pegado a una pared o a un
+  tronco se metia detras. `e3d3de6` le dio a la lamina entera la profundidad
+  de un solo punto, el centro del cuerpo adelantado medio largo del dibujo.
+- **Segundo aviso, con dos capturas**: una liebre «metida en la pared».
+- **La sonda** (`spriteDepthProbe`) reprodujo las capturas, en el caso
+  `cornisa`: el jugador en lo alto de un escalon, la liebre al pie.
+  - **El corte era verdadero.** El rayo de los ojos a la mitad cercana de la
+    liebre cruza el bloque antes de llegar a ella, asi que un cuerpo 3D en ese
+    sitio queda cortado por la misma arista.
+  - Lo enseña la sonda con `box`: la caja maciza del cuerpo en lugar del sprite
+    sale cortada igual.
+  - **Lo que estaba mal era lo contrario.** Para no cortar su perfil, el
+    bisonte se adelantaba 1,45 bloques, y se veia **a traves** de cornisas y
+    esquinas que tapan su cuerpo: el 100 % y el 21 % de lo que deberian tapar.
+- **Decision del autor: A+B tal cual**, sin tolerancia que deje ver a traves
+  del terreno. Con el resultado delante decide entre inclinar la lamina (C) o
+  pasar a animales de bloques.
+
+### A: ocho direcciones (`fauna-facing.ts`, `fauna-art.ts`)
+
+- Decision del autor: **8 direcciones**.
+- El dibujo sale del angulo, en el suelo, entre hacia donde mira el animal y la
+  camara.
+- Son **5 dibujos**: de frente, tres cuartos de frente, perfil, tres cuartos de
+  espaldas y de espaldas. Los tres de en medio, en espejo segun el lado.
+- **Frente y espaldas** se dibujan aparte con los mismos rasgos de cada
+  especie: orejas, cuernos y astas abiertos a los dos lados, el hocico hacia la
+  camara, la grupa y la cola.
+- **Los tres cuartos** son el perfil encogido a lo ancho alrededor del ancla,
+  hasta lo que mide la caja girada 45°, `(largo + ancho)·cos 45°`. De frente se
+  le ven el pecho y los dos ojos; de espaldas, ningun ojo.
+- **El cangrejo anda de lado**: su perfil, el ancho, es el que se ve mirando
+  su marcha de lado.
+- Cada vista se escala por su tinta para medir `animalHeight`.
+- **Histeresis de 8°** *(deduccion)*: el dibujo solo cambia cuando el angulo
+  pasa el borde de su sector por mas de eso, y asi no parpadea.
+- **Desde arriba** se ve el dibujo de su angulo en el suelo, de pie y entero:
+  la lamina mira a la camara. No enseña el lomo ni se acorta; es lo que C o los
+  bloques cambiarian.
+- **El ancho de cada cuerpo** es dibujo mio *(deduccion)*, con proporciones de
+  la especie real: `wide` en `fauna-art.ts`, de 0,27 (reno) a 0,5 (bisonte,
+  marmota) del alto. El cangrejo, 0,8; la gaviota, 0,33.
+
+### B: la profundidad de la caja del cuerpo (`sprite-depth.ts`)
+
+- **Cada pixel toma la profundidad del cuerpo.** El fragment shader corta el
+  rayo de la camara por ese pixel con la caja y escribe en `gl_FragDepth` el
+  punto donde entra.
+- **La caja** es la misma que mide la sonda en JS (`body-ray.ts`):
+  - largo: el de la tinta del perfil, medido desde el ancla;
+  - ancho: el `wide` de su especie;
+  - alto: `animalHeight`;
+  - orientada con el **rumbo real** del animal *(deduccion)*. El dibujo va de
+    45 en 45°, asi que pueden diferir hasta 22,5°.
+  - No es la caja de golpe, que sigue cuadrada (regla 12).
+- **Tinta cuyo rayo no toca la caja** (una oreja, unas astas): toma el punto de
+  la caja mas cercano a su rayo *(deduccion)*. Asi es siempre la profundidad
+  del cuerpo, nunca la de la lamina.
+- **Cada animal tiene su material**, porque su rumbo es suyo; las texturas son
+  de la clase.
+- **El jugador tambien**, con la caja de colision: medio lado `BODY_RADIUS` y
+  el alto de su dibujo.
+- Reescribe una linea del vertex shader y otra del fragment de three.js 0.170.
+  Si una version nueva las cambia, se avisa en consola y el humo falla.
+- **Lo que B no arregla**:
+  - El cuerpo dibujado es mas largo que su radio de colision. Un bisonte mide
+    unos 2,9 y choca con 0,34, como el jugador.
+  - De cara a una pared su cabeza esta, en 3D, dentro de ella, y B la tapa
+    como la taparia un modelo de bloques.
+  - Que cada animal choque con su cuerpo seria cambio del nucleo, y espera al
+    autor.
+
+### La sonda, antes y despues
+
+Las cifras van por caso, en la suma de 8 rumbos × 3 alturas:
+
+- **mal tapado**: lo que tapa el terreno sin tapar al cuerpo;
+- **mal visto**: lo que se ve a traves de lo que tapa al cuerpo;
+- **fuera**: la tinta que no cae sobre el cuerpo.
+
+| Caso | Mal tapado, antes → ahora | Mal visto, antes → ahora | Fuera, antes → ahora |
+|---|---|---|---|
+| lado / liebre | 0 → 0 % | 0 → 0 % | 18,5 → 14,6 % |
+| lado / bisonte | 0 → 0 % | **92,9 → 0,1 %** | 10,4 → 9,4 % |
+| esquina / liebre | 0 → 0 % | 0,4 → 0,5 % | 18,5 → 10,7 % |
+| esquina / bisonte | 0,1 → 0 % | **21,5 → 0,1 %** | 10,4 → 6,1 % |
+| cornisa / liebre | 0 → 0 % | 0 → 0 % | 20,4 → 11,9 % |
+| cornisa / bisonte | 0 → 0 % | **100 → 0 %** | 8,3 → 3,9 % |
+| detras / liebre | 0 → 0 % | 0 → 0 % | 26,5 → 8,1 % |
+| detras / bisonte | 0 → 0 % | **100 → 0 %** | 12,4 → 4,7 % |
+| delante / liebre | 0 → 0 % | 0 → 0 % | 26,5 → 8,1 % |
+| delante / bisonte | 0 → 0 % | 0 → 0 % | 12,4 → 4,7 % |
+
+**Listones** *(deduccion)*, en cada caso:
+
+- mal tapado ≤ 5 %;
+- mal visto ≤ 5 %;
+- fuera ≤ 16 %. Con el perfil de siempre la liebre pasaba del 26 %.
 
 ## Lo que mide cada prueba
 
@@ -348,10 +434,12 @@ cara la tapa.
   los recursos con su lista de pendientes.
 - **La pasada `fauna` del humo** afirma:
   - cada animal materializado tiene su sprite en la escena;
-  - cada dibujo mide su caja;
   - deambulan;
   - una presa se caza con el raton y el clic, suelta carne cruda y deja
     impactos, sin una sola esquirla ni escombro;
-  - con `spriteDepthProbe`, que un sprite pegado de lado a un bloque se ve
-    entero y uno con un bloque delante sigue tapado.
+  - cada dibujo mide su caja, en sus cinco vistas;
+  - paseando, se dibujan desde 3 direcciones o mas;
+  - la sonda de profundidad, con los listones de arriba en los diez casos.
+- **`tests/fauna-facing.test.ts`**: los ocho sectores, el espejo, la
+  histeresis, y el rayo contra la caja del cuerpo y contra el terreno.
 - **La pasada `stations`** asa en el horno y come la carne asada.

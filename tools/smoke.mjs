@@ -2472,8 +2472,9 @@ async function faunaPass(browser, baseUrl) {
     `no se dibuja cada animal: ${first.faunaInScene} sprites para ${first.fauna.length}`);
   // Lo dibujado mide lo que la caja de golpe del nucleo: lo que se ve es lo
   // que se golpea.
+  // En las cinco vistas de cada uno, que salen por separado (`fauna-art.ts`).
   const off = first.faunaSizes.filter((s) => Math.abs(s.dibujo - s.caja) > 0.03);
-  check(first.faunaSizes.length === 30 && off.length === 0,
+  check(first.faunaSizes.length === 150 && off.length === 0,
     `el dibujo no mide lo que su caja: ${JSON.stringify(off.slice(0, 3))}`);
 
   // Deambulan.
@@ -2555,16 +2556,26 @@ async function faunaPass(browser, baseUrl) {
     `golpear y matar a la presa solto fragmentos: esquirlas ${there.chipsDrawn} -> ${now.chipsDrawn}, escombros ${there.debrisDrawn} -> ${now.debrisDrawn}`);
   check(now.impactsDrawn > there.impactsDrawn, 'golpear a la presa no dibujo ningun impacto');
 
-  // Un sprite pegado de lado a un bloque no se mete detras, y uno con un bloque
-  // delante sigue tapado (`sprite-depth.ts`), medido en pixeles en una escena
-  // minima fuera de pantalla con el mismo material de animales y jugador.
+  // Paseando, los animales se dibujan desde varias de sus ocho direcciones
+  // (`fauna-facing.ts`): uno que se viera siempre de perfil no las usaria.
+  console.log(`  direcciones dibujadas ${now.faunaDirections} de 8`);
+  check(now.faunaDirections >= 3, `los animales se dibujan casi siempre desde la misma direccion: ${now.faunaDirections}`);
+
+  // Cada pixel con la profundidad de la caja del cuerpo (`sprite-depth.ts`),
+  // medido en una escena fuera de pantalla con la vista de la fauna real: cinco
+  // casos de terreno, ocho rumbos y tres alturas, contra el rayo en JS.
   const depth = await page.evaluate(() => window.__verdant.spriteDepthProbe());
-  console.log(`  profundidad del sprite: al lado se ve ${(depth?.besideShare * 100).toFixed(0)} %, ` +
-    `con un bloque delante ${(depth?.frontShare * 100).toFixed(0)} % (de ${depth?.alone} px)`);
-  check(depth !== null && depth.alone > 500, `la sonda de profundidad no dibujo el sprite: ${JSON.stringify(depth)}`);
-  check(depth !== null && depth.misses === 0, 'el shader del sprite no trae la linea que reescribe sprite-depth.ts');
-  check(depth !== null && depth.besideShare >= 0.95, `el sprite se mete detras del bloque de al lado: ${JSON.stringify(depth)}`);
-  check(depth !== null && depth.frontShare <= 0.05, `el sprite se ve a traves del bloque de delante: ${JSON.stringify(depth)}`);
+  check(depth !== null && depth.cases.length === 10, `la sonda de profundidad no se pudo montar: ${JSON.stringify(depth)}`);
+  check(depth !== null && depth.misses === 0, 'el shader del sprite no trae las lineas que reescribe sprite-depth.ts');
+  for (const c of depth?.cases ?? []) {
+    const pct = (v) => `${(v * 100).toFixed(1)} %`;
+    console.log(`  ${c.name.padEnd(15)} tinta ${String(c.ink).padStart(6)}  mal tapado ${pct(c.wrongHidden)}  ` +
+      `mal visto ${pct(c.wrongShown)}  fuera ${pct(c.outside)}`);
+    check(c.ink > 1500, `la sonda no dibujo el animal en ${c.name}: ${c.ink} px`);
+    check(c.wrongHidden <= 0.05, `${c.name}: el terreno tapa del dibujo lo que no taparia del cuerpo (${pct(c.wrongHidden)}, peor ${c.worstView})`);
+    check(c.wrongShown <= 0.05, `${c.name}: el dibujo se ve a traves del terreno que tapa su cuerpo (${pct(c.wrongShown)})`);
+    check(c.outside <= 0.16, `${c.name}: demasiado dibujo fuera de su cuerpo (${pct(c.outside)}), como un perfil visto de frente`);
+  }
 
   await page.close();
 }
