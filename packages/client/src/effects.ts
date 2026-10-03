@@ -163,9 +163,42 @@ export interface Slash {
   fresh: boolean;
 }
 
+/**
+ * Lo que dura el impacto: el destello en estrella que sale donde se golpea algo
+ * que se puede romper (pedido del autor, 2026-10-03: «una animacion sencilla de
+ * impacto»; la estrella la eligio el, la duracion es mia).
+ */
+export const IMPACT_SECONDS = 0.2;
+/** Lo que mide la estrella de punta a punta al nacer y al apagarse, en bloques. **Mio.** */
+export const IMPACT_SIZE_FROM = 0.18;
+export const IMPACT_SIZE_TO = 0.42;
+
+export interface Impact {
+  /** Donde toco el golpe, en coordenadas de three.js. */
+  at: Point3;
+  age: number;
+  ttl: number;
+  /** True hasta el primer `advance`; ver la regla del fotograma alli. */
+  fresh: boolean;
+}
+
+/**
+ * Como esta un impacto en su vida: crece deprisa al principio y se apaga.
+ * `size` de punta a punta en bloques, `alpha` de 1 a 0.
+ */
+export function impactLook(impact: { age: number; ttl: number }): { size: number; alpha: number } {
+  const t = progressOf(impact);
+  const grow = 1 - (1 - t) * (1 - t);
+  return {
+    size: IMPACT_SIZE_FROM + (IMPACT_SIZE_TO - IMPACT_SIZE_FROM) * grow,
+    alpha: 1 - t * t,
+  };
+}
+
 export class Effects {
   private readonly live: Particle[] = [];
   private readonly slashList: Slash[] = [];
+  private readonly impactList: Impact[] = [];
   /** Cada estallido avanza la semilla, para que dos seguidos no sean iguales. */
   private seed: number;
 
@@ -181,13 +214,22 @@ export class Effects {
     return this.slashList;
   }
 
+  get impacts(): readonly Impact[] {
+    return this.impactList;
+  }
+
   get count(): number {
-    return this.live.length + this.slashList.length;
+    return this.live.length + this.slashList.length + this.impactList.length;
   }
 
   /** Recuentos por separado. Solo para verificacion. */
-  get tally(): { particles: number; slashes: number } {
-    return { particles: this.live.length, slashes: this.slashList.length };
+  get tally(): { particles: number; slashes: number; impacts: number } {
+    return { particles: this.live.length, slashes: this.slashList.length, impacts: this.impactList.length };
+  }
+
+  /** Un impacto en ese punto del mundo (`Swing.impacts`, pasado a three.js). */
+  spawnImpact(at: Point3): void {
+    this.impactList.push({ at: { x: at.x, y: at.y, z: at.z }, age: 0, ttl: IMPACT_SECONDS, fresh: true });
   }
 
   /** Un barrido por esos puntos del mundo (ver `slashEdge`). */
@@ -340,11 +382,24 @@ export class Effects {
       s.age += dt;
       if (s.age >= s.ttl) this.slashList.splice(i, 1);
     }
+
+    // El impacto, con la misma garantia que el barrido: dura menos que un
+    // fotograma de una maquina lenta.
+    for (let i = this.impactList.length - 1; i >= 0; i--) {
+      const s = this.impactList[i];
+      if (s.fresh) {
+        s.fresh = false;
+        continue;
+      }
+      s.age += dt;
+      if (s.age >= s.ttl) this.impactList.splice(i, 1);
+    }
   }
 
   clear(): void {
     this.live.length = 0;
     this.slashList.length = 0;
+    this.impactList.length = 0;
   }
 }
 

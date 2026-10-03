@@ -5,8 +5,9 @@
  * Materializar no crea vida: el animal ya existia como potencial de su chunk, y
  * solo pasa a ser una entidad que se mueve y se golpea mientras su chunk esta a
  * `FAUNA_RADIUS_CHUNKS` del jugador. Al alejarse se retira, y al volver
- * reaparece donde le toca en ese periodo, con su daño (el overlay de `World`).
- * Los muertos no se materializan nunca.
+ * reaparece donde le toca en ese periodo y **entero**: el daño no sobrevive a
+ * recargarse (decision del autor, 2026-10-03). Lo que si sobrevive es la
+ * muerte (el overlay de `World`): los muertos no se materializan nunca.
  */
 
 import {
@@ -94,7 +95,9 @@ export function syncFauna(
         const full = animalHitPoints(animal.species, animal.stage);
         store.animal[id] = animal;
         store.maxHealth[id] = full;
-        store.health[id] = full - world.faunaDamageOf(animal.key);
+        // Entero: el daño no sobrevive a retirarse (decision del autor,
+        // 2026-10-03). Lo unico que se guarda de el es si murio.
+        store.health[id] = full;
         placeAt(world, store, id, animal, tick);
         index.set(animal.key, id);
       }

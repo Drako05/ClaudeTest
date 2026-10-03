@@ -49,6 +49,7 @@ import {
   groundHit,
   lookVector,
   plantTile,
+  pointAlong,
   rayBox,
   strike,
   STRIKE_RANGE,
@@ -109,10 +110,26 @@ export type Blocked = 'full' | 'needPickaxe' | 'needBetterPickaxe';
  * El daño acumulado en cada objeto golpeado y las ramas que ya se le han
  * arrancado a cada arbol. Es estado de las mutaciones del jugador y vive fuera
  * del chunk, como el overlay (regla 4).
+ *
+ * El daño lleva su casilla para poder olvidarlo al descargar su chunk
+ * (`forgetUnloadedDamage`). Las ramas no son daño: se reponen con el tiempo, y
+ * se quedan aunque el chunk se descargue.
  */
 export class WorkState {
-  readonly damage = new Map<number, { feature: Feature; work: number; tick: number }>();
+  readonly damage = new Map<number, { feature: Feature; work: number; tick: number; x: number; y: number }>();
   readonly branches = new Map<number, { taken: number; tick: number }>();
+}
+
+/**
+ * Olvida el daño de los objetos cuyo chunk ya no esta cargado: **el daño no
+ * sobrevive a recargar el chunk**, decision del autor (2026-10-03) para todo
+ * lo que se golpea —plantas, bloques y animales—. `step` lo llama al podar
+ * chunks, como `syncFauna` olvida el de los animales al retirarlos.
+ */
+export function forgetUnloadedDamage(work: WorkState, world: World): void {
+  for (const [key, d] of work.damage) {
+    if (!world.isLoaded(toChunkCoord(d.x), toChunkCoord(d.y))) work.damage.delete(key);
+  }
 }
 
 /**
@@ -239,7 +256,7 @@ export function actionReach(world: World, store: EntityStore, id: number): Offse
  * alcance; ninguno si el terreno esta antes. Con su distancia desde los ojos,
  * que es donde acaba la estocada que lo dibuja.
  */
-export function preciseTarget(world: World, store: EntityStore, id: number): (Offset & { t: number }) | null {
+export function preciseTarget(world: World, store: EntityStore, id: number): (Offset & { t: number; at: Vec3 }) | null {
   return gazeTarget(
     eyeOf(store, id),
     store.facingX[id],
@@ -248,12 +265,6 @@ export function preciseTarget(world: World, store: EntityStore, id: number): (Of
     (x, y) => world.groundHeightAt(x, y),
     (tx, ty) => hitboxAt(world, tx, ty),
   );
-}
-
-/** Las casillas que alcanza el golpe preciso: una o ninguna. */
-export function preciseReach(world: World, store: EntityStore, id: number): Offset[] {
-  const t = preciseTarget(world, store, id);
-  return t ? [{ x: t.x, y: t.y }] : [];
 }
 
 /**
@@ -291,6 +302,12 @@ export interface Swing {
   broke: boolean;
   /** Los animales que alcanzo, y si murieron. */
   animals: AnimalHit[];
+  /**
+   * Donde toco el golpe cada cosa que se puede romper —feature o animal—: el
+   * punto de su caja que alcanzo su rayo mas corto. Ahi dibuja el cliente el
+   * impacto (pedido del autor, 2026-10-03).
+   */
+  impacts: Vec3[];
 }
 
 /** Un animal alcanzado por un golpe. */
@@ -334,7 +351,7 @@ function animalsInReach(
   id: number,
   animals: Iterable<number>,
   precise: boolean,
-): Array<{ id: number; t: number }> {
+): Array<{ id: number; t: number; at: Vec3 }> {
   const origin = eyeOf(store, id);
   const rays = precise
     ? (() => {
@@ -343,18 +360,22 @@ function animalsInReach(
         return [{ dir, length: hit ? hit.t : STRIKE_RANGE }];
       })()
     : strikeOf(world, store, id).rays;
-  const out: Array<{ id: number; t: number }> = [];
+  const out: Array<{ id: number; t: number; at: Vec3 }> = [];
   for (const a of animals) {
     const reach = STRIKE_RANGE + 2;
     if (Math.abs(store.x[a] - origin.x) > reach || Math.abs(store.y[a] - origin.y) > reach) continue;
     const box = animalBox(store, a);
     if (!box) continue;
     let best = Infinity;
+    let bestDir: Vec3 | null = null;
     for (const ray of rays) {
       const t = rayBox(origin, ray.dir, box, ray.length);
-      if (t !== null && t < best) best = t;
+      if (t !== null && t < best) {
+        best = t;
+        bestDir = ray.dir;
+      }
     }
-    if (best < Infinity) out.push({ id: a, t: best });
+    if (bestDir) out.push({ id: a, t: best, at: pointAlong(origin, bestDir, best) });
   }
   out.sort((p, q) => p.t - q.t);
   return out;
@@ -386,7 +407,6 @@ function hitAnimal(
   };
   if (left > 0) {
     store.health[a] = left;
-    world.setFaunaDamage(animal.key, store.maxHealth[a] - left);
     return { ...base, health: left, killed: false };
   }
   const loot = animalLoot(animal.species, animal.stage);
@@ -419,7 +439,7 @@ export function tryHarvestArea(
   precise = false,
   animals: Iterable<number> = [],
 ): Swing {
-  const swing: Swing = { results: [], hits: [], blocked: null, broke: false, animals: [] };
+  const swing: Swing = { results: [], hits: [], blocked: null, broke: false, animals: [], impacts: [] };
   const held = inventory.held();
   const stats = held === null ? null : toolStats(held);
   let useful = false;
@@ -427,14 +447,23 @@ export function tryHarvestArea(
   // Los animales, con el mismo golpe (regla 12). En preciso solo cuenta el
   // primer objetivo de la mira, sea un animal o un objeto del mundo.
   const beasts = animalsInReach(world, store, id, animals, precise);
-  let tiles = precise ? preciseReach(world, store, id) : actionReach(world, store, id);
-  if (precise && beasts.length > 0) {
+  let tiles: Array<Offset & { at: Vec3 }>;
+  if (precise) {
     const tile = preciseTarget(world, store, id);
-    if (tile && tile.t < beasts[0].t) beasts.length = 0;
-    else tiles = [];
-    beasts.length = Math.min(beasts.length, 1);
+    tiles = tile ? [tile] : [];
+    if (beasts.length > 0) {
+      if (tile && tile.t < beasts[0].t) beasts.length = 0;
+      else tiles = [];
+      beasts.length = Math.min(beasts.length, 1);
+    }
+  } else {
+    tiles = strikeOf(world, store, id).targets.slice();
   }
-  for (const { id: a } of beasts) {
+  for (const { id: a, at } of beasts) {
+    // El impacto, en el punto donde el golpe toca su caja: lo dibuja el
+    // cliente, y es lo unico que sale de un animal golpeado (decision del
+    // autor, 2026-10-03: sin fragmentos).
+    swing.impacts.push(at);
     const hit = hitAnimal(world, store, a, inventory, strikeDamage(stats));
     if (hit === 'full') {
       swing.blocked = 'full';
@@ -450,10 +479,12 @@ export function tryHarvestArea(
     if (stats) useful = true;
   }
 
-  for (const { x, y } of tiles) {
+  for (const { x, y, at } of tiles) {
     const feature = world.featureAt(x, y);
     const need = workOf(feature);
     if (!need) continue;
+    // Todo lo que el golpe toca y se puede romper da su impacto, se rompa o no.
+    swing.impacts.push(at);
 
     let power = 0;
     if (need.tool === ToolKind.Hand) power = 1;
@@ -478,7 +509,7 @@ export function tryHarvestArea(
     const key = tileKey(x, y);
     const done = damageAt(work, world, x, y, tick) + power;
     if (done < need.work) {
-      work.damage.set(key, { feature, work: done, tick });
+      work.damage.set(key, { feature, work: done, tick, x, y });
       swing.hits.push({ x, y, feature });
       continue;
     }
@@ -487,7 +518,7 @@ export function tryHarvestArea(
       swing.hits.push({ x, y, feature });
       // No cabe: el objeto se queda y su dano tambien, asi el siguiente golpe
       // lo termina en cuanto haya sitio.
-      work.damage.set(key, { feature, work: need.work, tick });
+      work.damage.set(key, { feature, work: need.work, tick, x, y });
       swing.blocked = 'full';
       continue;
     }

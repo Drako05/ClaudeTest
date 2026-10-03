@@ -1,6 +1,6 @@
 /**
- * Dibuja los efectos en 3D: el barrido del golpe y los escombros de lo
- * derribado.
+ * Dibuja los efectos en 3D: el barrido del golpe, el impacto donde toca, y los
+ * escombros de lo derribado.
  *
  * **Aqui solo se DIBUJA.** El movimiento —donde esta cada escombro, cuanto le
  * queda de vida, con que colores— sale entero de `client/effects.ts`, que es
@@ -37,8 +37,8 @@ import {
   Vector3,
   type Scene,
 } from 'three';
-import type { Effects, Particle, Slash } from './effects.js';
-import { MAX_PARTICLES, progressOf } from './effects.js';
+import type { Effects, Impact, Particle, Slash } from './effects.js';
+import { impactLook, MAX_PARTICLES, progressOf } from './effects.js';
 
 /** Opacidad de las esquirlas de golpe. **Propuesta mia.** */
 const CHIP_OPACITY = 0.45;
@@ -65,8 +65,37 @@ const OBJECT_SCALE = 2.3;
  */
 const SLASH_POOL = 8;
 
+/** Cuantos impactos pueden verse a la vez: un barrido alcanza a varias cosas. */
+const IMPACT_POOL = 12;
+
+/**
+ * La estrella de 4 puntas del impacto (elegida por el autor, 2026-10-03), de
+ * punta a punta 1, en el plano XY: ocho triangulos del centro a cada punta y a
+ * cada cintura. Se escala y se orienta al ojo por instancia.
+ */
+function starGeometry(): BufferGeometry {
+  const tip = 0.5;
+  const waist = 0.11;
+  const ring: Array<[number, number]> = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i * Math.PI) / 4;
+    const r = i % 2 === 0 ? tip : waist;
+    ring.push([Math.cos(a) * r, Math.sin(a) * r]);
+  }
+  const positions: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    const [x0, y0] = ring[i];
+    const [x1, y1] = ring[(i + 1) % 8];
+    positions.push(0, 0, 0, x0, y0, 0, x1, y1, 0);
+  }
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(new Float32Array(positions), 3));
+  return geometry;
+}
+
 export class EffectsView {
   private readonly slashes: Mesh[] = [];
+  private readonly impacts: Mesh[] = [];
   private readonly debris: InstancedMesh;
   private readonly chips: InstancedMesh;
   private readonly scratch = new Object3D();
@@ -90,8 +119,33 @@ export class EffectsView {
   debrisDrawn = 0;
   /** Esquirlas de golpe trazadas, acumulado maximo: gemelo de `debrisDrawn`. */
   chipsDrawn = 0;
+  /** Impactos trazados, acumulado de fotogramas: gemelo de `slashesDrawn`. */
+  impactsDrawn = 0;
 
   constructor(scene: Scene) {
+    // El impacto: un destello encima de lo golpeado, como el barrido, asi que
+    // sin prueba de profundidad. La geometria es fija —solo se escala y se
+    // orienta—, pero se mueve de punta a punta del mundo: sin recorte por el
+    // frustum, por la misma razon que el barrido.
+    const star = starGeometry();
+    for (let i = 0; i < IMPACT_POOL; i++) {
+      const mesh = new Mesh(
+        star,
+        new MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          depthWrite: false,
+          depthTest: false,
+          side: DoubleSide,
+        }),
+      );
+      mesh.visible = false;
+      mesh.renderOrder = 11;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      this.impacts.push(mesh);
+    }
+
     for (let i = 0; i < SLASH_POOL; i++) {
       const mesh = new Mesh(
         new BufferGeometry(),
@@ -162,8 +216,28 @@ export class EffectsView {
    */
   update(effects: Effects, world: World, eye: Vector3): void {
     this.drawSlashes(effects.slashes, world, eye);
+    this.drawImpacts(effects.impacts, eye);
     this.drawDebris(effects.particles.filter((p) => !p.chip), this.debris, false);
     this.drawDebris(effects.particles.filter((p) => p.chip), this.chips, true);
+  }
+
+  /** Cada impacto, de cara al ojo, con su tamano y su opacidad (`impactLook`). */
+  private drawImpacts(impacts: readonly Impact[], eye: Vector3): void {
+    for (let i = 0; i < this.impacts.length; i++) {
+      const mesh = this.impacts[i];
+      const impact = impacts[impacts.length - 1 - i];
+      if (!impact) {
+        mesh.visible = false;
+        continue;
+      }
+      const { size, alpha } = impactLook(impact);
+      mesh.position.set(impact.at.x, impact.at.y, impact.at.z);
+      mesh.lookAt(eye);
+      mesh.scale.setScalar(size);
+      (mesh.material as MeshBasicMaterial).opacity = alpha;
+      mesh.visible = alpha > 0;
+      if (mesh.visible) this.impactsDrawn++;
+    }
   }
 
   private drawSlashes(slashes: readonly Slash[], world: World, eye: Vector3): void {

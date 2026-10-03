@@ -30,7 +30,6 @@ import {
   MeshBasicMaterial,
   NearestFilter,
   Sprite,
-  SpriteMaterial,
   type Texture,
 } from 'three';
 import { Feature } from '@verdant/shared';
@@ -47,6 +46,7 @@ import {
 import { LOOKS } from './palette.js';
 import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
 import { TREE_SHAPES, treeShapeOf } from './tree-shapes.js';
+import { depthNearOf, depthSafeSpriteMaterial } from './sprite-depth.js';
 
 /** Las especies de arbol adulto, las que tienen forma propia. */
 const TREES = Object.keys(TREE_SHAPES).map(Number) as Feature[];
@@ -601,8 +601,19 @@ export class BillboardSet {
   }
 }
 
+/**
+ * El sprite de algo que se apoya en el suelo, con la profundidad de su cuerpo
+ * (`sprite-depth.ts`): pegado a una pared o a un tronco, no se mete detras. El
+ * sprite se coloca por su centro, que esta a `h/2 - lift` de los pies; el
+ * centro del cuerpo, a la mitad de lo que mide su dibujo. Se adelanta medio
+ * bloque, lo que queda por delante de su centro la cara de un bloque al que se
+ * arrima, y mas que su cuerpo (`BODY_RADIUS`, 0,34). **Deduccion mia.**
+ */
 function place(art: Billboard, wx: number, height: number, wy: number): Sprite {
-  const sprite = new Sprite(new SpriteMaterial({ map: art.texture, transparent: true }));
+  const toCore = art.visible / 2 - (art.h / 2 - art.lift);
+  const sprite = new Sprite(
+    depthSafeSpriteMaterial({ map: art.texture, transparent: true }, toCore, depthNearOf(0.5, 0.34)),
+  );
   sprite.scale.set(art.w, art.h, 1);
   sprite.userData.lift = art.lift;
   sprite.position.set(wx, height + art.h / 2 - art.lift, wy);

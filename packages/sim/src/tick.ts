@@ -15,6 +15,7 @@ import { autoJumpDue } from './systems/autojump.js';
 import { spendJump, updateSurvival } from './systems/survival.js';
 import {
   craftNear,
+  forgetUnloadedDamage,
   tryHarvestArea,
   tryUse,
   WorkState,
@@ -28,6 +29,7 @@ import {
 } from './systems/gathering.js';
 import { Inventory } from './inventory.js';
 import { toChunkCoord, World } from './world.js';
+import type { Vec3 } from './aim.js';
 import { settleFauna, stepFauna, syncFauna, type FaunaIndex } from './systems/wander.js';
 
 /** Radio de chunks mantenidos cargados alrededor del jugador. */
@@ -84,6 +86,8 @@ export interface GameState {
   readonly fauna: FaunaIndex;
   /** Lo que golpeo el ultimo golpe en animales vivos, y los que mato. */
   lastAnimalHits: AnimalHit[];
+  /** Donde toco el ultimo golpe cada cosa que se puede romper: el impacto. */
+  lastImpacts: Vec3[];
 }
 
 /**
@@ -123,6 +127,7 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     survivalFrozen: false,
     fauna: new Map(),
     lastAnimalHits: [],
+    lastImpacts: [],
   };
 
   streamChunks(state);
@@ -143,6 +148,10 @@ function streamChunks(state: GameState): void {
   const wy = cy * CHUNK_SIZE;
   world.ensureAround(wx, wy, STREAM_RADIUS_CHUNKS);
   world.pruneFar(wx, wy, PRUNE_RADIUS_CHUNKS);
+  // El daño no sobrevive a recargar el chunk (decision del autor, 2026-10-03):
+  // el de lo que se acaba de descargar se olvida, y la fauna que se retira
+  // vuelve entera.
+  forgetUnloadedDamage(state.work, world);
   syncFauna(world, entities, state.fauna, entities.x[playerId], entities.y[playerId], state.tick);
 }
 
@@ -158,6 +167,7 @@ export function step(state: GameState, intent: Intent): void {
   state.lastBroke = false;
   state.lastCrafted = -1;
   state.lastAnimalHits = [];
+  state.lastImpacts = [];
 
   // El tiempo avanza antes que nada: el resto del tick actua sobre el mundo tal
   // y como esta AHORA, con la vegetacion ya puesta al dia.
@@ -230,6 +240,7 @@ export function step(state: GameState, intent: Intent): void {
       state.lastBlocked = swing.blocked;
       state.lastBroke = swing.broke;
       state.lastAnimalHits = swing.animals;
+      state.lastImpacts = swing.impacts;
       // Lo que murio deja de ser una entidad: su muerte ya esta en el overlay.
       for (const hit of swing.animals) {
         if (!hit.killed) continue;

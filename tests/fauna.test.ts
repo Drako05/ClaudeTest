@@ -25,6 +25,8 @@ import {
   emptyIntent,
   foodValue,
   hitPointsOf,
+  LifeKind,
+  lifeKindOf,
   meatOf,
   RECIPES,
   Resource,
@@ -271,19 +273,54 @@ describe('Fauna: deambular', () => {
 });
 
 describe('Fauna: cazar', () => {
-  it('golpear quita PV, y el daño sigue ahi aunque el chunk se descargue', () => {
+  it('golpear quita PV, y al recargar su chunk vuelve entero', () => {
+    // El daño no sobrevive a recargarse (decision del autor, 2026-10-03); lo
+    // que si sobrevive es la muerte (el test siguiente).
     const state = createGame(1);
     const id = someAnimal(state, (a) => state.entities.maxHealth[a] > 30);
     const key = state.entities.animal[id]!.key;
+    const full = state.entities.maxHealth[id];
     step(state, aimAt(state, id));
-    const hurt = state.entities.health[id];
-    expect(hurt).toBe(state.entities.maxHealth[id] - 5);
+    expect(state.entities.health[id]).toBe(full - 5);
     expect(state.lastAnimalHits.map((h) => h.key)).toEqual([key]);
 
     travelAndBack(state);
     const again = state.fauna.get(key)!;
     expect(again).toBeDefined();
-    expect(state.entities.health[again]).toBe(hurt);
+    expect(state.entities.health[again]).toBe(full);
+  });
+
+  it('el daño de un arbol se olvida al descargar su chunk, y no antes', () => {
+    const state = createGame(1);
+    state.inventory.add(Resource.StoneAxe, 1);
+    state.inventory.select(0);
+    const { entities, playerId, world } = state;
+    // El primer arbol de alrededor del nacimiento, golpeado una vez.
+    let tree: { x: number; y: number } | null = null;
+    const px = Math.floor(entities.x[playerId]);
+    const py = Math.floor(entities.y[playerId]);
+    for (let r = 1; r < 12 && !tree; r++) {
+      for (let dy = -r; dy <= r && !tree; dy++) {
+        for (let dx = -r; dx <= r; dx++) {
+          if (lifeKindOf(world.featureAt(px + dx, py + dy)) === LifeKind.Tree) {
+            tree = { x: px + dx, y: py + dy };
+            break;
+          }
+        }
+      }
+    }
+    expect(tree).not.toBeNull();
+    const work = state.work;
+    work.damage.set(tree!.y * 100003 + tree!.x, {
+      feature: world.featureAt(tree!.x, tree!.y), work: 1, tick: state.tick, x: tree!.x, y: tree!.y,
+    });
+    // Un paso quieto, sin cambiar de chunk: sigue ahi.
+    step(state, emptyIntent());
+    expect(work.damage.size).toBe(1);
+    // Ir lejos descarga su chunk: se olvida.
+    entities.x[playerId] += 40 * CHUNK_SIZE;
+    step(state, emptyIntent());
+    expect(work.damage.size).toBe(0);
   });
 
   it('matarlo da su botin entero, y lo que muere no vuelve', () => {
@@ -304,6 +341,26 @@ describe('Fauna: cazar', () => {
 
     travelAndBack(state);
     expect(state.fauna.has(animal.key)).toBe(false);
+  });
+
+  it('el impacto cae sobre la caja de lo golpeado, uno por objetivo, en preciso y en barrido', () => {
+    const near = (p: { x: number; y: number; z: number }, box: ReturnType<typeof animalBox>) =>
+      !!box &&
+      p.x >= box.x0 - 1e-6 && p.x <= box.x1 + 1e-6 &&
+      p.y >= box.y0 - 1e-6 && p.y <= box.y1 + 1e-6 &&
+      p.z >= box.z0 - 1e-6 && p.z <= box.z1 + 1e-6;
+    for (const precise of [true, false]) {
+      const state = createGame(1);
+      const id = someAnimal(state, (a) => state.entities.maxHealth[a] > 30);
+      const intent = { ...aimAt(state, id), precise };
+      step(state, intent);
+      const box = animalBox(state.entities, id);
+      const hit = state.lastAnimalHits.find((h) => h.id === id);
+      expect(hit, `modo ${precise ? 'preciso' : 'barrido'}`).toBeDefined();
+      // Uno por cosa golpeada: animales y objetos del mundo.
+      expect(state.lastImpacts.length).toBe(state.lastAnimalHits.length + state.lastHits.length + state.lastHarvest.filter((r) => r.felled).length);
+      expect(state.lastImpacts.some((p) => near(p, box))).toBe(true);
+    }
   });
 
   it('con el inventario lleno el golpe que mataria no completa, y el animal sigue', () => {

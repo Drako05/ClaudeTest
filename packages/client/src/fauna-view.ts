@@ -11,8 +11,9 @@
  * pasean a un bloque por segundo y el salto entre ticks no se ve.
  */
 
-import { CanvasTexture, NearestFilter, Sprite, SpriteMaterial, type Scene } from 'three';
-import { animalHeight, SPECIES_COUNT, STAGE_COUNT, type Species, type Stage } from '@verdant/shared';
+import { CanvasTexture, NearestFilter, Sprite, type SpriteMaterial, type Scene } from 'three';
+import { animalHalf, animalHeight, SPECIES_COUNT, STAGE_COUNT, type Species, type Stage } from '@verdant/shared';
+import { depthNearOf, depthSafeSpriteMaterial } from './sprite-depth.js';
 import type { EntityStore } from '@verdant/sim';
 import { makeAnimalArt } from './fauna-art.js';
 
@@ -51,6 +52,29 @@ function inkRows(canvas: HTMLCanvasElement, footRow: number): number {
   return 0;
 }
 
+/** Cuanto mide de ancho la tinta del lienzo, en pixeles: el largo del animal dibujado. */
+function inkColumns(canvas: HTMLCanvasElement): number {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return 0;
+  let data: Uint8ClampedArray;
+  try {
+    data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  } catch {
+    return 0;
+  }
+  let min = canvas.width;
+  let max = -1;
+  for (let y = 0; y < canvas.height; y++) {
+    for (let x = 0; x < canvas.width; x++) {
+      if (data[(y * canvas.width + x) * 4 + 3] > 100) {
+        if (x < min) min = x;
+        if (x > max) max = x;
+      }
+    }
+  }
+  return max >= min ? max - min + 1 : 0;
+}
+
 function lookOf(species: Species, stage: Stage): AnimalLook | null {
   const art = makeAnimalArt(species, stage, DETAIL);
   if (!art) return null;
@@ -71,9 +95,15 @@ function lookOf(species: Species, stage: Stage): AnimalLook | null {
   const foot = art.anchorY * art.canvas.height;
   const ink = inkRows(art.canvas, foot) || art.figure * DETAIL;
   const perPx = animalHeight(species, stage) / ink;
+  // Con la profundidad del cuerpo: pegado a una pared o a un tronco, no se
+  // mete detras (`sprite-depth.ts`). El centro, a medio alto de los pies, y
+  // adelantado medio LARGO de su dibujo: es lo que la lamina sobresale de lado,
+  // y lo que este a menos de eso no debe taparlo.
+  const lift = animalHeight(species, stage) / 2;
+  const near = depthNearOf((inkColumns(art.canvas) * perPx) / 2, animalHalf(species, stage));
   return {
-    right: new SpriteMaterial({ map: tex(false), transparent: true, alphaTest: 0.4 }),
-    left: new SpriteMaterial({ map: tex(true), transparent: true, alphaTest: 0.4 }),
+    right: depthSafeSpriteMaterial({ map: tex(false), transparent: true, alphaTest: 0.4 }, lift, near),
+    left: depthSafeSpriteMaterial({ map: tex(true), transparent: true, alphaTest: 0.4 }, lift, near),
     w: art.canvas.width * perPx,
     h: art.canvas.height * perPx,
     ax: art.anchorX,

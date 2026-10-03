@@ -4,9 +4,10 @@
  * **La fauna es potencial del chunk, como sus plantas** (plan aprobado por el
  * autor, 2026-10-02). `faunaOf` es pura —reglas 2 y 3—: el mismo chunk da los
  * mismos animales, en cualquier orden y por mucho que se descarte y se
- * regenere. Lo que se les hace —el daño y la muerte— no vive aqui sino en el
- * overlay de `World`, por la clave de cada animal (regla 4): un animal muerto
- * no vuelve nunca, que es la ley de que la vida no surge sola.
+ * regenere. Su muerte no vive aqui sino en el overlay de `World`, por la clave
+ * de cada animal (regla 4): un animal muerto no vuelve nunca, que es la ley de
+ * que la vida no surge sola. Su daño, en cambio, se olvida al recargarse
+ * (decision del autor, 2026-10-03).
  *
  * **Donde esta un animal es funcion del tiempo.** Cada uno tiene un territorio
  * alrededor de su casilla de origen, y en cada periodo de paseo un punto de

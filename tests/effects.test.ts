@@ -4,6 +4,9 @@ import { EYE_HEIGHT, STRIKE_RANGE, strike } from '@verdant/sim';
 import {
   DEBRIS_PER_BURST,
   Effects,
+  IMPACT_SECONDS,
+  IMPACT_SIZE_FROM,
+  impactLook,
   MAX_PARTICLES,
   progressOf,
   SLASH_SECONDS,
@@ -261,6 +264,26 @@ describe('Un efecto nace y se ve, por lento que vaya el fotograma', () => {
     // Y no es inmortal: al siguiente paso se apaga como siempre.
     effects.advance(0.84);
     expect(effects.slashes).toHaveLength(0);
+  });
+
+  it('el impacto tambien: nace, sobrevive al primer fotograma, crece, se apaga y muere', () => {
+    const effects = new Effects();
+    effects.spawnImpact({ x: 1, y: 2, z: 3 });
+    effects.advance(0.84);
+    expect(effects.impacts).toHaveLength(1);
+    const born = impactLook(effects.impacts[0]);
+    expect(born.alpha).toBe(1);
+    expect(born.size).toBeCloseTo(IMPACT_SIZE_FROM, 6);
+    effects.advance(IMPACT_SECONDS / 2);
+    const mid = impactLook(effects.impacts[0]);
+    expect(mid.size).toBeGreaterThan(born.size);
+    expect(mid.alpha).toBeLessThan(1);
+    effects.advance(IMPACT_SECONDS);
+    expect(effects.impacts).toHaveLength(0);
+    // Y se va con el mundo: reiniciar no deja impactos del anterior.
+    effects.spawnImpact({ x: 0, y: 0, z: 0 });
+    effects.clear();
+    expect(effects.impacts).toHaveLength(0);
   });
 
   it('los escombros tambien, que caducan mas tarde pero caducan', () => {

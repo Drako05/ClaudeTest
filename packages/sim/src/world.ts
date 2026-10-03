@@ -145,12 +145,12 @@ export class World {
    */
   private readonly facings = new Map<string, number>();
   /**
-   * El overlay de la fauna (regla 4), por la clave de cada animal: los PV que
-   * ha perdido y los que han muerto. El animal es potencial de su chunk
-   * (`faunaOf`); esto es lo unico que le pasa, y sobrevive a que el chunk se
-   * descarte. Un muerto no vuelve nunca: la vida no surge sola.
+   * El overlay de la fauna (regla 4), por la clave de cada animal: los que han
+   * muerto. El animal es potencial de su chunk (`faunaOf`), y su muerte
+   * sobrevive a que el chunk se descarte: un muerto no vuelve nunca, la vida no
+   * surge sola. El daño, en cambio, no se guarda aqui: vive en la entidad y se
+   * olvida al retirarla (decision del autor, 2026-10-03).
    */
-  private readonly faunaDamage = new Map<string, number>();
   private readonly faunaDead = new Set<string>();
   /** Los animales de cada chunk cargado. Cache: `faunaOf` es pura. */
   private readonly faunaCache = new Map<string, Animal[]>();
@@ -277,15 +277,6 @@ export class World {
     return animals;
   }
 
-  /** Los PV que ha perdido un animal. */
-  faunaDamageOf(key: string): number {
-    return this.faunaDamage.get(key) ?? 0;
-  }
-
-  setFaunaDamage(key: string, damage: number): void {
-    this.faunaDamage.set(key, damage);
-  }
-
   isFaunaDead(key: string): boolean {
     return this.faunaDead.has(key);
   }
@@ -293,11 +284,15 @@ export class World {
   /** Mata a un animal para siempre. */
   killFauna(key: string): void {
     this.faunaDead.add(key);
-    this.faunaDamage.delete(key);
   }
 
   eachLoadedChunk(fn: (chunk: Chunk) => void): void {
     for (const chunk of this.chunks.values()) fn(chunk);
+  }
+
+  /** True si el chunk esta cargado ahora (no solo contabilizado). */
+  isLoaded(cx: number, cy: number): boolean {
+    return this.chunks.has(chunkKey(cx, cy));
   }
 
   /** True si el chunk ha llegado a generarse alguna vez. */
