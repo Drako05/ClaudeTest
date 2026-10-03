@@ -63,7 +63,9 @@ Decisiones del autor, que no se tocan sin preguntarle:
   y al menos 150 ms para que un toque rapido se vea.
 - **Al golpear algo que no se rompe salen esquirlas**, mas pequenas, poco
   saturadas y semitransparentes que los escombros de romperlo (`spawnChips`,
-  con `state.lastHits` del nucleo), y **no hay barra de progreso**.
+  con `state.lastHits` del nucleo), y **no hay barra de progreso**. Desde el
+  2026-10-03, ademas, todo golpe a algo que se puede romper deja su **impacto**
+  donde toca (`docs/efectos.md`); los animales, solo el impacto.
 - **La roca a mano no da nada**: la primera piedra son **guijarros** sueltos
   en el suelo, una feature inerte y finita que no estorba el paso.
 - Lo basico se fabrica a mano en cualquier sitio; lo mejor, en la **mesa de
@@ -87,8 +89,11 @@ Lo que el codigo tiene que respetar:
   cuanto haya sitio. Nada se reparte a medias ni se pierde.
 - **El dano acumulado y las ramas arrancadas viven en `WorkState`**, fuera del
   chunk como el overlay (regla 4). El dano se pierde a los `DAMAGE_DECAY_TICKS`
-  sin golpear; las ramas se reponen **por el tiempo transcurrido**, no por
-  pasos, asi que vivirlo y saltarlo con `skipTime` da lo mismo (hay test).
+  sin golpear, y tambien **al descargarse su chunk** (`forgetUnloadedDamage`,
+  decision del autor, 2026-10-03: el dano no sobrevive a recargar el chunk, sea
+  de una planta, un bloque o un animal); las ramas no son dano: se reponen
+  **por el tiempo transcurrido**, no por pasos, asi que vivirlo y saltarlo con
+  `skipTime` da lo mismo (hay test), y se quedan aunque el chunk se descargue.
 - **`harvestTile` es la primitiva que completa**, sin golpes ni herramientas;
   la usan `tryHarvestArea` y los tests del ecosistema.
 - **Las estaciones viven en el overlay** (regla 4): el mundo no las genera

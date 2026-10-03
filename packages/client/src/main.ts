@@ -29,7 +29,6 @@ import {
   MeshBasicMaterial,
 } from 'three';
 import {
-  animalHeight,
   BIOME_NAMES,
   CHUNK_SIZE,
   Feature,
@@ -68,7 +67,8 @@ import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { FaunaView } from './fauna-view.js';
-import { animalPalette, faunaGallery } from './fauna-art.js';
+import { faunaGallery } from './fauna-art.js';
+import { spriteDepthProbe } from './sprite-depth-probe.js';
 import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
 import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
@@ -918,17 +918,12 @@ function frame(now: number): void {
         box ? box.z1 - box.z0 : 1,
       );
     }
-    // Un animal golpeado suelta esquirlas de sus colores, y al morir, su
-    // estallido, como lo que se rompe.
-    for (const hit of state.lastAnimalHits) {
-      const colors = animalPalette(hit.species);
-      if (hit.killed) {
-        animalsKilled++;
-        effects.spawnDebris(hit.x - 0.5, hit.y - 0.5, colors, hit.z);
-      } else {
-        effects.spawnChips(hit.x - 0.5, hit.y - 0.5, colors, hit.z, animalHeight(hit.species, hit.stage));
-      }
-    }
+    // El impacto, donde el golpe toco cada cosa que se puede romper (pedido
+    // del autor, 2026-10-03). Del nucleo al mundo de three.js: `y` arriba.
+    for (const p of state.lastImpacts) effects.spawnImpact({ x: p.x, y: p.z, z: p.y });
+    // Un animal no suelta fragmentos, ni golpeado ni al morir (decision del
+    // autor, 2026-10-03): solo su impacto.
+    for (const hit of state.lastAnimalHits) if (hit.killed) animalsKilled++;
     for (const hit of state.lastHarvest) {
       // La rama de un arbol a mano no lo derriba: sus esquirlas ya salieron.
       if (!hit.felled) continue;
@@ -1125,6 +1120,8 @@ Object.defineProperty(window, '__verdant', {
       slashesDrawn: effectsView.slashesDrawn,
       debrisDrawn: effectsView.debrisDrawn,
       chipsDrawn: effectsView.chipsDrawn,
+      /** Impactos trazados, acumulado de fotogramas. Ver `EffectsView`. */
+      impactsDrawn: effectsView.impactsDrawn,
       effects: effects.tally,
       /** Lo que mide cada cosa en BLOQUES, medido del dibujo. Ver `BillboardSet`. */
       sizes: billboards.sizes,
@@ -1162,6 +1159,8 @@ Object.defineProperty(window, '__verdant', {
       faunaSizes: faunaView.sizes,
       /** Las diez especies en sus tres etapas, en un lienzo: para mirar el dibujo. */
       faunaGallery: () => faunaGallery(),
+      /** Cuanto se ve de un sprite pegado de lado a un bloque y con uno delante. */
+      spriteDepthProbe: () => spriteDepthProbe(),
       facing: [e.facingX[id], e.facingY[id]],
       /** Hacia donde mira la camara, que es de donde sale la mirada. */
       aim: [camera.forward().x, camera.forward().y],

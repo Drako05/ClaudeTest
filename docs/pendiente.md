@@ -37,7 +37,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Fauna: el **botin** — carne 0,6 × √(masa), piel 1 (2 el bisonte adulto, ninguna la cria), plumas 1-3, caparazon 1; el cangrejo no da carne | `docs/fauna.md`, botin | numeros en `animalLoot` |
 | Fauna: **asar** 2 de carne cruda + 1 de carbon da 2 de asada; la asada llena **35** de hambre | `docs/fauna.md`, botin | dos numeros |
 | Fauna: el **paseo** — un punto de paso cada 20 s, territorio de 6 a 16 casillas, de 0,6 a 1,2 bloques por segundo, sin salir de su bioma y sin chocar con nadie | `docs/fauna.md`, la ley del observador | numeros en `SPECIES` |
-| Fauna: **los animales no se curan** en esta tanda | `docs/fauna.md`, el sistema de PV | una regla |
+| Fauna: **los animales no se curan** mientras estan cerca (al recargarse si: tu decision) | `docs/fauna.md`, el sistema de PV | una regla |
+| El **impacto**: estrella de 0,18 a 0,42 bloques en 0,2 s, blanca y sin prueba de profundidad | `docs/efectos.md`, el impacto | tres numeros |
+| La **profundidad de los sprites**: el centro del cuerpo adelantado medio largo de su dibujo (el jugador, medio bloque) | `docs/fauna.md`, el dibujo no se mete detras | un numero |
 | Fauna: el **ciervo adulto se dibuja sin astas**, porque el dibujo aun no distingue sexos | `docs/fauna.md`, las especies | un dibujo |
 | Fauna: los **dibujos y colores** de las diez especies y sus crias; el **alto minimo** de 0,22 bloques (el cangrejo); el medio ancho de cada caja | `docs/fauna.md`, las especies | dibujo y numeros |
 | `GRAVITY = 62` y `JUMP_SPEED = 12`, deducidos de tu enunciado del salto | Fase 2 del relieve | dos numeros |
@@ -533,6 +535,29 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Fauna, ajustes: el daño se olvida, impacto, sprites enteros — HECHO (2026-10-03)
+
+Tres ajustes tuyos tras probar la primera tanda:
+- **El daño no se mantiene al recargar**, para todo lo que se golpea.
+  - El animal vuelve entero al retirarse y volver: su daño ya no esta en el
+    overlay, solo su muerte.
+  - Plantas y bloques lo olvidan al descargarse su chunk
+    (`forgetUnloadedDamage`).
+  - Las ramas arrancadas no son daño y se quedan.
+- **Los animales no sueltan fragmentos**, tampoco al morir (lo elegiste).
+  - A cambio, todo golpe a algo que se puede romper deja un **impacto**: la
+    estrella de 4 puntas que elegiste, donde el golpe toca.
+  - El punto lo da el nucleo, con la misma cuenta que decide que cae.
+- **El sprite no se mete detras de lo que tiene al lado**, y el del jugador
+  tampoco (lo elegiste).
+  - La lamina entera toma la profundidad del centro del cuerpo, adelantado
+    medio largo de su dibujo.
+  - Al proponerlo dije «medio ancho de la caja»; al medirlo no bastaba. La cara
+    de un bloque al que se arrima queda medio bloque por delante del centro, y
+    la lamina sobresale medio largo del dibujo, que es mucho mas que el cuerpo.
+  - Medido en una escena minima: pegado de lado a un bloque se ve el 100 %, y
+    con un bloque delante, el 0 %.
 
 ## Fauna, primera tanda: diez especies que deambulan — HECHO (2026-10-02)
 

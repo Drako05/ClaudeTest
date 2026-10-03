@@ -190,8 +190,16 @@ export function rayBox(origin: Vec3, dir: Vec3, box: Hitbox, maxT: number): numb
 export interface Strike {
   /** Cada rayo del sector, de derecha a izquierda, y hasta donde llega. */
   readonly rays: ReadonlyArray<{ dir: Vec3; length: number }>;
-  /** Las casillas de los objetos tocados, del mas cercano al mas lejano. */
-  readonly targets: ReadonlyArray<Offset & { t: number }>;
+  /**
+   * Las casillas de los objetos tocados, del mas cercano al mas lejano, con la
+   * distancia y el punto donde los toca su rayo mas corto: ahi va el impacto.
+   */
+  readonly targets: ReadonlyArray<Offset & { t: number; at: Vec3 }>;
+}
+
+/** El punto a `t` de `origin` a lo largo de `dir`. */
+export function pointAlong(origin: Vec3, dir: Vec3, t: number): Vec3 {
+  return { x: origin.x + dir.x * t, y: origin.y + dir.y * t, z: origin.z + dir.z * t };
 }
 
 /**
@@ -217,17 +225,21 @@ export function strike(
   const reach = Math.ceil(STRIKE_RANGE) + 1;
   const cx = Math.floor(origin.x);
   const cy = Math.floor(origin.y);
-  const targets: Array<Offset & { t: number }> = [];
+  const targets: Array<Offset & { t: number; at: Vec3 }> = [];
   for (let ty = cy - reach; ty <= cy + reach; ty++) {
     for (let tx = cx - reach; tx <= cx + reach; tx++) {
       const box = boxAt(tx, ty);
       if (!box) continue;
       let best = Infinity;
+      let bestDir: Vec3 | null = null;
       for (const ray of rays) {
         const t = rayBox(origin, ray.dir, box, ray.length);
-        if (t !== null && t < best) best = t;
+        if (t !== null && t < best) {
+          best = t;
+          bestDir = ray.dir;
+        }
       }
-      if (best < Infinity) targets.push({ x: tx, y: ty, t: best });
+      if (bestDir) targets.push({ x: tx, y: ty, t: best, at: pointAlong(origin, bestDir, best) });
     }
   }
   targets.sort((a, b) => a.t - b.t || a.y - b.y || a.x - b.x);
@@ -247,20 +259,20 @@ export function gazeTarget(
   lookZ: number,
   ground: Ground,
   boxAt: (tx: number, ty: number) => Hitbox | null,
-): (Offset & { t: number }) | null {
+): (Offset & { t: number; at: Vec3 }) | null {
   const dir = lookVector(fx, fy, lookZ);
   const hit = groundHit(origin, dir, STRIKE_RANGE, ground);
   const length = hit ? hit.t : STRIKE_RANGE;
   const reach = Math.ceil(STRIKE_RANGE) + 1;
   const cx = Math.floor(origin.x);
   const cy = Math.floor(origin.y);
-  let best: (Offset & { t: number }) | null = null;
+  let best: (Offset & { t: number; at: Vec3 }) | null = null;
   for (let ty = cy - reach; ty <= cy + reach; ty++) {
     for (let tx = cx - reach; tx <= cx + reach; tx++) {
       const box = boxAt(tx, ty);
       if (!box) continue;
       const t = rayBox(origin, dir, box, length);
-      if (t !== null && (best === null || t < best.t)) best = { x: tx, y: ty, t };
+      if (t !== null && (best === null || t < best.t)) best = { x: tx, y: ty, t, at: pointAlong(origin, dir, t) };
     }
   }
   return best;

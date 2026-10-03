@@ -54,8 +54,15 @@ Lo marcado *(deduccion)* es mio y esta en «Esperando tu juicio» de
   o hierro, valga el hacha o el pico (`strikeDamage`);
 - golpear un animal **gasta un uso** de la herramienta.
 
-Los animales **no se curan** en esta tanda *(deduccion)*. Su daño persiste
-aunque se descargue su chunk.
+Los animales **no se curan** mientras estan cerca *(deduccion)*, pero **el
+daño no sobrevive a recargarse** (decision del autor, 2026-10-03): un animal
+que se retira al alejarse el jugador (`FAUNA_RADIUS_CHUNKS`) vuelve entero.
+Vale para todo lo que se golpea: las plantas y los bloques olvidan su daño al
+descargarse su chunk (`forgetUnloadedDamage`, ver `docs/recoleccion.md`).
+
+**Al golpearlos no saltan fragmentos**, ni al matarlos (decision del autor,
+2026-10-03): solo el **impacto**, el destello en estrella que sale donde el
+golpe toca cualquier cosa que se puede romper (`docs/efectos.md`).
 
 ## Las especies
 
@@ -271,8 +278,8 @@ Interpretacion mia, aprobada con el plan:
   - `faunaOf` es pura (reglas 2 y 3): el mismo chunk da los mismos animales en
     cualquier orden.
   - Cada animal tiene una clave estable, `cx,cy,n`.
-- **Lo que se les hace va al overlay** (regla 4): el daño y la muerte, por clave,
-  en `World`.
+- **Su muerte va al overlay** (regla 4), por clave, en `World`. Su daño no:
+  vive en la entidad y se olvida al retirarla (decision del autor, 2026-10-03).
   - **Un animal muerto no vuelve nunca**, ni regenerando su chunk ni pasando el
     tiempo: es la ley «las entidades vivas no surgen automaticamente». Sin
     reproduccion, la fauna solo puede ir a menos.
@@ -304,6 +311,27 @@ Interpretacion mia, aprobada con el plan:
     pared, igual que un brote solo sale en el suyo (regla 10);
   - no chocan entre ellos ni con el jugador.
 
+## El dibujo no se mete detras de lo que tiene al lado
+
+Lo vio el autor (2026-10-03): un animal pegado a una pared o a un tronco se
+metia detras. Es el billboard: una lamina plana de cara a la camara, que
+sobresale de lado medio largo del dibujo —un bisonte mide 2,6 de largo con un
+cuerpo de colision de 0,34 de radio— y se clava en el bloque de al lado, cuya
+cara la tapa.
+
+- **La lamina entera toma la profundidad de un solo punto** (`sprite-depth.ts`):
+  el centro del cuerpo, a medio alto de los pies, adelantado hacia la camara
+  **medio largo de su dibujo** (`depthNearOf`, *deduccion*).
+- Lo que este a menos de eso no lo tapa; lo que este mas cerca de la camara
+  —un arbol entre ella y el animal— lo sigue tapando.
+- Se hace reescribiendo una linea del vertex shader del sprite de three.js
+  0.170. Si una version nueva la cambia, se avisa en consola y el humo falla.
+- **El jugador tambien** (decision del autor), adelantado medio bloque
+  *(deduccion)*.
+- **Medido** (`spriteDepthProbe`): pegado de lado a un bloque se ve el 100 %
+  del sprite, contra unos dos tercios sin el arreglo; con un bloque delante,
+  el 0 %.
+
 ## Lo que mide cada prueba
 
 - **`tests/fauna.test.ts`** mide:
@@ -312,7 +340,8 @@ Interpretacion mia, aprobada con el plan:
   - que la generacion es pura y salen las densidades, etapas y sexos;
   - que andan y nunca pisan otro bioma;
   - visto o saltado, el mismo punto de paso;
-  - el daño que persiste al descargar el chunk;
+  - el daño que se olvida al recargar: el del animal y el de un arbol;
+  - el impacto, sobre la caja de lo golpeado, uno por objetivo;
   - que lo muerto no vuelve;
   - que con el inventario lleno el golpe que mataria no completa.
 - **`tests/world-laws.test.ts`**: que la fauna no reaparece, y el destino de
@@ -322,5 +351,7 @@ Interpretacion mia, aprobada con el plan:
   - cada dibujo mide su caja;
   - deambulan;
   - una presa se caza con el raton y el clic, suelta carne cruda y deja
-    esquirlas y escombros.
+    impactos, sin una sola esquirla ni escombro;
+  - con `spriteDepthProbe`, que un sprite pegado de lado a un bloque se ve
+    entero y uno con un bloque delante sigue tapado.
 - **La pasada `stations`** asa en el horno y come la carne asada.

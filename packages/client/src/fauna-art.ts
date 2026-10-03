@@ -393,16 +393,3 @@ export function faunaGallery(scale = 3): string {
   }
   return canvas.toDataURL('image/png');
 }
-
-/**
- * Los colores de cada especie, para las esquirlas al golpearla y los
- * escombros al morir: los mismos del dibujo, como pide el autor para todo lo
- * que se rompe.
- */
-export function animalPalette(species: Species): number[] {
-  const hex = (s: string) => Number.parseInt(s.slice(1), 16);
-  if (species === Species.Gull) return ['#f6f6f2', '#9aa4ac', '#18181a'].map(hex);
-  if (species === Species.Crab) return ['#4a6a2a', '#2e4418', '#c8a050'].map(hex);
-  const q = ADULT[species]!;
-  return [q.coat, q.dark, q.belly].map(hex);
-}

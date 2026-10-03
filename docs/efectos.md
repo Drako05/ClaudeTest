@@ -1,7 +1,7 @@
 # Efectos visuales
 
 Lee esto antes de tocar `effects.ts`, `effects-view.ts`, el barrido, la
-estocada, los escombros o las esquirlas, o una medida de «se ve».
+estocada, el impacto, los escombros o las esquirlas, o una medida de «se ve».
 
 Estaba en `CLAUDE.md` hasta el 2026-10-02 y se mudo aqui **literal** (propuesta 3:
 `CLAUDE.md` se carga entero en cada turno, asi que lleva solo lo operativo y
@@ -122,3 +122,24 @@ el trazo perfectamente visible en la esquina. En primera persona mide ahora el
 ancho entero sin las franjas de botones, y da 9.000-19.000 en los cuatro rumbos.
 (Antes de que el barrido fuera delante de la mirada habia otro cero de mentira:
 rumbos donde solo se alcanzaba la casilla propia y no habia arco que trazar.)
+
+## El impacto (2026-10-03)
+
+Pedido del autor: «una animacion sencilla de impacto que se usara en el punto
+donde el player golpee cualquier cosa destruible». Eligio el destello en
+estrella entre tres propuestas.
+
+- **Donde**: el nucleo da el punto. `strike` y `gazeTarget` guardan en cada
+  objetivo donde lo toca su rayo mas corto (`at`), y `Swing.impacts` (en el
+  estado, `lastImpacts`) lleva uno por cada cosa golpeada que se puede romper,
+  feature o animal, se rompa o no. Es la misma cuenta que decide que cae: no se
+  recalcula nada en el cliente.
+- **Como**: una estrella blanca de 4 puntas, de cara al ojo, que crece de 0,18
+  a 0,42 bloques mientras se apaga en 0,2 s (`IMPACT_SECONDS`,
+  `impactLook`; tamanos y duracion, *deduccion mia*). Va sin prueba de
+  profundidad, como el barrido: es un destello encima de lo golpeado.
+- Tiene la misma garantia que el barrido, sobrevivir a su primer `advance`
+  (`tests/effects.test.ts`), y su acumulador de dibujados, `impactsDrawn`.
+- **Los animales no sueltan fragmentos**, ni golpeados ni al morir (decision
+  del autor, 2026-10-03): solo el impacto. Las features conservan sus esquirlas
+  y sus escombros.

@@ -545,6 +545,8 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  inventario tras recolectar: ${JSON.stringify(gathered.inventory)}`);
   check(sum(gathered.inventory) > 0, 'accionar no recolecto nada');
   check(gathered.debrisDrawn > 0, 'derribar no dibujo ningun escombro');
+  // Y el impacto, donde el golpe toco la mata (pedido del autor, 2026-10-03).
+  check(gathered.impactsDrawn > 0, 'golpear una mata no dibujo ningun impacto');
   // El registro de objetos anota lo que entro, y nunca mas de cinco lineas.
   console.log(`  registro de objetos: ${JSON.stringify(gathered.feed)}`);
   check(gathered.feed.length > 0 && gathered.feed.length <= 5 && gathered.feed.every((t) => /^[+-]\d+ \S/.test(t)),
@@ -2545,8 +2547,24 @@ async function faunaPass(browser, baseUrl) {
   check(now.animalsKilled === 1, 'golpear a la presa no la mato');
   check((now.inventory[22] ?? 0) >= 1, 'matar a la presa no dio carne cruda');
   check(!now.fauna.some((a) => a.key === prey.key), 'la presa muerta sigue en el mundo');
-  check(now.chipsDrawn > there.chipsDrawn && now.debrisDrawn > there.debrisDrawn,
-    'golpear y matar a la presa no solto esquirlas ni escombros');
+  // Un animal no suelta fragmentos, ni golpeado ni al morir: solo su impacto
+  // (decision del autor, 2026-10-03). En preciso solo cuenta la presa, asi que
+  // nada mas sube estos contadores.
+  console.log(`  impactos ${there.impactsDrawn} -> ${now.impactsDrawn}`);
+  check(now.chipsDrawn === there.chipsDrawn && now.debrisDrawn === there.debrisDrawn,
+    `golpear y matar a la presa solto fragmentos: esquirlas ${there.chipsDrawn} -> ${now.chipsDrawn}, escombros ${there.debrisDrawn} -> ${now.debrisDrawn}`);
+  check(now.impactsDrawn > there.impactsDrawn, 'golpear a la presa no dibujo ningun impacto');
+
+  // Un sprite pegado de lado a un bloque no se mete detras, y uno con un bloque
+  // delante sigue tapado (`sprite-depth.ts`), medido en pixeles en una escena
+  // minima fuera de pantalla con el mismo material de animales y jugador.
+  const depth = await page.evaluate(() => window.__verdant.spriteDepthProbe());
+  console.log(`  profundidad del sprite: al lado se ve ${(depth?.besideShare * 100).toFixed(0)} %, ` +
+    `con un bloque delante ${(depth?.frontShare * 100).toFixed(0)} % (de ${depth?.alone} px)`);
+  check(depth !== null && depth.alone > 500, `la sonda de profundidad no dibujo el sprite: ${JSON.stringify(depth)}`);
+  check(depth !== null && depth.misses === 0, 'el shader del sprite no trae la linea que reescribe sprite-depth.ts');
+  check(depth !== null && depth.besideShare >= 0.95, `el sprite se mete detras del bloque de al lado: ${JSON.stringify(depth)}`);
+  check(depth !== null && depth.frontShare <= 0.05, `el sprite se ve a traves del bloque de delante: ${JSON.stringify(depth)}`);
 
   await page.close();
 }
