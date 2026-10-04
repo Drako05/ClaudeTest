@@ -298,7 +298,7 @@ export interface Swing {
   hits: Hit[];
   /** Por que algo no salio, si es que no salio. */
   blocked: Blocked | null;
-  /** True si la herramienta de la mano se rompio con este golpe. */
+  /** True si la herramienta de la mano, o el arma equipada, se rompio con este golpe. */
   broke: boolean;
   /** Los animales que alcanzo, y si murieron. */
   animals: AnimalHit[];
@@ -379,8 +379,8 @@ function animalsInReach(
 }
 
 /**
- * Un golpe a un animal: le quita el daño de lo que se lleva en la mano
- * (`strikeDamage`) y, si llega a cero, suelta su botin y muere para siempre.
+ * Un golpe a un animal: le quita el daño de lo que lo golpea (`strikeDamage`):
+ * el arma equipada si la hay, y si no lo de la mano. Y, si llega a cero, suelta su botin y muere para siempre.
  * **Un botin entra entero o no entra**, como en la recoleccion: si no cabe, el
  * golpe que lo mataria no completa y el animal sigue con su daño.
  */
@@ -423,8 +423,13 @@ function hitAnimal(
  * - Lo que se trabaja a mano (arbustos, guijarros) sale con cualquier cosa.
  * - Un arbol sin hacha no cae: suelta una rama por golpe mientras le queden.
  * - Roca y minerales sin el pico adecuado no dan nada.
- * - La herramienta gasta **un uso por golpe util**, alcance a uno o a varios
- *   (propuesta mia), y golpear con ella lo que no es suyo no la gasta.
+ * - **A los seres vivos les pega el arma equipada**, si la hay, aunque en la
+ *   mano se lleve otra cosa; a lo demas, lo de la mano (el autor, 2026-10-04).
+ * - **Todo golpe que toca algo gasta un uso** de lo que pega, sea suyo o no
+ *   (el autor, 2026-10-04): uno por golpe y por objeto, alcance a uno o a
+ *   varios (propuesta mia). Un barrido que toca un animal y un arbol con un
+ *   arma equipada gasta uno del arma y otro de lo de la mano. Al aire, o a lo
+ *   que no se trabaja (un brote), no gasta.
  */
 export function tryHarvestArea(
   world: World,
@@ -439,7 +444,10 @@ export function tryHarvestArea(
   const swing: Swing = { results: [], hits: [], blocked: null, broke: false, animals: [], impacts: [] };
   const held = inventory.held();
   const stats = held === null ? null : toolStats(held);
-  let useful = false;
+  const weapon = inventory.weapon();
+  // Lo que pega a los animales: el arma equipada manda sobre la mano.
+  const beastStats = weapon === null ? stats : toolStats(weapon);
+  let touchedTile = false;
 
   // Los animales, con el mismo golpe (regla 12). En preciso solo cuenta el
   // primer objetivo de la mira, sea un animal o un objeto del mundo.
@@ -461,7 +469,7 @@ export function tryHarvestArea(
     // cliente, y es lo unico que sale de un animal golpeado (decision del
     // autor, 2026-10-03: sin fragmentos).
     swing.impacts.push(at);
-    const hit = hitAnimal(world, store, a, inventory, strikeDamage(stats));
+    const hit = hitAnimal(world, store, a, inventory, strikeDamage(beastStats));
     if (hit === 'full') {
       swing.blocked = 'full';
       const animal = store.animal[a]!;
@@ -472,23 +480,20 @@ export function tryHarvestArea(
     } else {
       swing.animals.push(hit);
     }
-    // Golpear un animal con una herramienta la gasta, sea la que sea.
-    if (stats) useful = true;
   }
 
   for (const { x, y, at } of tiles) {
     const feature = world.featureAt(x, y);
     const need = workOf(feature);
     if (!need) continue;
-    // Todo lo que el golpe toca y se puede romper da su impacto, se rompa o no.
+    // Todo lo que el golpe toca y se puede romper da su impacto, se rompa o no,
+    // y gasta lo de la mano.
     swing.impacts.push(at);
+    touchedTile = true;
 
     let power = 0;
     if (need.tool === ToolKind.Hand) power = 1;
-    else if (stats && stats.kind === need.tool && stats.tier >= need.tier) {
-      power = stats.power;
-      useful = true;
-    }
+    else if (stats && stats.kind === need.tool && stats.tier >= need.tier) power = stats.power;
 
     if (power === 0) {
       swing.hits.push({ x, y, feature });
@@ -524,7 +529,11 @@ export function tryHarvestArea(
     swing.results.push(result);
   }
 
-  if (useful) swing.broke = inventory.wearHeld();
+  const touchedBeast = beasts.length > 0;
+  let broke = false;
+  if (touchedBeast && weapon !== null) broke = inventory.wearWeapon();
+  if (touchedTile || (touchedBeast && weapon === null)) broke = inventory.wearHeld() || broke;
+  swing.broke = broke;
   return swing;
 }
 

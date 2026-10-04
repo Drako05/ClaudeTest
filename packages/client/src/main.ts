@@ -1199,7 +1199,7 @@ Object.defineProperty(window, '__verdant', {
       inventory: state.inventory.totals(),
       /**
        * Las casillas: objeto (o -1), cuantos, usos que le quedan y si existen
-       * ahora (las de una prenda que no se lleva, no).
+       * ahora (las del Bolso que lo puesto no abre, no).
        */
       slots: Array.from(state.inventory.items).map((item, i) => ({
         item,
@@ -1207,10 +1207,12 @@ Object.defineProperty(window, '__verdant', {
         wear: state.inventory.wear[i],
         open: state.inventory.isOpen(i),
       })),
-      /** Casillas abiertas: 16, y mas con la ropa. */
+      /** Casillas abiertas: 16, 18 con la bolsa y 22 con la mochila. */
       openSlots: state.inventory.openSlots(),
-      /** La prenda de cada hueco (cintura, espalda), o null. */
+      /** Lo equipado en cada hueco de PERSONAJE, por `Equip` (el 3 es el Bolso, el 12 el Arma), o null. */
       worn: [...state.inventory.worn],
+      /** Los usos que le quedan a lo equipado, por `Equip`. */
+      wornWear: Array.from(state.inventory.wornWear),
       /** De donde son las recetas que ensena el panel: 0 a mano, 1 mesa, 2 horno. */
       panelStation: items.station,
       /** Estaciones mandadas a la escena. Acumulado. */

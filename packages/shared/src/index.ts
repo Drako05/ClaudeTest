@@ -302,12 +302,17 @@ export enum Resource {
   Hide = 24,
   Feather = 25,
   Shell = 26,
+  // Las primeras armas (decision del autor, 2026-10-04): se equipan en la
+  // casilla Arma de PERSONAJE y golpean a los seres vivos.
+  StoneDagger = 27,
+  CopperSword = 28,
+  IronSword = 29,
 }
 /**
  * Cuantos objetos distintos hay. «Recurso» abarca tambien las herramientas:
  * todo lo que ocupa una casilla del inventario.
  */
-export const RESOURCE_COUNT = 27;
+export const RESOURCE_COUNT = 30;
 export const RESOURCE_NAMES: readonly string[] = [
   'Madera',
   'Piedra',
@@ -336,6 +341,9 @@ export const RESOURCE_NAMES: readonly string[] = [
   'Piel',
   'Pluma',
   'Caparazon',
+  'Punal de piedra',
+  'Espada de cobre',
+  'Espada de hierro',
 ];
 
 /**
@@ -357,6 +365,12 @@ export enum ToolKind {
   Hand = 0,
   Axe = 1,
   Pickaxe = 2,
+  /**
+   * Un arma: no trabaja nada (poder 0, asi no casa con lo que pide hacha o
+   * pico) y contra lo inerte pega como la mano. Su `damage` es lo que hace a
+   * un ser vivo.
+   */
+  Weapon = 3,
 }
 
 export interface ToolStats {
@@ -365,8 +379,13 @@ export interface ToolStats {
   power: number;
   /** Nivel: el hierro pide un pico de nivel 2 (cobre). */
   tier: number;
-  /** Golpes utiles hasta romperse (decision del autor: se desgastan). */
+  /**
+   * Golpes hasta romperse (decision del autor: se desgastan). **Todo golpe que
+   * toca algo gasta uno**, sea suyo o no (el autor, 2026-10-04).
+   */
   uses: number;
+  /** Daño a un ser vivo, en PV, si no es el de su poder (`strikeDamage`): las armas. */
+  damage?: number;
 }
 
 /**
@@ -388,39 +407,90 @@ export function toolStats(item: Resource): ToolStats | null {
       return { kind: ToolKind.Axe, power: 3, tier: 3, uses: 250 };
     case Resource.IronPickaxe:
       return { kind: ToolKind.Pickaxe, power: 3, tier: 3, uses: 250 };
+    // Las armas (decision del autor, 2026-10-04): el daño, suyo; que duren
+    // menos que la herramienta de su material, tambien. Los usos, tres cuartos
+    // de los de esa herramienta, son **deduccion mia**.
+    case Resource.StoneDagger:
+      return { kind: ToolKind.Weapon, power: 0, tier: 0, uses: 30, damage: 15 };
+    case Resource.CopperSword:
+      return { kind: ToolKind.Weapon, power: 0, tier: 0, uses: 90, damage: 30 };
+    case Resource.IronSword:
+      return { kind: ToolKind.Weapon, power: 0, tier: 0, uses: 180, damage: 45 };
     default:
       return null;
   }
 }
 
 /**
- * Cuantos caben en una casilla: uno si es herramienta o prenda, cien si no (el
- * autor). Las estaciones se apilan como un material (propuesta mia).
+ * Cuantos caben en una casilla: uno si es herramienta o equipable, cien si no
+ * (el autor). Las estaciones se apilan como un material (propuesta mia).
  */
 export function stackMax(item: Resource): number {
-  return toolStats(item) || garmentOf(item) !== null ? 1 : 100;
+  return toolStats(item) || equipOf(item) !== null ? 1 : 100;
 }
 
-// ---------------------------------------------------------------- ropa
+// ---------------------------------------------------------------- equipables
 
 /**
- * Donde se lleva una prenda: dos de los diez huecos de PERSONAJE (decision del
- * autor: la mochila en el centro de la columna derecha y el cinturon abajo a la
- * derecha).
+ * Las catorce casillas de PERSONAJE, en orden de lectura de la rejilla
+ * (decision del autor, 2026-10-04): tres filas de una a la izquierda del
+ * dibujo y dos a su derecha, y cinco debajo. El indice es tambien el orden en
+ * que el panel las pone. La mayoria aun no tiene nada que ponerse.
  */
-export enum Wear {
-  Waist = 0,
-  Back = 1,
+export enum Equip {
+  Cape = 0,
+  Helmet = 1,
+  Shoulders = 2,
+  /** Lo que da casillas de inventario: la bolsa o la mochila, una sola. */
+  Bag = 3,
+  Chest = 4,
+  Necklace = 5,
+  Belt = 6,
+  Pants = 7,
+  Ring = 8,
+  Boots = 9,
+  Pet = 10,
+  Mount = 11,
+  /** El arma equipada golpea a los seres vivos, lleves lo que lleves en la mano. */
+  Weapon = 12,
+  Emblem = 13,
+}
+export const EQUIP_COUNT = 14;
+export const EQUIP_NAMES: readonly string[] = [
+  'Capa',
+  'Casco',
+  'Hombreras',
+  'Bolso',
+  'Pechera',
+  'Collar',
+  'Cinturon',
+  'Pantalon',
+  'Anillo',
+  'Botas',
+  'Mascota',
+  'Montura',
+  'Arma',
+  'Emblema',
+];
+
+/** La casilla de PERSONAJE donde va un objeto, o `null` si no se equipa. */
+export function equipOf(item: Resource): Equip | null {
+  if (item === Resource.FiberBag || item === Resource.FrameBackpack) return Equip.Bag;
+  if (toolStats(item)?.kind === ToolKind.Weapon) return Equip.Weapon;
+  return null;
 }
 
-/** Casillas que abre cada hueco con su prenda puesta (plan de la tanda 2). */
-export const WEAR_SLOTS: readonly number[] = [2, 6];
+/**
+ * El tramo fijo de casillas del Bolso, detras de las base: lo que abre lo mas
+ * grande que cabe en el (la mochila).
+ */
+export const BAG_RANGE = 6;
 
-/** El hueco de una prenda, o `null` si no se viste. */
-export function garmentOf(item: Resource): Wear | null {
-  if (item === Resource.FiberBag) return Wear.Waist;
-  if (item === Resource.FrameBackpack) return Wear.Back;
-  return null;
+/** Casillas que abre lo que va en el Bolso (plan de la tanda 2): 0 si no es bolso. */
+export function bagCapacity(item: Resource | null): number {
+  if (item === Resource.FiberBag) return 2;
+  if (item === Resource.FrameBackpack) return 6;
+  return 0;
 }
 
 export interface Work {
@@ -649,6 +719,39 @@ export const RECIPES: readonly Recipe[] = [
     ],
     station: Station.Furnace,
   },
+  // Las primeras armas (decision del autor, 2026-10-04, recetas y categoria
+  // propuestas mias que aprobo). Al final, para no mover los indices.
+  {
+    category: 'Armas',
+    output: Resource.StoneDagger,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 1 },
+      { item: Resource.Stone, count: 2 },
+      { item: Resource.Fiber, count: 1 },
+    ],
+    station: Station.Hand,
+  },
+  {
+    category: 'Armas',
+    output: Resource.CopperSword,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 1 },
+      { item: Resource.CopperIngot, count: 4 },
+    ],
+    station: Station.Workbench,
+  },
+  {
+    category: 'Armas',
+    output: Resource.IronSword,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 1 },
+      { item: Resource.IronIngot, count: 4 },
+    ],
+    station: Station.Workbench,
+  },
 ];
 
 // ---------------------------------------------------------------- fauna
@@ -657,13 +760,15 @@ export const RECIPES: readonly Recipe[] = [
  * El daño de un golpe a algo vivo, en PV (es el primer daño que hay). A mano,
  * 5; con herramienta, 10 por punto de su poder, y vale cualquier hacha o pico.
  * **Deduccion mia.** Asi una liebre adulta (38) cae en 8 golpes a mano y en 2
- * con hierro, y un bisonte adulto (205) en 7 con hierro.
+ * con hierro, y un bisonte adulto (205) en 7 con hierro. Las armas traen el
+ * suyo (`ToolStats.damage`, del autor): 15, 30 y 45.
  */
 export const HAND_DAMAGE = 5;
 export const DAMAGE_PER_POWER = 10;
 
 export function strikeDamage(stats: ToolStats | null): number {
-  return stats ? DAMAGE_PER_POWER * stats.power : HAND_DAMAGE;
+  if (!stats) return HAND_DAMAGE;
+  return stats.damage ?? DAMAGE_PER_POWER * stats.power;
 }
 
 /**
@@ -864,9 +969,9 @@ export interface Intent {
   craft: number;
   /**
    * Mover lo de una casilla a otra (arrastrar): el mismo objeto se apila y uno
-   * distinto se intercambia. Los huecos de ropa tienen indice propio
-   * (`EQUIP_WAIST`, `EQUIP_BACK` en `sim/inventory.ts`): hacia ellos se equipa,
-   * desde ellos se quita. -1 si no.
+   * distinto se intercambia. Los huecos de PERSONAJE tienen indice propio
+   * (`equipSlot` en `sim/inventory.ts`): hacia ellos se equipa, desde ellos se
+   * quita. -1 si no.
    */
   moveFrom: number;
   moveTo: number;

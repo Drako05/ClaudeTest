@@ -3,8 +3,7 @@ import {
   createGame,
   EYE_HEIGHT,
   facingToward,
-  EQUIP_BACK,
-  EQUIP_WAIST,
+  equipSlot,
   hitboxAt,
   Inventory,
   skipTime,
@@ -24,7 +23,8 @@ import {
   Station,
   Terrain,
   toolStats,
-  Wear,
+  Equip,
+  EQUIP_COUNT,
   type Intent,
 } from '@verdant/shared';
 
@@ -428,56 +428,132 @@ describe('Las herramientas de metal', () => {
   });
 });
 
-describe('La ropa', () => {
-  it('la bolsa abre 2 casillas y la mochila 6, cada una en su hueco', () => {
+describe('Los equipables', () => {
+  const BAG = equipSlot(Equip.Bag);
+  const WEAPON = equipSlot(Equip.Weapon);
+
+  it('bolsa y mochila solo van al Bolso, una a la vez: abren 2 o 6 casillas', () => {
     const inv = new Inventory();
     inv.add(Resource.FiberBag, 1);
     inv.add(Resource.FrameBackpack, 1);
     expect(inv.openSlots()).toBe(16);
-    // La prenda equivocada no entra en el hueco.
-    inv.move(0, EQUIP_BACK);
-    expect(inv.worn[Wear.Back]).toBeNull();
-    inv.move(0, EQUIP_WAIST);
-    expect(inv.worn[Wear.Waist]).toBe(Resource.FiberBag);
+    // En ningun otro hueco: ni en el Cinturon, donde iba la bolsa, ni en el Arma.
+    for (let e = 0 as Equip; e < EQUIP_COUNT; e++) {
+      if (e === Equip.Bag) continue;
+      inv.move(0, equipSlot(e));
+      expect(inv.worn[e], `${e}`).toBeNull();
+    }
+    inv.move(0, BAG);
+    expect(inv.worn[Equip.Bag]).toBe(Resource.FiberBag);
     expect(inv.openSlots()).toBe(18);
-    inv.move(1, EQUIP_BACK);
-    expect(inv.worn[Wear.Back]).toBe(Resource.FrameBackpack);
-    expect(inv.openSlots()).toBe(24);
+    // La mochila sobre la bolsa las intercambia (con el tramo vacio): 22, no 24.
+    inv.move(1, BAG);
+    expect(inv.worn[Equip.Bag]).toBe(Resource.FrameBackpack);
+    expect(inv.itemAt(1)).toBe(Resource.FiberBag);
+    expect(inv.openSlots()).toBe(22);
     // Lo puesto cuenta en los totales, no en lo que se gasta.
-    expect(inv.totals()[Resource.FiberBag]).toBe(1);
-    expect(inv.count(Resource.FiberBag)).toBe(0);
+    expect(inv.totals()[Resource.FrameBackpack]).toBe(1);
+    expect(inv.count(Resource.FrameBackpack)).toBe(0);
   });
 
-  it('sin la prenda su tramo no existe: no se llena ni se arrastra a el', () => {
+  it('sin bolso su tramo no existe, y la bolsa solo abre sus 2 primeras', () => {
     const inv = new Inventory();
     expect(inv.add(Resource.Wood, 100 * START_SLOTS)).toBe(true);
     expect(inv.add(Resource.Wood, 1)).toBe(false);
     expect(inv.fits([{ item: Resource.Stone, count: 1 }])).toBe(false);
     inv.move(0, START_SLOTS);
     expect(inv.itemAt(START_SLOTS)).toBeNull();
+
+    inv.discard(0);
+    inv.add(Resource.FiberBag, 1);
+    inv.move(0, BAG);
+    // La casilla que dejo la bolsa, y las 2 suyas.
+    expect(inv.add(Resource.Wood, 300)).toBe(true);
+    expect(inv.add(Resource.Wood, 1)).toBe(false);
+    expect(inv.isOpen(START_SLOTS + 1)).toBe(true);
+    expect(inv.isOpen(START_SLOTS + 2)).toBe(false);
   });
 
-  it('no se quita una prenda con sus casillas ocupadas', () => {
+  it('el bolso no se quita ni se cambia con sus casillas ocupadas', () => {
     const inv = new Inventory();
     inv.add(Resource.FrameBackpack, 1);
-    inv.move(0, EQUIP_BACK);
+    inv.move(0, BAG);
     inv.add(Resource.Wood, 100 * START_SLOTS + 1);
-    const [a] = inv.rangeOf(Wear.Back);
+    const [a] = inv.bagRange();
     expect(inv.itemAt(a)).toBe(Resource.Wood);
     inv.discard(3);
-    inv.move(EQUIP_BACK, 3);
-    expect(inv.worn[Wear.Back]).toBe(Resource.FrameBackpack);
-    inv.discard(EQUIP_BACK);
-    expect(inv.worn[Wear.Back]).toBe(Resource.FrameBackpack);
+    inv.move(BAG, 3);
+    expect(inv.worn[Equip.Bag]).toBe(Resource.FrameBackpack);
+    inv.discard(BAG);
+    expect(inv.worn[Equip.Bag]).toBe(Resource.FrameBackpack);
+    // Tampoco se cambia por la bolsa: se cerrarian casillas llenas.
+    inv.add(Resource.FiberBag, 1);
+    inv.move(3, BAG);
+    expect(inv.worn[Equip.Bag]).toBe(Resource.FrameBackpack);
 
-    // Con el tramo vacio si, a una casilla vacia de fuera del tramo.
+    // Con el tramo vacio si, a una casilla de fuera del tramo.
     inv.discard(a);
-    inv.move(EQUIP_BACK, a);
-    expect(inv.worn[Wear.Back]).toBe(Resource.FrameBackpack);
-    inv.move(EQUIP_BACK, 3);
-    expect(inv.worn[Wear.Back]).toBeNull();
-    expect(inv.itemAt(3)).toBe(Resource.FrameBackpack);
+    inv.move(BAG, a);
+    expect(inv.worn[Equip.Bag]).toBe(Resource.FrameBackpack);
+    inv.discard(4);
+    inv.move(BAG, 4);
+    expect(inv.worn[Equip.Bag]).toBeNull();
+    expect(inv.itemAt(4)).toBe(Resource.FrameBackpack);
     expect(inv.openSlots()).toBe(16);
+  });
+
+  it('en el Arma solo entran armas, y conservan su desgaste al ponerlas y quitarlas', () => {
+    const inv = new Inventory();
+    inv.add(Resource.IronPickaxe, 1);
+    inv.add(Resource.StoneDagger, 1);
+    inv.add(Resource.IronSword, 1);
+    inv.move(0, WEAPON);
+    expect(inv.weapon()).toBeNull();
+    // Gastado a mano, para ver que el desgaste viaja con el arma.
+    inv.selected = 1;
+    inv.wearHeld();
+    inv.wearHeld();
+    const left = toolStats(Resource.StoneDagger)!.uses - 2;
+    expect(inv.wearAt(1)).toBe(left);
+    inv.move(1, WEAPON);
+    expect(inv.weapon()).toBe(Resource.StoneDagger);
+    expect(inv.wearAt(WEAPON)).toBe(left);
+    expect(inv.itemAt(1)).toBeNull();
+    // La espada sobre el punal los intercambia, cada uno con sus usos.
+    inv.move(2, WEAPON);
+    expect(inv.weapon()).toBe(Resource.IronSword);
+    expect(inv.wearAt(WEAPON)).toBe(toolStats(Resource.IronSword)!.uses);
+    expect(inv.itemAt(2)).toBe(Resource.StoneDagger);
+    expect(inv.wearAt(2)).toBe(left);
+    // Y se quita a una casilla vacia con los suyos.
+    inv.move(WEAPON, 1);
+    expect(inv.weapon()).toBeNull();
+    expect(inv.wearAt(1)).toBe(toolStats(Resource.IronSword)!.uses);
+  });
+
+  it('el arma equipada que se gasta del todo deja su hueco vacio', () => {
+    const inv = new Inventory();
+    inv.add(Resource.StoneDagger, 1);
+    inv.move(0, WEAPON);
+    const uses = toolStats(Resource.StoneDagger)!.uses;
+    for (let i = 0; i < uses - 1; i++) expect(inv.wearWeapon()).toBe(false);
+    expect(inv.wearWeapon()).toBe(true);
+    expect(inv.weapon()).toBeNull();
+    expect(inv.totals()[Resource.StoneDagger]).toBe(0);
+  });
+
+  it('las armas: punal a mano, espadas en la mesa, en su categoria', () => {
+    const armas = RECIPES.filter((r) => r.category === 'Armas');
+    expect(armas.map((r) => [r.output, r.station])).toEqual([
+      [Resource.StoneDagger, Station.Hand],
+      [Resource.CopperSword, Station.Workbench],
+      [Resource.IronSword, Station.Workbench],
+    ]);
+    expect(armas.map((r) => toolStats(r.output)?.damage)).toEqual([15, 30, 45]);
+    // Duran menos que la herramienta de su material (el autor).
+    expect(toolStats(Resource.StoneDagger)!.uses).toBeLessThan(toolStats(Resource.StoneAxe)!.uses);
+    expect(toolStats(Resource.CopperSword)!.uses).toBeLessThan(toolStats(Resource.CopperAxe)!.uses);
+    expect(toolStats(Resource.IronSword)!.uses).toBeLessThan(toolStats(Resource.IronAxe)!.uses);
   });
 });
 
@@ -530,14 +606,13 @@ describe('La partida de la tanda 2', () => {
     act(state, { craft: recipeOf(Resource.IronPickaxe) });
     expect(state.lastCrafted).toBe(-1);
 
-    // Vestirse: 24 casillas.
+    // Ponerse la mochila: 22 casillas. La bolsa ya no cabe a la vez.
     const slotOf = (item: Resource) => {
       for (let i = 0; i < inv.size; i++) if (inv.itemAt(i) === item) return i;
       return -1;
     };
-    act(state, { moveFrom: slotOf(Resource.FiberBag), moveTo: EQUIP_WAIST });
-    act(state, { moveFrom: slotOf(Resource.FrameBackpack), moveTo: EQUIP_BACK });
-    expect(inv.openSlots()).toBe(24);
+    act(state, { moveFrom: slotOf(Resource.FrameBackpack), moveTo: equipSlot(Equip.Bag) });
+    expect(inv.openSlots()).toBe(22);
 
     // Y con el pico de cobre, hierro.
     toHand(Resource.CopperPickaxe);

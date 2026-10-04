@@ -483,7 +483,6 @@
       .slot.off { opacity: .4; cursor: default; }
       .slot[hidden] { display: none; }
       /* Un hueco de ropa vacio dice que va ahi. */
-      .slot .hint { color: #6f82a0; font-size: 9px; }
       /* Cada pagina es una columna: titulo, lo suyo y, pegada abajo, la zona
          de lo seleccionado, que en PERSONAJE e INVENTARIO queda a la misma
          altura (boceto del autor, 2026-09-29). */
@@ -500,12 +499,21 @@
         border: 1px solid rgba(140, 190, 255, 0.22); color: #b8c6dc; font-size: 11px;
       }
       .selDesc b { display: block; color: #e8eef7; margin-bottom: 2px; }
-      /* PERSONAJE: el personaje en medio, tres equipables a cada lado y cuatro
-         debajo (boceto del autor). El dibujo ocupa las dos columnas centrales
-         de las tres primeras filas; las casillas se colocan solas en el resto. */
+      /* PERSONAJE: catorce equipables alrededor del personaje, tres a su
+         izquierda, seis en dos columnas a su derecha y cinco debajo (el autor,
+         2026-10-04). El dibujo ocupa las columnas 2 y 3 de las tres primeras
+         filas; las casillas se colocan solas en el resto, en orden de lectura.
+         `--eq` es el lado de cada una: 60 en PC, y en el movil lo que quepa. */
       #charGrid {
-        display: grid; grid-template-columns: repeat(4, 60px); grid-template-rows: repeat(4, 60px);
+        --eq: 60px;
+        display: grid; grid-template-columns: repeat(5, var(--eq)); grid-template-rows: repeat(4, var(--eq));
         gap: 6px; flex: none;
+      }
+      #charGrid .slot { width: var(--eq); height: var(--eq); }
+      /* El icono de lo que va en cada casilla vacia (`equip-icons.ts`). */
+      #charGrid .slot .equipIcon {
+        flex: none; width: calc(var(--eq) / 2); height: calc(var(--eq) / 2); margin-top: 10px; color: #6f82a0;
+        fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
       }
       #charArt {
         grid-column: 2 / 4; grid-row: 1 / 4; width: 100%; height: 100%; border-radius: 8px;
@@ -600,6 +608,11 @@
         display: flex; flex-direction: column; overflow: hidden; padding: 0 12px 12px; gap: 0;
       }
       body.touch-active #invPanel[hidden] { display: none; }
+      /* Cinco columnas de 60 no caben en 360 px: encogen al ancho del panel
+         menos su relleno (8 + 12 por lado) y los cuatro huecos. */
+      body.touch-active #charGrid {
+        --eq: min(60px, (100vw - 64px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 5);
+      }
       /* Fijos: las pestanas arriba, la zona de lo seleccionado abajo y las
          categorias de recetas. Solo se desliza la rejilla del inventario o la
          lista de recetas (pedido del autor). */

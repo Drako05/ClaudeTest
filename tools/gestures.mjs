@@ -397,10 +397,10 @@ await tapReal(await at('#invTabs button:nth-child(2)'));
 const bagSlot = (await probe()).slots.findIndex((x) => x.item === 20);
 if (bagSlot !== 1) await dragReal(await slotAt(bagSlot + 1), await at('#hotbar .slot:nth-child(2)'));
 await tapReal(await at('#invTabs button:nth-child(1)'));
-await dragReal(await at('#hotbar .slot:nth-child(2)'), await at('#charGrid [data-slot="1000"]'));
+await dragReal(await at('#hotbar .slot:nth-child(2)'), await at('#charGrid [data-slot="1003"]'));
 const belted = await probe();
-console.log(`  bolsa a la cintura: ${JSON.stringify(belted.worn)}, casillas ${belted.openSlots}`);
-check(belted.worn[0] === 20 && belted.openSlots === 18, 'arrastrar la bolsa a la cintura con el dedo no la puso');
+console.log(`  bolsa al Bolso: ${JSON.stringify(belted.worn)}, casillas ${belted.openSlots}`);
+check(belted.worn[3] === 20 && belted.openSlots === 18, 'arrastrar la bolsa al Bolso con el dedo no la puso');
 
 // Con el inventario abierto, un toque fuera de su interfaz lo cierra y nada
 // mas (decisiones del autor, 2026-10-01): ni gira la camara, ni ataca, ni pulsa

@@ -20,17 +20,22 @@
  *   ven las de mano; al USAR una mesa o un horno se abre este mismo panel con
  *   las suyas, bajo su nombre, y se cierra solo al salir del alcance, medido
  *   hasta su cara (`stationNear`, la misma cuenta con que el nucleo acepta).
- * - **La ropa** se arrastra a su hueco de PERSONAJE —la mochila en el centro
- *   de la columna derecha, el cinturon abajo a la derecha— y abre sus casillas
- *   en la rejilla; las de una prenda que no se lleva no se ven.
+ * - **PERSONAJE tiene catorce casillas** (decision del autor, 2026-10-04), cada
+ *   una con su icono en vez de su nombre, que se oculta al equipar algo. La
+ *   bolsa o la mochila van al **Bolso** y abren sus casillas en la rejilla
+ *   (las que no se abren no se ven); un arma va al **Arma**, y con ella se
+ *   golpea a los seres vivos.
  *
  * Nada de esto toca el estado: lo que se pide —elegir casilla, mover, tirar,
  * fabricar— se guarda como peticion y el bucle lo mete en la `Intent` (regla
  * 5). Estas peticiones no se tiran en pausa, al reves que las del mundo.
  */
 
-import { EQUIP_BACK, EQUIP_WAIST, EYE_HEIGHT, HOTBAR_SLOTS, hitboxAt, stationNear, type GameState } from '@verdant/sim';
+import { equipSlot, EYE_HEIGHT, HOTBAR_SLOTS, hitboxAt, stationNear, type GameState } from '@verdant/sim';
 import {
+  type Equip,
+  EQUIP_COUNT,
+  EQUIP_NAMES,
   RECIPES,
   RESOURCE_NAMES,
   Resource,
@@ -40,23 +45,13 @@ import {
   toolStats,
 } from '@verdant/shared';
 import { makePlayerArt } from './art.js';
+import { equipIcon } from './equip-icons.js';
 import { ScrollRail } from './scroll-rail-view.js';
 
 /** Lo que se tarda en fabricar manteniendo pulsado (decision del autor). */
 export const CRAFT_HOLD_MS = 1500;
 /** Lo que hay que mover el puntero para que un toque sea un arrastre. **Propuesta mia.** */
 const DRAG_SLOP = 6;
-/** Casillas de equipables: tres a cada lado del personaje y cuatro debajo (boceto del autor). */
-const EQUIP_SLOTS = 10;
-/**
- * Los huecos de la ropa entre esos diez, por su orden en la rejilla (izquierda
- * y derecha de cada fila, y luego los cuatro de abajo): la mochila en el
- * centro de la derecha y el cinturon abajo a la derecha (decision del autor).
- */
-const WORN_AT: Record<number, { slot: number; label: string }> = {
-  3: { slot: EQUIP_BACK, label: 'Espalda' },
-  5: { slot: EQUIP_WAIST, label: 'Cintura' },
-};
 /** Categorias del recetario que se dibujan (boceto: cinco). */
 const CATEGORY_SLOTS = 5;
 const PAGES = ['personaje', 'inventario', 'recetas'] as const;
@@ -74,23 +69,29 @@ const DESCRIPTIONS: Record<number, string> = {
   [Resource.Copper]: 'Mineral: sale con el pico de piedra. Se funde en el horno.',
   [Resource.Branch]: 'Sale de los arboles golpeandolos sin hacha. Para fabricar.',
   [Resource.Fiber]: 'La sueltan los arbustos. Para fabricar.',
-  [Resource.StoneAxe]: 'Tala arboles. Se gasta con cada golpe util.',
-  [Resource.StonePickaxe]: 'Saca piedra, carbon y cobre. Se gasta con cada golpe util.',
-  [Resource.CopperIngot]: 'Del horno. Para herramientas y la mochila, en la mesa.',
-  [Resource.IronIngot]: 'Del horno. Para las herramientas de hierro, en la mesa.',
-  [Resource.CopperAxe]: 'Tala en dos golpes. Se gasta con cada golpe util.',
-  [Resource.CopperPickaxe]: 'Mina tambien el hierro. Se gasta con cada golpe util.',
-  [Resource.IronAxe]: 'Tala mas deprisa que ninguna. Se gasta con cada golpe util.',
-  [Resource.IronPickaxe]: 'El mejor pico. Se gasta con cada golpe util.',
+  [Resource.StoneAxe]: 'Tala arboles. Se gasta con cada golpe.',
+  [Resource.StonePickaxe]: 'Saca piedra, carbon y cobre. Se gasta con cada golpe.',
+  [Resource.CopperIngot]: 'Del horno. Para herramientas, la espada y la mochila, en la mesa.',
+  [Resource.IronIngot]: 'Del horno. Para las herramientas y la espada de hierro, en la mesa.',
+  [Resource.CopperAxe]: 'Tala en dos golpes. Se gasta con cada golpe.',
+  [Resource.CopperPickaxe]: 'Mina tambien el hierro. Se gasta con cada golpe.',
+  [Resource.IronAxe]: 'Tala mas deprisa que ninguna. Se gasta con cada golpe.',
+  [Resource.IronPickaxe]: 'El mejor pico. Se gasta con cada golpe.',
   [Resource.Workbench]: 'En la mano, clic derecho (o USAR) mirando al suelo para ponerla. Usala para ver sus recetas.',
   [Resource.Furnace]: 'En la mano, clic derecho (o USAR) mirando al suelo para ponerlo. Usalo para fundir.',
-  [Resource.FiberBag]: 'Arrastrala a la cintura, en PERSONAJE: +2 casillas.',
-  [Resource.FrameBackpack]: 'Arrastrala a la espalda, en PERSONAJE: +6 casillas.',
+  [Resource.FiberBag]: 'Arrastrala al Bolso, en PERSONAJE: +2 casillas.',
+  [Resource.FrameBackpack]: 'Arrastrala al Bolso, en PERSONAJE: +6 casillas.',
   [Resource.RawMeat]: 'De los animales. Cruda no se come: asala en el horno.',
   [Resource.CookedMeat]: 'Del horno. En la mano, clic derecho (o USAR) para comer: alimenta mas que las bayas.',
   [Resource.Hide]: 'De los mamiferos. Aun no tiene uso.',
   [Resource.Feather]: 'De las gaviotas. Aun no tiene uso.',
   [Resource.Shell]: 'Del cangrejo. Aun no tiene uso.',
+  [Resource.StoneDagger]:
+    'Arma: 15 de dano a los animales. Equipada en Arma, en PERSONAJE, golpea con ella aunque lleves otra cosa en la mano.',
+  [Resource.CopperSword]:
+    'Arma: 30 de dano a los animales. Equipada en Arma, en PERSONAJE, golpea con ella aunque lleves otra cosa en la mano.',
+  [Resource.IronSword]:
+    'Arma: 45 de dano a los animales. Equipada en Arma, en PERSONAJE, golpea con ella aunque lleves otra cosa en la mano.',
 };
 
 /** Nombre corto para una casilla, que es estrecha. Sin iconos (decision del autor). */
@@ -110,6 +111,9 @@ const SHORT: Record<number, string> = {
   [Resource.Workbench]: 'Mesa',
   [Resource.FiberBag]: 'Bolsa',
   [Resource.FrameBackpack]: 'Mochila',
+  [Resource.StoneDagger]: 'Punal piedra',
+  [Resource.CopperSword]: 'Espada cobre',
+  [Resource.IronSword]: 'Espada hierro',
 };
 
 export interface ItemRequests {
@@ -137,8 +141,8 @@ export class InventoryUi {
   private readonly charSelSlot = byId('charSelSlot');
   private readonly charSelDesc = byId('charSelDesc');
   private readonly recipeTitle = byId('recipeTitle');
-  /** Los dos huecos de ropa, con el indice de arrastre de cada uno. */
-  private readonly wornSlots: Array<{ el: HTMLElement; slot: number; label: string }> = [];
+  /** Las catorce casillas de PERSONAJE, por `Equip`, con su indice de arrastre y su icono. */
+  private readonly wornSlots: Array<{ el: HTMLElement; slot: number; icon: SVGSVGElement; name: string }> = [];
   private readonly recipeTabs = byId('recipeTabs');
   private readonly recipeList = byId('recipeList');
   private readonly tabs = byId('invTabs');
@@ -202,23 +206,17 @@ export class InventoryUi {
       this.grid.appendChild(b);
     }
     // Los equipables: la rejilla los coloca alrededor del dibujo (CSS de
-    // `#charGrid`). Los dos de la ropa se arrastran; los demas, apagados hasta
-    // que haya algo que ponerse ahi.
+    // `#charGrid`), en el orden de `Equip`, que es el de lectura. Todos se
+    // arrastran, aunque la mayoria aun no tenga nada que ponerse: el nucleo
+    // solo acepta en cada uno lo suyo.
     const charGrid = byId('charGrid');
-    for (let i = 0; i < EQUIP_SLOTS; i++) {
-      const worn = WORN_AT[i];
-      if (worn) {
-        const b = this.slotButton(worn.slot);
-        b.classList.add('equip');
-        b.dataset.equip = '1';
-        this.bindDrag(b, worn.slot, false);
-        this.wornSlots.push({ el: b, slot: worn.slot, label: worn.label });
-        charGrid.appendChild(b);
-        continue;
-      }
-      const b = document.createElement('div');
-      b.className = 'slot off equip';
-      b.title = 'Equipable (aun sin ropa para aqui)';
+    for (let e = 0 as Equip; e < EQUIP_COUNT; e++) {
+      const slot = equipSlot(e);
+      const b = this.slotButton(slot);
+      b.classList.add('equip');
+      b.dataset.equip = '1';
+      this.bindDrag(b, slot, false);
+      this.wornSlots.push({ el: b, slot, icon: equipIcon(e), name: EQUIP_NAMES[e] });
       charGrid.appendChild(b);
     }
     this.drawCharacter();
@@ -491,7 +489,7 @@ export class InventoryUi {
 
   /**
    * Pinta una casilla: nombre y, abajo a la izquierda, solo el numero; una
-   * herramienta, su desgaste; y una prenda, nada, porque va de una en una.
+   * herramienta o un arma, su desgaste; y un bolso, nada, porque va de uno en uno.
    */
   private paint(el: HTMLElement, item: Resource | null, count: number, wear: number): void {
     el.replaceChildren();
@@ -726,7 +724,7 @@ export class InventoryUi {
     this.showSelected(this.pending.select >= 0 ? this.pending.select : inv.selected);
     if (this.panel.hidden) return;
 
-    // Las casillas de una prenda que no se lleva no existen, y no se ven.
+    // Las casillas del Bolso que lo puesto no abre no existen, y no se ven.
     Array.from(this.grid.children).forEach((el, i) => {
       (el as HTMLElement).hidden = !inv.isOpen(i);
       this.paint(el as HTMLElement, inv.itemAt(i), inv.counts[i], inv.wear[i]);
@@ -736,19 +734,17 @@ export class InventoryUi {
     });
     for (const worn of this.wornSlots) {
       const item = inv.itemAt(worn.slot);
-      this.paint(worn.el, item, 1, 0);
+      this.paint(worn.el, item, 1, inv.wearAt(worn.slot));
       worn.el.classList.toggle('picked', this.picked === worn.slot);
-      // Vacio, dice que va ahi.
+      // Vacio, su icono dice que va ahi; equipado, el icono se oculta (el
+      // autor). El nombre solo queda al pasar el raton.
       if (item === null) {
-        const label = document.createElement('span');
-        label.className = 'hint';
-        label.textContent = worn.label;
-        worn.el.appendChild(label);
-        worn.el.title = worn.label;
+        worn.el.appendChild(worn.icon);
+        worn.el.title = worn.name;
       }
     }
 
-    // Lo elegido se describe en su pagina: una prenda puesta en PERSONAJE, lo
+    // Lo elegido se describe en su pagina: lo equipado en PERSONAJE, lo
     // demas en INVENTARIO. La otra zona se queda vacia.
     const onBody = this.wornSlots.some((w) => w.slot === this.picked);
     const item = this.picked >= 0 ? inv.itemAt(this.picked) : null;
@@ -784,7 +780,7 @@ export class InventoryUi {
   private describe(slotEl: HTMLElement, descEl: HTMLElement, item: Resource | null, slot: number): void {
     const inv = this.current().inventory;
     const count = item === null ? 0 : stackMax(item) === 1 ? 1 : inv.counts[slot];
-    this.paint(slotEl, item, count, item === null ? 0 : inv.wear[slot] ?? 0);
+    this.paint(slotEl, item, count, item === null ? 0 : inv.wearAt(slot));
     descEl.replaceChildren();
     if (item === null) return;
     const title = document.createElement('b');

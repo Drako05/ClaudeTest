@@ -559,7 +559,7 @@ describe('Mirada y golpe', () => {
     expect(world.featureAt(x + 3, y)).toBe(Feature.RockNode);
     const reported = results.reduce((sum, r) => sum + r.amount + r.seeds, 0);
     expect(inventory.count(Resource.Stone)).toBe(reported);
-    // Un uso por golpe util, alcance a una roca o a tres.
+    // Un uso por golpe que toca algo, alcance a una roca o a tres.
     expect(inventory.wear[0]).toBe(40 - 3);
   });
 

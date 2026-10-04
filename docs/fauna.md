@@ -53,7 +53,12 @@ Lo marcado *(deduccion)* es mio y esta en «Esperando tu juicio» de
 - a mano, **5**;
 - con herramienta, **10 por punto de su poder**: 10, 20 o 30 para piedra, cobre
   o hierro, valga el hacha o el pico (`strikeDamage`);
-- golpear un animal **gasta un uso** de la herramienta.
+- golpear un animal **gasta un uso** de la herramienta;
+- **las armas traen el suyo** (el autor, 2026-10-04): punal de piedra 15,
+  espada de cobre 30 y espada de hierro 45. **Puesta en la casilla Arma de
+  PERSONAJE, al animal le pega ella** —y se gasta ella— aunque en la mano
+  haya otra cosa; lo demas lo golpea lo de la mano. Contado entero en
+  `docs/recoleccion.md`.
 
 Los animales **no se curan** mientras estan cerca *(deduccion)*, pero **el
 daño no sobrevive a recargarse** (decision del autor, 2026-10-03): un animal

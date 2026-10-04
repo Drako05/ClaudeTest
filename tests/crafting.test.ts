@@ -241,10 +241,11 @@ describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {
     expect(inv.count(Resource.Branch)).toBe(1);
     expect(inv.wear[inv.selected]).toBe(40 - 4);
 
-    // El hacha no sirve con la roca, y no se gasta en ella.
+    // El hacha no sirve con la roca, pero se gasta en ella: todo golpe que
+    // toca algo gasta (el autor, 2026-10-04).
     w.setFeature(tx + 1, ty, Feature.RockNode);
     expect(swing(state, 1, 0, 30).blocked).toBe('needPickaxe');
-    expect(inv.wear[inv.selected]).toBe(40 - 4);
+    expect(inv.wear[inv.selected]).toBe(40 - 5);
 
     // 4. El pico: roca en 3, carbon en 4, cobre en 5; el hierro pide uno mejor.
     toHand(Resource.StonePickaxe, 1);
@@ -263,6 +264,8 @@ describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {
     w.setFeature(tx + 1, ty, Feature.IronNode);
     for (let i = 0; i < 8; i++) expect(swing(state, 1, 0, 30).blocked).toBe('needBetterPickaxe');
     expect(w.featureAt(tx + 1, ty)).toBe(Feature.IronNode);
+    // Uno por golpe, tambien los que no pudo con el hierro: 3 + 4 + 5 + 8.
+    expect(inv.wear[inv.selected]).toBe(40 - 20);
   });
 
   it('sin materiales no se fabrica nada', () => {

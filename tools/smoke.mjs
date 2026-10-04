@@ -686,7 +686,24 @@ async function desktopPass(browser, baseUrl) {
     return ev.defaultPrevented;
   }), 'el clic derecho sobre el panel deja salir el menu del navegador');
   check((await page.locator('#recipeList .recipe').count()) === 2, 'el recetario no lista las dos herramientas de piedra');
-  check((await page.locator('#charGrid .slot.equip').count()) === 10, 'faltan las casillas de equipables');
+  // Catorce equipables, cada uno con su icono y sin nombre escrito (el autor,
+  // 2026-10-04), en cinco columnas alrededor del dibujo.
+  const equips = await page.evaluate(() => {
+    const slots = Array.from(document.querySelectorAll('#charGrid .slot.equip'));
+    const cols = new Set(slots.map((el) => Math.round(el.getBoundingClientRect().left)));
+    return {
+      n: slots.length,
+      icons: slots.filter((el) => {
+        const svg = el.querySelector('svg.equipIcon');
+        return svg && svg.getBoundingClientRect().width > 10;
+      }).length,
+      text: slots.filter((el) => el.textContent.trim() !== '').length,
+      cols: cols.size,
+    };
+  });
+  console.log(`  equipables: ${JSON.stringify(equips)}`);
+  check(equips.n === 14 && equips.cols === 5, `faltan las casillas de equipables: ${JSON.stringify(equips)}`);
+  check(equips.icons === 14 && equips.text === 0, `los equipables vacios no ensenan su icono, o llevan texto: ${JSON.stringify(equips)}`);
   // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
   // no llevan numero, llevan desgaste).
   const hudTotal = await page.evaluate(() =>
@@ -1345,7 +1362,7 @@ async function stationsPass(browser, baseUrl) {
   const handBox = await panelBox();
   console.log(`  con E: ${handTabs.join(', ')} («${await page.textContent('#recipeTitle')}»)`);
   check((await state(page)).panelStation === 0, 'con E el panel no es el de mano');
-  check(handTabs.includes('Estaciones') && !handTabs.includes('Fundicion') && !handTabs.includes('Ropa'),
+  check(handTabs.includes('Estaciones') && handTabs.includes('Armas') && !handTabs.includes('Fundicion') && !handTabs.includes('Ropa'),
     `con E salen recetas de estacion: ${handTabs}`);
   await category('Estaciones');
   await craft(1);
@@ -1468,7 +1485,7 @@ async function stationsPass(browser, baseUrl) {
   const benchTabs = await tabs();
   console.log(`  usar la mesa: «${await page.textContent('#recipeTitle')}», ${benchTabs}`);
   check(bench.inventoryOpen && bench.panelStation === 1, 'USAR mirando la mesa no abrio su panel');
-  check(benchTabs.join() === 'Herramientas,Ropa', `la mesa ensena otras recetas: ${benchTabs}`);
+  check(benchTabs.join() === 'Herramientas,Ropa,Armas', `la mesa ensena otras recetas: ${benchTabs}`);
   // El panel de PC (pedido del autor, 2026-10-01): las cuatro herramientas de
   // la mesa caben sin barra; las barras no van apretadas contra lo de al lado;
   // los titulos, mas grandes.
@@ -1506,14 +1523,18 @@ async function stationsPass(browser, baseUrl) {
   check(made.inventory[15] === 1, 'no se fabrico el pico de cobre en la mesa');
   check(made.inventory[21] === 1, 'no se fabrico la mochila en la mesa');
 
-  // La mochila, arrastrada a su hueco: 22 casillas.
+  // La mochila, arrastrada al Bolso (el 4.o de PERSONAJE, `Equip.Bag`): 22
+  // casillas, y su icono se oculta.
   const bag = made.slots.findIndex((x) => x.item === 21);
   if (bag >= 0) {
-    await drag(await center(`#invGrid .slot:nth-child(${bag + 1})`), await center('#charGrid [data-slot="1001"]'));
+    const bagIcon = () => page.evaluate(() => !!document.querySelector('#charGrid [data-slot="1003"] svg.equipIcon'));
+    check(await bagIcon(), 'el Bolso vacio no ensena su icono');
+    await drag(await center(`#invGrid .slot:nth-child(${bag + 1})`), await center('#charGrid [data-slot="1003"]'));
     const dressed = await state(page);
     const shown = await page.evaluate(() => Array.from(document.querySelectorAll('#invGrid .slot')).filter((el) => !el.hidden).length);
     console.log(`  mochila puesta: ${dressed.worn}, casillas ${dressed.openSlots}, a la vista ${shown}`);
-    check(dressed.worn[1] === 21 && dressed.openSlots === 22, `la mochila no se equipo: ${JSON.stringify(dressed.worn)}, ${dressed.openSlots}`);
+    check(dressed.worn[3] === 21 && dressed.openSlots === 22, `la mochila no se equipo: ${JSON.stringify(dressed.worn)}, ${dressed.openSlots}`);
+    check(!(await bagIcon()), 'el icono del Bolso sigue a la vista con la mochila puesta');
     check(shown === 22, `la rejilla no ensena las casillas de la mochila: ${shown}`);
     check(dressed.feed.every((t) => !t.includes('Mochila') || t.startsWith('+')), `equiparse la anoto como perdida: ${dressed.feed}`);
     await page.screenshot({ path: join(SHOTS, '3d-11-panel-mesa.png') });
