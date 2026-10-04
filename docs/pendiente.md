@@ -12,6 +12,20 @@ indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mun
 siete rondas de ajustes y las pruebas pesadas a la CI). La proxima parte de
 aqui: ver `.claude/skills/auditoria/`.
 
+**La primera tanda de fauna se cerro el 2026-10-04 sin su auditoria.** Abarca
+del diseño de las especies a los animales de bloques y la guia de arte. **Es lo
+primero de la sesion siguiente**: `/auditoria`, desde `8396b7f`.
+
+- **Hay que mirar en ella un fallo intermitente de `slash`.** En la CI de
+  `pruebas` `a28555b` (solo documentacion, el mismo codigo que `a1168a7`, verde
+  dos veces) fallo «el barrido no llega a verse: normal: 16 pixeles», y al
+  repetirlo salio verde.
+- **Sospecha, sin comprobar**: un animal de bloques, opaco y paseando, se cruzo
+  entre la camara y el barrido. Donde esta cada animal depende del tiempo real
+  del humo, y antes no habia animales que taparan nada.
+- **Un arreglo plausible**: que `slash` mida sin fauna en la escena, o que lo
+  aparte de su campo de vision. Hay que confirmar la causa antes.
+
 **Como leerlo.** Va de lo mas urgente a lo mas historico:
 
 1. **Esperando tu juicio** — la lista de abajo. Son decisiones que tomo el agente
@@ -537,6 +551,29 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Guia de arte — en progreso (abierta el 2026-10-04)
+
+Diste por buenos los modelos de bloques «dentro de lo esperado de una fase
+temprana». Pediste directrices de arte, que crezcan en una tanda dedicada o
+poco a poco. Estan en `docs/guia-de-arte.md`, con tu texto literal:
+
+1. **Lo que va en la piel se pinta en el cubo de su parte**: patrones del
+   pelaje y ojos.
+2. **Lo delgado va en laminas cruzadas**, como los arboles.
+
+Lo que espera tu juicio:
+
+- **Si mi lectura de la 1 vale.** Entraria tambien lo que hoy son cajas finas
+  pegadas al cuerpo: la barriga clara, la grupa blanca, el disco del hocico, la
+  punta de la oreja de la liebre y la de la cola del zorro, y el vientre del
+  cangrejo.
+- **Que cuenta como «delgado» en la 2**: astas, cuernos, colmillos, orejas
+  finas, colas finas, barbas, y las alas, el pico y las patas de la gaviota y
+  del cangrejo. Y si una lamina puede llevar caja de golpe (hoy ninguna de esas
+  partes golpea).
+- **Aplicarlas a la fauna es una tanda por pedir.** El inventario de lo que hoy
+  no las cumple esta en la guia.
 
 ## Fauna de bloques, con la caja de golpe de sus partes — HECHO (2026-10-03)
 

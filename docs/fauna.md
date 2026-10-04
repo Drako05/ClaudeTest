@@ -396,6 +396,9 @@ su cabeza entrara en una pared, no gira.
 - Material Lambert, como el terreno, con normales planas: la luz es la del
   mundo, asi que al girar cambia la cara iluminada.
 - Un `Mesh` por animal, en sus pies y girado con su rumbo.
+- **Las directrices de arte del autor** (`docs/guia-de-arte.md`, en progreso)
+  piden pintar en su cubo lo que va en la piel y hacer lo delgado con laminas
+  cruzadas. Los modelos de hoy aun no las cumplen; el inventario esta alli.
 
 ### Lo que quedo de la lamina
 
