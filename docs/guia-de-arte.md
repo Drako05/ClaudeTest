@@ -68,3 +68,40 @@ que venga. Son **las directrices del autor** para el diseño.
 - **Aplicarla** es dibujarlas como las aspas de `billboards.ts`, en el marco
   del animal y girando con el. No cambia el plano de golpe mientras esas partes
   sigan sin `hit`.
+
+## Directriz 3: los iconos son siluetas de aventurero medieval
+
+> «Me gustaria que los iconos esten mas inspirados en un aspecto de parte de
+> armadura medieval minimalista, algo parecido a la foto que te adjunte. [...]
+> El bolso que hiciste parece un bolso de mujer. Por favor cambia todo a un
+> aspecto aventurero/medieval/fantasia. Agrega esto a las directrices de la
+> guia de diseño grafico del juego.» — el autor, 2026-10-04
+
+- **El referente**: la imagen que adjunto el autor, que el repo no guarda.
+  - Doce iconos en negro sobre blanco: peto, yelmo con penacho, guantelete,
+    hombreras con puas, grebas, escudo redondo, capa con capucha, brazal,
+    capucha, tunica, botas altas y escudo de blason con un leon rampante.
+  - **Siluetas rellenas de un solo color**, sin contorno; los detalles (la
+    rendija del yelmo, las juntas de las laminas) son huecos calados.
+  - Formas simples, que se leen pequeñas.
+- **El tema** es el de un aventurero de un mundo medieval y de fantasia:
+  armadura, cuero, metal, blasones. **Nada que se lea como un objeto de hoy**:
+  el bolso de mano que tenia el Bolso fue justo el error que la origino.
+- **Como se hacen** (los equipables, `client/src/equip-icons.ts`):
+  - SVG en una caja de 24 × 24, rellenos con `currentColor`;
+  - los calados con `fill-rule: evenodd`, que vive en el CSS;
+  - lo simetrico (las hombreras, las grebas) se dibuja una vez y se espeja.
+- **Lectura del agente, *por confirmar***: vale para **todo icono del
+  juego**, no solo para los equipables.
+- **Lo que hoy no la cumple**: los iconos de trazo de los botones
+  (`client/index.html`). Algunos son de manejo, no de mundo, y puede que no
+  deban cambiar; eso lo decide el autor.
+  - USAR (una mano abierta);
+  - ATAQUE (`#action`);
+  - MODO, barrido y preciso (un tajo y una mirilla, `#modeTouch`, `#modeBar`);
+  - ENTRADA, mira y toque (una mano que toca, `#inputMode`);
+  - la vista en perspectiva (`#proj`) y la informacion (`#hudToggle`);
+  - OTROS (tres barras);
+  - INVENTARIO (una mochila de hoy, `#invOpen`);
+  - los anillos de hambre (cubiertos) y salud (un corazon).
+- **Aplicada**: los catorce equipables (2026-10-04).

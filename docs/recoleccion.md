@@ -155,8 +155,9 @@ Lo que el codigo tiene que respetar:
   **PERSONAJE** es el segundo boceto del autor, en PC y en el movil, con la
   columna que anadio el 2026-10-04: el dibujo en medio, tres equipables a su
   izquierda, seis en dos columnas a su derecha y cinco debajo. **Cada casilla
-  lleva un icono en vez de su nombre** (`equip-icons.ts`: siluetas
-  vectoriales, dibujos mios), que **se oculta al equipar algo**; el nombre
+  lleva un icono en vez de su nombre** (`equip-icons.ts`: siluetas rellenas
+  de armadura y equipo medieval, segun la directriz 3 de
+  `docs/guia-de-arte.md`; dibujos mios), que **se oculta al equipar algo**; el nombre
   queda solo al pasar el raton. En el movil las cinco columnas encogen hasta
   caber en 360 px. **PERSONAJE e INVENTARIO** llevan abajo la zona de lo seleccionado y
   su descripcion, del mismo tamano y a la misma altura. En el movil **no se

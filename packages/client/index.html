@@ -510,10 +510,12 @@
         gap: 6px; flex: none;
       }
       #charGrid .slot { width: var(--eq); height: var(--eq); }
-      /* El icono de lo que va en cada casilla vacia (`equip-icons.ts`). */
+      /* El icono de lo que va en cada casilla vacia (`equip-icons.ts`):
+         silueta rellena con los detalles calados (directriz 3 de la guia de
+         arte). */
       #charGrid .slot .equipIcon {
         flex: none; width: calc(var(--eq) / 2); height: calc(var(--eq) / 2); margin-top: 10px; color: #6f82a0;
-        fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round;
+        fill: currentColor; fill-rule: evenodd; stroke: none;
       }
       #charArt {
         grid-column: 2 / 4; grid-row: 1 / 4; width: 100%; height: 100%; border-radius: 8px;
