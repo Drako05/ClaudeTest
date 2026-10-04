@@ -30,16 +30,23 @@ const BOOT_CUTS = 'M5.8 11h6v.9h-6zM5.8 20.8h12.4v.6H5.8z';
 
 /** El contenido de cada icono, en una caja de 24 × 24. */
 const ICONS: Record<Equip, string> = {
-  // Capa puesta y abierta por delante, sin capucha (el autor): los hombros
-  // redondos, el cuello alto, los dos broches con la cadena que la cierra, la
-  // abertura en V invertida y dos pliegues.
+  // Capa vista de frente, sin capucha (el autor, con sus referencias): el
+  // cuello alto, el broche que la cierra y, entre los dos delanteros, la tela
+  // de atras, que se ve llena. Las juntas son lineas caladas con una mascara.
   [Equip.Cape]:
-    '<path d="M8.2 4.2h7.6c2.7.4 4.2 1.8 4.6 3.8l2.1 13.4c-2.2.8-4.4.3-6.2.6L12.8 8.4h-1.6L7.9 22' +
-    'c-1.8-.3-4 .2-6.2-.6L3.8 8c.4-2 1.9-3.4 4.4-3.8z' +
-    'M9.6 8.7a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zM14.4 8.7a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8z' +
-    'M6.4 10.5h.7l-1.5 10.3h-.7zM17.6 10.5h-.7l1.5 10.3h.7z"/>' +
-    '<path d="M8.4 4.8C7.2 4 7 2.4 7.6 1.6c1.4.4 3 1.4 3.8 2.4zM15.6 4.8c1.2-.8 1.4-2.4.8-3.2-1.4.4-3 1.4-3.8 2.4z' +
-    'M10.6 9.25h2.8v.7h-2.8z"/>',
+    `<defs><mask id="${MASK_ID}" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">` +
+    '<rect width="24" height="24" fill="#fff"/>' +
+    '<g fill="none" stroke="#000" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M7.2 3.8C9 4.8 10.6 5.8 12 6.8c1.4-1 3-2 4.8-3"/>' +
+    '<path d="M8.8 2.6c0 1 1.8 2.4 3.2 3.2 1.4-.8 3.2-2.2 3.2-3.2"/>' +
+    '<path d="M11.1 8C9.3 9 8.5 10.8 8.2 13.4l-.9 9.4M12.9 8c1.8 1 2.6 2.8 2.9 5.4l.9 9.4"/>' +
+    '<path d="M5.5 12.5 4.6 20M18.5 12.5l.9 7.5"/></g>' +
+    '<circle cx="12" cy="6.8" r="2" fill="#000"/></mask></defs>' +
+    `<path mask="url(#${MASK_ID})" d="M8.5 1.5H15.5C16.3 1.5 16.8 2 16.8 2.8V3.6L18.6 4.6C19.3 5 19.2 5.8 18.6 6` +
+    'C19.6 7.5 20.2 9.5 20.4 12C20.7 15.5 21.3 18.5 22.3 21.2C22.5 21.8 22.1 22.3 21.5 22.3' +
+    'C17 23.2 7 23.2 2.5 22.3C1.9 22.3 1.5 21.8 1.7 21.2C2.7 18.5 3.3 15.5 3.6 12C3.8 9.5 4.4 7.5 5.4 6' +
+    'C4.8 5.8 4.7 5 5.4 4.6L7.2 3.6V2.8C7.2 2 7.7 1.5 8.5 1.5Z"/>' +
+    '<circle cx="12" cy="6.8" r="1.3"/>',
   // Yelmo cerrado con rendija en cruz y penacho.
   [Equip.Helmet]:
     '<path d="M6 9.5C6 6 8.5 4.2 12 4.2S18 6 18 9.5V19c0 1.5-1.5 2.5-6 3-4.5-.5-6-1.5-6-3z' +
