@@ -30,14 +30,16 @@ const BOOT_CUTS = 'M5.8 11h6v.9h-6zM5.8 20.8h12.4v.6H5.8z';
 
 /** El contenido de cada icono, en una caja de 24 × 24. */
 const ICONS: Record<Equip, string> = {
-  // Capa vista de espaldas, sin capucha (el autor): el broche del cuello, la
-  // linea del cuello, dos pliegues y el bajo ondulado.
+  // Capa puesta y abierta por delante, sin capucha (el autor): los hombros
+  // redondos, el cuello alto, los dos broches con la cadena que la cierra, la
+  // abertura en V invertida y dos pliegues.
   [Equip.Cape]:
-    '<path d="M6.5 4.5 8 2.5h8l1.5 2c1.5 4.5 3 10 4 16.5-2-.9-4-.2-5.5.6-1.4-.9-3-.5-4 .2-1-.7-2.6-1.1-4-.2' +
-    '-1.5-.8-3.5-1.5-5.5-.6 1-6.5 2.5-12 4-16.5z' +
-    'M12 3.4a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z' +
-    'M7.3 6.4c3 1.3 6.4 1.3 9.4 0v.8c-3 1.3-6.4 1.3-9.4 0z' +
-    'M9.1 9.6h.7l-1.1 9.6H8zM14.2 9.6h.7l1.1 9.6h-.7z"/>',
+    '<path d="M8.2 4.2h7.6c2.7.4 4.2 1.8 4.6 3.8l2.1 13.4c-2.2.8-4.4.3-6.2.6L12.8 8.4h-1.6L7.9 22' +
+    'c-1.8-.3-4 .2-6.2-.6L3.8 8c.4-2 1.9-3.4 4.4-3.8z' +
+    'M9.6 8.7a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zM14.4 8.7a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8z' +
+    'M6.4 10.5h.7l-1.5 10.3h-.7zM17.6 10.5h-.7l1.5 10.3h.7z"/>' +
+    '<path d="M8.4 4.8C7.2 4 7 2.4 7.6 1.6c1.4.4 3 1.4 3.8 2.4zM15.6 4.8c1.2-.8 1.4-2.4.8-3.2-1.4.4-3 1.4-3.8 2.4z' +
+    'M10.6 9.25h2.8v.7h-2.8z"/>',
   // Yelmo cerrado con rendija en cruz y penacho.
   [Equip.Helmet]:
     '<path d="M6 9.5C6 6 8.5 4.2 12 4.2S18 6 18 9.5V19c0 1.5-1.5 2.5-6 3-4.5-.5-6-1.5-6-3z' +
