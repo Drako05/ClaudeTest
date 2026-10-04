@@ -17,13 +17,27 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Espejo horizontal en la caja de 24: el par de hombreras y de grebas. */
 const MIRROR = 'matrix(-1 0 0 1 24 0)';
 
+/**
+ * Marcador del `id` de una mascara: `equipIcon` lo cambia por uno unico en
+ * cada llamada, para que dos copias del mismo icono no compartan mascara.
+ */
+const MASK_ID = '%MASK%';
+let masks = 0;
+
+/** Una bota alta de perfil, con el empeine bajo (el autor), y sus calados. */
+const BOOT = 'M5 6h7.5v2h-.7v8.4l4.7 1.6c1.1.4 1.7 1.2 1.7 2.2V22H5.8V8H5z';
+const BOOT_CUTS = 'M5.8 11h6v.9h-6zM5.8 20.8h12.4v.6H5.8z';
+
 /** El contenido de cada icono, en una caja de 24 × 24. */
 const ICONS: Record<Equip, string> = {
-  // Capa con capucha: la cara y la abertura del frente, caladas.
+  // Capa vista de espaldas, sin capucha (el autor): el broche del cuello, la
+  // linea del cuello, dos pliegues y el bajo ondulado.
   [Equip.Cape]:
-    '<path d="M12 1.5C8.6 1.5 7 4 7 7.2v2C5.2 11.5 3.6 16 3 22h18c-.6-6-2.2-10.5-4-12.8v-2C17 4 15.4 1.5 12 1.5z' +
-    'M12 4.5c-1.4 0-2.4 1.3-2.4 3.1 0 2 1.1 3.4 2.4 3.4s2.4-1.4 2.4-3.4c0-1.8-1-3.1-2.4-3.1z' +
-    'M11.5 13h1l.4 9h-1.8z"/>',
+    '<path d="M6.5 4.5 8 2.5h8l1.5 2c1.5 4.5 3 10 4 16.5-2-.9-4-.2-5.5.6-1.4-.9-3-.5-4 .2-1-.7-2.6-1.1-4-.2' +
+    '-1.5-.8-3.5-1.5-5.5-.6 1-6.5 2.5-12 4-16.5z' +
+    'M12 3.4a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4z' +
+    'M7.3 6.4c3 1.3 6.4 1.3 9.4 0v.8c-3 1.3-6.4 1.3-9.4 0z' +
+    'M9.1 9.6h.7l-1.1 9.6H8zM14.2 9.6h.7l1.1 9.6h-.7z"/>',
   // Yelmo cerrado con rendija en cruz y penacho.
   [Equip.Helmet]:
     '<path d="M6 9.5C6 6 8.5 4.2 12 4.2S18 6 18 9.5V19c0 1.5-1.5 2.5-6 3-4.5-.5-6-1.5-6-3z' +
@@ -62,42 +76,53 @@ const ICONS: Record<Equip, string> = {
     '<path d="M8.3 7.8h7.4v7.9H8.3zM9.8 9.3v4.9h4.4V9.3z"/>' +
     '<path d="M11.4 9.3h1.2v4.9h-1.2z"/>' +
     '<path d="M16.6 14.5h4.6v4.8c0 1.5-1.1 2.7-2.3 2.7s-2.3-1.2-2.3-2.7z"/>',
-  // Grebas: el par de protecciones de pierna, con la rodillera.
+  // Pantalon de armadura entero (el autor): la cintura con su hebilla, las
+  // caderas hasta la entrepierna y las dos perneras con la rodillera.
   [Equip.Pants]:
-    '<path d="M4.3 2.5h6.2l-.5 8.4c.6.8.6 2 0 2.8l-.4 6.3 1.4 2H4.8l1.1-2-.6-6.3c-.6-.8-.6-2 0-2.8z' +
-    'M5.1 9.8h5.2v.8H5.1z"/>' +
-    `<path transform="${MIRROR}" d="M4.3 2.5h6.2l-.5 8.4c.6.8.6 2 0 2.8l-.4 6.3 1.4 2H4.8l1.1-2-.6-6.3c-.6-.8-.6-2 0-2.8z` +
-    'M5.1 9.8h5.2v.8H5.1z"/>',
+    '<path d="M4.5 2.5h15V6l-.5 5c.6.8.6 2 0 2.8l-.4 6.2 1.4 2h-6.2l1.1-2-.6-6.2c-.4-.6-.5-1.4-.3-2.1L12 9.6l-2 2.1' +
+    'c.2.7.1 1.5-.3 2.1L9.1 20l1.1 2H4l1.4-2-.4-6.2c-.6-.8-.6-2 0-2.8l-.5-5z' +
+    'M4.5 5.2h15V6h-15zM10.8 3.1h2.4v1.5h-2.4zM5.1 10.4h4.7v.7H5.1zM14.2 10.4h4.7v.7h-4.7z"/>',
   // Anillo de sello con una gema grande.
   [Equip.Ring]:
     '<path d="M12 8.6a6.7 6.7 0 1 1 0 13.4 6.7 6.7 0 0 1 0-13.4zM12 11a4.3 4.3 0 1 0 0 8.6 4.3 4.3 0 0 0 0-8.6z"/>' +
     '<path d="M12 1.5l4.2 3.7L12 10 7.8 5.2zM9.3 4.9h5.4v.7H9.3z"/>',
-  // Bota alta de cuero, con el doblez arriba, la correa y la suela.
+  // El par de botas altas, una detras de la otra (el autor), con el empeine
+  // bajo. La de atras lleva recortado el contorno de la de delante con un
+  // margen (`<mask>`), para que se distingan.
   [Equip.Boots]:
-    '<path d="M6 2h10v2.5h-1.5v8.3l5.1 3.6c1 .7 1.4 1.7 1.4 2.8V22H7V4.5H6z' +
-    'M7 8.8h7.5V10H7zM7 19.9h14v.8H7z"/>',
+    `<defs><mask id="${MASK_ID}" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">` +
+    '<rect width="24" height="24" fill="#fff"/>' +
+    `<path transform="translate(-.8 .4)" d="${BOOT}" fill="#000" fill-rule="nonzero" stroke="#000" stroke-width="2.2"/>` +
+    '</mask></defs>' +
+    `<g mask="url(#${MASK_ID})"><path transform="translate(3.6 -2.8)" d="${BOOT}${BOOT_CUTS}"/></g>` +
+    `<path transform="translate(-.8 .4)" d="${BOOT}${BOOT_CUTS}"/>`,
   // Huella de bestia (un lobo), con sus garras.
   [Equip.Pet]:
     '<path d="M12 12.6c3 0 5.6 3.1 5.6 5.7 0 2-2 3.2-3.6 2.7-1-.3-1.5-.7-2-.7s-1 .4-2 .7c-1.6.5-3.6-.7-3.6-2.7 0-2.6 2.6-5.7 5.6-5.7z"/>' +
     '<circle cx="5.3" cy="11.6" r="2.1"/><circle cx="9.3" cy="7.6" r="2.1"/>' +
     '<circle cx="14.7" cy="7.6" r="2.1"/><circle cx="18.7" cy="11.6" r="2.1"/>' +
     '<path d="M8.4 5.8 9.4 2.4l1 3.4zM13.6 5.8l1-3.4 1 3.4zM3.8 10.2l-1.6-3 3.1 1.6zM20.2 10.2l1.6-3-3.1 1.6z"/>',
-  // Cabeza de caballo, como el caballo del ajedrez.
+  // Cabeza de caballo de perfil, mirando a la izquierda: cana nasal recta,
+  // morro corto y redondo, la mandibula, la oreja y la crin; ojo y ollar
+  // calados.
   [Equip.Mount]:
-    '<path d="M6.5 22h12v-1.6c0-.9-.6-1.5-1.4-1.7-.3-2.8.2-5.6 1-8.2.9-3-.1-5.6-2.6-7l-.8-1.9-1.4 1.4' +
-    'c-2.6-.2-4.8 1-6.3 3.5l-3 4.7c-.5.8-.2 1.8.7 2.1l1.1.4c.6.2 1.3 0 1.7-.5l1.6-1.6c.7-.2 1.4-.4 2-1' +
-    '-.2 2.9-2.1 4.9-3 8.2-.8.2-1.6.8-1.6 1.6z' +
-    'M12.6 5.4a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8z"/>',
+    '<path d="M9 22l1.8-7.8c-.3 1.6-2.2 2.3-3.8 2-1-.2-1.4-.7-2-.6-1.2.1-1.8-1-1.4-2L7.8 6.8' +
+    'c.8-1.3 2.2-2.5 3.8-3l1-2.6 1.6 2.4c3.3 1.4 5.3 5.4 5.6 9.4.3 3.5.2 6.5.7 9z' +
+    'M10.4 6.8a.8.8 0 1 1 0 1.6.8.8 0 0 1 0-1.6zM4.8 13.3a.55.55 0 1 1 0 1.1.55.55 0 0 1 0-1.1z' +
+    'M14.6 5.2c2.6 1.4 4 4.8 4.2 8.3h-.7c-.2-3.2-1.5-6.2-3.9-7.6z"/>',
   // Espada en diagonal: el canal calado, el gavilan y el pomo.
   [Equip.Weapon]:
     '<g transform="rotate(45 12 12) translate(12 12) scale(1.18) translate(-12 -12)">' +
     '<path d="M10.4 3 12 .2 13.6 3v12h-3.2zM11.6 4.2v9.6h.8V4.2z"/>' +
     '<path d="M6.6 15h10.8v2.1H6.6zM11 17.1h2v4h-2z"/>' +
     '<circle cx="12" cy="22.3" r="1.6"/></g>',
-  // Escudo de blason con una cruz heraldica calada.
+  // Condecoracion de pecho (el autor: una medalla o placa, no un escudo): la
+  // cinta con su raya y el corte en V, la anilla y la medalla con su estrella.
   [Equip.Emblem]:
-    '<path d="M4 2.5h16v7.5c0 5.5-3.5 9.5-8 12-4.5-2.5-8-6.5-8-12z' +
-    'M11 4.5h2v14.5h-2zM6.3 8.5H11v2H6.3zM13 8.5h4.7v2H13z"/>',
+    '<path d="M8 1.5h8v7.1l-4-1.2-4 1.2zM11.4 1.5h1.2v5.6l-.6-.2-.6.2z"/>' +
+    '<path d="M12 7.8a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm0 .85a.65.65 0 1 0 0 1.3.65.65 0 0 0 0-1.3z"/>' +
+    '<path d="M12 10.9a5.4 5.4 0 1 1 0 10.8 5.4 5.4 0 0 1 0-10.8z' +
+    'M12 13l.79 2.21 2.35.07-1.86 1.44.66 2.25L12 17.65l-1.94 1.32.66-2.25-1.86-1.44 2.35-.07z"/>',
 };
 
 /** El icono de una casilla de PERSONAJE, listo para meter en su boton. */
@@ -106,6 +131,6 @@ export function equipIcon(e: Equip): SVGSVGElement {
   svg.setAttribute('viewBox', '0 0 24 24');
   svg.setAttribute('aria-hidden', 'true');
   svg.classList.add('equipIcon');
-  svg.innerHTML = ICONS[e];
+  svg.innerHTML = ICONS[e].split(MASK_ID).join(`equip-mask-${++masks}`);
   return svg;
 }
