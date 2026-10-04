@@ -48,6 +48,12 @@ un indice de estos documentos).
     incluido, y un test lo afirma. Arbusto, roca, minerales y brote llevan
     medidas sacadas de su dibujo (deduccion mia).
 
+    **El de un animal son las cajas de su cuerpo** (decision del autor,
+    2026-10-03): las partes `hit` de su plano (`shared/fauna-body.ts`), giradas
+    con su rumbo (`animalBoxes`, `rayOrientedBox`). El tronco, el cuello y la
+    cabeza si; la cola, las patas y las orejas no. Es el mismo plano que se
+    dibuja, como el tronco de los arboles.
+
     Es el tercer modelo, y cada uno cayo por lo mismo: la primera persona.
     Cuatro casillas fijas (la apuntada, sus vecinas en el anillo de 8
     direcciones y la propia) golpeaban lo que no estaba delante de los ojos; un
@@ -111,6 +117,15 @@ un indice de estos documentos).
     de un bloque, se sube de un salto y, si se desmonta, se cae. El horno mide
     1,25 y **no se sube desde su mismo nivel**: a proposito, porque «que haya
     bloques de diferente altura sera una de las caracteristicas del juego».
+
+    **Los animales llevan la regla a sus partes** (2026-10-03, ver
+    `docs/fauna.md`). Sus pies, como el jugador: centro y `STEP_UP`. Ademas,
+    cada parte de su cuerpo que choca (`hit`), girada con su rumbo, no puede
+    solapar una casilla solida ni una casilla que, hacia sus pies, tenga un
+    escalon de mas de `STEP_UP` cuya cima pase de la base de la parte
+    (`sim/body.ts`, *deduccion*). Una rampa no tiene escalon y deja pasar. La
+    decision del autor es que choquen las cajas de sus partes; como se mide la
+    altura contra ellas es deduccion mia.
 
 22. **Donde se nace hay que ganarselo.** `findSpawn` miraba solo si el tile era
     solido, y eso basto mientras el relieve solo se veia. Con la altura

@@ -46,7 +46,7 @@ import {
 } from '@verdant/shared';
 import { collectBiome, type BiomeStats } from './biome.js';
 import { chunkKey, localCoord, toChunkCoord } from './coords.js';
-import { canClimbTo, groundHeight } from './relief.js';
+import { canClimbTo, groundHeight, NO_RAMP } from './relief.js';
 
 /**
  * Casillas que tiene que haber al alcance para nacer en un sitio, contando con
@@ -363,6 +363,20 @@ export class World {
    */
   floorHeightAt(wx: number, wy: number): number {
     return this.groundHeightAt(wx, wy) + stationHeight(this.featureAt(Math.floor(wx), Math.floor(wy)));
+  }
+
+  /**
+   * Lo mas bajo y lo mas alto del suelo de una casilla, con su estacion, en
+   * `out[0]` y `out[1]`: en una rampa, su pie y su cima. Es lo que mira el
+   * choque de las partes de un animal (`body.ts`), y sale del nivel y de la
+   * rampa sin muestrear la altura.
+   */
+  floorRangeAt(tx: number, ty: number, out: Float64Array): void {
+    const chunk = this.getChunk(toChunkCoord(tx), toChunkCoord(ty));
+    const idx = localCoord(ty) * CHUNK_SIZE + localCoord(tx);
+    const low = chunk.level[idx] + stationHeight(this.featureAtIndex(chunk, idx));
+    out[0] = low;
+    out[1] = chunk.rampDir[idx] === NO_RAMP ? low : low + 1;
   }
 
   /** Lo que hay realmente en un tile. Unica fuente de verdad. */

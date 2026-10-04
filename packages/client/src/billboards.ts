@@ -603,6 +603,19 @@ export class BillboardSet {
 }
 
 /**
+ * El sprite del jugador, suelto: lo que usa la sonda de profundidad
+ * (`sprite-depth-probe.ts`) sin montar todos los billboards. En
+ * `userData.visible` lleva lo que mide su dibujo, el alto de su caja.
+ */
+export function playerSprite(): Sprite | null {
+  const art = fromArt(makePlayerArt(DETAIL), BASE, false);
+  if (!art) return null;
+  const sprite = place(art, 0, 0, 0);
+  sprite.userData.visible = art.visible;
+  return sprite;
+}
+
+/**
  * El sprite de algo que se apoya en el suelo, con la profundidad de su cuerpo
  * (`sprite-depth.ts`): el terreno le tapa lo que taparia a un cuerpo, ni mas
  * ni menos. El sprite se coloca por su centro, que esta a `h/2 - lift` de los

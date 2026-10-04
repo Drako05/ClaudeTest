@@ -31,6 +31,8 @@ export interface Offset {
 }
 
 /** Un punto o una direccion, con `z` la altura. */
+import type { OrientedBox } from './body.js';
+
 export interface Vec3 {
   readonly x: number;
   readonly y: number;
@@ -178,6 +180,36 @@ export function rayBox(origin: Vec3, dir: Vec3, box: Hitbox, maxT: number): numb
     }
     let t1 = (lo - o) / d;
     let t2 = (hi - o) / d;
+    if (t1 > t2) [t1, t2] = [t2, t1];
+    if (t1 > tmin) tmin = t1;
+    if (t2 < tmax) tmax = t2;
+    if (tmin > tmax) return null;
+  }
+  return tmin;
+}
+
+/**
+ * Donde entra el rayo en una caja girada en el suelo (`body.ts`): el metodo
+ * de las placas en los ejes de la caja, o `null` si no la cruza entre `0` y
+ * `maxT`. Es como se golpea a las partes de un animal.
+ */
+export function rayOrientedBox(origin: Vec3, dir: Vec3, box: OrientedBox, maxT: number): number | null {
+  const px = origin.x - box.cx;
+  const py = origin.y - box.cy;
+  const axes: Array<[number, number, number]> = [
+    [px * box.ux + py * box.uy, dir.x * box.ux + dir.y * box.uy, box.hl],
+    [-px * box.uy + py * box.ux, -dir.x * box.uy + dir.y * box.ux, box.hw],
+    [origin.z - box.cz, dir.z, box.hh],
+  ];
+  let tmin = 0;
+  let tmax = maxT;
+  for (const [o, d, half] of axes) {
+    if (Math.abs(d) < 1e-12) {
+      if (Math.abs(o) > half) return null;
+      continue;
+    }
+    let t1 = (-half - o) / d;
+    let t2 = (half - o) / d;
     if (t1 > t2) [t1, t2] = [t2, t1];
     if (t1 > tmin) tmin = t1;
     if (t2 < tmax) tmax = t2;

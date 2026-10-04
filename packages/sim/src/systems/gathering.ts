@@ -8,8 +8,6 @@
  */
 
 import {
-  animalHalf,
-  animalHeight,
   animalLoot,
   BALANCED_HARVEST_BONUS,
   biomeOfTerrain,
@@ -51,6 +49,7 @@ import {
   plantTile,
   pointAlong,
   rayBox,
+  rayOrientedBox,
   strike,
   STRIKE_RANGE,
   type Hitbox,
@@ -59,6 +58,7 @@ import {
   type Surface,
   type Vec3,
 } from '../aim.js';
+import { bodyBoxes, type OrientedBox } from '../body.js';
 import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
@@ -326,18 +326,14 @@ export interface AnimalHit {
 }
 
 /**
- * La caja de golpe de un animal: vertical, centrada en el y apoyada en sus
- * pies, con el medio ancho y el alto de su especie y su etapa.
+ * Las cajas de golpe de un animal: las partes `hit` de su plano
+ * (`fauna-body.ts`) en su sitio y giradas con su rumbo. Su cola, sus patas y
+ * sus orejas no: decision del autor, el golpe va al cuerpo.
  */
-export function animalBox(store: EntityStore, id: number): Hitbox | null {
+export function animalBoxes(store: EntityStore, id: number): OrientedBox[] {
   const animal = store.animal[id];
-  if (!animal || !store.alive[id]) return null;
-  const half = animalHalf(animal.species, animal.stage);
-  const height = animalHeight(animal.species, animal.stage);
-  const x = store.x[id];
-  const y = store.y[id];
-  const z0 = store.z[id];
-  return { x0: x - half, x1: x + half, y0: y - half, y1: y + half, z0, z1: z0 + height };
+  if (!animal || !store.alive[id]) return [];
+  return bodyBoxes(animal.species, animal.stage, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]);
 }
 
 /**
@@ -364,15 +360,16 @@ function animalsInReach(
   for (const a of animals) {
     const reach = STRIKE_RANGE + 2;
     if (Math.abs(store.x[a] - origin.x) > reach || Math.abs(store.y[a] - origin.y) > reach) continue;
-    const box = animalBox(store, a);
-    if (!box) continue;
+    const boxes = animalBoxes(store, a);
     let best = Infinity;
     let bestDir: Vec3 | null = null;
     for (const ray of rays) {
-      const t = rayBox(origin, ray.dir, box, ray.length);
-      if (t !== null && t < best) {
-        best = t;
-        bestDir = ray.dir;
+      for (const box of boxes) {
+        const t = rayOrientedBox(origin, ray.dir, box, ray.length);
+        if (t !== null && t < best) {
+          best = t;
+          bestDir = ray.dir;
+        }
       }
     }
     if (bestDir) out.push({ id: a, t: best, at: pointAlong(origin, bestDir, best) });

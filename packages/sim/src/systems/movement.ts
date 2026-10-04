@@ -19,6 +19,7 @@
 
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
+import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
 import { STEP_UP } from './jump.js';
 
 /** Medio ancho del cuerpo del jugador, en tiles. */
@@ -191,13 +192,57 @@ function walk(
   slide(world, store, id, dirX * speed * dt, dirY * speed * dt, margin);
 }
 
+/** Cuanto gira un animal, en radianes por segundo: media vuelta por segundo. **Deduccion mia.** */
+export const ANIMAL_TURN_RATE = Math.PI;
+
 /**
- * Andar a una velocidad propia, por el suelo y con la colision de siempre: es
- * lo de los animales, que pasean cada uno a la suya. `keep` dice que puntos
- * admite ademas —un animal no sale de los tiles de su bioma—, y lo que no
- * admite estorba como una pared.
+ * Lo que puede desviarse el rumbo de un animal de su destino para avanzar: mas
+ * alla, gira sin moverse, porque los animales no andan de lado. **Deduccion
+ * mia.**
  */
-export function walkAt(
+export const ANIMAL_WALK_CONE = Math.PI / 4;
+
+/** El angulo de `a` a `b`, por el camino corto, en (-π, π]. */
+function turnBetween(a: number, b: number): number {
+  let d = (b - a) % (2 * Math.PI);
+  if (d > Math.PI) d -= 2 * Math.PI;
+  if (d <= -Math.PI) d += 2 * Math.PI;
+  return d;
+}
+
+/**
+ * Si los pies de un animal pueden ir a (cx, cy): su casilla no es solida, el
+ * punto lo admite `keep` —no sale de los tiles de su bioma— y el suelo no sube
+ * mas de `STEP_UP`. Lo demas del cuerpo lo miran sus partes (`body.ts`).
+ */
+function feetBlocked(
+  world: World,
+  cx: number,
+  cy: number,
+  feet: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  if (world.isSolidAt(Math.floor(cx), Math.floor(cy))) return true;
+  if (keep && !keep(cx, cy)) return true;
+  return world.floorHeightAt(cx, cy) > feet + STEP_UP;
+}
+
+/**
+ * Un tick del andar de un animal hacia (`dirX`, `dirY`), a su velocidad.
+ *
+ * Decision del autor (2026-10-03): **choca con las cajas de sus partes**, que
+ * giran con su rumbo (`body.ts`). Por eso:
+ * - **gira hacia su destino** a `ANIMAL_TURN_RATE`, y un paso de giro que
+ *   metiera una parte en el terreno no se da: si al girar su cabeza entrara en
+ *   una pared, no gira;
+ * - **avanza a lo largo de su rumbo**, eje a eje como el jugador, cuando ese
+ *   rumbo esta a menos de `ANIMAL_WALK_CONE` de su destino;
+ * - **un cuerpo que cabe no puede dejar de caber**: un paso que lo meteria
+ *   en el terreno no se da. Uno que no cabe —nacio asi, o crecio algo a su
+ *   lado— anda sin que sus partes le estorben, solo con sus pies, hasta que
+ *   vuelve a caber: asi nunca se queda clavado. **Deduccion mia.**
+ */
+export function walkAnimal(
   world: World,
   store: EntityStore,
   id: number,
@@ -207,17 +252,63 @@ export function walkAt(
   dt: number,
   keep?: (x: number, y: number) => boolean,
 ): void {
-  const len = Math.hypot(dirX, dirY);
-  if (len <= 1e-6 || speed <= 0) {
-    store.vx[id] = 0;
-    store.vy[id] = 0;
-    return;
+  groundRound(world, store.x[id], store.y[id], () => walkAnimalStep(world, store, id, dirX, dirY, speed, dt, keep));
+}
+
+function walkAnimalStep(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dirX: number,
+  dirY: number,
+  speed: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  const animal = store.animal[id];
+  store.vx[id] = 0;
+  store.vy[id] = 0;
+  if (!animal || Math.hypot(dirX, dirY) <= 1e-6 || speed <= 0) return;
+  const feet = store.z[id];
+  const clashes = (x: number, y: number, fx: number, fy: number) =>
+    bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, feet, fx, fy), x, y);
+  let x = store.x[id];
+  let y = store.y[id];
+  let fx = store.facingX[id];
+  let fy = store.facingY[id];
+  let here = clashes(x, y, fx, fy);
+
+  // El giro, hasta lo que da un tick.
+  const have = Math.atan2(fy, fx);
+  let left = turnBetween(have, Math.atan2(dirY, dirX));
+  const turn = Math.max(-ANIMAL_TURN_RATE * dt, Math.min(ANIMAL_TURN_RATE * dt, left));
+  if (turn !== 0) {
+    const nfx = Math.cos(have + turn);
+    const nfy = Math.sin(have + turn);
+    const there = clashes(x, y, nfx, nfy);
+    if (here > 0 || there === 0) {
+      fx = nfx;
+      fy = nfy;
+      here = there;
+      left -= turn;
+      store.facingX[id] = fx;
+      store.facingY[id] = fy;
+    }
   }
-  const ux = dirX / len;
-  const uy = dirY / len;
-  store.facingX[id] = ux;
-  store.facingY[id] = uy;
-  store.vx[id] = ux * speed;
-  store.vy[id] = uy * speed;
-  slide(world, store, id, ux * speed * dt, uy * speed * dt, STEP_UP, keep);
+  if (Math.abs(left) > ANIMAL_WALK_CONE) return;
+
+  // El avance, a lo largo de su rumbo y eje a eje.
+  const stepX = fx * speed * dt;
+  const stepY = fy * speed * dt;
+  if (!feetBlocked(world, x + stepX, y, feet, keep)) {
+    const there = here > 0 ? here : clashes(x + stepX, y, fx, fy);
+    if (here > 0 || there === 0) x += stepX;
+  }
+  if (!feetBlocked(world, x, y + stepY, feet, keep)) {
+    if (here > 0 || clashes(x, y + stepY, fx, fy) === 0) y += stepY;
+  }
+  store.vx[id] = (x - store.x[id]) / dt;
+  store.vy[id] = (y - store.y[id]) / dt;
+  store.x[id] = x;
+  store.y[id] = y;
 }

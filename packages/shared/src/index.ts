@@ -6,6 +6,7 @@
 export * from './base.js';
 export * from './ecology.js';
 export * from './fauna.js';
+export * from './fauna-body.js';
 
 import { BiomeKind, CHUNK_SIZE, LifeKind, Terrain } from './base.js';
 import { AnimalClass, animalMass, SPECIES, Species, Stage } from './fauna.js';

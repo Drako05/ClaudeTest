@@ -26,7 +26,8 @@ import {
 } from '../fauna.js';
 import { toChunkCoord, type World } from '../world.js';
 import { applyVertical } from './jump.js';
-import { collides, walkAt } from './movement.js';
+import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
+import { collides, walkAnimal } from './movement.js';
 
 /** Los animales materializados, por su clave: la entidad que es cada uno. */
 export type FaunaIndex = Map<string, number>;
@@ -50,6 +51,8 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
     store.y[id] = y;
   }
   store.z[id] = world.floorHeightAt(store.x[id], store.y[id]);
+  // Mirando de su origen a su punto de paso: lo mismo lo mire alguien o no.
+  faceToFit(world, store, id, animal, Math.atan2(target.y - animal.homeY, target.x - animal.homeX));
   store.vz[id] = 0;
   store.grounded[id] = 1;
   store.vx[id] = 0;
@@ -57,6 +60,33 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
   store.wanderPeriod[id] = period;
   store.wanderX[id] = target.x;
   store.wanderY[id] = target.y;
+}
+
+/**
+ * El rumbo con que se pone a un animal: de 8, el primero en que su cuerpo cabe
+ * en el terreno, empezando por `start`; si no cabe en ninguno, el que
+ * menos se mete, y desde ahi `walkAnimal` le deja salir. **Deduccion mia.**
+ */
+function faceToFit(world: World, store: EntityStore, id: number, animal: Animal, start: number): void {
+  const x = store.x[id];
+  const y = store.y[id];
+  const z = store.z[id];
+  const best = groundRound(world, x, y, () => {
+    let fewest = Infinity;
+    let angle = start;
+    for (let k = 0; k < 8; k++) {
+      const a = start + (k * Math.PI) / 4;
+      const clashes = bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, Math.cos(a), Math.sin(a)), x, y);
+      if (clashes < fewest) {
+        fewest = clashes;
+        angle = a;
+        if (clashes === 0) break;
+      }
+    }
+    return angle;
+  });
+  store.facingX[id] = Math.cos(best);
+  store.facingY[id] = Math.sin(best);
 }
 
 /**
@@ -125,7 +155,7 @@ export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, t
     const dy = store.wanderY[id] - store.y[id];
     const info = SPECIES[animal.species];
     if (store.grounded[id] && Math.hypot(dx, dy) > ARRIVE_DISTANCE) {
-      walkAt(world, store, id, dx, dy, info.speed, TICK_DT, (x, y) =>
+      walkAnimal(world, store, id, dx, dy, info.speed, TICK_DT, (x, y) =>
         biomeOfTerrain(world.terrainAt(Math.floor(x), Math.floor(y))) === info.biome,
       );
     } else {

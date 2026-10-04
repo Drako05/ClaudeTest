@@ -10,57 +10,57 @@
  * - `gestures` o `slash`: esas herramientas;
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los animales con ocho direcciones y la profundidad de su cuerpo
- * (2026-10-03).
+ * Ronda: los animales de bloques, con la caja de golpe y el choque de sus
+ * partes (2026-10-03).
  */
 export default [
   {
-    nombre: 'sprite con la profundidad de la lamina',
-    fichero: 'packages/client/src/sprite-depth.ts',
-    de: 'gl_FragDepth = clamp( bodyClip.z / bodyClip.w * 0.5 + 0.5, 0.0, 1.0 );',
-    a: 'gl_FragDepth = gl_FragCoord.z;',
-    prueba: 'smoke:fauna',
+    nombre: 'la cola golpea',
+    fichero: 'packages/shared/src/fauna-body.ts',
+    de: "part('cola', 'dark', false, [0.06, 0.5, 0.06], [-1.13, 0.95, 0])",
+    a: "part('cola', 'dark', true, [0.06, 0.5, 0.06], [-1.13, 0.95, 0])",
+    prueba: 'test:tests/fauna-body.test.ts',
   },
   {
-    nombre: 'caja adelantada de mas',
-    fichero: 'packages/client/src/sprite-depth.ts',
-    de: '  bodyHit = bodyO + bodyD * bodyNear;',
-    a: '  bodyHit = bodyO + bodyD * max( bodyNear - 1.5, 0.0 );',
-    prueba: 'smoke:fauna',
+    nombre: 'la cabeza no golpea',
+    fichero: 'packages/shared/src/fauna-body.ts',
+    de: "part('cabeza', 'mane', true, [0.55, 0.6, 0.55], [1.25, 1.0, 0], true)",
+    a: "part('cabeza', 'mane', false, [0.55, 0.6, 0.55], [1.25, 1.0, 0], true)",
+    prueba: 'test:tests/fauna-body.test.ts',
   },
   {
-    nombre: 'caja sin el rumbo del animal',
+    nombre: 'gira sin mirar su postura',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '    const there = clashes(x, y, nfx, nfy);\n    if (here > 0 || there === 0) {',
+    a: '    const there = clashes(x, y, nfx, nfy);\n    if (true) {',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'el escalon no estorba a las partes',
+    fichero: 'packages/sim/src/body.ts',
+    de: '  return low - highOf(world, nx, ny) > STEP_UP ? low : -Infinity;',
+    a: '  return -Infinity;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'sin indulgencia al avanzar',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '    if (here > 0 || there === 0) x += stepX;',
+    a: '    if (there === 0) x += stepX;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'sin indulgencia al girar',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '    const there = clashes(x, y, nfx, nfy);\n    if (here > 0 || there === 0) {',
+    a: '    const there = clashes(x, y, nfx, nfy);\n    if (there === 0) {',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'el modelo no gira',
     fichero: 'packages/client/src/fauna-view.ts',
-    de: '      material.facing.set(fx, fy);',
-    a: '      material.facing.set(1, 0);',
+    de: '      mesh.rotation.y = yawOf(store.facingX[id], store.facingY[id]);',
+    a: '      mesh.rotation.y = 0;',
     prueba: 'smoke:fauna',
-  },
-  {
-    nombre: 'siempre de perfil',
-    fichero: 'packages/client/src/fauna-view.ts',
-    de: '      const { view, mirror } = viewOfSector(sector);',
-    a: '      const { view, mirror } = viewOfSector(2);',
-    prueba: 'smoke:fauna',
-  },
-  {
-    nombre: 'una vista que no mide su caja',
-    fichero: 'packages/client/src/fauna-view.ts',
-    de: '    const perPx = height / rows;',
-    a: '    const perPx = ((v === View.Front ? 1.2 : 1) * height) / rows;',
-    prueba: 'smoke:fauna',
-  },
-  {
-    nombre: 'vista sin histeresis',
-    fichero: 'packages/client/src/fauna-facing.ts',
-    de: '<= 22.5 + VIEW_HYSTERESIS_DEG) return previous;',
-    a: '<= 22.5) return previous;',
-    prueba: 'test:tests/fauna-facing.test.ts',
-  },
-  {
-    nombre: 'espejo al reves',
-    fichero: 'packages/client/src/fauna-facing.ts',
-    de: 'mirror: sector < 0 };',
-    a: 'mirror: sector > 0 };',
-    prueba: 'test:tests/fauna-facing.test.ts',
   },
 ];

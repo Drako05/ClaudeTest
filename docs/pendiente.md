@@ -39,8 +39,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Fauna: el **paseo** — un punto de paso cada 20 s, territorio de 6 a 16 casillas, de 0,6 a 1,2 bloques por segundo, sin salir de su bioma y sin chocar con nadie | `docs/fauna.md`, la ley del observador | numeros en `SPECIES` |
 | Fauna: **los animales no se curan** mientras estan cerca (al recargarse si: tu decision) | `docs/fauna.md`, el sistema de PV | una regla |
 | El **impacto**: estrella de 0,18 a 0,42 bloques en 0,2 s, blanca y sin prueba de profundidad | `docs/efectos.md`, el impacto | tres numeros |
-| Fauna, el dibujo: la **histeresis de 8°** antes de cambiar de direccion; el **ancho de cada cuerpo** (`wide`, de 0,27 a 0,5 del alto; cangrejo 0,8); la **caja orientada con el rumbo real** aunque el dibujo vaya de 45 en 45°; la tinta que **no cae sobre la caja toma el punto de la caja mas cercano**; los tres cuartos como **perfil encogido** | `docs/fauna.md`, el dibujo | numeros en `fauna-art.ts` y `fauna-facing.ts` |
-| Fauna: los **listones de la sonda** de profundidad — mal tapado y mal visto ≤ 5 %, dibujo fuera del cuerpo ≤ 16 % | `docs/fauna.md`, la sonda | tres numeros del humo |
+| Fauna, el cuerpo de bloques: las **medidas de cada plano** y que es `hit` mas alla de la cola (patas, orejas, cuernos, astas, barba, alas y pico, no); la cabeza de la cria un 30 % mayor y la del joven un 10 %; los colores | `docs/fauna.md`, el cuerpo de bloques | numeros en `fauna-body.ts` y `fauna-model.ts` |
+| Fauna, el choque: el **escalon de mas de `STEP_UP`** que estorba a una parte, y la rampa que no; **girar a 180°/s**; **no avanzar a mas de 45°** de su destino; la **indulgencia** del que no cabe; al ponerlo, **8 rumbos** desde el de su origen a su punto de paso | `docs/fauna.md`, el choque | numeros en `movement.ts` y `body.ts` |
+| La **sonda de profundidad del jugador**: mal tapado y mal visto ≤ 5 % en cinco casos de terreno | `docs/fauna.md`, lo que quedo de la lamina | dos numeros del humo |
 | Fauna: el **ciervo adulto se dibuja sin astas**, porque el dibujo aun no distingue sexos | `docs/fauna.md`, las especies | un dibujo |
 | Fauna: los **dibujos y colores** de las diez especies y sus crias; el **alto minimo** de 0,22 bloques (el cangrejo); el medio ancho de cada caja | `docs/fauna.md`, las especies | dibujo y numeros |
 | `GRAVITY = 62` y `JUMP_SPEED = 12`, deducidos de tu enunciado del salto | Fase 2 del relieve | dos numeros |
@@ -536,6 +537,37 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Fauna de bloques, con la caja de golpe de sus partes — HECHO (2026-10-03)
+
+Probaste las ocho direcciones y no te convencieron: «no siento que por ese
+camino podamos llegar a un juego pulido». Elegiste **animales de bloques**:
+
+- detalle medio;
+- estaticos de momento;
+- chocan con **las cajas de sus partes**;
+- no chocan entre ellos ni contigo.
+
+- **El plano de cada especie** (`shared/fauna-body.ts`) es el unico sitio que
+  dice como es un animal, de 10 a 25 cajas segun la especie.
+  - El nucleo golpea y choca con las partes `hit`, y el cliente dibuja todas.
+  - Tu ejemplo: el cuello y la cabeza del bisonte se golpean; su cola, no.
+  - Lo fino tambien queda fuera (patas, orejas, cuernos, astas): es mi
+    deduccion, esta arriba.
+- **El choque**:
+  - un bisonte no cabe por un pasillo de un bloque;
+  - no gira si su cabeza fuera a entrar en una pared;
+  - no mete la cabeza en un escalon de un nivel.
+  - **Una rampa deja pasar.** Es la deduccion que mas pesa: un cuerpo que no se
+    inclina asoma un poco sobre la pendiente, y sin eso ni una liebre subia
+    rampas.
+- **El coste**:
+  - la primera version subio el tick de 0,17 ms a 2,2 ms, y el juego no
+    llegaba a 60 ticks por segundo en el humo;
+  - leyendo cada casilla una vez por ronda, queda en 0,26 ms.
+- **Mirala** con `__verdant.faunaGallery()`.
+  - Los colores y las medidas son mios: dime que especie no se parece a la
+    suya.
 
 ## Fauna: ocho direcciones y la profundidad del cuerpo — HECHO (2026-10-03)
 
