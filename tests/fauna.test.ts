@@ -3,6 +3,7 @@ import {
   animalBoxes,
   collides,
   createGame,
+  equipSlot,
   EYE_HEIGHT,
   faunaOf,
   Inventory,
@@ -23,6 +24,8 @@ import {
   CHUNK_TILES,
   densityPerChunk,
   emptyIntent,
+  Equip,
+  Feature,
   foodValue,
   hitPointsOf,
   LifeKind,
@@ -121,10 +124,13 @@ describe('Fauna: el sistema de puntos de vida', () => {
     }
   });
 
-  it('el daño de un golpe: 5 a mano y 10 por punto de poder de la herramienta', () => {
+  it('el daño de un golpe: 5 a mano, 10 por punto de poder de la herramienta, y el suyo las armas', () => {
     expect(strikeDamage(null)).toBe(5);
     expect(strikeDamage(toolStats(Resource.StoneAxe))).toBe(10);
     expect(strikeDamage(toolStats(Resource.IronPickaxe))).toBe(30);
+    expect(strikeDamage(toolStats(Resource.StoneDagger))).toBe(15);
+    expect(strikeDamage(toolStats(Resource.CopperSword))).toBe(30);
+    expect(strikeDamage(toolStats(Resource.IronSword))).toBe(45);
   });
 });
 
@@ -368,6 +374,68 @@ describe('Fauna: cazar', () => {
       expect(state.lastImpacts.length).toBe(state.lastAnimalHits.length + state.lastHits.length + state.lastHarvest.filter((r) => r.felled).length);
       expect(state.lastImpacts.some((p) => near(p, box))).toBe(true);
     }
+  });
+
+  it('con un arma equipada, al animal le pega ella aunque en la mano haya otra cosa, y se gasta ella', () => {
+    // El autor, 2026-10-04: la casilla Arma manda sobre la mano con los seres vivos.
+    const state = createGame(1);
+    const inv = state.inventory;
+    inv.add(Resource.IronPickaxe, 1);
+    inv.add(Resource.IronSword, 1);
+    inv.select(0);
+    inv.move(1, equipSlot(Equip.Weapon));
+    expect(inv.weapon()).toBe(Resource.IronSword);
+    const id = someAnimal(state, (a) => state.entities.maxHealth[a] > 50);
+    const full = state.entities.maxHealth[id];
+    step(state, aimAt(state, id));
+    expect(state.entities.health[id]).toBe(full - 45);
+    expect(inv.wearAt(equipSlot(Equip.Weapon))).toBe(toolStats(Resource.IronSword)!.uses - 1);
+    expect(inv.wear[0]).toBe(toolStats(Resource.IronPickaxe)!.uses);
+  });
+
+  it('un barrido que toca un animal y una roca gasta un uso del arma equipada y otro de la mano', () => {
+    const state = createGame(1);
+    const inv = state.inventory;
+    inv.add(Resource.StoneAxe, 1);
+    inv.add(Resource.CopperSword, 1);
+    inv.select(0);
+    inv.move(1, equipSlot(Equip.Weapon));
+    const id = someAnimal(state, (a) => state.entities.maxHealth[a] > 50);
+    const intent = { ...aimAt(state, id), precise: false };
+    // Una roca en la casilla del animal: el sector toca a los dos. El hacha no
+    // puede con ella, pero la toca, y eso gasta.
+    const { entities, world } = state;
+    world.setFeature(Math.floor(entities.x[id]), Math.floor(entities.y[id]), Feature.RockNode);
+    const full = entities.maxHealth[id];
+    step(state, intent);
+    expect(entities.health[id]).toBe(full - 30);
+    expect(state.lastHits.some((h) => h.feature === Feature.RockNode)).toBe(true);
+    expect(inv.wearAt(equipSlot(Equip.Weapon))).toBe(toolStats(Resource.CopperSword)!.uses - 1);
+    expect(inv.wear[0]).toBe(toolStats(Resource.StoneAxe)!.uses - 1);
+  });
+
+  it('sin arma equipada, un arma en la mano pega con su daño y se gasta', () => {
+    const state = createGame(1);
+    const inv = state.inventory;
+    inv.add(Resource.StoneDagger, 1);
+    inv.select(0);
+    const id = someAnimal(state, (a) => state.entities.maxHealth[a] > 30);
+    const full = state.entities.maxHealth[id];
+    step(state, aimAt(state, id));
+    expect(state.entities.health[id]).toBe(full - 15);
+    expect(inv.wear[0]).toBe(toolStats(Resource.StoneDagger)!.uses - 1);
+  });
+
+  it('el arma equipada que se rompe en un animal deja su hueco vacio', () => {
+    const state = createGame(1);
+    const inv = state.inventory;
+    inv.add(Resource.StoneDagger, 1);
+    inv.move(0, equipSlot(Equip.Weapon));
+    inv.wornWear[Equip.Weapon] = 1;
+    const id = someAnimal(state, (a) => state.entities.maxHealth[a] > 30);
+    step(state, aimAt(state, id));
+    expect(state.lastBroke).toBe(true);
+    expect(inv.weapon()).toBeNull();
   });
 
   it('con el inventario lleno el golpe que mataria no completa, y el animal sigue', () => {

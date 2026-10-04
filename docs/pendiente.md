@@ -45,7 +45,13 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
-| Fauna: el **daño de un golpe** a algo vivo, 5 a mano y 10 por punto de poder de la herramienta (cualquier hacha o pico); golpear un animal gasta un uso | `docs/fauna.md`, el sistema de PV | dos numeros |
+| Equipables: los **usos de las armas**, 30, 90 y 180, tres cuartos de los de la herramienta de su material (tu pediste «menos») | Equipables, mas abajo | tres numeros en `toolStats` |
+| Equipables: **que gasta un golpe**: lo que da impacto (un animal, o algo que se trabaja); al aire o a un brote, nada; **uno por golpe y por objeto**, asi un barrido a un animal y un arbol gasta uno del arma puesta y otro de la mano | Equipables, mas abajo | una regla en `tryHarvestArea` |
+| Equipables: **soltar sobre lo puesto lo intercambia** si lo puesto se podria quitar (la espada sobre el punal, la mochila sobre la bolsa con sus casillas vacias) | Equipables, mas abajo | una regla en `Inventory.moveWorn` |
+| Equipables: las **14 casillas se ven iguales**, todas con su icono y todas destino de arrastre, aunque casi ninguna tenga aun que ponerse (antes, las sin ropa iban apagadas); el **nombre, al pasar el raton** | Equipables, mas abajo | una linea |
+| Equipables: los **dibujos de los iconos** (capa, casco, hombreras, bolso, pechera, collar, cinturon, pantalon, anillo, bota, huella, herradura, espada, escudo) | `packages/client/src/equip-icons.ts` | un dibujo cada uno |
+| Equipables: los nombres **sin tilde ni eñe**, como los demas objetos: «Punal de piedra» | Equipables, mas abajo | tres textos |
+| Fauna: el **daño de un golpe** a algo vivo, 5 a mano y 10 por punto de poder de la herramienta (cualquier hacha o pico); golpear un animal gasta un uso. Las armas traen el suyo (tuyo: 15, 30, 45) | `docs/fauna.md`, el sistema de PV | dos numeros |
 | Fauna: la **masa de cada etapa**, cria 15 % y joven 60 % del adulto (de ahi PV, alto y botin), y su **proporcion en el mundo**, 20 / 25 / 55 % | `docs/fauna.md` | numeros en `shared/src/fauna.ts` |
 | Fauna: **densidad en el juego = 0,45 × √(densidad real)**, para que un chunk tenga animales | `docs/fauna.md`, aparicion | un numero |
 | Fauna: el **botin** — carne 0,6 × √(masa), piel 1 (2 el bisonte adulto, ninguna la cria), plumas 1-3, caparazon 1; el cangrejo no da carne | `docs/fauna.md`, botin | numeros en `animalLoot` |
@@ -551,6 +557,43 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Equipables: catorce casillas, el Bolso, el Arma y las primeras armas — HECHO (2026-10-04)
+
+Lo pediste asi:
+
+- **Una columna mas a la derecha de PERSONAJE**: de 10 a 14 casillas. En orden
+  de lectura: Capa, Casco, Hombreras, Bolso, Pechera, Collar, Cinturon,
+  Pantalon, Anillo, Botas, Mascota, Montura, Arma y Emblema (`Equip`).
+- **Un icono por casilla en vez de su nombre**, que se oculta al equipar algo.
+  Elegiste siluetas vectoriales (`equip-icons.ts`).
+- **Bolsa y mochila solo van al Bolso**, y elegiste **una a la vez**: el
+  maximo baja de 24 a 22 casillas.
+- **La casilla del Arma**: a los seres vivos les pega el arma puesta aunque se
+  lleve otra cosa en la mano; a lo demas, lo de la mano.
+- **Tres armas**: punal de piedra (a mano), espada de cobre y de hierro (en la
+  mesa), en «Armas». Daño 15, 30 y 45, a falta de una sesion de equilibrio del
+  combate; deben **durar menos** que las herramientas. Las recetas, mi
+  propuesta, que aprobaste.
+- **Un arma en la mano pega con ella**, y **todo golpe gasta** a lo que pega,
+  vivo o inerte, en la mano o equipado. Esto **retira** la regla de antes, mia,
+  de que golpear lo que no es suyo no gastaba la herramienta: un hacha contra
+  la roca ahora se gasta.
+
+Como quedo (todo en `docs/recoleccion.md`):
+
+- **Lo puesto guarda su desgaste** (`Inventory.wornWear`) y lo devuelve al
+  quitarlo; el arma puesta que se rompe deja el hueco vacio.
+- **El tramo del Bolso es fijo, de 6**: la bolsa abre las 2 primeras. La regla
+  de que no se quita con sus casillas ocupadas sigue, y vale tambien para
+  cambiarla por la otra.
+- **En el movil** las cinco columnas encogen hasta caber en 360 px.
+
+Lo que eligi yo esta en «Esperando tu juicio»: los usos de las armas, que
+gasta un golpe, el intercambio directo, que las 14 casillas se vean iguales,
+los iconos y los nombres sin eñe.
+
+**La auditoria de la fauna sigue pendiente** (arriba): esta tanda no la hizo.
 
 ## Guia de arte — en progreso (abierta el 2026-10-04)
 

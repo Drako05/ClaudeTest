@@ -69,3 +69,11 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `animalHalf|animalBox\b|walkAt\b` — la caja de golpe cuadrada de cada animal y su andar con el radio del jugador; desde el 2026-10-03 golpea y choca con las partes de su plano (`hitPartsOf`, `animalBoxes`, `walkAnimal`).
 - `fauna-art|makeAnimalArt|fauna-facing|viewOf|VIEW_HYSTERESIS|bodyWideOf|directionsSeen|faunaDirections` — los animales en lamina, con ocho direcciones (`ff73508`); desde el 2026-10-03 son modelos de bloques (`fauna-model.ts`).
 - `animalPalette` — los colores de las esquirlas y escombros de los animales; desde el 2026-10-03 no sueltan fragmentos, solo el impacto.
+
+## Equipables
+
+- `EQUIP_WAIST|EQUIP_BACK|wearOfSlot|WEAR_SLOTS|garmentOf|Wear\.(Waist|Back)|enum Wear\b|rangeOf\(|rangeEmpty\(` — la ropa en dos huecos, cintura (bolsa) y espalda (mochila), cada uno con su tramo; desde el 2026-10-04 hay catorce equipables (`Equip`) y bolsa y mochila van al Bolso, una sola (`equipOf`, `bagCapacity`, `bagRange`, `bagEmpty`). Permitido en: `docs/pendiente.md`.
+- `'Cintura'|'Espalda'|bolsa a la cintura|mochila a la espalda|bolsa en la cintura|mochila en la espalda` — los nombres de aquellos huecos. Permitido en: `docs/pendiente.md`, `docs/recoleccion.md` (cuenta el antes).
+- `EQUIP_SLOTS = 10|WORN_AT|tres equipables a cada lado|cuatro debajo` — la rejilla de PERSONAJE de diez casillas; desde el 2026-10-04 son catorce en cinco columnas, con iconos. Permitido en: `docs/pendiente.md`.
+- `\b24 casillas|16, 18, 22 o 24` — el maximo con bolsa y mochila puestas a la vez; hoy 22. Permitido en: `docs/pendiente.md`.
+- `golpe util|lo que no es suyo no la gasta|no se gasta en ella` — la herramienta solo se gastaba con lo suyo; desde el 2026-10-04 todo golpe que toca algo gasta (el autor). Permitido en: `docs/pendiente.md`, `docs/recoleccion.md` (cuenta el antes).

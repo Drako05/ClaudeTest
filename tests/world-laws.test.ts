@@ -25,7 +25,7 @@ import {
   LIFE_STEP_TICKS,
   LifeKind,
   lifeKindOf,
-  garmentOf,
+  equipOf,
   placedFeatureOf,
   RECIPES,
   RESOURCE_COUNT,
@@ -666,7 +666,7 @@ describe('Capitulo II: combinar y herramientas', () => {
         foodValue(item) > 0 ||
         sown.includes(item) ||
         toolStats(item) !== null ||
-        garmentOf(item) !== null ||
+        equipOf(item) !== null ||
         placedFeatureOf(item) !== Feature.None;
       const awaiting = AWAITING_USE.includes(item);
       expect(destiny || awaiting, RESOURCE_NAMES[item]).toBe(true);

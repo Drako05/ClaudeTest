@@ -1,7 +1,8 @@
 # Recoleccion y fabricacion
 
 Lee esto antes de tocar el inventario, las herramientas, el trabajo por golpes,
-las estaciones, la ropa, el panel `inventory-ui.ts` o el registro de objetos.
+las estaciones, los equipables (bolso y armas), el panel `inventory-ui.ts` o el
+registro de objetos.
 
 Estaba en `CLAUDE.md` hasta el 2026-10-02 y se mudo aqui **literal** (propuesta 3:
 `CLAUDE.md` se carga entero en cada turno, asi que lleva solo lo operativo y
@@ -29,10 +30,16 @@ Decisiones del autor, que no se tocan sin preguntarle:
   comen, una semilla se siembra —esa, no otra— y una mesa o un horno se coloca,
   las dos donde toca la mirada (`tryUse`). Lo demas que se mira (puertas)
   llegara despues.
-- **Se desgastan y se rompen.**
-- **16 casillas con pilas de 100** (`sim/inventory.ts`), y la ropa las amplia:
-  la bolsa en la cintura, +2; la mochila en la espalda, +6. Se arrastran a su
-  hueco de PERSONAJE, y **no se quitan con sus casillas ocupadas**.
+- **Se desgastan y se rompen**, y **todo golpe que toca algo gasta un uso** de
+  lo que pega, sea suyo o no: un hacha contra la roca, tambien (el autor,
+  2026-10-04; antes, golpear lo que no era suyo no la gastaba). Uno por golpe
+  y por objeto, toque a uno o a varios (propuesta mia); al aire o a un brote,
+  nada (deduccion mia: lo que no da impacto no se toca).
+- **16 casillas con pilas de 100** (`sim/inventory.ts`), y el **Bolso** las
+  amplia: la bolsa +2 o la mochila +6, **una sola a la vez** (el autor,
+  2026-10-04; antes, la bolsa a la cintura y la mochila a la espalda, 24 como
+  mucho). Se arrastran a su casilla de PERSONAJE, y **no se quitan ni se
+  cambian con sus casillas ocupadas**.
   **Arrastrar mueve**: el mismo objeto se apila y lo que sobra se queda; uno
   distinto se intercambia (`Inventory.move`). Con el inventario abierto se
   arrastra entre la rejilla y la barra de la mano; **cerrado, dentro de la
@@ -103,13 +110,34 @@ Lo que el codigo tiene que respetar:
   una receta y el panel para cerrarse, asi que lo que la interfaz deja intentar
   es lo que el nucleo acepta. La caja que se dibuja (`stations-view.ts`) mide
   lo que su hitbox (`STATION_BOXES`), como el tronco de los arboles.
-- **La ropa abre tramos fijos** detras de las 16 casillas: la cintura el suyo
-  y la espalda el suyo, aunque solo se lleve una prenda. Un tramo cerrado no
-  existe para meter, sacar ni arrastrar (`Inventory.isOpen`). Los huecos de
-  ropa tienen indice de arrastre propio (`EQUIP_WAIST`, `EQUIP_BACK`), asi que
-  ponerse y quitarse viajan en la `Intent` como mover. Lo puesto **cuenta en
-  `totals()`** —equiparse no es «-1 Mochila» en el registro— **pero no en
-  `count()`**: una receta no se lo gasta.
+- **Los equipables son catorce** (`Equip` en `shared`, el autor, 2026-10-04),
+  en orden de lectura de la rejilla: Capa, Casco, Hombreras, **Bolso**,
+  Pechera, Collar, Cinturon, Pantalon, Anillo, Botas, Mascota, Montura,
+  **Arma** y Emblema. Solo el Bolso y el Arma tienen ya que ponerse; el resto
+  llega en tandas posteriores. Cada hueco tiene indice de arrastre propio
+  (`equipSlot(e)`, `EQUIP_BASE + e`), asi que ponerse y quitarse viajan en la
+  `Intent` como mover; en cada uno entra solo lo suyo (`equipOf`), y soltar
+  algo valido sobre lo puesto los **intercambia** si lo puesto se podria
+  quitar (propuesta mia). Lo puesto **conserva su desgaste**
+  (`Inventory.wornWear`), **cuenta en `totals()`** —equiparse no es «-1
+  Mochila» en el registro— **pero no en `count()`**: una receta no se lo
+  gasta.
+- **El Bolso abre un tramo fijo** de 6 casillas detras de las 16 (`BAG_RANGE`):
+  la bolsa abre sus 2 primeras y la mochila las 6 (`bagCapacity`). Una casilla
+  cerrada no existe para meter, sacar ni arrastrar (`Inventory.isOpen`), y lo
+  del Bolso no sale a su propio tramo, que se cerraria con ello dentro.
+- **La casilla del Arma** (el autor, 2026-10-04): con un arma puesta, **a los
+  seres vivos les pega ella** —su daño, y se gasta ella— aunque en la mano se
+  lleve otra cosa; a lo demas (arbol, roca, bloque), lo de la mano. Un barrido
+  que toca a la vez un animal y un arbol gasta un uso de cada uno. Sin arma
+  puesta, un arma en la mano pega con ella y contra lo inerte pega como la
+  mano (`ToolKind.Weapon`, poder 0), gastandose igual. Si la puesta se
+  rompe, el hueco se vacia.
+- **Las armas**: punal de piedra (1 rama, 2 piedras, 1 fibra, a mano), espada
+  de cobre y espada de hierro (1 rama y 4 lingotes, en la mesa), en la
+  categoria «Armas». Daño 15, 30 y 45 (el autor; sin equilibrar aun, habra
+  una sesion de combate); duran menos que la herramienta de su material (el
+  autor): 30, 90 y 180 usos, tres cuartos de los suyos (deduccion mia).
 - **Los guijarros no mueven nada**: salen solo en casillas que se quedarian
   vacias y con su propio hash, asi que ningun umbral ni ninguna otra feature
   cambia (reglas 2 y 3). Van **tumbados** en el suelo (`flatGeometry`), no en
@@ -124,9 +152,13 @@ Lo que el codigo tiene que respetar:
   —PERSONAJE, INVENTARIO y RECETAS—; en el movil, una pagina a la vez,
   elegida con las pestanas **Personaje | Inventario | Recetas**: todo el ancho
   en tres celdas iguales, la elegida iluminada y en orden fijo.
-  **PERSONAJE** es el segundo boceto del autor, en PC y en el movil: el dibujo
-  en medio, tres equipables a cada lado y cuatro debajo (apagados hasta la
-  ropa). **PERSONAJE e INVENTARIO** llevan abajo la zona de lo seleccionado y
+  **PERSONAJE** es el segundo boceto del autor, en PC y en el movil, con la
+  columna que anadio el 2026-10-04: el dibujo en medio, tres equipables a su
+  izquierda, seis en dos columnas a su derecha y cinco debajo. **Cada casilla
+  lleva un icono en vez de su nombre** (`equip-icons.ts`: siluetas
+  vectoriales, dibujos mios), que **se oculta al equipar algo**; el nombre
+  queda solo al pasar el raton. En el movil las cinco columnas encogen hasta
+  caber en 360 px. **PERSONAJE e INVENTARIO** llevan abajo la zona de lo seleccionado y
   su descripcion, del mismo tamano y a la misma altura. En el movil **no se
   desliza el panel entero**: pestanas, zona de lo seleccionado y categorias
   de recetas se quedan fijas, y solo se deslizan la rejilla del inventario o
