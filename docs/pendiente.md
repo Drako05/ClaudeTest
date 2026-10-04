@@ -49,7 +49,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Equipables: **que gasta un golpe**: lo que da impacto (un animal, o algo que se trabaja); al aire o a un brote, nada; **uno por golpe y por objeto**, asi un barrido a un animal y un arbol gasta uno del arma puesta y otro de la mano | Equipables, mas abajo | una regla en `tryHarvestArea` |
 | Equipables: **soltar sobre lo puesto lo intercambia** si lo puesto se podria quitar (la espada sobre el punal, la mochila sobre la bolsa con sus casillas vacias) | Equipables, mas abajo | una regla en `Inventory.moveWorn` |
 | Equipables: las **14 casillas se ven iguales**, todas con su icono y todas destino de arrastre, aunque casi ninguna tenga aun que ponerse (antes, las sin ropa iban apagadas); el **nombre, al pasar el raton** | Equipables, mas abajo | una linea |
-| Equipables: los **dibujos de los iconos** (capa, casco, hombreras, bolso, pechera, collar, cinturon, pantalon, anillo, bota, huella, herradura, espada, escudo) | `packages/client/src/equip-icons.ts` | un dibujo cada uno |
+| Equipables: los **dibujos de los iconos**, rehechos segun tu directriz 3 (siluetas medievales): capa con capucha, yelmo con penacho, hombreras con puas, mochila de aventurero con manta, peto, amuleto, cinturon con bolsita, grebas, anillo de sello, bota alta, huella de lobo, caballo de ajedrez, espada y escudo con cruz | `packages/client/src/equip-icons.ts` | un dibujo cada uno |
+| Guia de arte: mi lectura de la **directriz 3**, que vale para **todo icono**, y la lista de los botones que hoy no la cumplen (algunos son de manejo y quiza no deban cambiar) | `docs/guia-de-arte.md`, directriz 3 | una tanda de iconos |
+| El humo `desktop` **fallo una vez en la CI de `main`** (`47b4311`): «el registro no baja hacia INVENTARIO», con el mismo arbol que paso en `pruebas`. Sospecha: en una maquina cargada la deriva de 400 ms no llega a moverse; arreglo para la auditoria: medir hasta que se mueva, no con plazo fijo | `tools/smoke.mjs`, el registro en PC | una comprobacion |
 | Equipables: los nombres **sin tilde ni eñe**, como los demas objetos: «Punal de piedra» | Equipables, mas abajo | tres textos |
 | Fauna: el **daño de un golpe** a algo vivo, 5 a mano y 10 por punto de poder de la herramienta (cualquier hacha o pico); golpear un animal gasta un uso. Las armas traen el suyo (tuyo: 15, 30, 45) | `docs/fauna.md`, el sistema de PV | dos numeros |
 | Fauna: la **masa de cada etapa**, cria 15 % y joven 60 % del adulto (de ahi PV, alto y botin), y su **proporcion en el mundo**, 20 / 25 / 55 % | `docs/fauna.md` | numeros en `shared/src/fauna.ts` |
@@ -592,6 +594,12 @@ Como quedo (todo en `docs/recoleccion.md`):
 Lo que eligi yo esta en «Esperando tu juicio»: los usos de las armas, que
 gasta un golpe, el intercambio directo, que las 14 casillas se vean iguales,
 los iconos y los nombres sin eñe.
+
+**Los iconos, rehechos** (el mismo dia): los primeros eran de trazo fino y el
+Bolso parecia un bolso de mujer. Pediste partes de armadura medieval
+minimalista, como tu imagen de referencia, con aspecto aventurero, medieval y
+de fantasia, y que entrara en la guia: es su **directriz 3**. Ahora son
+siluetas rellenas con los detalles calados.
 
 **La auditoria de la fauna sigue pendiente** (arriba): esta tanda no la hizo.
 
