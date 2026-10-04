@@ -8,23 +8,10 @@ Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
 indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `8396b7f`, 2026-10-02** (la tanda 2 entera, con sus
-siete rondas de ajustes y las pruebas pesadas a la CI). La proxima parte de
-aqui: ver `.claude/skills/auditoria/`.
-
-**La primera tanda de fauna se cerro el 2026-10-04 sin su auditoria.** Abarca
-del diseño de las especies a los animales de bloques y la guia de arte. **Es lo
-primero de la sesion siguiente**: `/auditoria`, desde `8396b7f`.
-
-- **Hay que mirar en ella un fallo intermitente de `slash`.** En la CI de
-  `pruebas` `a28555b` (solo documentacion, el mismo codigo que `a1168a7`, verde
-  dos veces) fallo «el barrido no llega a verse: normal: 16 pixeles», y al
-  repetirlo salio verde.
-- **Sospecha, sin comprobar**: un animal de bloques, opaco y paseando, se cruzo
-  entre la camara y el barrido. Donde esta cada animal depende del tiempo real
-  del humo, y antes no habia animales que taparan nada.
-- **Un arreglo plausible**: que `slash` mida sin fauna en la escena, o que lo
-  aparte de su campo de vision. Hay que confirmar la causa antes.
+**Ultima auditoria: commit `3415d31`, 2026-10-04** (la primera tanda de fauna y
+la de los equipables, desde `8396b7f`). La proxima parte de aqui: ver
+`.claude/skills/auditoria/` y «Auditoria al cerrar la fauna y los equipables»,
+mas abajo.
 
 **Como leerlo.** Va de lo mas urgente a lo mas historico:
 
@@ -51,7 +38,6 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Equipables: las **14 casillas se ven iguales**, todas con su icono y todas destino de arrastre, aunque casi ninguna tenga aun que ponerse (antes, las sin ropa iban apagadas); el **nombre, al pasar el raton** | Equipables, mas abajo | una linea |
 | Equipables: los **dibujos de los iconos**, rehechos segun tu directriz 3 (siluetas medievales) y con tus correcciones: capa vista de frente, sin capucha, con cuello alto, broche y la tela de atras visible (segun tus referencias), yelmo con penacho, hombreras con puas, mochila de aventurero con manta, peto, amuleto, cinturon con bolsita, pantalon de armadura con cintura, anillo de sello, par de botas una detras de otra con el empeine bajo, huella de lobo, cabeza de caballo de perfil, espada y condecoracion de pecho (cinta y medalla con estrella) | `packages/client/src/equip-icons.ts` | un dibujo cada uno |
 | Guia de arte: mi lectura de la **directriz 3**, que vale para **todo icono**, y la lista de los botones que hoy no la cumplen (algunos son de manejo y quiza no deban cambiar) | `docs/guia-de-arte.md`, directriz 3 | una tanda de iconos |
-| El humo `desktop` **fallo una vez en la CI de `main`** (`47b4311`): «el registro no baja hacia INVENTARIO», con el mismo arbol que paso en `pruebas`. Sospecha: en una maquina cargada la deriva de 400 ms no llega a moverse; arreglo para la auditoria: medir hasta que se mueva, no con plazo fijo | `tools/smoke.mjs`, el registro en PC | una comprobacion |
 | Equipables: los nombres **sin tilde ni eñe**, como los demas objetos: «Punal de piedra» | Equipables, mas abajo | tres textos |
 | Fauna: el **daño de un golpe** a algo vivo, 5 a mano y 10 por punto de poder de la herramienta (cualquier hacha o pico); golpear un animal gasta un uso. Las armas traen el suyo (tuyo: 15, 30, 45) | `docs/fauna.md`, el sistema de PV | dos numeros |
 | Fauna: la **masa de cada etapa**, cria 15 % y joven 60 % del adulto (de ahi PV, alto y botin), y su **proporcion en el mundo**, 20 / 25 / 55 % | `docs/fauna.md` | numeros en `shared/src/fauna.ts` |
@@ -198,6 +184,38 @@ escrito, y el 2026-09-28 decidiste **seguir sin margen de espera ni coyote
 time** hasta ver si basta el arreglo de los pestillos (abajo).
 
 ---
+
+## Auditoria al cerrar la fauna y los equipables (2026-10-04)
+
+Desde `8396b7f` hasta `3415d31`: la primera tanda de fauna (que se cerro sin
+auditar), la guia de arte y los equipables con sus iconos.
+
+**Corregido:**
+- **El humo `desktop` media el registro de PC con un plazo fijo de 400 ms** y
+  cayo una vez en la CI de `main` (escape 23). Ahora espera hasta que la linea
+  se mueva, con tope dentro de su vida, y una mutacion la ve caer.
+- **`slash` fallo una vez con 16 pixeles en la vista normal** (suelo 20). La
+  sospecha es un animal paseando por delante del barrido; **la causa no esta
+  confirmada**. Ahora mide con `?fauna=0`, que quita solo el dibujo de los
+  animales (escape 24). Si vuelve a caer, la causa era otra.
+- **Dos cabeceras seguian contando a los animales como laminas**
+  (`sprite-depth.ts`, `body-ray.ts`), aunque son de bloques desde `a1168a7`
+  (escape 22). El escaner tiene una categoria nueva que lo habria visto.
+- Un comentario CSS huerfano de la regla `.slot .hint`, que se quito con los
+  iconos.
+- El README no contaba los equipables ni las armas, y `stations.test.ts` y el
+  humo seguian hablando de la ropa como antes.
+- El campo `wornWear` de la sonda `__verdant`, que no leia nadie.
+
+**Dejado a proposito:**
+- Los 18 avisos de terminos retirados, todos en secciones de historia.
+- `state.lastBroke`: el cliente no lo pinta (no hay avisos en pantalla), pero
+  lo leen los tests, como `lastBlocked`.
+
+**El alcance, dicho claro**: la fauna se audito con el escaner, buscando
+restos de los modelos sustituidos y releyendo las cabeceras de lo que esos
+modelos usaban. Sus comprobaciones ya se mutaron en sus rondas. Los
+equipables, ademas, linea a linea.
 
 ## Auditoria al cerrar la tanda 2 (2026-10-02)
 

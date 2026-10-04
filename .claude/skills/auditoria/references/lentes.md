@@ -82,6 +82,10 @@ el numero se saca de donde vive, no se copia.
   como invariante por fotograma.
 - **Un clic de prueba que cae en otra cosa** (#12): antes de clicar para
   probar algo, `elementFromPoint` en ese punto tiene que ser lo que se prueba.
+- **Medir movimiento tras un plazo fijo** (#23): `setTimeout(…, 400)` o
+  `waitForTimeout` y luego «se movio». En una maquina cargada no da tiempo a
+  un fotograma. Se espera hasta que se mueva, con un tope dentro de la vida
+  de lo que se mide, y se muta lo que lo mueve para verla caer.
 - **Un contador que suma de mas** (#21): si lo que se cuenta tambien lo sube
   otra cosa en la misma escena —las esquirlas del arbusto de al lado de la
   presa—, la comprobacion pasa sin lo que afirma. Se aisla la causa (golpe
@@ -135,6 +139,13 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
 
 **Patrones conocidos**: `aimZ` citaba `levelStep` (#5), y la cabecera de
 `hud.ts` decia que llevaba el inventario.
+- **Al sustituir un modelo, sus usuarios** (#22): las cabeceras de los
+  modulos que el modelo viejo usaba siguen diciendo que los usa. El escaner
+  cruza «lo usa(n) `x.ts`» con los imports; la lente relee ademas las frases
+  sin nombre de fichero («un animal se dibuja en una lamina»).
+- **Al quitar una regla CSS, su comentario**: el de `.slot .hint` («un hueco
+  de ropa vacio dice que va ahi») se quedo solo encima de otro comentario. El
+  escaner no mira CSS: al borrar una regla se busca su comentario.
 - **Comentarios sueltos** (#18): al meter un campo o una funcion entre una doc
   y lo que documenta, o al mover lo documentado, la doc se queda encima de
   otra cosa. El escaner los da (dos `/** */` seguidos); la lente mira ademas
@@ -184,6 +195,9 @@ el codigo delante.
   verticales contra horizontales, tiempo escalado contra real.
 - **Entradas raras**: rueda de trackpad contra la de raton, toque contra raton
   en el mismo boton, teclas con el cursor capturado o sin capturar.
+- **Algo nuevo que se mueve o tapa** (#24): si la tanda mete en la escena algo
+  que se mueve por su cuenta o tapa (la fauna), repasa cada medida en pixeles
+  (`slash`, la sonda de profundidad, `shots`) y aislala de ello (`?fauna=0`).
 
 ## H. Tests — ¿dicen lo que afirman?
 

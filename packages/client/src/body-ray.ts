@@ -1,8 +1,9 @@
 /**
  * La caja del cuerpo de un sprite y la cuenta de un rayo contra ella.
  *
- * Un animal (o el jugador) se dibuja en una lamina, pero ocupa un cuerpo: una
- * caja con su largo a lo largo de hacia donde mira, su ancho de lado y su alto.
+ * El jugador se dibuja en una lamina, pero ocupa un cuerpo: una caja con su
+ * largo a lo largo de hacia donde mira, su ancho de lado y su alto. (Los
+ * animales tambien fueron laminas hasta el 2026-10-03; hoy son de bloques.)
  * `sprite-depth.ts` hace en el shader, pixel a pixel, la misma cuenta que hay
  * aqui: el rayo de la camara por ese pixel, cortado contra la caja, da la
  * profundidad que tendria el cuerpo de verdad. Esta version en JS es la que usa

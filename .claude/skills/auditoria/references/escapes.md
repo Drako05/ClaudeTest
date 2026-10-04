@@ -270,6 +270,48 @@ Formato:
   preciso, que golpea solo el centro de la mira, y la mutacion cae.
 - **Donde vive ahora**: lente B (abajo, «un contador que suma de mas»).
 
+### 22. Cabeceras que seguian contando a los animales como laminas (2026-10-04)
+- **Que paso**: desde `a1168a7` los animales son modelos de bloques, pero la
+  cabecera de `sprite-depth.ts` seguia diciendo «lo usan los animales
+  (`fauna-view.ts`)», y la de `body-ray.ts` que «un animal se dibuja en una
+  lamina». Lo vio la auditoria del 2026-10-04, leyendo cabeceras.
+- **Por que se escapo**: la tanda que sustituyo el modelo retiro sus nombres
+  (`fauna-art`, `viewOf`…) y el escaner los vigila, pero no el concepto «los
+  animales usan esto». Las dos cabeceras eran de ficheros que esa tanda no
+  toco, y `fauna-view.ts` seguia existiendo: ninguna ruta rota que avisara.
+- **Que lo habria visto**: cruzar cada «lo usa(n) `x.ts`» de una cabecera con
+  los imports de `x.ts`.
+- **Donde vive ahora**: escaner, categoria «usuarios» (con su fallo sembrado),
+  y lente E: al sustituir un modelo, releer la cabecera de cada modulo que el
+  viejo usaba.
+
+### 23. El registro de PC medido con un plazo fijo de 400 ms (2026-10-04)
+- **Que paso**: la CI de `main` en `47b4311` cayo en «el registro no baja
+  hacia INVENTARIO» (`y0 = y1 = 623`), con el mismo arbol que habia pasado en
+  `pruebas`; al relanzarla, verde. La linea sube 18 px en 3 s, unos 2,4 px en
+  400 ms, y una maquina cargada no pintaba ni un fotograma en ese plazo.
+- **Por que se escapo**: el patron ya estaba en la lente B (#13, efimeros en
+  una ventana de tiempo), pero la comprobacion se escribio despues de la
+  auditoria del 2026-10-02 y nadie la miro con esa lente hasta que fallo.
+- **Que lo habria visto**: la lente B buscando `setTimeout`/`waitForTimeout`
+  con un plazo fijo antes de medir movimiento. Ahora espera hasta que se
+  mueva, con tope dentro de su vida, y su mutacion (`FEED_RISE = 0`) la ve
+  caer.
+- **Donde vive ahora**: lente B, «medir movimiento tras un plazo fijo».
+
+### 24. Un animal que pasea por delante de una medida en pixeles (2026-10-04)
+- **Que paso**: `slash` cayo una vez en la CI con 16 pixeles en la vista
+  normal (suelo 20, lo normal ~190), con un codigo que habia pasado dos
+  veces. La sospecha, sin confirmar: un animal de bloques, opaco y paseando
+  segun el tiempo real, cruzandose entre la camara y el barrido.
+- **Por que se escapo**: la fauna entro en todas las escenas, y ninguna de
+  las medidas en pixeles que ya existian (`slash`, `shots`) se reviso contra
+  algo nuevo que se mueve y tapa.
+- **Que lo habria visto**: lente G al meter algo que se mueve o tapa: repasar
+  cada medida en pixeles y aislarla. Ahora `slash` mide con `?fauna=0`, que
+  quita solo su dibujo. Si vuelve a caer, la causa era otra.
+- **Donde vive ahora**: lente G, «algo nuevo que se mueve o tapa».
+
 ---
 
 ## Del proceso del agente

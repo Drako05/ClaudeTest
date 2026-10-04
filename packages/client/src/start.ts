@@ -8,6 +8,9 @@
  *   sirve igual para volver a mano a un punto que se quiere mirar dos veces.
  * - `?view=perspectiva|orto|primera` arranca en esa vista. Las pruebas que
  *   dependen de la vista la fijan asi, en vez de dar por hecha la de arranque.
+ * - `?fauna=0` no dibuja los animales. Solo el dibujo: la simulacion los sigue
+ *   moviendo igual. Lo usa `tools/slash.mjs`, que mide pixeles del barrido y
+ *   no puede dejar que un animal que pasea se cruce por delante.
  *
  * Todo envuelto en try/catch: en un iframe con sandbox restrictivo el acceso a
  * `location` puede lanzar, y entonces se juega un mundo al azar.
@@ -35,6 +38,11 @@ export function randomSeed(): number {
 export function viewFromLocation(): Projection | null {
   const raw = param('view');
   return (PROJECTIONS as readonly string[]).includes(raw ?? '') ? (raw as Projection) : null;
+}
+
+/** Si se dibujan los animales: si, salvo con `?fauna=0`. */
+export function faunaShownFromLocation(): boolean {
+  return param('fauna') !== '0';
 }
 
 export function seedFromLocation(): number {

@@ -397,6 +397,8 @@ await tapReal(await at('#invTabs button:nth-child(2)'));
 const bagSlot = (await probe()).slots.findIndex((x) => x.item === 20);
 if (bagSlot !== 1) await dragReal(await slotAt(bagSlot + 1), await at('#hotbar .slot:nth-child(2)'));
 await tapReal(await at('#invTabs button:nth-child(1)'));
+// El Bolso es `EQUIP_BASE + Equip.Bag` = 1003 (`sim/inventory.ts`; esto es JS
+// suelto y no puede importarlo).
 await dragReal(await at('#hotbar .slot:nth-child(2)'), await at('#charGrid [data-slot="1003"]'));
 const belted = await probe();
 console.log(`  bolsa al Bolso: ${JSON.stringify(belted.worn)}, casillas ${belted.openSlots}`);

@@ -57,7 +57,7 @@ node .claude/skills/auditoria/scripts/escaner.mjs
 Si la autoprueba falla, **se arregla el escaner antes de seguir**: un escaner
 que no ve su fallo sembrado no ve los de verdad.
 
-El informe trae once categorias:
+El informe trae doce categorias:
 - rutas y nombres citados que no existen;
 - CSS sin elemento;
 - ids que el JS pide y el HTML no tiene;
@@ -67,7 +67,8 @@ El informe trae once categorias:
 - herramientas fuera de CI;
 - pasadas del humo sin casilla en la matriz de CI;
 - comentarios de documentacion sueltos (dos `/** */` seguidos);
-- documentos de `docs/` que el indice de `CLAUDE.md` no nombra.
+- documentos de `docs/` que el indice de `CLAUDE.md` no nombra;
+- ficheros que un modulo dice que «lo usan» y no lo importan.
 
 **Cada aviso se juzga** y acaba en uno de tres sitios:
 - **se corrige**;

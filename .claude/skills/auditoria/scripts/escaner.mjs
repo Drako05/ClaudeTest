@@ -130,6 +130,7 @@ export function scan(root) {
     matriz: [],
     docSuelta: [],
     sinIndice: [],
+    usuarios: [],
   };
 
   // 1. Rutas citadas entre comillas invertidas que no existen.
@@ -328,6 +329,26 @@ export function scan(root) {
     }
   }
 
+  // 12. Usuarios citados que no lo usan: una frase «lo usa» o «lo usan» de un
+  // modulo que nombra un fichero (`fauna-view.ts`) que no lo importa. Es como
+  // se pudrio la cabecera de `sprite-depth.ts`, que siguio diciendo que la
+  // usaban los animales cuando ya eran de bloques (escape 22): el nombre del
+  // fichero seguia existiendo, asi que la categoria 1 no lo veia.
+  const byBase = new Map(code.map((f) => [basename(f), f]));
+  for (const f of code) {
+    const src = text.get(f);
+    const self = basename(f).replace(/\.(ts|mjs|js)$/, '');
+    for (const m of src.matchAll(/\blo usan?\b([^.]*(?:\.(?!\s)[^.]*)*)/gi)) {
+      for (const n of m[1].matchAll(/`([\w-]+\.(?:ts|mjs|js))`/g)) {
+        const user = byBase.get(n[1]);
+        if (!user || user === f) continue;
+        if (!new RegExp(`from\\s+['"][^'"]*\\b${escapeRe(self)}(\\.js|\\.ts|\\.mjs)?['"]`).test(text.get(user))) {
+          report.usuarios.push(`${f}  dice que lo usa \`${n[1]}\`, que no lo importa`);
+        }
+      }
+    }
+  }
+
   // 11. Documentos de `docs/` que el indice de `CLAUDE.md` no nombra. Desde el
   // 2026-10-02 `CLAUDE.md` lleva solo lo operativo y cada parte del juego vive
   // en su documento: uno que el indice no nombra no lo lee nadie antes de
@@ -369,6 +390,7 @@ const TITLES = {
   matriz: 'Pasadas del humo y casillas de la matriz de CI que no casan',
   docSuelta: 'Comentarios de documentacion sueltos, sin nada que documentar (lente E)',
   sinIndice: 'Documentos de docs/ que el indice de CLAUDE.md no nombra (lente F)',
+  usuarios: 'Ficheros citados como usuarios de un modulo que no lo importan (lente E)',
 };
 
 function print(report) {
@@ -412,7 +434,9 @@ function selfTest() {
   put('packages/client/src/docs.ts',
     '/**\n * Cabecera.\n */\n\n/** Bien. */\nfunction bien() {}\n\n' +
     '/**\n * Suelta: lo que explicaba se fue.\n */\n/** La de verdad. */\nfunction otra() {}\nbien(); otra();\n');
-  put('packages/client/src/lib.ts', 'export function usada() {}\nexport function huerfana() {}\n');
+  // Dice que la usan dos: `main.ts` si la importa, `docs.ts` no.
+  put('packages/client/src/lib.ts',
+    '/**\n * Lo usan `main.ts` y `docs.ts`.\n */\nexport function usada() {}\nexport function huerfana() {}\n');
   put('docs/notas.md',
     '# Notas\n\nVer `packages/client/src/main.ts` y `docs/fantasma.md`.\n' +
     'La vieja `wheelZoom` se fue.\n\n## Algo — SUSTITUIDO\n\nAntes era `wheelZoom`.\n');
@@ -443,6 +467,7 @@ function selfTest() {
       r.retirados.some((x) => x.startsWith('[historia]') && x.includes('notas.md'))],
     ['doc suelta', (r) => r.docSuelta.length === 1 && r.docSuelta[0].includes('docs.ts:8')],
     ['sin indice', (r) => r.sinIndice.length === 1 && r.sinIndice[0].includes('docs/otra.md')],
+    ['usuarios', (r) => r.usuarios.length === 1 && r.usuarios[0].includes('`docs.ts`')],
     ['ignorados con ambito', (r) => r.identificadores.some((x) => x.includes('zoom.ts') && x.includes('nombreJuzgado')) &&
       !r.identificadores.some((x) => x.includes('otra.md'))],
   ];

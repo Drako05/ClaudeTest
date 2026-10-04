@@ -33,7 +33,9 @@ import {
  * (2026-09-29): la estacion se coloca con USAR llevandola en la mano, USAR
  * mirandola la abre siempre, sus recetas solo sirven al alcance —de los ojos a
  * su caja, `stationNear`, desde el 2026-10-01; antes, 3 casillas a su centro—, y
- * la ropa abre casillas que no se pueden cerrar llenas.
+ * la ropa abre casillas que no se pueden cerrar llenas. Desde el 2026-10-04 la
+ * bolsa y la mochila van al Bolso, una sola, entre los catorce equipables, y
+ * el Arma golpea a los animales (`Los equipables`).
  */
 
 const recipeOf = (item: Resource) => RECIPES.findIndex((r) => r.output === item);

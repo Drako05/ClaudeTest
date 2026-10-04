@@ -18,11 +18,12 @@
  *
  * Sustituye a «la lamina entera con la profundidad de un punto adelantado»
  * (`e3d3de6`), que dejaba ver a un bisonte a traves de una cornisa: para no
- * cortar su dibujo de perfil se adelantaba 1,45 bloques. La sonda
- * (`sprite-depth-probe.ts`) mide los dos.
+ * cortar su dibujo de perfil se adelantaba 1,45 bloques.
  *
- * Lo usan los animales (`fauna-view.ts`), cada uno con su material porque su
- * rumbo es suyo, y el jugador (`billboards.ts`), con su caja cuadrada.
+ * Hoy lo usa **solo el jugador** (`billboards.ts`), con su caja cuadrada. Los
+ * animales lo usaron hasta el 2026-10-03; desde entonces son modelos de
+ * bloques (`fauna-model.ts`) con su profundidad de verdad. La sonda
+ * (`sprite-depth-probe.ts`) mide el del jugador.
  */
 
 import { SpriteMaterial, Vector2, Vector3, type SpriteMaterialParameters } from 'three';
