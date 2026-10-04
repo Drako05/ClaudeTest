@@ -102,6 +102,7 @@ que venga. Son **las directrices del autor** para el diseño.
   - ENTRADA, mira y toque (una mano que toca, `#inputMode`);
   - la vista en perspectiva (`#proj`) y la informacion (`#hudToggle`);
   - OTROS (tres barras);
-  - INVENTARIO (una mochila de hoy, `#invOpen`);
+  - INVENTARIO (la «mochila de explorador» de trazo de `docs/controles.md`,
+    `#invOpen`);
   - los anillos de hambre (cubiertos) y salud (un corazon).
 - **Aplicada**: los catorce equipables (2026-10-04).

@@ -90,7 +90,14 @@ import {
   stoneOreSpot,
 } from './probes.js';
 import { skyTint, tintCss } from './sky.js';
-import { randomSeed, seedFromLocation, startGame, viewFromLocation, writeSeedToLocation } from './start.js';
+import {
+  faunaShownFromLocation,
+  randomSeed,
+  seedFromLocation,
+  startGame,
+  viewFromLocation,
+  writeSeedToLocation,
+} from './start.js';
 
 /** Radio de chunks que se mallan alrededor del jugador. */
 const RADIUS = 3;
@@ -392,6 +399,8 @@ const billboards = new BillboardSet();
 const stations = new StationSet();
 /** La fauna que anda cerca del jugador (`fauna-view.ts`). */
 const faunaView = new FaunaView(scene);
+/** Sin animales dibujados con `?fauna=0` (`start.ts`), para medir sin ellos. */
+const showFauna = faunaShownFromLocation();
 const player = billboards.spawnPlayer();
 if (player) scene.add(player);
 
@@ -1008,7 +1017,7 @@ function frame(now: number): void {
     ),
   );
   // La fauna, cada modelo en sus pies y girado con su rumbo.
-  faunaView.update(state.fauna, state.entities);
+  if (showFauna) faunaView.update(state.fauna, state.entities);
   if (player) {
     billboards.moveTo(player, px, ph, py);
     // Desde dentro no se dibuja el cuerpo: en primera persona, y cuando la
@@ -1211,8 +1220,6 @@ Object.defineProperty(window, '__verdant', {
       openSlots: state.inventory.openSlots(),
       /** Lo equipado en cada hueco de PERSONAJE, por `Equip` (el 3 es el Bolso, el 12 el Arma), o null. */
       worn: [...state.inventory.worn],
-      /** Los usos que le quedan a lo equipado, por `Equip`. */
-      wornWear: Array.from(state.inventory.wornWear),
       /** De donde son las recetas que ensena el panel: 0 a mano, 1 mesa, 2 horno. */
       panelStation: items.station,
       /** Estaciones mandadas a la escena. Acumulado. */

@@ -83,7 +83,12 @@ const problems = [];
 page.on('console', (m) => { if (m.type() === 'error') problems.push(m.text()); });
 page.on('pageerror', (e) => problems.push(String(e)));
 
-await page.goto(`http://127.0.0.1:${port}/?seed=12345&view=perspectiva`, { waitUntil: 'load' });
+// Sin animales dibujados (`?fauna=0`): un animal de bloques, opaco y paseando
+// segun el tiempo real de la prueba, puede cruzarse entre la camara y el
+// barrido. En la CI dio una vez 16 pixeles en la vista normal (suelo 20, lo
+// normal ~190) con el mismo codigo que habia pasado dos veces (auditoria del
+// 2026-10-04).
+await page.goto(`http://127.0.0.1:${port}/?seed=12345&view=perspectiva&fauna=0`, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 
 const spawn = await page.evaluate(() => window.__verdant);

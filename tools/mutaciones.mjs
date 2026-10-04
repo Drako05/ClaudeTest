@@ -11,7 +11,7 @@
  * - `test:<fichero>`: un fichero de vitest.
  *
  * Ronda: los catorce equipables, el Bolso, la casilla del Arma y las primeras
- * armas (2026-10-04).
+ * armas (2026-10-04), y la auditoria que cerro la tanda.
  */
 export default [
   {
@@ -61,6 +61,15 @@ export default [
     fichero: 'packages/client/index.html',
     de: 'grid-template-columns: repeat(5, var(--eq))',
     a: 'grid-template-columns: repeat(4, var(--eq))',
+    prueba: 'smoke:desktop',
+  },
+  // Auditoria del 2026-10-04: el registro en PC ya no mira con un plazo fijo
+  // de 400 ms, sino hasta que la linea se mueve. Si no sube, tiene que caer.
+  {
+    nombre: 'el registro de PC no baja',
+    fichero: 'packages/client/src/pickup-feed.ts',
+    de: 'export const FEED_RISE = 18;',
+    a: 'export const FEED_RISE = 0;',
     prueba: 'smoke:desktop',
   },
 ];

@@ -557,7 +557,7 @@ async function desktopPass(browser, baseUrl) {
   // En PC, encima del boton INVENTARIO y bajando hacia el (pedido del autor,
   // 2026-10-02). Lo mide la propia pagina, porque cada ida y vuelta se come la
   // vida de la linea (3 s) en este navegador lento: con el registro vacio, un
-  // observador anota la primera linea que nace y donde esta 400 ms despues.
+  // observador anota la primera linea que nace y donde esta cuando se mueve.
   // Es la mas vieja, asi que no la desliza ninguna otra: solo se mueve lo que
   // deriva. Tiene que seguir viva, o no prueba nada.
   await page.waitForFunction(() => document.getElementById('pickupFeed').children.length === 0, null, { timeout: 8000 })
@@ -571,13 +571,22 @@ async function desktopPass(browser, baseUrl) {
       watch.disconnect();
       requestAnimationFrame(() => {
         const r0 = el.getBoundingClientRect();
-        setTimeout(() => {
-          const button = document.getElementById('invOpen').getBoundingClientRect();
+        // Hasta que se mueva o pasen 2,5 s, dentro de su vida de 3: un plazo
+        // fijo de 400 ms (unos 2,4 px) no veia ni un fotograma en una maquina
+        // de la CI cargada (escape 23).
+        const since = performance.now();
+        const look = () => {
           const r1 = el.getBoundingClientRect();
+          if (el.isConnected && r1.y <= r0.y && performance.now() - since < 2500) {
+            setTimeout(look, 100);
+            return;
+          }
+          const button = document.getElementById('invOpen').getBoundingClientRect();
           const mid = r1.left + r1.width / 2;
           const above = el.isConnected && r1.bottom <= button.top + 0.5 && mid >= button.left && mid <= button.right;
           window.__feedPc = { above, y0: r0.y, y1: r1.y, alive: el.isConnected };
-        }, 400);
+        };
+        setTimeout(look, 100);
       });
     });
     watch.observe(box, { childList: true });
@@ -1297,8 +1306,8 @@ async function resourcesPass(browser, baseUrl) {
  * La tanda 2: mesa y horno, fundir, herramientas de metal y ropa, jugado con
  * el raton y el panel. Decisiones del autor que se afirman: la estacion se
  * coloca con USAR llevandola en la mano, USAR mirandola abre el panel con SUS
- * recetas —que con E no salen—, el panel se cierra al alejarse, y la ropa se
- * arrastra a su hueco y abre casillas. Los numeros —cuantos golpes, que pico
+ * recetas —que con E no salen—, el panel se cierra al alejarse, y la mochila
+ * se arrastra al Bolso, abre casillas y oculta su icono. Los numeros —cuantos golpes, que pico
  * mina que— los miden `tests/stations.test.ts`.
  *
  * Desde el nacimiento, que es un rellano llano (regla 22): la mesa va a la
@@ -1523,8 +1532,9 @@ async function stationsPass(browser, baseUrl) {
   check(made.inventory[15] === 1, 'no se fabrico el pico de cobre en la mesa');
   check(made.inventory[21] === 1, 'no se fabrico la mochila en la mesa');
 
-  // La mochila, arrastrada al Bolso (el 4.o de PERSONAJE, `Equip.Bag`): 22
-  // casillas, y su icono se oculta.
+  // La mochila, arrastrada al Bolso (el 4.o de PERSONAJE, `Equip.Bag`; su
+  // indice de arrastre es `EQUIP_BASE + Equip.Bag` = 1003, que este JS suelto
+  // no puede importar): 22 casillas, y su icono se oculta.
   const bag = made.slots.findIndex((x) => x.item === 21);
   if (bag >= 0) {
     const bagIcon = () => page.evaluate(() => !!document.querySelector('#charGrid [data-slot="1003"] svg.equipIcon'));

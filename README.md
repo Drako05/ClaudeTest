@@ -99,9 +99,12 @@ sin hacha. Con eso se fabrican el hacha y el pico de piedra, que talan arboles
 y sacan piedra, carbon y cobre golpe a golpe; el hierro pide un pico mejor.
 Luego, a mano, la **mesa de trabajo** y el **horno**, que se ponen en el suelo
 con clic derecho (USAR) y se usan mirandolos: el horno funde el cobre y el
-hierro en lingotes, y la mesa hace con ellos las herramientas de metal, la
-bolsa y la mochila, que se arrastran a su hueco del personaje y dan casillas.
-Las herramientas se gastan y se rompen, y el inventario son dieciseis casillas
+hierro en lingotes, y la mesa hace con ellos las herramientas de metal, las
+espadas, la bolsa y la mochila. El personaje tiene catorce casillas de
+equipables, con un icono cada una: la bolsa o la mochila van al **Bolso** y dan
+casillas, y un arma en el **Arma** golpea a los animales aunque se lleve otra
+cosa en la mano. Las herramientas y las armas se gastan con cada golpe que toca
+algo y se rompen, y el inventario son dieciseis casillas
 con pilas de cien. Al golpear algo que no se rompe saltan esquirlas pequenas, y
 lo que entra o sale del inventario se anota en letra pequena («+5 Madera»).
 

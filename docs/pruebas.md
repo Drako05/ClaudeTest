@@ -16,7 +16,11 @@ y tests, y una **matriz con una maquina por pasada del humo** —`desktop`,
 corre aqui **falla** si la vista normal, la camara baja o la primera persona
 bajan de 20 pixeles aclarados, o la estocada de 500; los fallos que tuvo daban
 0, 2 y 13. La vista que gira cerca se mide pero no hace fallar: en la CI dio
-46, 12 y ~190 sobre el mismo codigo, y como puerta fallaria a suertes), todas a la vez; y un trabajo final, «CI completa», que solo sale
+46, 12 y ~190 sobre el mismo codigo, y como puerta fallaria a suertes. Desde
+la auditoria del 2026-10-04 mide **sin animales dibujados** (`?fauna=0`, que
+solo quita su dibujo): la vista normal dio una vez 16 en la CI con un codigo
+que habia pasado dos veces, y un animal de bloques paseando por delante del
+barrido es la sospecha), todas a la vez; y un trabajo final, «CI completa», que solo sale
 verde si todo lo esta. La preparacion —Node, dependencias y Chromium con su
 cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
 tandas. Cada pasada se lanza por el prefijo de su nombre
