@@ -322,6 +322,7 @@ con fecha, o la leccion de un fallo que ya paso.
 | El inventario, herramientas, golpes, estaciones, ropa, el panel, el registro de objetos | `docs/recoleccion.md` |
 | Barrido, estocada, escombros, esquirlas, o una medida de «se ve» | `docs/efectos.md` |
 | Aspas, sombras, tamanos, arboles y sus especies | `docs/arte.md` |
+| Las directrices de arte del autor (en progreso): como se diseña un modelo | `docs/guia-de-arte.md` |
 | El relieve, el salto, el hambre | `docs/relieve.md` |
 | Los animales: especies, puntos de vida, botin, su paseo y su dibujo | `docs/fauna.md` |
 | El panel de desarrollo, las superposiciones, la reticula | `docs/devtools.md` |

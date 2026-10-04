@@ -24,7 +24,8 @@ humanoide es verlo de frente y de perfil a la vez, dos figuras atravesadas. Su
 solucion serian los sprites de cuatro u ocho direcciones. **Los animales los
 probaron y no llegaron** (decision del autor, 2026-10-03): desde el 2026-10-03
 son **modelos de bloques**, como las estaciones, con la luz del mundo
-(`fauna-model.ts`, ver `docs/fauna.md`). El jugador sigue siendo un sprite, y
+(`fauna-model.ts`, ver `docs/fauna.md`). Como se diseña un modelo lo dicen
+las directrices del autor, en progreso: `docs/guia-de-arte.md`. El jugador sigue siendo un sprite, y
 cada pixel de su lamina toma **la profundidad de la caja de su cuerpo**
 (`sprite-depth.ts`): el terreno le tapa lo que taparia a un cuerpo, ni lo que
 tiene al lado ni menos de lo que tiene delante.

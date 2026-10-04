@@ -538,6 +538,29 @@ golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
 
+## Guia de arte — en progreso (abierta el 2026-10-04)
+
+Diste por buenos los modelos de bloques «dentro de lo esperado de una fase
+temprana». Pediste directrices de arte, que crezcan en una tanda dedicada o
+poco a poco. Estan en `docs/guia-de-arte.md`, con tu texto literal:
+
+1. **Lo que va en la piel se pinta en el cubo de su parte**: patrones del
+   pelaje y ojos.
+2. **Lo delgado va en laminas cruzadas**, como los arboles.
+
+Lo que espera tu juicio:
+
+- **Si mi lectura de la 1 vale.** Entraria tambien lo que hoy son cajas finas
+  pegadas al cuerpo: la barriga clara, la grupa blanca, el disco del hocico, la
+  punta de la oreja de la liebre y la de la cola del zorro, y el vientre del
+  cangrejo.
+- **Que cuenta como «delgado» en la 2**: astas, cuernos, colmillos, orejas
+  finas, colas finas, barbas, y las alas, el pico y las patas de la gaviota y
+  del cangrejo. Y si una lamina puede llevar caja de golpe (hoy ninguna de esas
+  partes golpea).
+- **Aplicarlas a la fauna es una tanda por pedir.** El inventario de lo que hoy
+  no las cumple esta en la guia.
+
 ## Fauna de bloques, con la caja de golpe de sus partes — HECHO (2026-10-03)
 
 Probaste las ocho direcciones y no te convencieron: «no siento que por ese
