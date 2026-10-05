@@ -2163,12 +2163,15 @@ async function devToolsPass(browser, baseUrl) {
   await page.screenshot({ path: join(SHOTS, '3d-06-bordes.png') });
 
   // Las cajas de golpe y de choque (pedido del autor, 2026-10-05): con «Cajas»
-  // se dibujan las de alrededor —rojo golpe, cian choque—, y se quitan al
-  // apagarlas. El nacimiento tiene plantas cerca y siempre esta el jugador.
+  // se dibujan las de alrededor, y se quitan al apagarlas. Cada objeto tiene
+  // una caja (el autor, 2026-10-05): los troncos y las rocas del nacimiento van
+  // en amarillo, golpe y choque a la vez, y en cian solo queda el jugador; con
+  // el choque de casilla entera de antes, el cian contaba cada arbol.
   await page.click('[data-toggle="boxes"]');
   const boxed = await waitForLoop(page, 10);
   console.log(`  cajas: ${JSON.stringify(boxed.debugBoxes)}`);
-  check(boxed.debugBoxes.hit > 0 && boxed.debugBoxes.solid > 0, `las cajas no dibujaron golpe y choque: ${JSON.stringify(boxed.debugBoxes)}`);
+  check(boxed.debugBoxes.both > 0 && boxed.debugBoxes.solid === 1,
+    `las cajas no dibujaron los objetos en amarillo y solo al jugador en cian: ${JSON.stringify(boxed.debugBoxes)}`);
   await page.screenshot({ path: join(SHOTS, '3d-06b-cajas.png') });
   await page.click('[data-toggle="boxes"]');
   const unboxed = await waitForLoop(page, 10);

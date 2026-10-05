@@ -16,9 +16,12 @@
  * - `z`, de lado (+ a su izquierda).
  *
  * Las medidas son **dibujo mio**, con las proporciones de la especie real; se
- * escalan para que el plano mida de alto justo `animalHeight`. Que es `hit` y
- * que no, tambien: el tronco, el cuello, la cabeza, el hocico y la joroba si;
- * las patas finas, la cola, las orejas, los cuernos y la barba no.
+ * escalan para que el plano mida de alto justo `animalHeight`. Que es `hit`
+ * lo decidio el autor (2026-10-05): **la cabeza, el cuello, las extremidades y
+ * el tronco** —con el hocico, el pecho, la joroba, la crin y la melena—; lo
+ * pequeno o fino no: los cuernos y las astas, las colas cortas, las alas
+ * recogidas, las orejas, la barba, el pico, y las patas de la gaviota y del
+ * cangrejo, finas como un cuerno. Las pinzas del cangrejo, si.
  */
 
 import { animalHeight, Species, Stage } from './fauna.js';
@@ -69,7 +72,7 @@ function pair(name: string, role: BodyRole, hit: boolean, size: V3, at: V3, head
 function legs(h: number, w: number, x: number, z: number): Draft[] {
   const out: Draft[] = [];
   for (const [i, lx] of [x, -x].entries()) {
-    out.push(...pair(i === 0 ? 'pata-del' : 'pata-tras', 'coat', false, [w, h, w], [lx, h / 2, z]));
+    out.push(...pair(i === 0 ? 'pata-del' : 'pata-tras', 'coat', true, [w, h, w], [lx, h / 2, z]));
   }
   return out;
 }
@@ -220,8 +223,8 @@ function draft(species: Species, y: Young): Draft[] {
       const out: Draft[] = [
         part('caparazon', 'coat', true, [0.4, 0.14, 0.28], [0, 0.15, 0]),
         part('vientre', 'dark', false, [0.3, 0.03, 0.22], [0, 0.07, 0]),
-        part('pinza-delante', 'coat', false, [0.1, 0.1, 0.12], [0.2, 0.18, 0.18], true),
-        part('pinza-detras', 'coat', false, [0.1, 0.1, 0.12], [-0.2, 0.18, 0.18], true),
+        part('pinza-delante', 'coat', true, [0.1, 0.1, 0.12], [0.2, 0.18, 0.18], true),
+        part('pinza-detras', 'coat', true, [0.1, 0.1, 0.12], [-0.2, 0.18, 0.18], true),
         part('ojo-delante', 'eye', false, [0.03, 0.08, 0.03], [0.06, 0.26, 0.11], true),
         part('ojo-detras', 'eye', false, [0.03, 0.08, 0.03], [-0.06, 0.26, 0.11], true),
       ];

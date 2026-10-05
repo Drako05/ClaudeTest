@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { animalHeight, partsOf, SPECIES_COUNT, Species, Stage, STAGE_COUNT } from '@verdant/shared';
+import { animalHeight, Feature, partsOf, SPECIES_COUNT, Species, Stage, STAGE_COUNT } from '@verdant/shared';
 import {
   airborneAnimal,
   applyVertical,
@@ -7,6 +7,7 @@ import {
   bodyClashes,
   EntityKind,
   EntityStore,
+  hitboxAt,
   rayOrientedBox,
   walkAnimal,
   type Animal,
@@ -15,16 +16,28 @@ import {
 
 /**
  * Un mundo hecho a mano: lo unico que miran el choque de las partes y el andar
- * de un animal es que casillas son solidas y a que altura esta el suelo.
+ * de un animal es que casillas son solidas (agua), a que altura esta el suelo y
+ * que objeto hay en cada casilla (`objects`, ninguno si no se dice).
  */
-function fakeWorld(solid: (tx: number, ty: number) => boolean, floor: (x: number, y: number) => number = () => 0): World {
+function fakeWorld(
+  solid: (tx: number, ty: number) => boolean,
+  floor: (x: number, y: number) => number = () => 0,
+  objects: (tx: number, ty: number) => Feature = () => Feature.None,
+): World {
   const floorRangeAt = (tx: number, ty: number, out: Float64Array) => {
     const e = 0.02;
     const h = [floor(tx + e, ty + e), floor(tx + 1 - e, ty + e), floor(tx + e, ty + 1 - e), floor(tx + 1 - e, ty + 1 - e)];
     out[0] = Math.min(...h);
     out[1] = Math.max(...h);
   };
-  return { isSolidAt: solid, floorHeightAt: floor, floorRangeAt } as unknown as World;
+  return {
+    seed: 1,
+    isSolidAt: solid,
+    isTerrainSolidAt: solid,
+    groundHeightAt: floor,
+    featureAt: objects,
+    floorRangeAt,
+  } as unknown as World;
 }
 
 /** Un animal suelto, con los pies en (`x`, `y`) y mirando a (`fx`, `fy`). */
@@ -92,15 +105,22 @@ describe('el plano del cuerpo', () => {
     }
   });
 
-  it('golpean y chocan el tronco y la cabeza; la cola, las patas y las orejas no', () => {
+  it('golpean y chocan la cabeza, el cuello, las extremidades y el tronco; lo pequeno o fino no', () => {
+    // El autor, 2026-10-05: las patas y las pinzas si; las patas de la gaviota
+    // y del cangrejo, finas como un cuerno, no.
+    const thinLegs = new Set([Species.Gull, Species.Crab]);
     for (let s = 0; s < SPECIES_COUNT; s++) {
       const parts = partsOf(s as Species, Stage.Adult);
       for (const p of parts) {
-        if (/^(cola|pata|oreja|cuerno|asta|barba|ojo)/.test(p.name)) expect(p.hit, `${Species[s]} ${p.name}`).toBe(false);
-        if (/^(tronco|cabeza|caparazon)$/.test(p.name)) expect(p.hit, `${Species[s]} ${p.name}`).toBe(true);
+        const what = `${Species[s]} ${p.name}`;
+        if (/^(cola|oreja|cuerno|asta|barba|ojo|ala|pico)/.test(p.name)) expect(p.hit, what).toBe(false);
+        if (/^(tronco|cabeza|cuello|caparazon|pinza)/.test(p.name)) expect(p.hit, what).toBe(true);
+        if (/^pata/.test(p.name)) expect(p.hit, what).toBe(!thinLegs.has(s as Species));
       }
       expect(parts.some((p) => p.hit)).toBe(true);
     }
+    // Los cuadrupedos tienen sus cuatro patas con caja.
+    expect(partsOf(Species.RedDeer, Stage.Adult).filter((p) => /^pata/.test(p.name) && p.hit)).toHaveLength(4);
   });
 
   it('la cabeza de un bisonte se golpea aunque quede lejos del tronco, y su cola no', () => {
@@ -215,5 +235,49 @@ describe('el cuerpo choca con el terreno', () => {
     walk(wall, rump.store, rump.id, -1, 0, 3);
     expect(clashesOf(wall, rump.store, rump.id)).toBe(0);
     expect(rump.store.x[rump.id]).toBeLessThan(0.8);
+  });
+
+  it('choca con una roca por las patas, la salta y sigue por encima (el autor, 2026-10-05)', () => {
+    // Una roca de 1,0 en la casilla 3 de la fila 0; el ciervo anda al este.
+    const world = fakeWorld(() => false, () => 0, (tx, ty) => (tx === 3 && ty === 0 ? Feature.RockNode : Feature.None));
+    const rock = hitboxAt(world, 3, 0)!;
+    // Las patas solas ya chocan: puesto con la pata delantera dentro de la roca.
+    const legs = bodyBoxes(Species.RedDeer, Stage.Adult, rock.x0 - 0.3, 0.5, 0, 1, 0, true);
+    expect(legs.length).toBe(4);
+    expect(bodyClashes(world, legs, rock.x0 - 0.3, 0.5)).toBeGreaterThan(0);
+    // Andando, salta encima, se apoya en ella y sigue.
+    const deer = lone(Species.RedDeer, 0, 0.5, 1, 0);
+    let stood = 0;
+    walk(world, deer.store, deer.id, 1, 0, 8, () => {
+      expect(clashesOf(world, deer.store, deer.id)).toBe(0);
+      if (deer.store.grounded[deer.id]) stood = Math.max(stood, deer.store.z[deer.id]);
+    });
+    expect(stood).toBe(rock.z1);
+    expect(deer.store.x[deer.id]).toBeGreaterThan(rock.x1 + 1);
+    expect(deer.store.z[deer.id]).toBe(0);
+  });
+
+  it('un golpe que solo toca la pata de un ciervo le da; el de su cuerno, no', () => {
+    const parts = partsOf(Species.RedDeer, Stage.Adult);
+    const leg = parts.find((p) => p.name.startsWith('pata-del'))!;
+    const trunk = parts.find((p) => p.name === 'tronco')!;
+    const boxes = bodyBoxes(Species.RedDeer, Stage.Adult, 0, 0, 0, 1, 0);
+    // A media pata, por debajo del tronco: solo hay patas a esa altura.
+    const z = leg.size[1] / 2;
+    expect(trunk.at[1] - trunk.size[1] / 2).toBeGreaterThan(z);
+    const side = { x: 0, y: 1, z: 0 };
+    expect(boxes.some((b) => rayOrientedBox({ x: leg.at[0], y: -5, z }, side, b, 10) !== null)).toBe(true);
+    // Entre las patas, a esa altura, no hay nada.
+    expect(boxes.some((b) => rayOrientedBox({ x: 0, y: -5, z }, side, b, 10) !== null)).toBe(false);
+  });
+
+  it('se apoya en lo que tocan sus partes mas bajas: las patas, el caparazon, el tronco de la gaviota', () => {
+    const lowest = (s: Species) => {
+      const boxes = bodyBoxes(s, Stage.Adult, 0, 0, 0, 1, 0, true);
+      return { n: boxes.length, base: Math.min(...boxes.map((b) => b.cz - b.hh)) };
+    };
+    expect(lowest(Species.RedDeer)).toEqual({ n: 4, base: 0 });
+    expect(lowest(Species.Crab).n).toBe(1);
+    expect(lowest(Species.Gull).n).toBe(1);
   });
 });

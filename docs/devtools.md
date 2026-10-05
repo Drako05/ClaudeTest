@@ -53,16 +53,17 @@ conmutador «Cajas» del grupo Vista las dibuja alrededor del jugador
 dos cosas. Se ven **a traves de todo**, sin prueba de profundidad, porque el
 tronco que se golpea vive dentro de su copa. **El agua no se dibuja**, aunque
 corte el paso (decision del autor). Ninguna caja es del cliente: todas salen
-del nucleo.
-- **Golpe**: `hitboxAt` de cada casilla —del arbol, solo su tronco—.
-- **Choque**: la casilla entera de lo que `isFeatureSolid` (arboles, roca y
-  minerales), que es lo que mira `collides`. El choque no tiene alto —es una
-  columna—, asi que se dibuja hasta el alto de su caja de golpe (propuesta
-  mia). Y el jugador: su huella de `BODY_RADIUS` de los pies a los ojos
-  (propuesta mia, por lo mismo).
-- **Las dos**: las estaciones (su `STATION_BOXES`, que es a la vez el bloque
-  que se pisa) y los animales (`animalBoxes`, las partes que golpean y
-  chocan).
+del nucleo. Desde el mismo dia cada objeto tiene **una** caja, que se golpea y,
+si su tipo choca, tambien choca (`sim/boxes.ts`, ver `docs/reglas.md`, 21):
+- **Las dos**: los objetos que chocan (`blocksBody`: el tronco del arbol, la
+  roca, los minerales y las estaciones) y cada parte de los animales
+  (`animalBoxes`), patas incluidas.
+- **Golpe**: lo que solo se golpea: el arbusto, el brote y los guijarros.
+- **Choque**: el jugador, su huella de `BODY_RADIUS` de los pies a los ojos
+  (propuesta mia: su choque no tiene alto).
+
+El primer dibujo (unas horas) pintaba en cian la casilla entera de cada arbol y
+roca, que era lo que chocaba entonces; al verlo, el autor cambio la regla.
 
 Se rehacen enteras en cada fotograma: son unas 600 casillas, cuesta poco, y no
 hay cache que se quede vieja al talar algo o al pasar un animal. El humo las

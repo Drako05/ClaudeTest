@@ -25,7 +25,8 @@ import {
   type Animal,
 } from '../fauna.js';
 import { toChunkCoord, type World } from '../world.js';
-import { applyVertical } from './jump.js';
+import { BODY_RADIUS, footing } from '../boxes.js';
+import { applyVertical, STEP_UP } from './jump.js';
 import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
 import { airborneAnimal, collides, walkAnimal } from './movement.js';
 
@@ -45,14 +46,16 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
   // Si el punto de paso quedo tapado —un arbol que crecio, una estacion—, el
   // origen; y si tampoco, se queda donde este.
   let { x, y } = target;
-  if (collides(world, x, y)) ({ x, y } = { x: animal.homeX, y: animal.homeY });
-  if (!collides(world, x, y)) {
+  if (covered(world, x, y)) ({ x, y } = { x: animal.homeX, y: animal.homeY });
+  if (!covered(world, x, y)) {
     store.x[id] = x;
     store.y[id] = y;
   }
-  store.z[id] = world.floorHeightAt(store.x[id], store.y[id]);
+  store.z[id] = world.groundHeightAt(store.x[id], store.y[id]);
   // Mirando de su origen a su punto de paso: lo mismo lo mire alguien o no.
   faceToFit(world, store, id, animal, Math.atan2(target.y - animal.homeY, target.x - animal.homeX));
+  // Ya girado: sus pies, sobre lo que pisan sus partes mas bajas.
+  store.z[id] = footing(world, store, id, store.z[id] + STEP_UP);
   store.vz[id] = 0;
   store.grounded[id] = 1;
   store.vx[id] = 0;
@@ -61,6 +64,20 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
   store.wanderX[id] = target.x;
   store.wanderY[id] = target.y;
   forgetObstacles(store, id);
+}
+
+/**
+ * Si el punto queda tapado: agua, o una casilla con un objeto que choca bajo
+ * una huella como la del jugador (la medida por casilla, `World.isSolidAt`).
+ */
+function covered(world: World, x: number, y: number): boolean {
+  if (collides(world, x, y)) return true;
+  for (let ty = Math.floor(y - BODY_RADIUS); ty <= Math.floor(y + BODY_RADIUS); ty++) {
+    for (let tx = Math.floor(x - BODY_RADIUS); tx <= Math.floor(x + BODY_RADIUS); tx++) {
+      if (world.isSolidAt(tx, ty)) return true;
+    }
+  }
+  return false;
 }
 
 /** Lo que estorbaba camino del punto de paso de antes ya no cuenta. */
@@ -164,15 +181,19 @@ export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, t
     const dy = store.wanderY[id] - store.y[id];
     const info = SPECIES[animal.species];
     const keep = (x: number, y: number) => biomeOfTerrain(world.terrainAt(Math.floor(x), Math.floor(y))) === info.biome;
-    if (!store.grounded[id]) {
-      airborneAnimal(world, store, id, TICK_DT, keep);
-    } else if (Math.hypot(dx, dy) > ARRIVE_DISTANCE) {
-      walkAnimal(world, store, id, dx, dy, info.speed, TICK_DT, keep);
-    } else {
-      store.vx[id] = 0;
-      store.vy[id] = 0;
-    }
-    applyVertical(world, store, id, TICK_DT);
+    // Una ronda de consultas para el andar y la vertical: leen casi las mismas
+    // casillas.
+    groundRound(world, store.x[id], store.y[id], () => {
+      if (!store.grounded[id]) {
+        airborneAnimal(world, store, id, TICK_DT, keep);
+      } else if (Math.hypot(dx, dy) > ARRIVE_DISTANCE) {
+        walkAnimal(world, store, id, dx, dy, info.speed, TICK_DT, keep);
+      } else {
+        store.vx[id] = 0;
+        store.vy[id] = 0;
+      }
+      applyVertical(world, store, id, TICK_DT);
+    });
   }
 }
 

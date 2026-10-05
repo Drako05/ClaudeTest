@@ -78,3 +78,9 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `\b24 casillas|16, 18, 22 o 24` — el maximo con bolsa y mochila puestas a la vez; hoy 22. Permitido en: `docs/pendiente.md`.
 - `golpe util|lo que no es suyo no la gasta|no se gasta en ella` — la herramienta solo se gastaba con lo suyo; desde el 2026-10-04 todo golpe que toca algo gasta (el autor). Permitido en: `docs/pendiente.md`, `docs/recoleccion.md` (cuenta el antes).
 - `caballo de(l)? ajedrez|capa con capucha|capa de espaldas|escudo con (una )?cruz|huella, herradura|iconos de trazo` — los dibujos de los equipables que el autor hizo rehacer el 2026-10-04: los primeros de trazo fino (con una herradura), y luego la capa con capucha y despues de espaldas, el caballo de ajedrez y el escudo con cruz como Emblema. Hoy: siluetas rellenas, capa de frente, cabeza de caballo de perfil y medalla de pecho. Permitido en: `docs/pendiente.md`, `docs/guia-de-arte.md` (describe la referencia del autor, que tiene una capa con capucha).
+
+## Cajas de los objetos
+
+- `isFeatureSolid|floorHeightAt` — el choque de casilla entera de arboles, roca y minerales, y lo que pisaba el cuerpo medido en el centro con la estacion de su casilla; desde el 2026-10-05 cada objeto tiene una caja que golpea y, si su tipo choca, choca (`blocksBody`, `solidBoxAt`), y el cuerpo pisa con su huella (`squareFloor`, `footing`). Permitido en: `docs/pendiente.md`, `docs/reglas.md`, `docs/devtools.md` (cuentan el antes).
+- `casilla entera (de lo que|en cian)|choque dibujado hasta el alto` — el primer dibujo de las cajas del panel, con el choque de casilla entera en cian (unas horas del 2026-10-05). Permitido en: `docs/pendiente.md`, `docs/devtools.md`.
+- `patas finas, la cola|la cola, las patas y las orejas no|las patas finas.{0,20}no chocan` — las patas sin caja; desde el 2026-10-05 la cabeza, el cuello, las extremidades y el tronco golpean y chocan (el autor). Permitido en: `docs/pendiente.md`.

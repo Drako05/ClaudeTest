@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { emptyIntent, TICK_DT } from '@verdant/shared';
+import { emptyIntent, Feature, TICK_DT } from '@verdant/shared';
 import {
   applyVertical,
   autoJumpDue,
@@ -41,11 +41,12 @@ import {
 /**
  * Un mundo de alturas escrito a mano.
  *
- * Solo implementa lo que miran el movimiento y la vertical: la altura del suelo
- * —sin estaciones, asi que lo que se pisa es el terreno— y si un tile es
- * solido. Se pasa como `World` a la fuerza, asi que si algun dia miran algo
- * mas NO dejara de compilar: fallara en ejecucion diciendo que falta, que es
- * como aviso cuando las estaciones pasaron a ser suelo (`floorHeightAt`).
+ * Solo implementa lo que miran el movimiento y la vertical: la altura del suelo,
+ * si un tile es agua y que hay en el —nada, asi que no hay cajas y lo que se
+ * pisa es el terreno—. Se pasa como `World` a la fuerza, asi que si algun dia
+ * miran algo mas NO dejara de compilar: fallara en ejecucion diciendo que
+ * falta, que es como aviso cuando las estaciones pasaron a ser suelo y cuando
+ * los objetos pasaron a tener caja (`boxes.ts`).
  */
 function heightField(
   levelAt: (x: number, y: number) => number,
@@ -59,9 +60,10 @@ function heightField(
   return {
     levelAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)),
     groundHeightAt,
-    floorHeightAt: groundHeightAt,
+    featureAt: () => Feature.None,
     // Solo el agua detiene el paso (regla 9), y el agua es nivel negativo.
     isSolidAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)) < 0,
+    isTerrainSolidAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)) < 0,
   } as unknown as World;
 }
 
@@ -347,8 +349,9 @@ describe('El auto salto', () => {
     return {
       levelAt: (x: number, y: number) => Math.floor(floorAt(x, y)),
       groundHeightAt: floorAt,
-      floorHeightAt: floorAt,
+      featureAt: () => Feature.None,
       isSolidAt: (x: number) => solidAt(x),
+      isTerrainSolidAt: (x: number) => solidAt(x),
     } as unknown as World;
   }
 
@@ -356,7 +359,7 @@ describe('El auto salto', () => {
   function walkEast(world: World, opts: { auto: boolean; running?: boolean; moveX?: number; ticks?: number }) {
     const store = new EntityStore(4);
     const id = store.spawn(EntityKind.Player, 0.5, 0.5);
-    store.z[id] = world.floorHeightAt(0.5, 0.5);
+    store.z[id] = world.groundHeightAt(0.5, 0.5);
     const moveX = opts.moveX ?? 1;
     let jumps = 0;
     let stalls = 0;

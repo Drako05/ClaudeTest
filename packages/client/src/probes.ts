@@ -12,7 +12,7 @@
 import {
   Feature,
   harvestOf,
-  isFeatureSolid,
+  blocksBody,
   isStation,
   isTerrainSolid,
   MINERAL_NODES,
@@ -145,7 +145,7 @@ function reachSpot(
       const sy = y + 1;
       const standTerrain = gen.terrainAt(sx, sy);
       if (isTerrainSolid(standTerrain)) continue;
-      if (isFeatureSolid(gen.featureAt(sx, sy, standTerrain))) continue;
+      if (blocksBody(gen.featureAt(sx, sy, standTerrain))) continue;
       if (gen.levelAt(sx, sy) !== gen.levelAt(x, y)) continue;
       if (gen.rampDirAt(sx, sy) >= 0 || gen.rampDirAt(x, y) >= 0) continue;
 

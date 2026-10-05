@@ -237,14 +237,15 @@ export function isTerrainSolid(t: Terrain): boolean {
 }
 
 /**
- * Features que bloquean el paso de arriba abajo. Los brotes no estorban: aun
- * son pequenos. Las estaciones tampoco estan aqui: no son un muro sino suelo
- * que se pisa (`stationHeight`), y estorban de lado por la regla 21, como una
- * pared de terreno.
+ * Features cuya caja choca y se pisa (decision del autor, 2026-10-05): el
+ * tronco del arbol, la roca, los minerales y las estaciones. Su caja es la
+ * misma que se golpea (`featureBox`, en `sim/boxes.ts`), ajustada al objeto y
+ * con alto: estorba de lado y encima se esta de pie. **El arbusto, el brote y
+ * los guijarros no chocan**, solo se golpean (el autor).
  */
-export function isFeatureSolid(f: Feature): boolean {
+export function blocksBody(f: Feature): boolean {
   if (isSapling(f) || f === Feature.Pebbles) return false;
-  return isInert(f) || lifeKindOf(f) === LifeKind.Tree;
+  return isInert(f) || lifeKindOf(f) === LifeKind.Tree || isStation(f);
 }
 
 /** True si es una estacion de fabricacion puesta por el jugador. */
@@ -255,7 +256,7 @@ export function isStation(f: Feature): boolean {
 /**
  * Lo que mide de alto una estacion, o 0 si no lo es. **Es suelo que se pisa**
  * (decision del autor, 2026-09-30: fisica como un bloque, se choca de lado y se
- * sube encima), asi que entra en `World.floorHeightAt`. El horno mide mas que el
+ * sube encima), asi que es el alto de su caja (`STATION_BOXES`). El horno mide mas que el
  * salto a proposito: «que haya bloques de diferente altura sera una de las
  * caracteristicas del juego». Las medidas son propuesta mia.
  */

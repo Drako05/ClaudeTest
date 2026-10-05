@@ -343,11 +343,13 @@ Interpretacion mia, aprobada con el plan:
   - su centro en el marco del animal;
   - su papel de color;
   - si **golpea y choca** (`hit`).
-- **Lo que es `hit`**: el tronco, el cuello, la cabeza, el hocico, el pecho,
-  la joroba y la crin.
-- **Lo que no**: las patas finas, la cola, las orejas, los cuernos, las astas,
-  la barba, los ojos, las alas plegadas y el pico. Es la regla del autor (la
-  cola fuera) extendida a lo fino *(deduccion)*.
+- **Lo que es `hit`** (el autor, 2026-10-05: «cabeza, cuello, extremidades y
+  tronco»): el tronco, el cuello, la cabeza, el hocico, el pecho, la joroba,
+  la crin, la melena, **las patas** y **las pinzas** del cangrejo.
+- **Lo que no** («las partes pequeñas o delgadas»): la cola, las orejas, los
+  cuernos, las astas, la barba, los ojos, las alas plegadas, el pico, y **las
+  patas de la gaviota y del cangrejo**, finas como un cuerno (el autor). Hasta
+  el 2026-10-05 tampoco las patas.
 - **Las medidas son mias**, de la especie real. Se escalan para que el plano
   mida justo `animalHeight`, con los pies en el suelo.
 - **El nucleo golpea y choca con las partes `hit`**, y el cliente dibuja todas.
@@ -366,7 +368,15 @@ Decision del autor: **las cajas de sus partes giran con el rumbo y no entran
 en un bloque**. Un bisonte no cabe por un pasillo de un bloque, y si al girar
 su cabeza entrara en una pared, no gira.
 
-- **Solidos**: ninguna parte `hit` solapa en el suelo una casilla solida.
+- **Solidos**: ninguna parte `hit` solapa en el suelo una casilla de agua.
+- **Objetos** (desde el 2026-10-05, ver `docs/reglas.md`, 21): ninguna parte
+  `hit` solapa en planta la caja de un objeto que choca —el tronco, la roca,
+  los minerales, las estaciones— si el techo de la caja pasa de la base de la
+  parte. La cabeza de un bisonte pasa por encima de una roca; sus patas no, y
+  la roca (1,0) se salta (`ANIMAL_JUMP_UP`).
+- **Apoyo** *(deduccion)*: se esta de pie sobre el terreno en el centro y,
+  encima, el techo de las cajas que tocan **sus partes mas bajas**: las patas;
+  el caparazon del cangrejo; el tronco de la gaviota.
 - **Escalones** *(deduccion, la regla 21 extendida a las partes)*:
   - una casilla estorba a una parte si, entre ella y su vecina hacia los pies,
     hay un escalon de mas de `STEP_UP` cuya cima pasa de la base de la parte;

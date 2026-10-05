@@ -32,7 +32,11 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
-| Cajas de depuracion: **12 casillas** a la redonda; el **choque dibujado hasta el alto de su caja de golpe** (el choque no tiene alto); el **jugador de los pies a los ojos**; se rehacen en cada fotograma | `docs/devtools.md`, las cajas | numeros en `debug-boxes.ts` |
+| Una caja por objeto: los animales **se apoyan en sus partes mas bajas** (las patas; el caparazon del cangrejo; el tronco de la gaviota) | Una caja por objeto, mas abajo | una funcion en `boxes.ts` |
+| Una caja por objeto: una caja que asoma **mas de `STEP_UP` sobre los pies no se pisa** —un arbol que crece bajo la huella deja al cuerpo metido, no lo sube de golpe a su techo— | Una caja por objeto, mas abajo | un parametro en `jump.ts` |
+| Una caja por objeto: las **medidas por casilla** (el nacimiento, `reachableArea`, `analyze-world`) siguen contando una casilla con tronco o roca como que no se cruza: miden **por lo bajo** de lo que el cuerpo recorre | Una caja por objeto, mas abajo | una regla en `World.isSolidAt` |
+| Una caja por objeto: las **medidas de las cajas** (la roca 0,9 de ancho y 1,0 de alto, sacadas de su dibujo) ahora tambien chocan: entre dos rocas vecinas no se pasa, y una se sube de un salto | `sim/boxes.ts` | numeros en `ROCK_BOX` |
+| Cajas de depuracion: **12 casillas** a la redonda; el **jugador de los pies a los ojos**; se rehacen en cada fotograma | `docs/devtools.md`, las cajas | numeros en `debug-boxes.ts` |
 | El boton de desarrollo del movil: una **llave inglesa de trazo** (como el resto de esa columna, a falta de tu juicio sobre la directriz 3), y el **panel al lado de la columna**, como el HUD | `docs/devtools.md`, el movil | un icono y una regla CSS |
 | Equipables: los **usos de las armas**, 30, 90 y 180, tres cuartos de los de la herramienta de su material (tu pediste «menos») | Equipables, mas abajo | tres numeros en `toolStats` |
 | Equipables: **que gasta un golpe**: lo que da impacto (un animal, o algo que se trabaja); al aire o a un brote, nada; **uno por golpe y por objeto**, asi un barrido a un animal y un arbol gasta uno del arma puesta y otro de la mano | Equipables, mas abajo | una regla en `tryHarvestArea` |
@@ -49,7 +53,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Fauna: el **paseo** — un punto de paso cada 20 s, territorio de 6 a 16 casillas, de 0,6 a 1,2 bloques por segundo, sin salir de su bioma y sin chocar con nadie | `docs/fauna.md`, la ley del observador | numeros en `SPECIES` |
 | Fauna: **los animales no se curan** mientras estan cerca (al recargarse si: tu decision) | `docs/fauna.md`, el sistema de PV | una regla |
 | El **impacto**: estrella de 0,18 a 0,42 bloques en 0,2 s, blanca y sin prueba de profundidad | `docs/efectos.md`, el impacto | tres numeros |
-| Fauna, el cuerpo de bloques: las **medidas de cada plano** y que es `hit` mas alla de la cola (patas, orejas, cuernos, astas, barba, alas y pico, no); la cabeza de la cria un 30 % mayor y la del joven un 10 %; los colores | `docs/fauna.md`, el cuerpo de bloques | numeros en `fauna-body.ts` y `fauna-model.ts` |
+| Fauna, el cuerpo de bloques: las **medidas de cada plano** (que es `hit` ya es tuyo: cabeza, cuello, extremidades y tronco); la cabeza de la cria un 30 % mayor y la del joven un 10 %; los colores | `docs/fauna.md`, el cuerpo de bloques | numeros en `fauna-body.ts` y `fauna-model.ts` |
 | Fauna, el choque: el **escalon de mas de `STEP_UP`** que estorba a una parte, y la rampa que no; **girar a 180°/s**; **no avanzar a mas de 45°** de su destino; la **indulgencia** del que no cabe; al ponerlo, **8 rumbos** desde el de su origen a su punto de paso | `docs/fauna.md`, el choque | numeros en `movement.ts` y `body.ts` |
 | Fauna, que no se queden clavados (tu elegiste retroceder y girar, saltar todos un bloque y bordear): **retroceder 1 bloque** como mucho; un rodeo de **1 bloque** por **±45°, ±90°, ±135° y 180°**, el izquierdo antes; sin salida, **quieto hasta el siguiente punto de paso** | `docs/fauna.md`, lo que estorba | numeros en `movement.ts` |
 | Fauna, el salto: en el aire **avanza lo justo para pasar el borde en lo alto del salto** (el plan decia a 5,2, la del jugador, y el bisonte adulto no llegaba: topa con la cabeza a 1,7 del borde), y si no llega, a tres cuartos o a la mitad del ascenso. El bisonte adulto salta asi unos 3,4 bloques de largo, y mas si tiene que probar a tres cuartos o a la mitad | `docs/fauna.md`, lo que estorba | una formula en `tryJump` |
@@ -189,6 +193,62 @@ escrito, y el 2026-09-28 decidiste **seguir sin margen de espera ni coyote
 time** hasta ver si basta el arreglo de los pestillos (abajo).
 
 ---
+
+## Una caja por objeto, con alto, y las patas con caja — HECHO (2026-10-05)
+
+Al ver las cajas en el panel, el autor afino las reglas:
+
+> En plantas, rocas y futuros recursos. La caja de daño y colisión será mixta,
+> ajustada al área general de objeto y no cubriendo necesariamente toda la
+> casilla que lo contiene, además, la altura también debe estar definida,
+> pudiendo así el jugador o animales subirse a, por ejemplo, una roca o el
+> tronco de un árbol.
+>
+> En animales, todas las partes principales de un animal deben tener cajas de
+> colisión y daño, entiéndase partes importantes por: cabeza, cuello,
+> extremidades y tronco. Aún se dejarán por fuera las partes pequeñas o
+> delgadas como: cuernos, antenas, colas cortas, alas recogidas.
+>
+> Estas consideraciones pueden variar y afinarse según el animal o elemento,
+> así que siempre que se tenga duda, se deberá debatir.
+
+Y sus respuestas a mis preguntas:
+- el arbusto, los guijarros y el brote **no chocan**;
+- **se apoya y se choca con la huella entera**, tambien contra las estaciones;
+- las **pinzas** del cangrejo si; las **patas de la gaviota y del cangrejo**,
+  no;
+- el resto de partes, como estaban, mas las patas.
+
+Lo que se hizo:
+- **`sim/boxes.ts`**, modulo nuevo: la caja de cada objeto (`featureBox`, lo
+  que era `hitboxAt`), `solidBoxAt` para lo que choca (`blocksBody`, que
+  sustituye a `isFeatureSolid`), y lo que pisa un cuerpo: `squareFloor` (el
+  terreno en el centro y el techo de las cajas que tocan la huella) y
+  `footing`. Vive fuera de `systems/` para no abrir ciclos de importacion.
+- **La regla 21 no cambia de enunciado**: no se entra donde el suelo esta por
+  encima de los pies; el suelo es ahora el terreno mas esas cajas. El choque de
+  casilla entera de arboles y roca y la estacion medida por el centro se
+  retiraron, y `World.floorHeightAt` con ellos.
+- **Las patas** (`legs()`) y las **pinzas** pasan a `hit`. Los animales
+  chocan con las cajas por sus partes y saltan a una roca de 1,0
+  (`ANIMAL_JUMP_UP`).
+
+Medido:
+- **Entre dos troncos de tundra vecinos se pasa** (hueco de ~0,78, mas que el
+  cuerpo, 0,68); entre los de bosque o pradera, no.
+- **Animales clavados**, el primer minuto de tres semillas: 6,9 → 3,6 %,
+  5,0 → 2,0 % y 0,04 → 0,13 %; los pequeños, 0,04 → 0,02 %, 0,26 → 0,64 % y
+  0,01 → 0,09 %. Los troncos ya no ocupan la casilla.
+- **El tick medio**: 0,46 → ~0,75 ms (cuatro cajas mas por animal y las cajas
+  de los objetos), muy por debajo de los 8 ms. Una ronda de consultas por
+  animal y tick, compartida por su andar y su vertical, lo bajo de ~0,83.
+- **`tools/analyze-world.ts`**: identico a antes, porque las medidas por
+  casilla no cambiaron (ver «Esperando tu juicio»).
+
+Deducciones mias, en «Esperando tu juicio»: el apoyo de los animales, la caja
+que asoma por encima de los pies, las medidas por casilla y las medidas de la
+roca. Colocar una estacion encima de la propia huella ya estaba prohibido
+(`placeTarget`).
 
 ## Fauna: lo que estorba no los deja clavados — HECHO (2026-10-05)
 

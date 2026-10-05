@@ -46,13 +46,17 @@ un indice de estos documentos).
     nucleo** (`sim/trunk.ts`) y el cliente lo lee de ahi para dibujarlo: el que
     se ve y el que se golpea son el mismo numero, escalon de cuarto de bloque
     incluido, y un test lo afirma. Arbusto, roca, minerales y brote llevan
-    medidas sacadas de su dibujo (deduccion mia).
+    medidas sacadas de su dibujo (deduccion mia). **Desde el 2026-10-05 esa
+    caja es tambien la que choca** si su tipo choca (`sim/boxes.ts`; ver la
+    regla 21).
 
     **El de un animal son las cajas de su cuerpo** (decision del autor,
     2026-10-03): las partes `hit` de su plano (`shared/fauna-body.ts`), giradas
-    con su rumbo (`animalBoxes`, `rayOrientedBox`). El tronco, el cuello y la
-    cabeza si; la cola, las patas y las orejas no. Es el mismo plano que se
-    dibuja, como el tronco de los arboles.
+    con su rumbo (`animalBoxes`, `rayOrientedBox`). Desde el 2026-10-05 (el
+    autor), **la cabeza, el cuello, las extremidades y el tronco**; lo pequeno
+    o fino —cuernos, colas cortas, alas recogidas, orejas, las patas de la
+    gaviota y del cangrejo— no. Es el mismo plano que se dibuja, como el tronco
+    de los arboles.
 
     Es el tercer modelo, y cada uno cayo por lo mismo: la primera persona.
     Cuatro casillas fijas (la apuntada, sus vecinas en el anillo de 8
@@ -109,23 +113,45 @@ un indice de estos documentos).
     1.16 de la derivacion, y ese decimo es justo el margen que el autor pidio
     para que subirse a un bloque no fuera al milimetro.
 
-    **Las estaciones entran en ese suelo** (decision del autor, 2026-09-30:
-    fisicas como un bloque). Lo que pisa el cuerpo es `World.floorHeightAt`, el
-    terreno mas la estacion de la casilla (`stationHeight`); lo usan el choque y
-    la vertical, y nada mas —el terreno que se dibuja, el golpe y sembrar
-    siguen con `groundHeightAt`—. Asi una mesa estorba de lado como una pared
-    de un bloque, se sube de un salto y, si se desmonta, se cae. El horno mide
-    1,25 y **no se sube desde su mismo nivel**: a proposito, porque «que haya
-    bloques de diferente altura sera una de las caracteristicas del juego».
+    **Los objetos entran en ese suelo por su caja** (decision del autor,
+    2026-10-05, que extiende la de las estaciones del 2026-09-30: «fisicas como
+    un bloque»). Cada objeto tiene **una** caja, la que se golpea (regla 12),
+    ajustada a el y con alto; si su tipo choca (`blocksBody`: el tronco del
+    arbol, la roca, los minerales y las estaciones; el arbusto, el brote y los
+    guijarros no), entra en el suelo que se pisa. **El cuerpo se apoya y choca
+    con su huella entera** (`BODY_RADIUS` por lado), tambien contra las
+    estaciones, mientras el **terreno** se sigue midiendo en el centro. Lo que
+    pisa el cuerpo es `squareFloor` (`sim/boxes.ts`): el terreno en el centro
+    y, encima, el techo de cada caja que toca la huella; lo usan el choque, la
+    vertical (`footing`) y el auto salto, y nada mas —el terreno que se dibuja,
+    el golpe y sembrar siguen con `groundHeightAt`—. De ahi, sin casos
+    especiales:
+    - una roca (1,0) o una mesa (1) estorban de lado como una pared, se suben de
+      un salto (llega a 1,16), encima se esta de pie y al bajarse se cae;
+    - un tronco (de 2 a 5) no se sube, y entre dos troncos vecinos se pasa si el
+      hueco supera el cuerpo (0,68): entre los de tundra si, entre los de
+      bosque o pradera no;
+    - el horno mide 1,25 y **no se sube desde su mismo nivel**: a proposito,
+      porque «que haya bloques de diferente altura sera una de las
+      caracteristicas del juego».
+
+    Una caja que asoma **mas de `STEP_UP` por encima de los pies no se pisa**
+    (*deduccion*): si un arbol crece bajo la huella, el cuerpo se queda metido
+    en vez de subir de golpe a su techo. Hasta el 2026-10-05 los arboles y la
+    roca chocaban por la casilla entera y sin alto, y la estacion se media en
+    el centro (`World.floorHeightAt`, retirado).
 
     **Los animales llevan la regla a sus partes** (2026-10-03, ver
-    `docs/fauna.md`). Sus pies, como el jugador: centro y `STEP_UP`. Ademas,
-    cada parte de su cuerpo que choca (`hit`), girada con su rumbo, no puede
-    solapar una casilla solida ni una casilla que, hacia sus pies, tenga un
-    escalon de mas de `STEP_UP` cuya cima pase de la base de la parte
-    (`sim/body.ts`, *deduccion*). Una rampa no tiene escalon y deja pasar. La
-    decision del autor es que choquen las cajas de sus partes; como se mide la
-    altura contra ellas es deduccion mia.
+    `docs/fauna.md`). Sus pies, como el jugador: centro y `STEP_UP` contra el
+    terreno. Ademas, cada parte de su cuerpo que choca (`hit`), girada con su
+    rumbo, no puede solapar una casilla de agua, ni una casilla que, hacia sus
+    pies, tenga un escalon de mas de `STEP_UP` cuya cima pase de la base de la
+    parte, ni la caja de un objeto cuyo techo pase de esa base (`sim/body.ts`,
+    *deduccion*). Una rampa no tiene escalon y deja pasar. Se apoyan en las
+    cajas que tocan **sus partes mas bajas** —las patas; el caparazon del
+    cangrejo; el tronco de la gaviota— (*deduccion*). La decision del autor es
+    que choquen las cajas de sus partes; como se mide la altura contra ellas es
+    deduccion mia.
 
 22. **Donde se nace hay que ganarselo.** `findSpawn` miraba solo si el tile era
     solido, y eso basto mientras el relieve solo se veia. Con la altura

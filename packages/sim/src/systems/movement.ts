@@ -20,10 +20,11 @@
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
+import { BODY_RADIUS, squareFloor } from '../boxes.js';
 import { applyVertical, GRAVITY, JUMP_SPEED, STEP_UP, takeOff } from './jump.js';
 
-/** Medio ancho del cuerpo del jugador, en tiles. */
-export const BODY_RADIUS = 0.34;
+/** Medio ancho del cuerpo del jugador, en tiles: su huella. Vive en `boxes.ts`. */
+export { BODY_RADIUS };
 /** Velocidad de marcha, en tiles por segundo. Es la de siempre. */
 export const WALK_SPEED = 5.2;
 
@@ -59,7 +60,11 @@ export function speedOf(running: boolean): number {
   return running ? RUN_SPEED : WALK_SPEED;
 }
 
-/** True si el AABB centrado en (cx, cy) solapa algun tile solido. */
+/**
+ * True si la huella centrada en (cx, cy) solapa una casilla cuyo terreno corta
+ * el paso: el agua. Los objetos no estan aqui: estorban por su caja, que entra
+ * en el suelo que se pisa (`squareFloor`).
+ */
 export function collides(world: World, cx: number, cy: number): boolean {
   const minX = Math.floor(cx - BODY_RADIUS);
   const maxX = Math.floor(cx + BODY_RADIUS);
@@ -67,7 +72,7 @@ export function collides(world: World, cx: number, cy: number): boolean {
   const maxY = Math.floor(cy + BODY_RADIUS);
   for (let ty = minY; ty <= maxY; ty++) {
     for (let tx = minX; tx <= maxX; tx++) {
-      if (world.isSolidAt(tx, ty)) return true;
+      if (world.isTerrainSolidAt(tx, ty)) return true;
     }
   }
   return false;
@@ -91,9 +96,11 @@ function blocked(
 ): boolean {
   if (collides(world, cx, cy)) return true;
   if (keep && !keep(cx, cy)) return true;
-  // El suelo con sus estaciones: una mesa estorba de lado como una pared de un
-  // bloque y se sube saltando (decision del autor, 2026-09-30).
-  return world.floorHeightAt(cx, cy) > feet + margin;
+  // El terreno en el centro y, encima, el techo de cada caja que toca la
+  // huella: un tronco, una roca o una mesa estorban de lado como una pared, y
+  // lo que no pasa del salto se sube saltando (decisiones del autor,
+  // 2026-09-30 y 2026-10-05).
+  return squareFloor(world, cx, cy, BODY_RADIUS) > feet + margin;
 }
 
 /**
@@ -248,10 +255,10 @@ function turnBetween(a: number, b: number): number {
 }
 
 /**
- * Si los pies de un animal pueden ir a (cx, cy): su casilla no es solida, el
- * punto lo admite `keep` —no sale de los tiles de su bioma— y el suelo no sube
- * mas de `margin`: `STEP_UP` andando y 0 en el aire. Lo demas del cuerpo lo
- * miran sus partes (`body.ts`).
+ * Si los pies de un animal pueden ir a (cx, cy): su casilla no es agua, el
+ * punto lo admite `keep` —no sale de los tiles de su bioma— y el terreno no
+ * sube mas de `margin`: `STEP_UP` andando y 0 en el aire. Lo demas —las cajas
+ * de los objetos incluidas— lo miran sus partes (`body.ts`), patas incluidas.
  */
 function feetBlocked(
   world: World,
@@ -261,9 +268,9 @@ function feetBlocked(
   keep?: (x: number, y: number) => boolean,
   margin = STEP_UP,
 ): boolean {
-  if (world.isSolidAt(Math.floor(cx), Math.floor(cy))) return true;
+  if (world.isTerrainSolidAt(Math.floor(cx), Math.floor(cy))) return true;
   if (keep && !keep(cx, cy)) return true;
-  return world.floorHeightAt(cx, cy) > feet + margin;
+  return world.groundHeightAt(cx, cy) > feet + margin;
 }
 
 /** Cuantas veces se mete en el terreno el cuerpo del animal `id` puesto asi. */
@@ -524,8 +531,9 @@ function tryJump(
   for (let d = 0.05; d <= JUMP_LOOK; d += 0.05) {
     const px = x + fx * d;
     const py = y + fy * d;
-    if (world.isSolidAt(Math.floor(px), Math.floor(py)) || (keep && !keep(px, py))) return false;
-    const rise = world.floorHeightAt(px, py) - z;
+    if (world.isTerrainSolidAt(Math.floor(px), Math.floor(py)) || (keep && !keep(px, py))) return false;
+    // El suelo en ese punto, con la caja que haya: una roca se salta.
+    const rise = squareFloor(world, px, py, 0) - z;
     if (rise > ANIMAL_JUMP_UP + 1e-6) return false;
     if (rise > STEP_UP) {
       edge = d;
