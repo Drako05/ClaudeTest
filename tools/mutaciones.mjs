@@ -10,66 +10,36 @@
  * - `gestures` o `slash`: esas herramientas;
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los catorce equipables, el Bolso, la casilla del Arma y las primeras
- * armas (2026-10-04), y la auditoria que cerro la tanda.
+ * Ronda: los animales que no se quedan clavados —retroceder para girar,
+ * saltar un bloque y bordear lo demas— (2026-10-05).
  */
 export default [
   {
-    nombre: 'el arma equipada no manda sobre la mano',
-    fichero: 'packages/sim/src/systems/gathering.ts',
-    de: 'const beastStats = weapon === null ? stats : toolStats(weapon);',
-    a: 'const beastStats = stats;',
-    prueba: 'test:tests/fauna.test.ts',
+    nombre: 'el animal no retrocede para girar',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'store.backedUp[id] + back <= ANIMAL_BACKUP + 1e-9 &&',
+    a: 'false &&',
+    prueba: 'test:tests/fauna-body.test.ts',
   },
   {
-    nombre: 'el arma equipada no se gasta',
-    fichero: 'packages/sim/src/systems/gathering.ts',
-    de: 'if (touchedBeast && weapon !== null) broke = inventory.wearWeapon();',
-    a: 'if (false) broke = inventory.wearWeapon();',
-    prueba: 'test:tests/fauna.test.ts',
+    nombre: 'el animal no salta',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'if (!tryJump(world, store, id, speed, dt, keep)) stuck(',
+    a: 'if (true) stuck(',
+    prueba: 'test:tests/fauna-body.test.ts',
   },
   {
-    nombre: 'golpear lo inerte no gasta',
-    fichero: 'packages/sim/src/systems/gathering.ts',
-    de: '    touchedTile = true;',
-    a: '    touchedTile = power > 0;',
-    prueba: 'test:tests/crafting.test.ts',
+    nombre: 'el animal salta a su paso',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'Math.max(speed, edge / (share * (JUMP_SPEED / GRAVITY)))',
+    a: 'speed',
+    prueba: 'test:tests/fauna-body.test.ts',
   },
   {
-    nombre: 'cualquier cosa entra en cualquier hueco',
-    fichero: 'packages/sim/src/inventory.ts',
-    de: 'if (loose !== null && equipOf(loose) !== e) return;',
-    a: 'if (loose !== null && equipOf(loose) === null) return;',
-    prueba: 'test:tests/stations.test.ts',
-  },
-  {
-    nombre: 'el arma equipada pierde su desgaste',
-    fichero: 'packages/sim/src/inventory.ts',
-    de: 'this.wornWear[e] = loose === null ? 0 : looseWear;',
-    a: 'this.wornWear[e] = loose === null ? 0 : (toolStats(loose)?.uses ?? 0);',
-    prueba: 'test:tests/stations.test.ts',
-  },
-  {
-    nombre: 'el icono no se oculta al equipar',
-    fichero: 'packages/client/src/inventory-ui.ts',
-    de: '      if (item === null) {\n        worn.el.appendChild(worn.icon);',
-    a: '      if (item === null || true) {\n        worn.el.appendChild(worn.icon);',
-    prueba: 'smoke:stations',
-  },
-  {
-    nombre: 'los equipables en cuatro columnas',
-    fichero: 'packages/client/index.html',
-    de: 'grid-template-columns: repeat(5, var(--eq))',
-    a: 'grid-template-columns: repeat(4, var(--eq))',
-    prueba: 'smoke:desktop',
-  },
-  // Auditoria del 2026-10-04: el registro en PC ya no mira con un plazo fijo
-  // de 400 ms, sino hasta que la linea se mueve. Si no sube, tiene que caer.
-  {
-    nombre: 'el registro de PC no baja',
-    fichero: 'packages/client/src/pickup-feed.ts',
-    de: 'export const FEED_RISE = 18;',
-    a: 'export const FEED_RISE = 0;',
-    prueba: 'smoke:desktop',
+    nombre: 'el animal no bordea',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'if (rehearseDetour(world, store, id, ax, ay, speed, dt, keep)) {',
+    a: 'if (false) {',
+    prueba: 'test:tests/fauna-body.test.ts',
   },
 ];

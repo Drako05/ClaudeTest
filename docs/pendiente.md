@@ -49,6 +49,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El **impacto**: estrella de 0,18 a 0,42 bloques en 0,2 s, blanca y sin prueba de profundidad | `docs/efectos.md`, el impacto | tres numeros |
 | Fauna, el cuerpo de bloques: las **medidas de cada plano** y que es `hit` mas alla de la cola (patas, orejas, cuernos, astas, barba, alas y pico, no); la cabeza de la cria un 30 % mayor y la del joven un 10 %; los colores | `docs/fauna.md`, el cuerpo de bloques | numeros en `fauna-body.ts` y `fauna-model.ts` |
 | Fauna, el choque: el **escalon de mas de `STEP_UP`** que estorba a una parte, y la rampa que no; **girar a 180°/s**; **no avanzar a mas de 45°** de su destino; la **indulgencia** del que no cabe; al ponerlo, **8 rumbos** desde el de su origen a su punto de paso | `docs/fauna.md`, el choque | numeros en `movement.ts` y `body.ts` |
+| Fauna, que no se queden clavados (tu elegiste retroceder y girar, saltar todos un bloque y bordear): **retroceder 1 bloque** como mucho; un rodeo de **1 bloque** por **±45°, ±90°, ±135° y 180°**, el izquierdo antes; sin salida, **quieto hasta el siguiente punto de paso** | `docs/fauna.md`, lo que estorba | numeros en `movement.ts` |
+| Fauna, el salto: en el aire **avanza lo justo para pasar el borde en lo alto del salto** (el plan decia a 5,2, la del jugador, y el bisonte adulto no llegaba: topa con la cabeza a 1,7 del borde), y si no llega, a tres cuartos o a la mitad del ascenso. El bisonte adulto salta asi unos 3,4 bloques de largo, y mas si tiene que probar a tres cuartos o a la mitad | `docs/fauna.md`, lo que estorba | una formula en `tryJump` |
+| Fauna: **los cuerpos grandes aun se quedan quietos en sitios estrechos** — jabali (40-47 % del tiempo) y ciervo (16-23 %) en el bosque, bisonte (19-34 %) —: no caben al girar entre arboles a dos casillas. ¿Que los arboles no estorben a sus partes, solo a sus pies? ¿Rodeos mas largos? ¿Buscar camino? | `docs/fauna.md`, lo que estorba | segun lo que elijas |
 | La **sonda de profundidad del jugador**: mal tapado y mal visto ≤ 5 % en cinco casos de terreno | `docs/fauna.md`, lo que quedo de la lamina | dos numeros del humo |
 | Fauna: el **ciervo adulto se dibuja sin astas**, porque el dibujo aun no distingue sexos | `docs/fauna.md`, las especies | un dibujo |
 | Fauna: los **dibujos y colores** de las diez especies y sus crias; el **alto minimo** de 0,22 bloques (el cangrejo); el medio ancho de cada caja | `docs/fauna.md`, las especies | dibujo y numeros |
@@ -184,6 +187,28 @@ escrito, y el 2026-09-28 decidiste **seguir sin margen de espera ni coyote
 time** hasta ver si basta el arreglo de los pestillos (abajo).
 
 ---
+
+## Fauna: lo que estorba no los deja clavados — HECHO (2026-10-05)
+
+Viste que los animales se paraban al topar con algo, incluso de frente, y no
+salian. Pasaban clavados el **25-53 % del tiempo** (2 min, cinco semillas): iban
+en linea recta a su punto de paso y, pegados de frente, ningun giro les cabia.
+Elegiste: **retroceder y girar**, **todos saltan un bloque** y **lo demas se
+bordea**. Contado entero en `docs/fauna.md`, «Lo que estorba no los deja
+clavados».
+
+- El salto y cada rodeo **se ensayan** con las mismas funciones que los
+  mueven, y solo se hace lo que en el ensayo sale. Suponer que un rumbo servia
+  fallaba: casi todos los que se rendian habian elegido un rodeo cuyo giro no
+  cabia ni retrocediendo.
+- **Me aparte del plan en una cosa**: el avance en el aire. A 5,2 bloques por
+  segundo el bisonte adulto no subia un escalon (topa con la cabeza con los
+  pies a 1,7 del borde); avanza lo justo para pasar el borde en lo alto del
+  salto. Esta en «Esperando tu juicio».
+- Despues: **0,1-11 % del tiempo**; liebre, zorro, cangrejo, gaviota y reno
+  0-4 %, la marmota hasta 12 % en una semilla. Quedan los cuerpos grandes en
+  sitios estrechos, tambien en «Esperando tu juicio».
+- El tick medio no cambia (0,26 ms).
 
 ## Auditoria al cerrar la fauna y los equipables (2026-10-04)
 

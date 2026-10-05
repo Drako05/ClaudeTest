@@ -394,6 +394,64 @@ su cabeza entrara en una pared, no gira.
   - Con 63 animales el tick paso de 0,17 ms a 2,2 ms sin la ronda, y a
     0,26 ms con ella.
 
+### Lo que estorba no los deja clavados (2026-10-05)
+
+El autor vio que los animales se paraban al topar con algo y no salian,
+**incluso de frente**. Dos causas:
+- iban en linea recta a su punto de paso y empujaban contra lo que hubiera en
+  medio hasta el siguiente (hasta 20 s);
+- pegados de frente, **ya no podian girar**: cualquier paso de giro metia una
+  esquina de la cabeza en la pared, la regla del giro lo rechazaba siempre, y
+  se quedaban asi para siempre.
+
+Medido en 2 min de cinco semillas, pasaban clavados (lejos de su punto de paso
+y quietos 3 s) el **25-53 % del tiempo**.
+
+Lo que eligio el autor, y como esta hecho (`movement.ts`, `walkAnimal`):
+- **Retrocede y gira.** Si el giro no cabe, da un paso atras a lo largo de su
+  rumbo y vuelve a probar; gira sobre el centro de su tronco, y el cuerpo nunca
+  entra en la pared. Como mucho **1 bloque** (`ANIMAL_BACKUP`, *deduccion*).
+- **Todos saltan un bloque** (`ANIMAL_JUMP_UP`), con la parabola del jugador.
+  - Salta cuando el avance no progresa y, a lo largo de su rumbo, el suelo
+    sube mas de `STEP_UP` y no mas de un nivel, sin nada solido ni fuera de su
+    bioma antes del borde.
+  - **En el aire avanza lo justo para que sus pies pasen el borde en lo alto
+    del salto**, y nunca mas despacio que su paso *(deduccion)*. Un animal
+    largo topa con la cabeza teniendo los pies lejos del borde: al bisonte
+    adulto le quedan 1,7 bloques, y a la velocidad del jugador (5,2, la del
+    plan) llegaba cayendo. Si asi no llega, prueba a pasarlo a tres cuartos
+    del ascenso y a la mitad *(deduccion)*.
+  - En el aire no gira, y se estampa como el jugador contra lo que no alcanza.
+  - Si se cae andando por un borde, cae avanzando a su paso.
+- **Lo que no se salta lo bordea**: pared alta, agua, arbol, el borde de su
+  bioma.
+  - Rumbos, desde el de su punto de paso: ±45°, ±90°, ±135° y 180°, el
+    izquierdo antes *(deduccion; determinista)*.
+  - Anda **1 bloque** por el (`ANIMAL_DETOUR`, *deduccion*) y vuelve a apuntar
+    a su punto de paso. Contra una pared larga elige el mismo lado y la
+    recorre.
+  - Se probaron dos refinamientos y se quitaron porque no mejoraban la medida:
+    empezar por el rumbo siguiente si se atascaba otra vez en el mismo sitio,
+    y contar como trecho del rodeo lo que avanza en el aire.
+  - Si no sale ninguno, es un callejon: espera quieto a su siguiente punto de
+    paso, que olvida todo lo anterior.
+- **Ensaya antes de hacer.** El salto y cada rodeo se prueban enteros con las
+  mismas funciones que los van a mover, tick a tick como `stepFauna`, y se
+  deshacen; solo se hace lo que en el ensayo sale. Como todo es determinista,
+  lo de verdad es lo ensayado. Se eligio asi porque suponer que un rumbo sirve
+  fallaba: casi todos los que se rendian habian elegido un rodeo cuyo giro no
+  cabia ni retrocediendo.
+- **La ley del observador no cambia**: los puntos de paso son los mismos; solo
+  cambia la forma de llegar.
+
+Despues, en las mismas cinco semillas: **0,1-11 % del tiempo**. Liebre, zorro,
+cangrejo, gaviota y reno, 0-4 %; la marmota, 0-12 % segun la semilla. Lo que
+queda es sobre todo de cuerpos grandes en sitios estrechos —el jabali (40-47 %)
+y el ciervo (16-23 %) entre los arboles del bosque, el bisonte (19-34 %), el
+ibice en algun risco (0-22 %)—: un cuerpo de dos bloques que no cabe al girar
+entre arboles a dos casillas. Esta en «Esperando tu
+juicio» de `docs/pendiente.md`. El tick no cambia: 0,26 ms de media.
+
 ### El modelo (`client/src/fauna-model.ts`, `fauna-view.ts`)
 
 - Una geometria por (especie, etapa), con todas sus cajas y el color de cada
@@ -418,6 +476,9 @@ cinco casos de terreno: nada mal tapado ni mal visto.
   - asar y comer;
   - que la generacion es pura y salen las densidades, etapas y sexos;
   - que andan y nunca pisan otro bioma;
+  - que en el mundo de verdad casi no se quedan clavados (el primer minuto de
+    la semilla 5, con el limite en 20 % del tiempo y 5 % las especies
+    pequeñas: antes 33 y 25 %, ahora 7 y 0,04 %);
   - visto o saltado, el mismo punto de paso;
   - el daño que se olvida al recargar: el del animal y el de un arbol;
   - el impacto, sobre la caja de lo golpeado, uno por objetivo;
@@ -429,7 +490,10 @@ cinco casos de terreno: nada mal tapado ni mal visto.
   - el plano: su alto, los pies en el suelo, y que es `hit`;
   - la cabeza del bisonte se golpea y su cola no, y girado;
   - el choque en mundos hechos a mano: el pasillo, la pared al girar, el
-    escalon y la rampa, y la indulgencia al girar y al avanzar.
+    escalon y la rampa, y la indulgencia al girar y al avanzar;
+  - que no se quedan clavados: de frente contra una pared retrocede y gira;
+    un escalon de un nivel lo saltan la liebre y el bisonte sin meter la
+    cabeza; un pilar, un charco y una pared de dos niveles se bordean.
 - **`tests/body-ray.test.ts`**: el rayo contra la caja del cuerpo y contra el
   terreno, la verdad de la sonda.
 - **La pasada `fauna` del humo** afirma:
