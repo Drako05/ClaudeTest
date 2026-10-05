@@ -29,6 +29,7 @@ import {
   MeshBasicMaterial,
 } from 'three';
 import {
+  blocksBody,
   BIOME_NAMES,
   CHUNK_SIZE,
   Feature,
@@ -80,7 +81,7 @@ import { InventoryUi } from './inventory-ui.js';
 import { MouseLook } from './pointer-lock.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
-import { DebugBoxes } from './debug-boxes.js';
+import { BOX_RADIUS, DebugBoxes } from './debug-boxes.js';
 import { aboveButtonY, inventoryDelta, opacityOf, PickupFeed, riseOf } from './pickup-feed.js';
 import {
   berrySpot,
@@ -1083,6 +1084,19 @@ requestAnimationFrame(frame);
  * no un campo porque recorren cientos de miles de casillas del generador: como
  * campo se pagarian en cada lectura.
  */
+/** Cuantas cajas de objeto hay a `BOX_RADIUS` de (`px`, `py`): las que solo golpean y las que chocan. */
+function boxesNear(px: number, py: number): { hitOnly: number; blocking: number } {
+  const out = { hitOnly: 0, blocking: 0 };
+  for (let y = py - BOX_RADIUS; y <= py + BOX_RADIUS; y++) {
+    for (let x = px - BOX_RADIUS; x <= px + BOX_RADIUS; x++) {
+      if (!hitboxAt(state.world, x, y)) continue;
+      if (blocksBody(state.world.featureAt(x, y))) out.blocking++;
+      else out.hitOnly++;
+    }
+  }
+  return out;
+}
+
 Object.defineProperty(window, '__verdant', {
   get: () => {
     const id = state.playerId;
@@ -1142,6 +1156,11 @@ Object.defineProperty(window, '__verdant', {
       reticle: overlays.reticle,
       /** Cajas dibujadas de cada clase (golpe, choque, las dos), con «Cajas» puesto. */
       debugBoxes: debugBoxes.counts,
+      /**
+       * Para el humo, contadas aparte del dibujo: las cajas de alrededor que
+       * solo se golpean y las de los objetos que tambien chocan.
+       */
+      boxesNear: boxesNear(tx, ty),
       /** Lo recolectado, para poder comprobar la accion desde fuera. */
       gathered,
       /** Barridos y escombros DIBUJADOS, acumulados. Ver `EffectsView`. */

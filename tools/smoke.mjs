@@ -2170,8 +2170,12 @@ async function devToolsPass(browser, baseUrl) {
   await page.click('[data-toggle="boxes"]');
   const boxed = await waitForLoop(page, 10);
   console.log(`  cajas: ${JSON.stringify(boxed.debugBoxes)}`);
-  check(boxed.debugBoxes.both > 0 && boxed.debugBoxes.solid === 1,
-    `las cajas no dibujaron los objetos en amarillo y solo al jugador en cian: ${JSON.stringify(boxed.debugBoxes)}`);
+  // Lo que hay, contado aparte (`boxesNear`): el rojo es exactamente lo que solo
+  // se golpea, y el amarillo, al menos lo que choca (mas los animales).
+  console.log(`  alrededor: ${JSON.stringify(boxed.boxesNear)}`);
+  check(boxed.debugBoxes.hit === boxed.boxesNear.hitOnly && boxed.debugBoxes.both >= boxed.boxesNear.blocking &&
+    boxed.boxesNear.blocking > 0 && boxed.debugBoxes.solid === 1,
+    `las cajas no son las de alrededor: ${JSON.stringify(boxed.debugBoxes)} frente a ${JSON.stringify(boxed.boxesNear)}`);
   await page.screenshot({ path: join(SHOTS, '3d-06b-cajas.png') });
   await page.click('[data-toggle="boxes"]');
   const unboxed = await waitForLoop(page, 10);
