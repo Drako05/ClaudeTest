@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { animalHeight, partsOf, SPECIES_COUNT, Species, Stage, STAGE_COUNT } from '@verdant/shared';
 import {
+  airborneAnimal,
+  applyVertical,
   bodyBoxes,
   bodyClashes,
   EntityKind,
@@ -40,14 +42,41 @@ function clashesOf(world: World, store: EntityStore, id: number): number {
   return bodyClashes(world, bodyBoxes(a.species, a.stage, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]), store.x[id], store.y[id]);
 }
 
-/** Anda `seconds` hacia (`dx`, `dy`), con los pies siempre en el suelo. */
-function walk(world: World, store: EntityStore, id: number, dx: number, dy: number, seconds: number, each?: () => void): void {
+/**
+ * Anda `seconds` hacia (`dx`, `dy`) como en `stepFauna`: en el suelo
+ * `walkAnimal`, en el aire `airborneAnimal`, y la gravedad. `keep` es lo que
+ * admiten sus pies, como su bioma.
+ */
+function walk(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dx: number,
+  dy: number,
+  seconds: number,
+  each?: () => void,
+  keep?: (x: number, y: number) => boolean,
+): void {
   for (let t = 0; t < seconds * 60; t++) {
-    walkAnimal(world, store, id, dx, dy, 1, 1 / 60);
-    store.z[id] = world.floorHeightAt(store.x[id], store.y[id]);
+    if (store.grounded[id]) walkAnimal(world, store, id, dx, dy, 1, 1 / 60, keep);
+    else airborneAnimal(world, store, id, 1 / 60, keep);
+    applyVertical(world, store, id, 1 / 60);
     each?.();
   }
 }
+
+/** Hasta donde llega en x el cuerpo que choca, girado con su rumbo. */
+function frontOf(store: EntityStore, id: number): number {
+  const a = store.animal[id]!;
+  const boxes = bodyBoxes(a.species, a.stage, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]);
+  return Math.max(...boxes.map((b) => b.cx + b.hl * Math.abs(b.ux) + b.hw * Math.abs(b.uy)));
+}
+
+/** Donde acaba por delante el hocico de un bisonte adulto, desde sus pies. */
+const SNOUT_REACH = (() => {
+  const snout = partsOf(Species.Bison, Stage.Adult).find((p) => p.name === 'hocico')!;
+  return snout.at[0] + snout.size[0] / 2;
+})();
 
 describe('el plano del cuerpo', () => {
   it('cada especie y etapa mide de alto su animalHeight, con los pies en el suelo', () => {
@@ -115,18 +144,60 @@ describe('el cuerpo choca con el terreno', () => {
     expect(bison.store.facingX[bison.id]).toBeLessThan(0.95);
   });
 
-  it('no mete la cabeza en un escalon de un nivel, y una liebre sube una rampa', () => {
+  it('no mete la cabeza en un escalon de un nivel: lo salta, y una liebre sube una rampa', () => {
     const step = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
-    const bison = lone(Species.Bison, 0, 0.5, 1, 0);
-    walk(step, bison.store, bison.id, 1, 0, 5, () => expect(clashesOf(step, bison.store, bison.id)).toBe(0));
-    const snout = partsOf(Species.Bison, Stage.Adult).find((p) => p.name === 'hocico')!;
-    expect(bison.store.x[bison.id] + snout.at[0] + snout.size[0] / 2).toBeLessThanOrEqual(3 + 1e-6);
-    // La rampa sube un nivel en una casilla, de x = 2 a x = 3.
+    for (const species of [Species.Bison, Species.Hare]) {
+      const a = lone(species, 0, 0.5, 1, 0);
+      let jumped = false;
+      walk(step, a.store, a.id, 1, 0, 5, () => {
+        expect(clashesOf(step, a.store, a.id)).toBe(0);
+        if (!a.store.grounded[a.id]) jumped = true;
+        // Andando por abajo, ninguna parte entra en el escalon.
+        if (a.store.grounded[a.id] && a.store.z[a.id] === 0) expect(frontOf(a.store, a.id)).toBeLessThanOrEqual(3 + 1e-6);
+      });
+      // Lo salto y siguio arriba (el autor, 2026-10-05: todos saltan un bloque).
+      expect(jumped).toBe(true);
+      expect(a.store.z[a.id]).toBe(1);
+      expect(a.store.x[a.id]).toBeGreaterThan(4);
+    }
+    // La rampa sube un nivel en una casilla, de x = 2 a x = 3: se sube andando.
     const ramp = fakeWorld(() => false, (x) => Math.max(0, Math.min(1, x - 2)));
     const hare = lone(Species.Hare, 0, 0.5, 1, 0);
-    walk(ramp, hare.store, hare.id, 1, 0, 5);
+    walk(ramp, hare.store, hare.id, 1, 0, 5, () => expect(hare.store.grounded[hare.id]).toBe(1));
     expect(hare.store.x[hare.id]).toBeGreaterThan(3.5);
     expect(hare.store.z[hare.id]).toBe(1);
+  });
+
+  it('de frente contra una pared y con el destino detras, retrocede, gira y se va', () => {
+    // Una pared en x >= 3, y el hocico pegado a ella: cualquier paso de giro
+    // la meteria. Antes se quedaba asi para siempre.
+    const wall = fakeWorld((tx) => tx >= 3);
+    const x0 = 3 - SNOUT_REACH - 1e-3;
+    const bison = lone(Species.Bison, x0, 0.5, 1, 0);
+    expect(clashesOf(wall, bison.store, bison.id)).toBe(0);
+    walk(wall, bison.store, bison.id, -1, 0, 4, () => expect(clashesOf(wall, bison.store, bison.id)).toBe(0));
+    expect(bison.store.facingX[bison.id]).toBeLessThan(-0.9);
+    expect(bison.store.x[bison.id]).toBeLessThan(x0 - 1);
+  });
+
+  it('lo que no se salta se bordea: un pilar, un charco y una pared de dos niveles', () => {
+    // Un pilar solido en (3, 0), justo en el camino.
+    const pillar = fakeWorld((tx, ty) => tx === 3 && ty === 0);
+    const a = lone(Species.Hare, 0.5, 0.5, 1, 0);
+    walk(pillar, a.store, a.id, 1, 0, 8, () => expect(clashesOf(pillar, a.store, a.id)).toBe(0));
+    expect(a.store.x[a.id]).toBeGreaterThan(5);
+    // Un charco de tres casillas en x = 3: el agua no es de su bioma.
+    const open = fakeWorld(() => false);
+    const dry = (x: number, y: number) => !(Math.floor(x) === 3 && Math.abs(Math.floor(y)) <= 1);
+    const b = lone(Species.Hare, 0.5, 0.5, 1, 0);
+    walk(open, b.store, b.id, 1, 0, 10, () => expect(dry(b.store.x[b.id], b.store.y[b.id])).toBe(true), dry);
+    expect(b.store.x[b.id]).toBeGreaterThan(5);
+    // Una pared de dos niveles a lo largo de y: no se salta, se recorre.
+    const cliff = fakeWorld(() => false, (x) => (x >= 3 ? 2 : 0));
+    const c = lone(Species.Hare, 0.5, 0.5, 1, 0);
+    walk(cliff, c.store, c.id, 1, 0, 6, () => expect(c.store.z[c.id]).toBeLessThan(1));
+    expect(c.store.x[c.id]).toBeLessThan(3);
+    expect(Math.abs(c.store.y[c.id] - 0.5)).toBeGreaterThan(2);
   });
 
   it('un animal que nacio sin caber sale andando y no se queda clavado', () => {

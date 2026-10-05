@@ -279,6 +279,44 @@ describe('Fauna: deambular', () => {
   });
 });
 
+describe('Fauna: lo que estorba no los deja clavados', () => {
+  it('en el mundo de verdad casi nunca estan lejos de su punto de paso y quietos 3 s', () => {
+    // Clavado: lejos de su punto de paso los ultimos 3 s y sin moverse en
+    // ellos. Medido en 2 min de cinco semillas (2026-10-05): antes de saltar
+    // y bordear, 25-53 % del tiempo, y las especies pequeñas igual que las
+    // grandes; despues, 0,1-11 %, y las pequeñas casi nada. Lo que queda es de
+    // cuerpos grandes en sitios estrechos: el ciervo y el jabali entre los
+    // arboles del bosque, el bisonte. Aqui, el primer minuto de la semilla
+    // 5: antes 33 % y 25 % las pequeñas; despues 7 % y 0,04 %.
+    const state = createGame(5);
+    const window = 3 * 60;
+    const small = new Set([Species.Hare, Species.ArcticFox, Species.Marmot, Species.Crab, Species.Gull]);
+    const trail = new Map<string, number[][]>();
+    const count = { all: 0, stuck: 0, small: 0, smallStuck: 0 };
+    for (let t = 0; t < 60 * 60; t++) {
+      step(state, emptyIntent());
+      const e = state.entities;
+      for (const [key, id] of state.fauna) {
+        const far = Math.hypot(e.wanderX[id] - e.x[id], e.wanderY[id] - e.y[id]);
+        const h = trail.get(key) ?? [];
+        h.push([e.x[id], e.y[id], far]);
+        if (h.length > window) h.shift();
+        trail.set(key, h);
+        if (h.length < window) continue;
+        const stuck = h.every((p) => p[2] > 0.6) && Math.hypot(h[0][0] - e.x[id], h[0][1] - e.y[id]) < 0.05;
+        const isSmall = small.has(e.animal[id]!.species);
+        count.all++;
+        if (stuck) count.stuck++;
+        if (isSmall) count.small++;
+        if (isSmall && stuck) count.smallStuck++;
+      }
+    }
+    expect(count.small).toBeGreaterThan(1000);
+    expect(count.stuck / count.all).toBeLessThan(0.2);
+    expect(count.smallStuck / count.small).toBeLessThan(0.05);
+  });
+});
+
 describe('Fauna: cazar', () => {
   it('golpear quita PV, y al recargar su chunk vuelve entero', () => {
     // El daño no sobrevive a recargarse (decision del autor, 2026-10-03); lo

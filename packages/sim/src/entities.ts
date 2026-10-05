@@ -67,6 +67,18 @@ export class EntityStore {
   readonly wanderPeriod: Float64Array;
   readonly wanderX: Float64Array;
   readonly wanderY: Float64Array;
+  /**
+   * El rodeo de un animal (`walkAnimal`): su rumbo y los bloques que le quedan
+   * por andar en el. 0 es que va derecho a su punto de paso; menos de 0, que
+   * no encontro salida y espera al siguiente.
+   */
+  readonly detourX: Float32Array;
+  readonly detourY: Float32Array;
+  readonly detourLeft: Float32Array;
+  /** Lo que lleva retrocedido un animal para que le quepa un giro. */
+  readonly backedUp: Float32Array;
+  /** A que velocidad avanza un animal en el aire: la de su salto, o la de su paso si se cayo andando. */
+  readonly leap: Float32Array;
   /** Huecos de entidades retiradas, que `spawn` reutiliza antes de crecer. */
   private readonly free: number[] = [];
 
@@ -92,6 +104,11 @@ export class EntityStore {
     this.wanderPeriod = new Float64Array(capacity).fill(Number.NaN);
     this.wanderX = new Float64Array(capacity);
     this.wanderY = new Float64Array(capacity);
+    this.detourX = new Float32Array(capacity);
+    this.detourY = new Float32Array(capacity);
+    this.detourLeft = new Float32Array(capacity);
+    this.backedUp = new Float32Array(capacity);
+    this.leap = new Float32Array(capacity);
   }
 
   spawn(kind: EntityKind, x: number, y: number): number {
@@ -119,6 +136,9 @@ export class EntityStore {
     this.animal[id] = null;
     this.maxHealth[id] = 100;
     this.wanderPeriod[id] = Number.NaN;
+    this.detourLeft[id] = 0;
+    this.backedUp[id] = 0;
+    this.leap[id] = 0;
     return id;
   }
 

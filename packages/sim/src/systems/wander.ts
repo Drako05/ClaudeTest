@@ -27,7 +27,7 @@ import {
 import { toChunkCoord, type World } from '../world.js';
 import { applyVertical } from './jump.js';
 import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
-import { collides, walkAnimal } from './movement.js';
+import { airborneAnimal, collides, walkAnimal } from './movement.js';
 
 /** Los animales materializados, por su clave: la entidad que es cada uno. */
 export type FaunaIndex = Map<string, number>;
@@ -60,6 +60,13 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
   store.wanderPeriod[id] = period;
   store.wanderX[id] = target.x;
   store.wanderY[id] = target.y;
+  forgetObstacles(store, id);
+}
+
+/** Lo que estorbaba camino del punto de paso de antes ya no cuenta. */
+function forgetObstacles(store: EntityStore, id: number): void {
+  store.detourLeft[id] = 0;
+  store.backedUp[id] = 0;
 }
 
 /**
@@ -138,7 +145,8 @@ export function syncFauna(
 /**
  * Un tick de paseo: cada animal anda hacia su punto de paso del periodo en
  * curso a su velocidad, sin salir de los tiles de su bioma, y se para al
- * llegar. La gravedad, como al jugador.
+ * llegar; lo que estorba lo salta o lo bordea (`walkAnimal`), y en el aire
+ * sigue su salto (`airborneAnimal`). La gravedad, como al jugador.
  */
 export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, tick: number): void {
   for (const id of index.values()) {
@@ -150,14 +158,16 @@ export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, t
       store.wanderPeriod[id] = period;
       store.wanderX[id] = target.x;
       store.wanderY[id] = target.y;
+      forgetObstacles(store, id);
     }
     const dx = store.wanderX[id] - store.x[id];
     const dy = store.wanderY[id] - store.y[id];
     const info = SPECIES[animal.species];
-    if (store.grounded[id] && Math.hypot(dx, dy) > ARRIVE_DISTANCE) {
-      walkAnimal(world, store, id, dx, dy, info.speed, TICK_DT, (x, y) =>
-        biomeOfTerrain(world.terrainAt(Math.floor(x), Math.floor(y))) === info.biome,
-      );
+    const keep = (x: number, y: number) => biomeOfTerrain(world.terrainAt(Math.floor(x), Math.floor(y))) === info.biome;
+    if (!store.grounded[id]) {
+      airborneAnimal(world, store, id, TICK_DT, keep);
+    } else if (Math.hypot(dx, dy) > ARRIVE_DISTANCE) {
+      walkAnimal(world, store, id, dx, dy, info.speed, TICK_DT, keep);
     } else {
       store.vx[id] = 0;
       store.vy[id] = 0;

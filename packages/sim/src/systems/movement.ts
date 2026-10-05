@@ -20,7 +20,7 @@
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
-import { STEP_UP } from './jump.js';
+import { applyVertical, GRAVITY, JUMP_SPEED, STEP_UP, takeOff } from './jump.js';
 
 /** Medio ancho del cuerpo del jugador, en tiles. */
 export const BODY_RADIUS = 0.34;
@@ -202,6 +202,43 @@ export const ANIMAL_TURN_RATE = Math.PI;
  */
 export const ANIMAL_WALK_CONE = Math.PI / 4;
 
+/**
+ * Lo que retrocede un animal, como mucho, para que le quepa un giro: el autor
+ * eligio «retrocede y gira» (2026-10-05); el bloque es **deduccion mia**.
+ */
+export const ANIMAL_BACKUP = 1;
+
+/**
+ * Lo que anda un animal por su rodeo antes de volver a apuntar a su punto de
+ * paso. **Deduccion mia.**
+ */
+export const ANIMAL_DETOUR = 1;
+
+/** El desnivel que salta un animal, cualquier especie: un bloque (el autor, 2026-10-05). */
+export const ANIMAL_JUMP_UP = 1;
+
+/**
+ * Cuanto mira hacia delante un animal buscando el borde de lo que va a saltar:
+ * mas que el hocico del bisonte adulto, que es lo que mas sobresale de sus pies.
+ */
+const JUMP_LOOK = 2.5;
+
+/**
+ * En que parte del ascenso pasan los pies el borde, por orden de ensayo: en lo
+ * alto, a tres cuartos y a la mitad. Lo mas justo primero; los otros, por si
+ * la cabeza lo retiene contra el escalon los primeros ticks. **Deduccion mia.**
+ */
+const LEAP_SHARES = [1, 0.75, 0.5];
+
+/**
+ * Los rumbos de un rodeo, desde el de su destino: de mas cerca a mas lejos, y
+ * el izquierdo antes que el derecho (**deduccion mia**: determinista, sin azar).
+ */
+const DETOUR_TURNS = [1, -1, 2, -2, 3, -3, 4].map((k) => (k * Math.PI) / 4);
+
+/** Por debajo de esta fraccion de su paso, el avance no progresa: algo estorba. */
+const STALL = 0.3;
+
 /** El angulo de `a` a `b`, por el camino corto, en (-π, π]. */
 function turnBetween(a: number, b: number): number {
   let d = (b - a) % (2 * Math.PI);
@@ -213,7 +250,8 @@ function turnBetween(a: number, b: number): number {
 /**
  * Si los pies de un animal pueden ir a (cx, cy): su casilla no es solida, el
  * punto lo admite `keep` —no sale de los tiles de su bioma— y el suelo no sube
- * mas de `STEP_UP`. Lo demas del cuerpo lo miran sus partes (`body.ts`).
+ * mas de `margin`: `STEP_UP` andando y 0 en el aire. Lo demas del cuerpo lo
+ * miran sus partes (`body.ts`).
  */
 function feetBlocked(
   world: World,
@@ -221,14 +259,30 @@ function feetBlocked(
   cy: number,
   feet: number,
   keep?: (x: number, y: number) => boolean,
+  margin = STEP_UP,
 ): boolean {
   if (world.isSolidAt(Math.floor(cx), Math.floor(cy))) return true;
   if (keep && !keep(cx, cy)) return true;
-  return world.floorHeightAt(cx, cy) > feet + STEP_UP;
+  return world.floorHeightAt(cx, cy) > feet + margin;
+}
+
+/** Cuantas veces se mete en el terreno el cuerpo del animal `id` puesto asi. */
+function clashesAt(world: World, store: EntityStore, id: number, x: number, y: number, z: number, fx: number, fy: number): number {
+  const animal = store.animal[id]!;
+  return bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, fx, fy), x, y);
+}
+
+/** Lleva al animal a (`x`, `y`) y deja puesta la velocidad que eso supone. */
+function moveTo(store: EntityStore, id: number, x: number, y: number, dt: number): void {
+  store.vx[id] = (x - store.x[id]) / dt;
+  store.vy[id] = (y - store.y[id]) / dt;
+  store.x[id] = x;
+  store.y[id] = y;
 }
 
 /**
- * Un tick del andar de un animal hacia (`dirX`, `dirY`), a su velocidad.
+ * Un tick del andar de un animal hacia (`dirX`, `dirY`), a su velocidad. Solo
+ * en el suelo: en el aire, `airborneAnimal`.
  *
  * Decision del autor (2026-10-03): **choca con las cajas de sus partes**, que
  * giran con su rumbo (`body.ts`). Por eso:
@@ -241,6 +295,15 @@ function feetBlocked(
  *   en el terreno no se da. Uno que no cabe —nacio asi, o crecio algo a su
  *   lado— anda sin que sus partes le estorben, solo con sus pies, hasta que
  *   vuelve a caber: asi nunca se queda clavado. **Deduccion mia.**
+ *
+ * Y para que lo que estorba no lo deje clavado (el autor, 2026-10-05):
+ * - si el giro no cabe, **retrocede** a lo largo de su rumbo hasta que quepa,
+ *   `ANIMAL_BACKUP` como mucho;
+ * - si el avance no progresa y delante hay un escalon de hasta
+ *   `ANIMAL_JUMP_UP`, **salta** (si el salto llega y el cuerpo cabe arriba);
+ * - si no, **lo bordea**: `ANIMAL_DETOUR` por el rumbo libre mas cercano al de
+ *   su destino, y vuelta a apuntarle. Un rodeo que no se puede ni empezar es un
+ *   callejon sin salida: espera quieto al siguiente punto de paso.
  */
 export function walkAnimal(
   world: World,
@@ -269,9 +332,12 @@ function walkAnimalStep(
   store.vx[id] = 0;
   store.vy[id] = 0;
   if (!animal || Math.hypot(dirX, dirY) <= 1e-6 || speed <= 0) return;
+  // Sin salida: espera a su siguiente punto de paso (`stepFauna` lo olvida).
+  if (store.detourLeft[id] < 0) return;
   const feet = store.z[id];
-  const clashes = (x: number, y: number, fx: number, fy: number) =>
-    bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, feet, fx, fy), x, y);
+  const clashes = (x: number, y: number, fx: number, fy: number) => clashesAt(world, store, id, x, y, feet, fx, fy);
+  const detouring = store.detourLeft[id] > 0;
+  const goal = detouring ? Math.atan2(store.detourY[id], store.detourX[id]) : Math.atan2(dirY, dirX);
   let x = store.x[id];
   let y = store.y[id];
   let fx = store.facingX[id];
@@ -280,7 +346,7 @@ function walkAnimalStep(
 
   // El giro, hasta lo que da un tick.
   const have = Math.atan2(fy, fx);
-  let left = turnBetween(have, Math.atan2(dirY, dirX));
+  let left = turnBetween(have, goal);
   const turn = Math.max(-ANIMAL_TURN_RATE * dt, Math.min(ANIMAL_TURN_RATE * dt, left));
   if (turn !== 0) {
     const nfx = Math.cos(have + turn);
@@ -293,6 +359,22 @@ function walkAnimalStep(
       left -= turn;
       store.facingX[id] = fx;
       store.facingY[id] = fy;
+    } else {
+      // No cabe el giro: un paso atras, a lo largo de su rumbo, y a probar.
+      const back = speed * dt;
+      const bx = x - fx * back;
+      const by = y - fy * back;
+      if (
+        store.backedUp[id] + back <= ANIMAL_BACKUP + 1e-9 &&
+        !feetBlocked(world, bx, by, feet, keep) &&
+        clashes(bx, by, fx, fy) === 0
+      ) {
+        store.backedUp[id] += back;
+        moveTo(store, id, bx, by, dt);
+        return;
+      }
+      stuck(world, store, id, dirX, dirY, speed, dt, keep, detouring);
+      return;
     }
   }
   if (Math.abs(left) > ANIMAL_WALK_CONE) return;
@@ -307,8 +389,236 @@ function walkAnimalStep(
   if (!feetBlocked(world, x, y + stepY, feet, keep)) {
     if (here > 0 || clashes(x, y + stepY, fx, fy) === 0) y += stepY;
   }
-  store.vx[id] = (x - store.x[id]) / dt;
-  store.vy[id] = (y - store.y[id]) / dt;
+  const moved = Math.hypot(x - store.x[id], y - store.y[id]);
+  if (moved < STALL * speed * dt) {
+    if (!tryJump(world, store, id, speed, dt, keep)) stuck(world, store, id, dirX, dirY, speed, dt, keep, detouring);
+    return;
+  }
+  store.backedUp[id] = 0;
+  // Si con este paso se cae por un borde, cae avanzando a su paso.
+  store.leap[id] = speed;
+  if (detouring) store.detourLeft[id] = Math.max(0, store.detourLeft[id] - moved);
+  moveTo(store, id, x, y, dt);
+}
+
+/**
+ * Algo estorba y no se salta: empieza un rodeo, por el primer rumbo de
+ * `DETOUR_TURNS` cuyo ensayo (`rehearseDetour`) lo deja andado entero. Si
+ * estaba en un rodeo que no llego a empezar, o ninguno sale, se rinde hasta su
+ * siguiente punto de paso. Dentro de un ensayo, atascarse es que el ensayo
+ * falla.
+ */
+function stuck(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dirX: number,
+  dirY: number,
+  speed: number,
+  dt: number,
+  keep: ((x: number, y: number) => boolean) | undefined,
+  detouring: boolean,
+): void {
+  if (rehearsing) {
+    rehearsalFailed = true;
+    return;
+  }
+  if (detouring && store.detourLeft[id] >= ANIMAL_DETOUR) {
+    store.detourLeft[id] = -1;
+    return;
+  }
+  const toward = Math.atan2(dirY, dirX);
+  for (const offset of DETOUR_TURNS) {
+    const ax = Math.cos(toward + offset);
+    const ay = Math.sin(toward + offset);
+    if (rehearseDetour(world, store, id, ax, ay, speed, dt, keep)) {
+      store.detourX[id] = ax;
+      store.detourY[id] = ay;
+      store.detourLeft[id] = ANIMAL_DETOUR;
+      store.backedUp[id] = 0;
+      return;
+    }
+  }
+  store.detourLeft[id] = -1;
+}
+
+/** Si hay un ensayo en marcha, y si en el se atasco. */
+let rehearsing = false;
+let rehearsalFailed = false;
+
+/** Lo que un ensayo cambia de un animal, para deshacerlo. */
+const SAVED = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'grounded', 'facingX', 'facingY', 'detourX', 'detourY', 'detourLeft', 'backedUp', 'leap'] as const;
+const saved = new Float64Array(SAVED.length);
+
+/**
+ * **Ensaya un rodeo** por (`ax`, `ay`) con las mismas funciones que lo van a
+ * mover, tick a tick como `stepFauna` —girar, retroceder, andar, saltar—, y lo
+ * deshace: sale si anda sus `ANIMAL_DETOUR` sin atascarse en el tiempo que
+ * tardaria en dar media vuelta, retroceder y andarlo. Como todo es
+ * determinista, el rodeo de verdad es el ensayado.
+ */
+function rehearseDetour(
+  world: World,
+  store: EntityStore,
+  id: number,
+  ax: number,
+  ay: number,
+  speed: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  for (let i = 0; i < SAVED.length; i++) saved[i] = store[SAVED[i]][id];
+  store.detourX[id] = ax;
+  store.detourY[id] = ay;
+  store.detourLeft[id] = ANIMAL_DETOUR;
+  store.backedUp[id] = 0;
+  rehearsing = true;
+  rehearsalFailed = false;
+  const ticks = Math.ceil((Math.PI / ANIMAL_TURN_RATE + (ANIMAL_BACKUP + ANIMAL_DETOUR) / speed) / dt) + 1;
+  try {
+    for (let t = 0; t < ticks && !rehearsalFailed && store.detourLeft[id] > 0; t++) {
+      if (store.grounded[id]) walkAnimalStep(world, store, id, ax, ay, speed, dt, keep);
+      else airStep(world, store, id, dt, keep);
+      applyVertical(world, store, id, dt);
+    }
+    return !rehearsalFailed && store.detourLeft[id] === 0;
+  } finally {
+    rehearsing = false;
+    for (let i = 0; i < SAVED.length; i++) store[SAVED[i]][id] = saved[i];
+  }
+}
+
+/**
+ * Si delante hay un escalon que se salta, salta.
+ *
+ * - **El borde**: el primer punto, a lo largo de su rumbo, en que el suelo sube
+ *   mas de `STEP_UP` bajo sus pies. Si antes hay algo solido o fuera de su
+ *   bioma, o sube mas de `ANIMAL_JUMP_UP`, no se salta.
+ * - **En el aire avanza lo justo para que sus pies pasen el borde en lo alto
+ *   del salto**, donde mas sobra, y nunca mas despacio que su paso
+ *   (**deduccion mia**). La parabola es la del jugador; lo que cambia es el
+ *   avance, porque un animal largo topa con la cabeza teniendo los pies lejos
+ *   del borde: al bisonte adulto le quedan 1,7 bloques, y a la velocidad del
+ *   jugador llegaria cayendo. Si asi no llega, prueba los otros `LEAP_SHARES`.
+ * - **Ensaya cada salto entero** con las mismas funciones que lo van a mover
+ *   —`takeOff`, `airStep` y `applyVertical`, en el orden de `stepFauna`— y lo
+ *   deshace: salta si aterriza arriba, mas alto de lo que se sube andando, y
+ *   con el cuerpo cabiendo. Como todo es determinista, el salto de verdad es el
+ *   ensayado.
+ */
+function tryJump(
+  world: World,
+  store: EntityStore,
+  id: number,
+  speed: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  if (!store.grounded[id]) return false;
+  const x = store.x[id];
+  const y = store.y[id];
+  const z = store.z[id];
+  const fx = store.facingX[id];
+  const fy = store.facingY[id];
+  let edge = -1;
+  for (let d = 0.05; d <= JUMP_LOOK; d += 0.05) {
+    const px = x + fx * d;
+    const py = y + fy * d;
+    if (world.isSolidAt(Math.floor(px), Math.floor(py)) || (keep && !keep(px, py))) return false;
+    const rise = world.floorHeightAt(px, py) - z;
+    if (rise > ANIMAL_JUMP_UP + 1e-6) return false;
+    if (rise > STEP_UP) {
+      edge = d;
+      break;
+    }
+  }
+  if (edge < 0) return false;
+  for (const share of LEAP_SHARES) {
+    if (rehearseJump(world, store, id, Math.max(speed, edge / (share * (JUMP_SPEED / GRAVITY))), dt, keep)) {
+      takeOff(store, id);
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Ensaya un salto avanzando a `leap` y lo deshace. Si aterriza arriba, deja
+ * puesto ese `leap` para el salto de verdad.
+ */
+function rehearseJump(
+  world: World,
+  store: EntityStore,
+  id: number,
+  leap: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  const x = store.x[id];
+  const y = store.y[id];
+  const z = store.z[id];
+  const before = store.leap[id];
+  store.leap[id] = leap;
+  takeOff(store, id);
+  applyVertical(world, store, id, dt);
+  for (let t = 0; t < 120 && !store.grounded[id]; t++) {
+    airStep(world, store, id, dt, keep);
+    applyVertical(world, store, id, dt);
+  }
+  const lands =
+    store.grounded[id] === 1 &&
+    store.z[id] - z > STEP_UP &&
+    clashesAt(world, store, id, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]) === 0;
   store.x[id] = x;
   store.y[id] = y;
+  store.z[id] = z;
+  store.vz[id] = 0;
+  store.grounded[id] = 1;
+  store.vx[id] = 0;
+  store.vy[id] = 0;
+  store.leap[id] = lands ? leap : before;
+  return lands;
+}
+
+/**
+ * Un tick de un animal en el aire: no gira, y avanza a lo largo de su rumbo a
+ * `leap`, la de su salto o la de su paso si se cayo andando. Sin margen de subida, como el jugador en el aire: se
+ * estampa contra la cara de lo que no alcanzo, y cae. La altura la pone
+ * despues `applyVertical`.
+ */
+export function airborneAnimal(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  groundRound(world, store.x[id], store.y[id], () => airStep(world, store, id, dt, keep));
+}
+
+function airStep(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  store.vx[id] = 0;
+  store.vy[id] = 0;
+  if (!store.animal[id]) return;
+  const z = store.z[id];
+  const fx = store.facingX[id];
+  const fy = store.facingY[id];
+  let x = store.x[id];
+  let y = store.y[id];
+  const here = clashesAt(world, store, id, x, y, z, fx, fy);
+  const stepX = fx * store.leap[id] * dt;
+  const stepY = fy * store.leap[id] * dt;
+  if (!feetBlocked(world, x + stepX, y, z, keep, 0)) {
+    if (here > 0 || clashesAt(world, store, id, x + stepX, y, z, fx, fy) === 0) x += stepX;
+  }
+  if (!feetBlocked(world, x, y + stepY, z, keep, 0)) {
+    if (here > 0 || clashesAt(world, store, id, x, y + stepY, z, fx, fy) === 0) y += stepY;
+  }
+  moveTo(store, id, x, y, dt);
 }
