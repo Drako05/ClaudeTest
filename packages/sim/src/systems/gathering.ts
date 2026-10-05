@@ -58,7 +58,8 @@ import {
   type Surface,
   type Vec3,
 } from '../aim.js';
-import { bodyBoxes, type OrientedBox } from '../body.js';
+import { bodyBoxes, BODY_RADIUS, featureBox, type OrientedBox } from '../boxes.js';
+export { STATION_BOXES } from '../boxes.js';
 import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
@@ -66,7 +67,6 @@ import { NO_RAMP } from '../relief.js';
 import { hash2DFloat } from '../rng.js';
 import { facingToward, stationNear } from '../stations.js';
 import { toChunkCoord, type World } from '../world.js';
-import { BODY_RADIUS } from './movement.js';
 
 /** Cuanto se come de una vez: una unidad. Lo que llena, `foodValue`. */
 export const BERRIES_PER_MEAL = 1;
@@ -165,61 +165,11 @@ export function branchesLeft(work: WorkState, x: number, y: number, tick: number
 }
 
 /**
- * Medidas de los hitboxes que no son arboles: medio ancho y alto, en bloques.
- * Salen de lo que mide cada dibujo (1,17 el arbusto, 1,09 la roca, 0,88 el
- * brote) y son **deduccion mia**; estan en `docs/pendiente.md`.
+ * El hitbox del objeto de una casilla, o `null` si no hay nada que golpear: su
+ * caja (`featureBox`, en `boxes.ts`), la misma con la que choca si su tipo
+ * choca (`blocksBody`). Del arbol, solo su tronco desnudo.
  */
-const BUSH_BOX = { half: 0.45, height: 1.1 };
-const ROCK_BOX = { half: 0.45, height: 1.0 };
-const SAPLING_BOX = { half: 0.15, height: 0.85 };
-/**
- * Los guijarros: bajos, hay que mirar al suelo para cogerlos, y del ancho de
- * su dibujo tumbado. **Propuesta mia.**
- */
-const PEBBLES_BOX = { half: 0.3, height: 0.2 };
-/**
- * Las estaciones ocupan su casilla entera, con el alto de `stationHeight`: lo
- * que se pisa, lo que se golpea y lo que se dibuja son el mismo numero.
- */
-export const STATION_BOXES: Readonly<Record<Station.Workbench | Station.Furnace, { half: number; height: number }>> = {
-  [Station.Workbench]: { half: 0.5, height: stationHeight(Feature.Workbench) },
-  [Station.Furnace]: { half: 0.5, height: stationHeight(Feature.Furnace) },
-};
-
-/**
- * El hitbox del objeto de una casilla, o `null` si no hay nada que golpear.
- *
- * Una caja vertical centrada en la casilla y apoyada en su suelo. **El del arbol
- * es solo su tronco desnudo** (decision del autor: las hojas no), del suelo a la
- * copa y del grosor de su especie, y sale de `treeTrunkAt`, lo mismo que dibuja
- * el cliente: el tronco que se ve es el que se golpea.
- */
-export function hitboxAt(world: World, tx: number, ty: number): Hitbox | null {
-  const feature = world.featureAt(tx, ty);
-  if (feature === Feature.None || !harvestOf(feature)) return null;
-  let half: number;
-  let height: number;
-  const trunk = treeTrunkAt(world.seed, tx, ty, feature);
-  const station = stationOfFeature(feature);
-  if (station === Station.Workbench || station === Station.Furnace) {
-    ({ half, height } = STATION_BOXES[station]);
-  } else if (trunk) {
-    half = trunk.width / 2;
-    height = trunk.bare;
-  } else if (isSapling(feature)) {
-    ({ half, height } = SAPLING_BOX);
-  } else if (feature === Feature.Pebbles) {
-    ({ half, height } = PEBBLES_BOX);
-  } else if (isInert(feature)) {
-    ({ half, height } = ROCK_BOX);
-  } else {
-    ({ half, height } = BUSH_BOX);
-  }
-  const cx = tx + 0.5;
-  const cy = ty + 0.5;
-  const z0 = world.groundHeightAt(cx, cy);
-  return { x0: cx - half, x1: cx + half, y0: cy - half, y1: cy + half, z0, z1: z0 + height };
-}
+export const hitboxAt = featureBox;
 
 /** Los ojos de la entidad: el origen del golpe. */
 function eyeOf(store: EntityStore, id: number): Vec3 {
@@ -327,8 +277,9 @@ export interface AnimalHit {
 
 /**
  * Las cajas de golpe de un animal: las partes `hit` de su plano
- * (`fauna-body.ts`) en su sitio y giradas con su rumbo. Su cola, sus patas y
- * sus orejas no: decision del autor, el golpe va al cuerpo.
+ * (`fauna-body.ts`) en su sitio y giradas con su rumbo: la cabeza, el cuello,
+ * las extremidades y el tronco; lo pequeno o fino —la cola, las orejas, los
+ * cuernos— no (decision del autor, 2026-10-05).
  */
 export function animalBoxes(store: EntityStore, id: number): OrientedBox[] {
   const animal = store.animal[id];

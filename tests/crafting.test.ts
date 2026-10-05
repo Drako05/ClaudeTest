@@ -15,7 +15,7 @@ import {
 import {
   emptyIntent,
   Feature,
-  isFeatureSolid,
+  blocksBody,
   isTerrainSolid,
   RECIPES,
   Resource,
@@ -347,7 +347,7 @@ describe('Los guijarros en el mundo', () => {
         }
       }
     }
-    expect(isFeatureSolid(Feature.Pebbles)).toBe(false);
+    expect(blocksBody(Feature.Pebbles)).toBe(false);
     expect(pebbles / land).toBeGreaterThan(0.01);
     expect(pebbles / land).toBeLessThan(0.05);
     if (rock > 500) expect(rockPebbles / rock).toBeGreaterThan(pebbles / land);

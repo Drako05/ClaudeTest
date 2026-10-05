@@ -19,6 +19,7 @@
  * **alcance dos**. `tests/jump.test.ts` lo tiene como tabla.
  */
 
+import { footing } from '../boxes.js';
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 
@@ -90,9 +91,10 @@ export function takeOff(store: EntityStore, id: number): boolean {
  * misma parabola con `vz = 0`.
  */
 export function applyVertical(world: World, store: EntityStore, id: number, dt: number): void {
-  // Lo que se pisa, estaciones incluidas: encima de una mesa se esta de pie, y
-  // si se desmonta, se cae.
-  const ground = world.floorHeightAt(store.x[id], store.y[id]);
+  // Lo que se pisa, con las cajas que tocan la huella: encima de una roca o de
+  // una mesa se esta de pie, y al bajarse o si se desmonta, se cae. Una caja que
+  // asoma mas de lo que se sube andando no se pisa (`footing`).
+  const ground = footing(world, store, id, store.z[id] + STEP_UP);
 
   if (store.grounded[id]) {
     if (store.z[id] <= ground + SNAP_DOWN) {

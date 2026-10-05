@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BODY_RADIUS,
   createGame,
   EYE_HEIGHT,
   facingToward,
@@ -17,7 +18,7 @@ import {
 import {
   emptyIntent,
   Feature,
-  isFeatureSolid,
+  blocksBody,
   RECIPES,
   Resource,
   Station,
@@ -109,17 +110,18 @@ describe('Colocar una estacion', () => {
   });
 
   it('estorba de lado, como una pared de su altura', () => {
-    // No es un muro de arriba abajo: es suelo que se pisa (decision del autor,
-    // 2026-09-30), y de lado estorba por la regla 21.
-    expect(isFeatureSolid(Feature.Workbench)).toBe(false);
-    expect(isFeatureSolid(Feature.Furnace)).toBe(false);
+    // Su caja choca y se pisa (decisiones del autor, 2026-09-30 y 2026-10-05):
+    // de lado estorba por la regla 21, y encima se esta de pie.
+    expect(blocksBody(Feature.Workbench)).toBe(true);
+    expect(blocksBody(Feature.Furnace)).toBe(true);
     const { state, tx, ty } = atSpawn();
     placeWorkbench(state);
     const id = state.playerId;
     for (let i = 0; i < 60; i++) act(state, { moveX: 1 });
-    // Los pies se paran en el borde de la mesa, sin entrar en su casilla.
-    expect(state.entities.x[id]).toBeLessThan(tx + 1);
-    expect(state.entities.x[id]).toBeGreaterThan(tx + 0.9);
+    // La huella se para al tocar la mesa (el autor, 2026-10-05): el centro
+    // queda a `BODY_RADIUS` de su cara, no dentro de su casilla.
+    expect(state.entities.x[id] + BODY_RADIUS).toBeLessThanOrEqual(tx + 1);
+    expect(state.entities.x[id] + BODY_RADIUS).toBeGreaterThan(tx + 0.9);
     expect(Math.floor(state.entities.y[id])).toBe(ty);
     expect(state.entities.z[id]).toBeCloseTo(state.world.groundHeightAt(tx + 0.5, ty + 0.5));
   });

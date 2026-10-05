@@ -107,6 +107,8 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     El plano puede girar alrededor de la mirada (`aimRoll`, lo usa el modo TAP).
     El hitbox del arbol es **solo su tronco desnudo**, que vive en el nucleo
     (`sim/trunk.ts`) para que el que se ve y el que se golpea sean el mismo.
+    **Cada objeto tiene una caja** (`sim/boxes.ts`), que se golpea y, si su
+    tipo choca (`blocksBody`), tambien choca (regla 21).
     Hay dos modos: el **barrido** y el **preciso** (`preciseTarget`, el primer
     objetivo en el centro de la mira). **Sembrar** va donde la mirada toca la
     cara de arriba del suelo, a menos de 3 en horizontal, y **colocar** ahi o
@@ -144,8 +146,10 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     ninguno: de ahi salen el talud que se sube, la pared que no y el bloque
     contra el que uno se estampa en el aire. La altura del personaje es
     **suya** (`entities.z`) y es la que se dibuja; la gravedad se integra con el
-    **promedio de las dos velocidades**, que da la parabola exacta; y las
-    **estaciones entran en el suelo que se pisa** (`World.floorHeightAt`).
+    **promedio de las dos velocidades**, que da la parabola exacta; y **los
+    objetos que chocan entran en el suelo que se pisa por su caja, con la
+    huella entera** del cuerpo (`squareFloor`, `footing`): se choca de lado,
+    se sube saltando y encima se esta de pie. El terreno, en el centro.
     **Texto entero, con el porque de cada numero, en `docs/reglas.md`.**
 22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano de 3x3,
     sitio para andar sin saltar, sitio del que salir contando con el salto, y

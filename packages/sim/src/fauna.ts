@@ -28,7 +28,7 @@ import {
   CHUNK_TILES,
   densityPerChunk,
   Feature,
-  isFeatureSolid,
+  blocksBody,
   isTerrainSolid,
   meanGroup,
   Sex,
@@ -91,7 +91,7 @@ export function habitable(species: Species, terrain: Terrain, feature: Feature):
   return (
     biomeOfTerrain(terrain) === SPECIES[species].biome &&
     !isTerrainSolid(terrain) &&
-    !isFeatureSolid(feature)
+    !blocksBody(feature)
   );
 }
 

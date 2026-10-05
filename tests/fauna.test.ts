@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BODY_RADIUS,
+  squareFloor,
   animalBoxes,
   collides,
   createGame,
@@ -78,14 +80,15 @@ function aimAt(state: GameState, id: number): Intent {
   for (const [ox, oy] of [[1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6], [1.2, 1.2], [-1.2, -1.2]]) {
     const px = entities.x[id] + ox;
     const py = entities.y[id] + oy;
-    if (collides(world, px, py)) continue;
+    // Ni en el agua ni encima o dentro de un objeto: de pie en el suelo.
+    if (collides(world, px, py) || squareFloor(world, px, py, BODY_RADIUS) > world.groundHeightAt(px, py)) continue;
     entities.x[playerId] = px;
     entities.y[playerId] = py;
-    entities.z[playerId] = world.floorHeightAt(px, py);
+    entities.z[playerId] = world.groundHeightAt(px, py);
     break;
   }
-  // La primera parte que golpea es su tronco.
-  const box = animalBoxes(entities, id)[0];
+  // La parte mas grande que golpea: su tronco.
+  const box = animalBoxes(entities, id).reduce((a, b) => (b.hl * b.hw * b.hh > a.hl * a.hw * a.hh ? b : a));
   const dx = box.cx - entities.x[playerId];
   const dy = box.cy - entities.y[playerId];
   const dz = box.cz - (entities.z[playerId] + EYE_HEIGHT);
@@ -287,7 +290,9 @@ describe('Fauna: lo que estorba no los deja clavados', () => {
     // grandes; despues, 0,1-11 %, y las pequeñas casi nada. Lo que queda es de
     // cuerpos grandes en sitios estrechos: el ciervo y el jabali entre los
     // arboles del bosque, el bisonte. Aqui, el primer minuto de la semilla
-    // 5: antes 33 % y 25 % las pequeñas; despues 7 % y 0,04 %.
+    // 5: antes 33 % y 25 % las pequeñas; despues 7 % y 0,04 %. Con la caja
+    // ajustada al tronco y las patas con caja (2026-10-05), 3,6 % y 0,02 %:
+    // entre troncos finos ya se pasa.
     const state = createGame(5);
     const window = 3 * 60;
     const small = new Set([Species.Hare, Species.ArcticFox, Species.Marmot, Species.Crab, Species.Gull]);

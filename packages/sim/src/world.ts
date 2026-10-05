@@ -23,7 +23,7 @@ import {
   Feature,
   isStation,
   growthStep,
-  isFeatureSolid,
+  blocksBody,
   isOvercrowded,
   isSapling,
   isTerrainSolid,
@@ -31,7 +31,6 @@ import {
   LIFE_STEP_TICKS,
   lifeSlot,
   LifeKind,
-  stationHeight,
   lifeKindOf,
   LIVING_BIOMES,
   LIVING_KINDS,
@@ -357,24 +356,16 @@ export class World {
   }
 
   /**
-   * Lo que se pisa en un punto: el suelo y, encima, la estacion que haya en su
-   * casilla. Es la vara del cuerpo —chocar (regla 21), caer y aterrizar—; el
-   * terreno que se dibuja, el golpe y sembrar siguen con `groundHeightAt`.
-   */
-  floorHeightAt(wx: number, wy: number): number {
-    return this.groundHeightAt(wx, wy) + stationHeight(this.featureAt(Math.floor(wx), Math.floor(wy)));
-  }
-
-  /**
-   * Lo mas bajo y lo mas alto del suelo de una casilla, con su estacion, en
-   * `out[0]` y `out[1]`: en una rampa, su pie y su cima. Es lo que mira el
-   * choque de las partes de un animal (`body.ts`), y sale del nivel y de la
-   * rampa sin muestrear la altura.
+   * Lo mas bajo y lo mas alto del suelo de una casilla, en `out[0]` y
+   * `out[1]`: en una rampa, su pie y su cima. Es lo que mira el choque de las
+   * partes de un animal contra los escalones (`body.ts`), y sale del nivel y
+   * de la rampa sin muestrear la altura. Solo el terreno: lo que hay encima
+   * tiene su caja (`boxes.ts`).
    */
   floorRangeAt(tx: number, ty: number, out: Float64Array): void {
     const chunk = this.getChunk(toChunkCoord(tx), toChunkCoord(ty));
     const idx = localCoord(ty) * CHUNK_SIZE + localCoord(tx);
-    const low = chunk.level[idx] + stationHeight(this.featureAtIndex(chunk, idx));
+    const low = chunk.level[idx];
     out[0] = low;
     out[1] = chunk.rampDir[idx] === NO_RAMP ? low : low + 1;
   }
@@ -404,13 +395,27 @@ export class World {
     for (const [idx, feature] of ov) out[idx] = feature;
   }
 
+  /**
+   * Si la casilla no se cruza, para las **medidas por casilla** —el
+   * nacimiento, `debug.reachableArea`, `tools/analyze-world.ts`—: el agua, o
+   * un objeto que choca (`blocksBody`). La fisica no la usa: alli manda la
+   * caja del objeto, ajustada a el (`boxes.ts`), y entre dos troncos finos se
+   * pasa. Asi esta medida queda **por lo bajo** de lo que el cuerpo recorre
+   * (*deduccion mia*, 2026-10-05).
+   */
   isSolidAt(wx: number, wy: number): boolean {
     const chunk = this.getChunk(toChunkCoord(wx), toChunkCoord(wy));
     const idx = localCoord(wy) * CHUNK_SIZE + localCoord(wx);
     return (
       isTerrainSolid(chunk.terrain[idx] as Terrain) ||
-      isFeatureSolid(this.featureAtIndex(chunk, idx))
+      blocksBody(this.featureAtIndex(chunk, idx))
     );
+  }
+
+  /** Si el terreno de la casilla corta el paso: el agua. Es lo que mira la fisica. */
+  isTerrainSolidAt(wx: number, wy: number): boolean {
+    const chunk = this.getChunk(toChunkCoord(wx), toChunkCoord(wy));
+    return isTerrainSolid(chunk.terrain[localCoord(wy) * CHUNK_SIZE + localCoord(wx)] as Terrain);
   }
 
   /** Hacia donde mira el frente de la estacion de `(wx, wy)`, o `null`. */

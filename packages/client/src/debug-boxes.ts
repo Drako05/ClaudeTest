@@ -6,23 +6,21 @@
  * **amarillo** lo que hace las dos cosas. Se ven **a traves de todo** (sin
  * prueba de profundidad), y el **agua no se dibuja** aunque corte el paso.
  * Ninguna caja es de aqui: todas salen del nucleo, las mismas que usa la
- * simulacion.
- * - **Golpe**: `hitboxAt` de cada casilla —del arbol, solo su tronco—.
- * - **Choque**: la casilla entera de lo que `isFeatureSolid` (arboles, roca y
- *   minerales), que es lo que mira `collides`. Ese choque no tiene alto —es
- *   una columna—, asi que se dibuja hasta el alto de su caja de golpe
- *   (**propuesta mia**). Y el jugador: su huella de `BODY_RADIUS` de los pies
- *   a los ojos (`EYE_HEIGHT`, **propuesta mia**: su choque tampoco tiene alto).
- * - **Las dos**: las estaciones (`hitboxAt` es su `STATION_BOXES`, el bloque
- *   que se pisa) y los animales (`animalBoxes`, las partes que golpean y
- *   chocan).
+ * simulacion. Desde el 2026-10-05 (el autor) cada objeto tiene **una** caja,
+ * que se golpea y, si su tipo choca, tambien choca (`boxes.ts`):
+ * - **Las dos**: los objetos que chocan (`blocksBody`: el tronco del arbol, la
+ *   roca, los minerales y las estaciones) y cada parte de los animales
+ *   (`animalBoxes`), patas incluidas.
+ * - **Golpe**: lo que solo se golpea (el arbusto, el brote, los guijarros).
+ * - **Choque**: el jugador, su huella de `BODY_RADIUS` de los pies a los ojos
+ *   (`EYE_HEIGHT`, **propuesta mia**: su choque no tiene alto).
  *
  * La cuenta es pura (`collectBoxes`, `boxEdges`) y se mide en Node; dibujarla
  * es `DebugBoxes`.
  */
 
 import { BufferAttribute, BufferGeometry, LineBasicMaterial, LineSegments, type Scene } from 'three';
-import { isFeatureSolid, isStation } from '@verdant/shared';
+import { blocksBody } from '@verdant/shared';
 import {
   animalBoxes,
   BODY_RADIUS,
@@ -87,21 +85,13 @@ export function collectBoxes(state: GameState, radius = BOX_RADIUS): BoxEdges {
   for (let ty = py - radius; ty <= py + radius; ty++) {
     for (let tx = px - radius; tx <= px + radius; tx++) {
       const box = hitboxAt(world, tx, ty);
-      const feature = world.featureAt(tx, ty);
-      if (box && isStation(feature)) {
+      if (!box) continue;
+      if (blocksBody(world.featureAt(tx, ty))) {
         boxEdges(out.both, box);
         out.counts.both++;
-        continue;
-      }
-      if (box) {
+      } else {
         boxEdges(out.hit, box);
         out.counts.hit++;
-      }
-      if (isFeatureSolid(feature)) {
-        const z0 = world.groundHeightAt(tx + 0.5, ty + 0.5);
-        const z1 = box ? box.z1 : z0 + 1;
-        boxEdges(out.solid, { x0: tx, x1: tx + 1, y0: ty, y1: ty + 1, z0, z1 });
-        out.counts.solid++;
       }
     }
   }

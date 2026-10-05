@@ -10,50 +10,71 @@
  * - `gestures` o `slash`: esas herramientas;
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: las cajas de golpe y de choque del panel de desarrollo, y el boton que
- * abre el panel en el movil (2026-10-05).
+ * Ronda: una caja por objeto, que golpea y choca, con alto; el cuerpo se apoya
+ * y choca con su huella; las patas de los animales con caja (2026-10-05).
  */
 export default [
   {
-    nombre: 'las cajas sin golpe',
+    nombre: 'el tronco vuelve a la casilla entera',
+    fichero: 'packages/sim/src/boxes.ts',
+    de: '    half = trunk.width / 2;',
+    a: '    half = 0.5;',
+    prueba: 'test:tests/object-boxes.test.ts',
+  },
+  {
+    nombre: 'el choque por el centro y no por la huella',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '  return squareFloor(world, cx, cy, BODY_RADIUS) > feet + margin;',
+    a: '  return squareFloor(world, cx, cy, 0) > feet + margin;',
+    prueba: 'test:tests/object-boxes.test.ts',
+  },
+  {
+    nombre: 'el apoyo por el centro y no por la huella',
+    fichero: 'packages/sim/src/boxes.ts',
+    de: '  if (store.kind[id] === EntityKind.Player) return squareFloor(world, x, y, BODY_RADIUS, upTo);',
+    a: '  if (store.kind[id] === EntityKind.Player) return squareFloor(world, x, y, 0, upTo);',
+    prueba: 'test:tests/object-boxes.test.ts',
+  },
+  {
+    nombre: 'una caja alta sube el cuerpo de golpe',
+    fichero: 'packages/sim/src/systems/jump.ts',
+    de: '  const ground = footing(world, store, id, store.z[id] + STEP_UP);',
+    a: '  const ground = footing(world, store, id);',
+    prueba: 'test:tests/object-boxes.test.ts',
+  },
+  {
+    nombre: 'el arbusto choca',
+    fichero: 'packages/shared/src/index.ts',
+    de: '  return isInert(f) || lifeKindOf(f) === LifeKind.Tree || isStation(f);',
+    a: '  return isInert(f) || lifeKindOf(f) !== null || isStation(f);',
+    prueba: 'test:tests/object-boxes.test.ts',
+  },
+  {
+    nombre: 'las patas sin caja',
+    fichero: 'packages/shared/src/fauna-body.ts',
+    de: "    out.push(...pair(i === 0 ? 'pata-del' : 'pata-tras', 'coat', true, [w, h, w], [lx, h / 2, z]));",
+    a: "    out.push(...pair(i === 0 ? 'pata-del' : 'pata-tras', 'coat', false, [w, h, w], [lx, h / 2, z]));",
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'los animales no ven las cajas de los objetos',
+    fichero: 'packages/sim/src/body.ts',
+    de: '          o.z1 > base + 1e-6 &&',
+    a: '          false &&',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'las cajas del panel con los colores viejos',
     fichero: 'packages/client/src/debug-boxes.ts',
-    de: 'boxEdges(out.hit, box);',
-    a: 'void box;',
+    de: '      if (blocksBody(world.featureAt(tx, ty))) {',
+    a: '      if (false) {',
     prueba: 'test:tests/debug-boxes.test.ts',
   },
   {
-    nombre: 'la estacion no va en amarillo',
+    nombre: 'las cajas del humo al reves',
     fichero: 'packages/client/src/debug-boxes.ts',
-    de: 'if (box && isStation(feature)) {',
-    a: 'if (box && false) {',
-    prueba: 'test:tests/debug-boxes.test.ts',
-  },
-  {
-    nombre: 'las cajas no dibujan en el juego',
-    fichero: 'packages/client/src/main.ts',
-    de: '  debugBoxes.update(state, dev.showBoxes);',
-    a: '  debugBoxes.update(state, false);',
+    de: '      if (blocksBody(world.featureAt(tx, ty))) {',
+    a: '      if (!blocksBody(world.featureAt(tx, ty))) {',
     prueba: 'smoke:devTools',
-  },
-  {
-    nombre: 'apagar las cajas no las quita',
-    fichero: 'packages/client/src/debug-boxes.ts',
-    de: '    if (!show) {\n      this.clear();',
-    a: '    if (!show) {\n      void this.clear;',
-    prueba: 'smoke:devTools',
-  },
-  {
-    nombre: 'el boton del movil no abre el panel',
-    fichero: 'packages/client/src/main.ts',
-    de: "devToggle.addEventListener('click', () => dev.toggle());",
-    a: "devToggle.addEventListener('click', () => {});",
-    prueba: 'smoke:mobile',
-  },
-  {
-    nombre: 'el panel del movil abajo, sobre los mandos',
-    fichero: 'packages/client/index.html',
-    de: 'top: calc(74px + env(safe-area-inset-top)); bottom: auto;',
-    a: 'top: auto; bottom: 10px;',
-    prueba: 'smoke:mobile',
   },
 ];

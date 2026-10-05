@@ -13,6 +13,7 @@
  */
 
 import { TICK_DT } from '@verdant/shared';
+import { BODY_RADIUS, squareFloor } from '../boxes.js';
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 import { GRAVITY, JUMP_SPEED, STEP_UP } from './jump.js';
@@ -71,7 +72,7 @@ export function autoJumpDue(
     const px = store.x[id] + dirX * s;
     const py = store.y[id] + dirY * s;
     if (collides(world, px, py)) return false;
-    const rise = world.floorHeightAt(px, py) - feet;
+    const rise = squareFloor(world, px, py, BODY_RADIUS) - feet;
     if (rise <= STEP_UP) continue;
     // El primer punto que estorba decide: o se sube de un salto, o nada.
     if (rise > JUMP_HEIGHT) return false;

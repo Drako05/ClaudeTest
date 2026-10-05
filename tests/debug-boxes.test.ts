@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { animalBoxes, BODY_RADIUS, createGame, EYE_HEIGHT, hitboxAt, type OrientedBox } from '@verdant/sim';
-import { Feature } from '@verdant/shared';
+import { blocksBody, Feature } from '@verdant/shared';
 import { BOX_RADIUS, boxEdges, collectBoxes } from '../packages/client/src/debug-boxes.js';
 
 /**
@@ -42,7 +42,7 @@ describe('Cajas de depuracion', () => {
     expect(spanX(box(0, 1))).toBeCloseTo(1);
   });
 
-  it('un arbol junto al jugador: su tronco en rojo y su casilla entera en cian, del mismo alto', () => {
+  it('un arbol junto al jugador: su tronco en amarillo, la caja que golpea y choca; un arbusto, en rojo', () => {
     const state = createGame(1);
     const { entities, playerId, world } = state;
     const tx = Math.floor(entities.x[playerId]) + 2;
@@ -50,13 +50,17 @@ describe('Cajas de depuracion', () => {
     world.setFeature(tx, ty, Feature.MeadowTree);
     const trunk = hitboxAt(world, tx, ty)!;
     const boxes = collectBoxes(state);
-    // El tronco esta entre las rojas, y la casilla entera entre las cian.
+    // Una sola caja, la del tronco, entre las amarillas; y nada de la casilla
+    // entera de antes, en ningun color.
     const has = (data: number[], x: number, h: number, y: number) =>
       points(data).some((q) => Math.abs(q[0] - x) < 1e-6 && Math.abs(q[1] - h) < 1e-6 && Math.abs(q[2] - y) < 1e-6);
-    expect(has(boxes.hit, trunk.x0, trunk.z1, trunk.y0)).toBe(true);
-    expect(has(boxes.solid, tx, trunk.z1, ty)).toBe(true);
-    expect(has(boxes.solid, tx + 1, trunk.z1, ty + 1)).toBe(true);
-    expect(boxes.counts.hit).toBeGreaterThan(0);
+    expect(has(boxes.both, trunk.x0, trunk.z1, trunk.y0)).toBe(true);
+    expect(has(boxes.hit, trunk.x0, trunk.z1, trunk.y0)).toBe(false);
+    for (const data of [boxes.hit, boxes.solid, boxes.both]) expect(has(data, tx, trunk.z1, ty)).toBe(false);
+    // Un arbusto solo se golpea: en rojo.
+    world.setFeature(tx, ty + 2, Feature.MeadowPlant);
+    const bush = hitboxAt(world, tx, ty + 2)!;
+    expect(has(collectBoxes(state).hit, bush.x0, bush.z1, bush.y0)).toBe(true);
   });
 
   it('una estacion va en amarillo, no en rojo ni en cian', () => {
@@ -91,7 +95,17 @@ describe('Cajas de depuracion', () => {
     const parts = near.reduce((n, id) => n + animalBoxes(entities, id).length, 0);
     // Sin animales cerca esto seria 0 = 0 y no probaria nada.
     expect(parts).toBeGreaterThan(0);
-    // Sin estaciones puestas, el amarillo es todo de los animales.
-    expect(collectBoxes(state).counts.both).toBe(parts);
+    // El amarillo: las partes de los animales y las cajas de los objetos que
+    // chocan (troncos, rocas, minerales).
+    const { world } = state;
+    const px = Math.floor(entities.x[playerId]);
+    const py = Math.floor(entities.y[playerId]);
+    let objects = 0;
+    for (let ty = py - BOX_RADIUS; ty <= py + BOX_RADIUS; ty++) {
+      for (let tx = px - BOX_RADIUS; tx <= px + BOX_RADIUS; tx++) {
+        if (hitboxAt(world, tx, ty) && blocksBody(world.featureAt(tx, ty))) objects++;
+      }
+    }
+    expect(collectBoxes(state).counts.both).toBe(parts + objects);
   });
 });
