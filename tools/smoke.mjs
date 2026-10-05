@@ -421,6 +421,7 @@ async function desktopPass(browser, baseUrl) {
   // caja, centrada al pixel; MODO e INVENTARIO, del mismo tamano.
   check(await page.isVisible('#hudToggle'), 'falta el boton del HUD');
   check(!(await page.isVisible('#others')), 'en PC se ve OTROS, que es del movil');
+  check(!(await page.isVisible('#devToggle')), 'en PC se ve el boton de desarrollo, que es del movil (aqui esta F3)');
   const bar = await page.evaluate(() => {
     const r = (id) => document.getElementById(id).getBoundingClientRect().toJSON();
     return { box: r('barBox'), hotbar: r('hotbar'), mode: r('modeBar'), inv: r('invOpen'), hunger: r('hungerRing'), health: r('healthRing') };
@@ -1720,6 +1721,27 @@ async function mobilePass(browser, baseUrl) {
   check(await page.isVisible('#hud'), 'tocar el boton no abrio el HUD en el movil');
   check(await page.isVisible('.touch-only'), 'la pista de los gestos no se ve en el movil');
   await page.tap('#hudToggle');
+  // El panel de desarrollo, que el movil no puede abrir con F3 (pedido del
+  // autor, 2026-10-05): el cuarto de la columna, bajo el bioma. Lo abre y lo
+  // cierra, y abierto no pisa ningun mando.
+  check(await page.isVisible('#devToggle'), 'falta el boton de desarrollo en la columna de OTROS');
+  const devR = await rect('devToggle');
+  check(devR.top >= envR.bottom && Math.abs(mid(devR) - mid(others)) < 2, 'el boton de desarrollo no va bajo el bioma, en la columna');
+  await page.tap('#devToggle');
+  await page.waitForTimeout(200);
+  check(await page.isVisible('#devPanel') && (await state(page)).dev, 'tocar el boton no abrio el panel de desarrollo');
+  const devPanelR = await rect('devPanel');
+  const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const pisados = [];
+  for (const id of ['action', 'use', 'jump', 'run', 'modeTouch', 'inputMode']) {
+    if (overlaps(devPanelR, await rect(id))) pisados.push(id);
+  }
+  console.log(`  desarrollo en el movil: ${JSON.stringify(devPanelR)}, pisa ${pisados.join(',') || 'nada'}`);
+  check(pisados.length === 0, `el panel de desarrollo pisa mandos: ${pisados}`);
+  await page.screenshot({ path: join(SHOTS, '3d-04b-movil-desarrollo.png') });
+  await page.tap('#devToggle');
+  await page.waitForTimeout(200);
+  check(!(await page.isVisible('#devPanel')) && !(await state(page)).dev, 'tocar otra vez no cerro el panel de desarrollo');
   // El inventario: se abre sin pausar, y sus pestanas cambian de pagina.
   await page.tap('#invOpen');
   await page.waitForTimeout(200);
@@ -2139,6 +2161,19 @@ async function devToolsPass(browser, baseUrl) {
   check(withBorders.borderSegments > 0, 'el contorno de biomas no dibujo ni un segmento');
   check(withBorders.misplacedBorders === 0, `${withBorders.misplacedBorders} contornos fuera de su chunk`);
   await page.screenshot({ path: join(SHOTS, '3d-06-bordes.png') });
+
+  // Las cajas de golpe y de choque (pedido del autor, 2026-10-05): con «Cajas»
+  // se dibujan las de alrededor —rojo golpe, cian choque—, y se quitan al
+  // apagarlas. El nacimiento tiene plantas cerca y siempre esta el jugador.
+  await page.click('[data-toggle="boxes"]');
+  const boxed = await waitForLoop(page, 10);
+  console.log(`  cajas: ${JSON.stringify(boxed.debugBoxes)}`);
+  check(boxed.debugBoxes.hit > 0 && boxed.debugBoxes.solid > 0, `las cajas no dibujaron golpe y choque: ${JSON.stringify(boxed.debugBoxes)}`);
+  await page.screenshot({ path: join(SHOTS, '3d-06b-cajas.png') });
+  await page.click('[data-toggle="boxes"]');
+  const unboxed = await waitForLoop(page, 10);
+  check(unboxed.debugBoxes.hit + unboxed.debugBoxes.solid + unboxed.debugBoxes.both === 0,
+    `apagar las cajas no las quito: ${JSON.stringify(unboxed.debugBoxes)}`);
 
   // Y sobreviven a cambiar de chunk, saltando por el camino.
   const chunkOf = (s) => [Math.floor(s.x) >> 5, Math.floor(s.y) >> 5].join(',');

@@ -248,7 +248,7 @@ export class InventoryUi {
       (e) => {
         if (!document.body.classList.contains('others-open')) return;
         const t = e.target as Element | null;
-        if (t?.closest('#others, #hudToggle, #statsToggle, #proj, #fovPanel')) return;
+        if (t?.closest('#others, #hudToggle, #statsToggle, #proj, #fovPanel, #devToggle, #devPanel')) return;
         this.setOthers(false);
       },
       true,

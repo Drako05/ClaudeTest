@@ -49,11 +49,16 @@ export class DevTools {
   paused = false;
   showChunkBorders = false;
   showBiomeBorders = false;
+  /** Las cajas de golpe y de choque (`debug-boxes.ts`). */
+  showBoxes = false;
   /**
    * Congela hambre y salud. Empieza puesto porque, sin el, el boton mas util del
    * panel es el que mata: saltar un dia gasta 264 puntos de hambre.
    */
   freezeSurvival = true;
+
+  /** Se llama al abrir o cerrar el panel: el boton del movil se enciende con el. */
+  onToggle: ((open: boolean) => void) | null = null;
 
   /** Ultimo estado observado, para deducir que ha cambiado. */
   private lastInventory: number[] | null = null;
@@ -109,9 +114,11 @@ export class DevTools {
       this.speed = 1;
       this.showChunkBorders = false;
       this.showBiomeBorders = false;
+      this.showBoxes = false;
       this.freezeSurvival = true;
     }
     this.refresh();
+    this.onToggle?.(this.enabled);
   }
 
   /**
@@ -158,6 +165,7 @@ export class DevTools {
     for (const [key, on] of [
       ['chunks', this.showChunkBorders],
       ['biomes', this.showBiomeBorders],
+      ['boxes', this.showBoxes],
       ['pause', this.paused],
       ['survival', this.freezeSurvival],
     ] as Array<[string, boolean]>) {
@@ -200,7 +208,10 @@ export class DevTools {
         <div class="devRow">
           <button data-toggle="chunks" type="button">Bordes de chunk</button>
           <button data-toggle="biomes" type="button">Bordes de bioma</button>
+          <button data-toggle="boxes" type="button">Cajas</button>
         </div>
+        <p class="devNote">Cajas: <b class="boxHit">golpe</b>, <b class="boxSolid">choque</b>,
+          <b class="boxBoth">las dos</b>.</p>
         <span class="devLabel">Pisando <b id="devBiome">—</b></span>
       </div>
       <div class="devGroup">
@@ -242,6 +253,9 @@ export class DevTools {
             break;
           case 'biomes':
             this.showBiomeBorders = !this.showBiomeBorders;
+            break;
+          case 'boxes':
+            this.showBoxes = !this.showBoxes;
             break;
           case 'survival':
             this.freezeSurvival = !this.freezeSurvival;

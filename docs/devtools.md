@@ -45,3 +45,31 @@ abierto (`DevTools.survivalFrozen` es un getter, como `timeScale`). Sin ella las
 herramientas no sirven para lo que se hicieron: a 64x se pierden unos 6,7 puntos
 de hambre por segundo real y saltar un dia vacia la mitad del hambre, asi que el
 boton mas util del panel era el que mataba.
+
+**Las cajas de golpe y de choque** (pedido del autor, 2026-10-05): el
+conmutador «Cajas» del grupo Vista las dibuja alrededor del jugador
+(`debug-boxes.ts`, 12 casillas a la redonda, propuesta mia). Colores del autor:
+**rojo** lo que se golpea, **cian** lo que choca y **amarillo** lo que hace las
+dos cosas. Se ven **a traves de todo**, sin prueba de profundidad, porque el
+tronco que se golpea vive dentro de su copa. **El agua no se dibuja**, aunque
+corte el paso (decision del autor). Ninguna caja es del cliente: todas salen
+del nucleo.
+- **Golpe**: `hitboxAt` de cada casilla —del arbol, solo su tronco—.
+- **Choque**: la casilla entera de lo que `isFeatureSolid` (arboles, roca y
+  minerales), que es lo que mira `collides`. El choque no tiene alto —es una
+  columna—, asi que se dibuja hasta el alto de su caja de golpe (propuesta
+  mia). Y el jugador: su huella de `BODY_RADIUS` de los pies a los ojos
+  (propuesta mia, por lo mismo).
+- **Las dos**: las estaciones (su `STATION_BOXES`, que es a la vez el bloque
+  que se pisa) y los animales (`animalBoxes`, las partes que golpean y
+  chocan).
+
+Se rehacen enteras en cada fotograma: son unas 600 casillas, cuesta poco, y no
+hay cache que se quede vieja al talar algo o al pasar un animal. El humo las
+cuenta (`__verdant.debugBoxes`) y `tests/debug-boxes.test.ts` mide la parte pura.
+
+**En el movil, que no tiene F3**, el panel se abre con el cuarto boton de la
+columna de OTROS, una llave inglesa bajo el bioma (`#devToggle`, pedido del
+autor, 2026-10-05), y se abre al lado de la columna, como el HUD: abajo a la
+izquierda pisaria el joystick. El boton se enciende mientras el panel esta
+abierto, se haya abierto con el, con F3 o con `?dev=1` (`DevTools.onToggle`).
