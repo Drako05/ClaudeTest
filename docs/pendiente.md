@@ -32,6 +32,8 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
+| Cajas de depuracion: **12 casillas** a la redonda; el **choque dibujado hasta el alto de su caja de golpe** (el choque no tiene alto); el **jugador de los pies a los ojos**; se rehacen en cada fotograma | `docs/devtools.md`, las cajas | numeros en `debug-boxes.ts` |
+| El boton de desarrollo del movil: una **llave inglesa de trazo** (como el resto de esa columna, a falta de tu juicio sobre la directriz 3), y el **panel al lado de la columna**, como el HUD | `docs/devtools.md`, el movil | un icono y una regla CSS |
 | Equipables: los **usos de las armas**, 30, 90 y 180, tres cuartos de los de la herramienta de su material (tu pediste «menos») | Equipables, mas abajo | tres numeros en `toolStats` |
 | Equipables: **que gasta un golpe**: lo que da impacto (un animal, o algo que se trabaja); al aire o a un brote, nada; **uno por golpe y por objeto**, asi un barrido a un animal y un arbol gasta uno del arma puesta y otro de la mano | Equipables, mas abajo | una regla en `tryHarvestArea` |
 | Equipables: **soltar sobre lo puesto lo intercambia** si lo puesto se podria quitar (la espada sobre el punal, la mochila sobre la bolsa con sus casillas vacias) | Equipables, mas abajo | una regla en `Inventory.moveWorn` |
@@ -602,6 +604,15 @@ Lo comprueban los tests del nucleo (mover y apilar, usar, fabricar sin sitio,
 golpes sin romper), el humo con raton (E, arrastrar, tirar, mantener 2 s, clic
 derecho para comer y sembrar, OTROS, las paginas del movil) y `npm run gestures`
 con toques de verdad (arrastrar una casilla y mantener una receta).
+
+## Cajas de golpe y de choque, y el panel de desarrollo en el movil — HECHO (2026-10-05)
+
+Pediste ver las cajas de golpe y de choque de todo —plantas, rocas,
+estaciones, animales— con un boton del panel de desarrollo, y otro para abrir
+ese panel en el movil, en la columna de OTROS. Elegiste que se vean a traves de
+todo, tres colores (rojo golpe, cian choque, amarillo las dos) y el agua sin
+dibujar. Como quedo, en `docs/devtools.md`; lo que elegi yo, en «Esperando tu
+juicio».
 
 ## Equipables: catorce casillas, el Bolso, el Arma y las primeras armas — HECHO (2026-10-04)
 

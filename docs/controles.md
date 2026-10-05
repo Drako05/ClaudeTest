@@ -138,7 +138,8 @@ derecho. Los **anillos de salud y hambre** van abajo a la izquierda.
 Arriba, **OTROS** a la izquierda, la **barra de la mano** en el centro exacto
 (sus casillas encogen en pantallas estrechas para no pisar a los redondos) e
 **INVENTARIO** a la derecha; OTROS despliega **en columna debajo de el** el
-ojo, el HUD y el entorno, y se cierra tocando fuera. **Los botones son solo
+ojo, el HUD, el entorno y, desde el 2026-10-05, el **panel de desarrollo** (una
+llave inglesa; en PC es F3, ver `docs/devtools.md`), y se cierra tocando fuera. **Los botones son solo
 iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
 USAR, espada y pico cruzados en ATAQUE, una **mochila de explorador** en
 INVENTARIO (asa, solapa con dos cierres y bolsillos, casi tan ancha como alta

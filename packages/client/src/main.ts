@@ -79,6 +79,7 @@ import { InventoryUi } from './inventory-ui.js';
 import { MouseLook } from './pointer-lock.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
+import { DebugBoxes } from './debug-boxes.js';
 import { aboveButtonY, inventoryDelta, opacityOf, PickupFeed, riseOf } from './pickup-feed.js';
 import {
   berrySpot,
@@ -210,6 +211,8 @@ document.getElementById('restart')?.addEventListener('click', restart);
 const effects = new Effects();
 const effectsView = new EffectsView(scene);
 const overlays = new Overlays(scene);
+/** Las cajas de golpe y de choque del panel de desarrollo (`debug-boxes.ts`). */
+const debugBoxes = new DebugBoxes(scene);
 
 /**
  * El registro de objetos, «+5 Madera» y «-1 Bayas» (pedido del autor): sale de
@@ -303,6 +306,19 @@ const dev = new DevTools({
     for (const [item, n] of bundle) state.inventory.add(item, n);
   },
 });
+
+/**
+ * El panel en el movil, que no tiene F3 (pedido del autor, 2026-10-05): un
+ * boton mas en la columna que despliega OTROS. Se enciende mientras el panel
+ * esta abierto, se abra desde aqui, con F3 o con `?dev=1`.
+ */
+const devToggle = document.getElementById('devToggle') as HTMLButtonElement;
+dev.onToggle = (open) => {
+  devToggle.classList.toggle('open', open);
+  devToggle.setAttribute('aria-expanded', String(open));
+};
+dev.onToggle(dev.active);
+devToggle.addEventListener('click', () => dev.toggle());
 
 /**
  * El inventario con su recetario y la barra de la mano (`inventory-ui.ts`),
@@ -641,6 +657,7 @@ function restart(): void {
   for (const [key, view] of views) dispose(key, view);
   effects.clear();
   overlays.reset();
+  debugBoxes.clear();
   faunaView.clear();
   state = startGame(seed, false, RADIUS);
   // Un mundo nuevo empieza sin nada: eso no es perder lo que se llevaba.
@@ -989,6 +1006,7 @@ function frame(now: number): void {
     dev.showChunkBorders,
     dev.showBiomeBorders,
   );
+  debugBoxes.update(state, dev.showBoxes);
   skyEl.style.background = tintCss(skyTint(state.tick));
 
   const px = state.entities.x[state.playerId];
@@ -1121,6 +1139,8 @@ Object.defineProperty(window, '__verdant', {
       misplacedBorders: overlays.misplacedBorderCount,
       /** Lo que marca la reticula: 'suelo', 'pared' o null. */
       reticle: overlays.reticle,
+      /** Cajas dibujadas de cada clase (golpe, choque, las dos), con «Cajas» puesto. */
+      debugBoxes: debugBoxes.counts,
       /** Lo recolectado, para poder comprobar la accion desde fuera. */
       gathered,
       /** Barridos y escombros DIBUJADOS, acumulados. Ver `EffectsView`. */
