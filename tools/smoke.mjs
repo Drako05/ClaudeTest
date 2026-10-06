@@ -2351,7 +2351,8 @@ async function reliefPass(browser, baseUrl) {
     const relief = (await spots(page)).relief;
     console.log(`  al pie: nivel ${arrived.level}, ${relief.levels} alturas, ${relief.tallWalls} al pie de un muro`);
     check(relief.tallWalls > 0, 'no hay paredes de dos bloques donde deberia haberlas');
-    check(relief.ramps > 0, 'no hay ni un talud por el que subir');
+    // Sin rampas (el autor, 2026-10-06): se sube andando por escalones de medio bloque.
+    check(relief.halfSteps > 0, 'no hay ni un escalon de medio bloque por el que subir andando');
     await page.screenshot({ path: join(SHOTS, '3d-09-relieve.png') });
 
     const moved = await bestWalk(page, arrived);
@@ -2359,17 +2360,19 @@ async function reliefPass(browser, baseUrl) {
     check(moved > 1, 'el jugador no pudo andar en ninguna direccion junto a la pared');
     check(moved < 30, `no camino, se teletransporto: ${moved.toFixed(1)}`);
 
-    // Andando no se sube un muro: lo mas que se gana sin saltar es un nivel.
+    // Andando no se sube un muro: en ningun rumbo se gana lo que mide la pared.
+    // Con escalones de medio bloque se sube algo andando, y eso es correcto; lo
+    // que no puede pasar es acabar encima de la pared sin saltar.
     let peor = null;
     for (const key of ['KeyW', 'KeyA', 'KeyS', 'KeyD']) {
       const antes = await open(page, baseUrl, at);
-      await hold(page, key, 900);
+      await hold(page, key, 600);
       const despues = await waitForLoop(page, 30);
       const subida = despues.level - antes.level;
       if (!peor || subida > peor.subida) peor = { key, subida };
     }
-    console.log(`  contra la pared: lo mas que se sube andando es ${peor.subida} nivel(es)`);
-    check(peor.subida <= 1, `andar salvo un muro sin saltar: subio ${peor.subida} niveles`);
+    console.log(`  contra la pared de ${spot.drop}: lo mas que se sube andando es ${peor.subida}`);
+    check(peor.subida < spot.drop, `andar salvo un muro sin saltar: subio ${peor.subida} de ${spot.drop}`);
 
     // Al pie de la pared, mirando casi de frente en ocho rumbos: la reticula
     // enmarca la cara de la pared en alguno (pedido del autor, 2026-09-30).

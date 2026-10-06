@@ -20,7 +20,24 @@ import {
   Resource,
   Terrain,
 } from '@verdant/shared';
-import type { GameState } from '@verdant/sim';
+import { topOf, VOXELS_PER_TILE, type GameState, type WorldGen } from '@verdant/sim';
+
+/**
+ * Donde ponerse en una casilla para pisar su columna de esquina, la que mide
+ * `tileTopAt`: el centro de esa columna de 0,5.
+ */
+const CORNER = 1 / (2 * VOXELS_PER_TILE);
+
+/** La altura de la casilla si sus cuatro columnas estan a la misma, o `null`. */
+function flatTop(gen: WorldGen, x: number, y: number): number | null {
+  const h = gen.columnTopAt(x * VOXELS_PER_TILE, y * VOXELS_PER_TILE);
+  for (let s = 1; s < VOXELS_PER_TILE * VOXELS_PER_TILE; s++) {
+    const vx = x * VOXELS_PER_TILE + (s % VOXELS_PER_TILE);
+    const vy = y * VOXELS_PER_TILE + Math.floor(s / VOXELS_PER_TILE);
+    if (gen.columnTopAt(vx, vy) !== h) return null;
+  }
+  return h;
+}
 
 /** El punto mas alto que se encuentre cerca. La prueba de humo sube ahi. */
 export function peakSpot(state: GameState): { stand: { x: number; y: number }; level: number } | null {
@@ -31,9 +48,9 @@ export function peakSpot(state: GameState): { stand: { x: number; y: number }; l
   let best: { stand: { x: number; y: number }; level: number } | null = null;
   for (let y = py - 300; y <= py + 300; y += 3) {
     for (let x = px - 300; x <= px + 300; x += 3) {
-      const level = gen.levelAt(x, y);
+      const level = topOf(gen.tileTopAt(x, y));
       if (best && level <= best.level) continue;
-      best = { stand: { x: x + 0.5, y: y + 0.5 }, level };
+      best = { stand: { x: x + CORNER, y: y + CORNER }, level };
     }
   }
   return best;
@@ -54,15 +71,15 @@ export function cliffSpot(state: GameState): { stand: { x: number; y: number }; 
   let best: { stand: { x: number; y: number }; drop: number; d: number } | null = null;
   for (let y = py - 220; y <= py + 220; y += 2) {
     for (let x = px - 220; x <= px + 220; x += 2) {
-      const level = gen.levelAt(x, y);
+      const level = topOf(gen.tileTopAt(x, y));
       if (level < 0) continue;
       let drop = 0;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-        drop = Math.max(drop, gen.levelAt(x + dx, y + dy) - level);
+        drop = Math.max(drop, topOf(gen.tileTopAt(x + dx, y + dy)) - level);
       }
       if (drop < 2) continue;
       const d = Math.max(Math.abs(x - px), Math.abs(y - py));
-      if (!best || d < best.d) best = { stand: { x: x + 0.5, y: y + 0.5 }, drop, d };
+      if (!best || d < best.d) best = { stand: { x: x + CORNER, y: y + CORNER }, drop, d };
     }
   }
   return best ? { stand: best.stand, drop: best.drop } : null;
@@ -71,34 +88,35 @@ export function cliffSpot(state: GameState): { stand: { x: number; y: number }; 
 /**
  * Resumen del relieve alrededor del jugador, para la prueba de humo.
  *
- * Los tres numeros que interesan: que haya varias alturas —si no, el relieve no
- * se esta generando—, que haya taludes por los que subir y que existan paredes
- * de dos o mas bloques, que es lo que el autor pidio expresamente. Se lee del
- * GENERADOR y no del mundo, para no registrar chunks solo por mirar.
+ * Los numeros que interesan: que haya varias alturas —si no, el relieve no se
+ * esta generando—, que haya escalones de medio bloque, que se suben andando y
+ * hacen de las antiguas rampas, y que existan paredes de dos o mas bloques, que
+ * es lo que el autor pidio expresamente. Por casillas, con su columna de
+ * esquina. Se lee del GENERADOR y no del mundo, para no registrar chunks solo
+ * por mirar.
  */
-export function reliefAround(state: GameState): { levels: number; ramps: number; tallWalls: number } {
+export function reliefAround(state: GameState): { levels: number; halfSteps: number; tallWalls: number } {
   const px = Math.floor(state.entities.x[state.playerId]);
   const py = Math.floor(state.entities.y[state.playerId]);
   const gen = state.world.gen;
   const seen = new Set<number>();
-  let ramps = 0;
+  let halfSteps = 0;
   let tallWalls = 0;
 
   for (let y = py - 40; y <= py + 40; y++) {
     for (let x = px - 40; x <= px + 40; x++) {
-      const level = gen.levelAt(x, y);
-      if (level < 0) continue;
-      seen.add(level);
-      if (gen.rampDirAt(x, y) >= 0) ramps++;
+      const height = gen.tileTopAt(x, y);
+      if (height < 0) continue;
+      seen.add(height);
+      let rise = 0;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-        if (gen.levelAt(x + dx, y + dy) - level >= 2) {
-          tallWalls++;
-          break;
-        }
+        rise = Math.max(rise, gen.tileTopAt(x + dx, y + dy) - height);
       }
+      if (rise === 1) halfSteps++;
+      if (rise >= 2 * VOXELS_PER_TILE) tallWalls++;
     }
   }
-  return { levels: seen.size, ramps, tallWalls };
+  return { levels: seen.size, halfSteps, tallWalls };
 }
 
 /** Un sitio desde el que la accion alcanza algo concreto. */
@@ -119,9 +137,9 @@ export interface ReachSpot {
  * noroeste (`camera.ts`, rumbo de un octavo de vuelta): nada mas aparecer en el
  * centro del apoyo, esa casilla cae justo en el eje del sector del golpe (regla
  * 12). La de apoyo tiene que ser pisable, estar despejada y a la MISMA altura,
- * para que ningun escalon corte el sector por delante; y ninguna de las dos
- * puede ser talud, que es donde la altura de una casilla deja de ser un numero
- * solo.
+ * para que ningun escalon corte el sector por delante; y las dos tienen que ser
+ * llanas —sus cuatro columnas de 0,5 a la misma altura—, que es donde la altura
+ * de una casilla es un numero solo.
  */
 function reachSpot(
   state: GameState,
@@ -146,8 +164,8 @@ function reachSpot(
       const standTerrain = gen.terrainAt(sx, sy);
       if (isTerrainSolid(standTerrain)) continue;
       if (blocksBody(gen.featureAt(sx, sy, standTerrain))) continue;
-      if (gen.levelAt(sx, sy) !== gen.levelAt(x, y)) continue;
-      if (gen.rampDirAt(sx, sy) >= 0 || gen.rampDirAt(x, y) >= 0) continue;
+      const top = flatTop(gen, x, y);
+      if (top === null || flatTop(gen, sx, sy) !== top) continue;
 
       best = {
         stand: { x: sx + 0.5, y: sy + 0.5 },

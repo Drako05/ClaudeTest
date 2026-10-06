@@ -58,12 +58,11 @@ import {
   type Surface,
   type Vec3,
 } from '../aim.js';
-import { bodyBoxes, BODY_RADIUS, featureBox, type OrientedBox } from '../boxes.js';
+import { bodyBoxes, BODY_RADIUS, featureBox, objectBase, type OrientedBox } from '../boxes.js';
 export { STATION_BOXES } from '../boxes.js';
 import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
-import { NO_RAMP } from '../relief.js';
 import { hash2DFloat } from '../rng.js';
 import { facingToward, stationNear } from '../stations.js';
 import { toChunkCoord, type World } from '../world.js';
@@ -725,7 +724,6 @@ export function tryPlace(world: World, store: EntityStore, id: number, inventory
   const { x, y } = at;
   if (world.featureAt(x, y) !== Feature.None) return null;
   if (isTerrainSolid(world.terrainAt(x, y))) return null;
-  if (world.rampDirAt(x, y) !== NO_RAMP) return null;
   const px = store.x[id];
   const py = store.y[id];
   const touches =
@@ -738,7 +736,7 @@ export function tryPlace(world: World, store: EntityStore, id: number, inventory
   world.setFeature(x, y, feature);
   // Su cara principal, hacia quien la pone (pedido del autor, 2026-10-02).
   world.setStationFacing(x, y, facingToward(x, y, px, py));
-  return { x, y, z: Math.max(at.z, world.groundHeightAt(x + 0.5, y + 0.5)) };
+  return { x, y, z: Math.max(at.z, objectBase(world, x, y, feature)) };
 }
 
 /** `tryCraft` con las estaciones que hay alrededor de la entidad. */

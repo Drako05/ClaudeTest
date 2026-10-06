@@ -24,19 +24,14 @@ function fakeWorld(
   floor: (x: number, y: number) => number = () => 0,
   objects: (tx: number, ty: number) => Feature = () => Feature.None,
 ): World {
-  const floorRangeAt = (tx: number, ty: number, out: Float64Array) => {
-    const e = 0.02;
-    const h = [floor(tx + e, ty + e), floor(tx + 1 - e, ty + e), floor(tx + e, ty + 1 - e), floor(tx + 1 - e, ty + 1 - e)];
-    out[0] = Math.min(...h);
-    out[1] = Math.max(...h);
-  };
   return {
     seed: 1,
     isSolidAt: solid,
     isTerrainSolidAt: solid,
     groundHeightAt: floor,
+    // La altura de la columna de 0,5, en medios bloques, de la misma funcion.
+    columnTop: (vx: number, vy: number) => floor((vx + 0.5) / 2, (vy + 0.5) / 2) * 2,
     featureAt: objects,
-    floorRangeAt,
   } as unknown as World;
 }
 

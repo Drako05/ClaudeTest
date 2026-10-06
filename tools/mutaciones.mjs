@@ -10,71 +10,50 @@
  * - `gestures` o `slash`: esas herramientas;
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: una caja por objeto, que golpea y choca, con alto; el cuerpo se apoya
- * y choca con su huella; las patas de los animales con caja (2026-10-05).
+ * Ronda: el terreno de voxeles de 0,5, fase 1 (2026-10-06): columnas de medio
+ * bloque sin rampas, su dibujo, y lo que se apoya en ellas.
  */
 export default [
   {
-    nombre: 'el tronco vuelve a la casilla entera',
+    nombre: 'la columna no interpola: toma la casilla entera',
+    fichero: 'packages/sim/src/worldgen.ts',
+    de: '    const fx = sx / VOXELS_PER_TILE;',
+    a: '    const fx = 0;',
+    prueba: 'test:tests/relief.test.ts',
+  },
+  {
+    nombre: 'lo generado se apoya en lo mas alto',
     fichero: 'packages/sim/src/boxes.ts',
-    de: '    half = trunk.width / 2;',
-    a: '    half = 0.5;',
-    prueba: 'test:tests/object-boxes.test.ts',
+    de: '  const highest = isStation(feature);',
+    a: '  const highest = true;',
+    prueba: 'test:tests/stations.test.ts',
   },
   {
-    nombre: 'el choque por el centro y no por la huella',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: '  return squareFloor(world, cx, cy, BODY_RADIUS) > feet + margin;',
-    a: '  return squareFloor(world, cx, cy, 0) > feet + margin;',
-    prueba: 'test:tests/object-boxes.test.ts',
+    nombre: 'la casilla con escalon sale sin tapas',
+    fichero: 'packages/client/src/terrain-mesh.ts',
+    de: '        if (!flat) lid(x0, y0, x0 + VOXEL, y0 + VOXEL, top, rgb);',
+    a: '        void lid;',
+    prueba: 'test:tests/terrain-mesh.test.ts',
   },
   {
-    nombre: 'el apoyo por el centro y no por la huella',
-    fichero: 'packages/sim/src/boxes.ts',
-    de: '  if (store.kind[id] === EntityKind.Player) return squareFloor(world, x, y, BODY_RADIUS, upTo);',
-    a: '  if (store.kind[id] === EntityKind.Player) return squareFloor(world, x, y, 0, upTo);',
-    prueba: 'test:tests/object-boxes.test.ts',
+    nombre: 'el auto salto no sigue la escalera',
+    fichero: 'packages/sim/src/systems/autojump.ts',
+    de: '      walked = floor;',
+    a: '      void floor;',
+    prueba: 'test:tests/jump.test.ts',
   },
   {
-    nombre: 'una caja alta sube el cuerpo de golpe',
-    fichero: 'packages/sim/src/systems/jump.ts',
-    de: '  const ground = footing(world, store, id, store.z[id] + STEP_UP);',
-    a: '  const ground = footing(world, store, id);',
-    prueba: 'test:tests/object-boxes.test.ts',
+    nombre: 'el chunk y el generador discrepan en el borde',
+    fichero: 'packages/sim/src/worldgen.ts',
+    de: '            : gen.columnFrom(sx, sy, corners[at], corners[at + 1], corners[at + side], corners[at + side + 1]);',
+    a: '            : gen.columnFrom(sx, sy, corners[at], corners[at], corners[at + side], corners[at + side + 1]);',
+    prueba: 'test:tests/relief.test.ts',
   },
   {
-    nombre: 'el arbusto choca',
-    fichero: 'packages/shared/src/index.ts',
-    de: '  return isInert(f) || lifeKindOf(f) === LifeKind.Tree || isStation(f);',
-    a: '  return isInert(f) || lifeKindOf(f) !== null || isStation(f);',
-    prueba: 'test:tests/object-boxes.test.ts',
-  },
-  {
-    nombre: 'las patas sin caja',
-    fichero: 'packages/shared/src/fauna-body.ts',
-    de: "    out.push(...pair(i === 0 ? 'pata-del' : 'pata-tras', 'coat', true, [w, h, w], [lx, h / 2, z]));",
-    a: "    out.push(...pair(i === 0 ? 'pata-del' : 'pata-tras', 'coat', false, [w, h, w], [lx, h / 2, z]));",
-    prueba: 'test:tests/fauna-body.test.ts',
-  },
-  {
-    nombre: 'los animales no ven las cajas de los objetos',
-    fichero: 'packages/sim/src/body.ts',
-    de: '          o.z1 > base + 1e-6 &&',
-    a: '          false &&',
-    prueba: 'test:tests/fauna-body.test.ts',
-  },
-  {
-    nombre: 'las cajas del panel con los colores viejos',
-    fichero: 'packages/client/src/debug-boxes.ts',
-    de: '      if (blocksBody(world.featureAt(tx, ty))) {',
-    a: '      if (false) {',
-    prueba: 'test:tests/debug-boxes.test.ts',
-  },
-  {
-    nombre: 'las cajas del humo al reves',
-    fichero: 'packages/client/src/debug-boxes.ts',
-    de: '      if (blocksBody(world.featureAt(tx, ty))) {',
-    a: '      if (!blocksBody(world.featureAt(tx, ty))) {',
-    prueba: 'smoke:devTools',
+    nombre: 'la sonda del humo no ve escalones de medio bloque',
+    fichero: 'packages/client/src/probes.ts',
+    de: '      if (rise === 1) halfSteps++;',
+    a: '      if (rise === 99) halfSteps++;',
+    prueba: 'smoke:relief',
   },
 ];

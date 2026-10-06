@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groundHeight, World } from '@verdant/sim';
+import { VOXELS_PER_TILE, World } from '@verdant/sim';
 import { biomeOfTerrain, CHUNK_SIZE, type Terrain } from '@verdant/shared';
 import { collectBiomeEdges } from '../packages/client/src/biome-edges.js';
 
@@ -24,9 +24,17 @@ function biomeOf(world: World, wx: number, wy: number): number {
   return biomeOfTerrain(world.gen.terrainAt(wx, wy) as Terrain);
 }
 
-/** La esquina (fx, fy) del tile (wx, wy), a la altura de su suelo. */
-function corner(world: World, wx: number, wy: number, fx: number, fy: number): number[] {
-  return [wx + fx, groundHeight(world.levelAt(wx, wy), world.rampDirAt(wx, wy), fx, fy), wy + fy];
+/**
+ * El primer tramo (de medio bloque) de la arista este o sur del tile (wx, wy),
+ * a la altura de la columna de 0,5 que bordea por dentro.
+ */
+function firstHalf(world: World, wx: number, wy: number, side: 'este' | 'sur'): string {
+  if (side === 'este') {
+    const h = world.groundHeightAt(wx + 0.75, wy + 0.25);
+    return [wx + 1, h, wy, wx + 1, h, wy + 0.5].join(',');
+  }
+  const h = world.groundHeightAt(wx + 0.25, wy + 0.75);
+  return [wx + 0.5, h, wy + 1, wx, h, wy + 1].join(',');
 }
 
 function chunkWithEdges(world: World): { cx: number; cy: number } {
@@ -40,7 +48,7 @@ function chunkWithEdges(world: World): { cx: number; cy: number } {
 }
 
 describe('Contorno de biomas (3D)', () => {
-  it('cada arista este une las esquinas (1,0) y (1,1) del tile, en coordenadas del mundo', () => {
+  it('cada arista este va de la esquina (1,0) a la (1,1) del tile, en tramos de medio bloque a la altura de su columna', () => {
     // Lejos del origen: el fallo historico —el origen del chunk sumado dos
     // veces— valia cero en el chunk (0,0).
     const world = new World(31337);
@@ -53,8 +61,7 @@ describe('Contorno de biomas (3D)', () => {
         const wx = cx * CHUNK_SIZE + lx;
         const wy = cy * CHUNK_SIZE + ly;
         if (biomeOf(world, wx + 1, wy) === biomeOf(world, wx, wy)) continue;
-        const key = [...corner(world, wx, wy, 1, 0), ...corner(world, wx, wy, 1, 1)].join(',');
-        expect(found, `falta la arista este de (${wx}, ${wy})`).toContain(key);
+        expect(found, `falta la arista este de (${wx}, ${wy})`).toContain(firstHalf(world, wx, wy, 'este'));
         checked++;
       }
     }
@@ -72,8 +79,7 @@ describe('Contorno de biomas (3D)', () => {
         const wx = cx * CHUNK_SIZE + lx;
         const wy = cy * CHUNK_SIZE + ly;
         if (biomeOf(world, wx, wy + 1) === biomeOf(world, wx, wy)) continue;
-        const key = [...corner(world, wx, wy, 1, 1), ...corner(world, wx, wy, 0, 1)].join(',');
-        expect(found, `falta la arista sur de (${wx}, ${wy})`).toContain(key);
+        expect(found, `falta la arista sur de (${wx}, ${wy})`).toContain(firstHalf(world, wx, wy, 'sur'));
         checked++;
       }
     }
@@ -108,7 +114,8 @@ describe('Contorno de biomas (3D)', () => {
     }
     const segments = collectBiomeEdges(world, world.getChunk(cx, cy));
     expect(segments.length % 6).toBe(0);
-    expect(segments.length / 6).toBe(expected);
+    // Cada arista, en dos tramos de medio bloque.
+    expect(segments.length / 6).toBe(expected * VOXELS_PER_TILE);
   });
 
   it('las costuras entre chunks tambien se dibujan', () => {
@@ -122,8 +129,7 @@ describe('Contorno de biomas (3D)', () => {
           const wx = cx * CHUNK_SIZE + lx;
           const wy = cy * CHUNK_SIZE + ly;
           if (biomeOf(world, wx + 1, wy) === biomeOf(world, wx, wy)) continue;
-          const key = [...corner(world, wx, wy, 1, 0), ...corner(world, wx, wy, 1, 1)].join(',');
-          expect(found, `costura sin dibujar en (${wx}, ${wy})`).toContain(key);
+          expect(found, `costura sin dibujar en (${wx}, ${wy})`).toContain(firstHalf(world, wx, wy, 'este'));
           seams++;
         }
       }
@@ -155,6 +161,6 @@ describe('Contorno de biomas (3D)', () => {
       if (biomeOf(world, CHUNK_SIZE, i) !== flat) expected++;
       if (biomeOf(world, i, CHUNK_SIZE) !== flat) expected++;
     }
-    expect(collectBiomeEdges(world, uniform).length / 6).toBe(expected);
+    expect(collectBiomeEdges(world, uniform).length / 6).toBe(expected * VOXELS_PER_TILE);
   });
 });

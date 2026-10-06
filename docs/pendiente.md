@@ -15,6 +15,8 @@ mas abajo.
 
 **Como leerlo.** Va de lo mas urgente a lo mas historico:
 
+0. **La proxima tanda**, si la hay decidida: lo que el autor ya eligio y aun no
+   es codigo.
 1. **Esperando tu juicio** — la lista de abajo. Son decisiones que tomo el agente
    por deduccion y que el autor puede corregir, mas lo que quedo senalado para
    que lo mire. **Empieza aqui.**
@@ -23,6 +25,79 @@ mas abajo.
    Es historia, pero es historia que el codigo no cuenta.
 
 ---
+
+## PROXIMA TANDA: el mundo de voxeles de 0,5 — decidido (2026-10-06), sin empezar
+
+**Empieza aqui.** El autor decidio pasar el terreno de mapa de alturas (un
+nivel y una rampa por casilla de 1) a **voxeles de 0,5 × 0,5 × 0,5**, «para
+darle un aspecto y jugabilidad diferente a mi juego, sobre todo de cara a los
+próximos cambios referentes al sandbox (destrucción del terreno y
+construcción)». Un mapa de alturas no puede tener nada debajo de un suelo —ni
+tuneles, ni cuevas, ni puentes, ni techos—, asi que destruir y construir de
+verdad piden voxeles; y pasar primero a alturas de 0,5 y luego a voxeles seria
+migrar dos veces. Por eso se hacen juntos.
+
+**Sus respuestas, literales** (2026-10-06):
+
+1. Modelo: «Sí, me gustaría un modelo de voxeles completo, con todas las
+   formaciones del terreno que eso implica. Pero en la primera tanda quisiera
+   que solo nos centremos en dejar las bases del mundo de voxeles y aún no
+   entrar en la creación de formaciones geográficas, sino solo en que se genere
+   el terreno y los biomas superficiales como los tenemos ahora.»
+2. Subir: «El nuevo bloque y cualquier otro elementos que mida ≤ 0.5, se sube
+   andando. Debe ser una característica de las físicas del juego, para no tener
+   que especificarlo en cada elemento.»
+3. Cuerpo: «El cuerpo del player va a medir 1.8.»
+4. Objetos: «Los objetos se colocan en la rejilla de 0.5. pero aquí hay
+   matices: elementos generados proceduralmente en la creación del mundo deben
+   ir con toda su hitbox apoyada en terreno. Por ejemplo, si la ubicación de un
+   árbol dice que va en un punto y resulta que ese punto es un escalón aislado
+   (bloque de 0.5 sin bloques adyacentes) entonces el árbol bajara un nivel y
+   reconsultara la condición, así hasta que toda la cara inferior de su hitbox
+   este apoyada en terreno. Para el caso de bloques puestos por el jugador,
+   estos se quedarán sobre cualquier otro bloque que sean puestos, siempre que
+   la base de su hitbox toque con algo, sin importar que el área de toque sea
+   pequeña.»
+5. Movil: «Deberemos medir y optimizar para el caso del móvil, ya iremos
+   decidiendo que medidas se pueden tomar.»
+
+**Lo que eso fija para la primera tanda:**
+- **Alcance**: las bases del mundo de voxeles —el dato, su generacion, su
+  dibujo y su fisica— con **el mismo terreno y los mismos biomas de
+  superficie que hoy**. Nada de cuevas, salientes ni formaciones nuevas, y
+  todavia ni excavar ni construir: son tandas siguientes.
+- **Subir**: todo lo que mida ≤ 0,5 se sube andando, por la fisica y no por
+  objeto: `STEP_UP` = 0,5 inclusive, para el terreno y para las cajas. Una
+  pared es de 2 bloques (1, lo que hoy es un bloque); el salto (1,16) sube 2.
+- **El jugador mide 1,8** de alto: pasar pide 4 bloques libres (2,0 ≥ 1,8).
+  Con voxeles hay techos: la cabeza choca.
+- **Objetos en la rejilla de 0,5**:
+  - **generados**: toda la cara inferior de su caja apoyada en terreno; si no
+    lo esta, baja un nivel y vuelve a mirar, hasta que lo este;
+  - **puestos por el jugador**: se quedan sobre lo que toque la base de su
+    caja, por poco que sea.
+- **Movil**: medir y optimizar; las medidas (distancia de vista, terreno lejano
+  simplificado…) las decide el autor a la vista de los numeros.
+
+**Lo que habra que proponerle y que confirme antes de escribirlo** (regla de
+trabajo con el autor; nada de esto esta decidido):
+- como se lee el terreno de hoy en voxeles: el nivel entero de cada casilla
+  pasa a 2 bloques de 0,5, y las rampas (regla 15) a medios bloques;
+- si el bioma, la contabilidad de vida y los recursos siguen por casilla de 1
+  o pasan a la de 0,5 (la regla 10 y la ley del observador dependen de ello);
+- que reglas duras caen o se reescriben —9, 13, 14, 15, 21, 22 y 23 al
+  menos— y en que orden por fases, cada una jugable y verificada. La propuesta
+  que se le hizo: (1) voxeles en el nucleo con tests, (2) el dibujo, (3) la
+  fisica —suelo, techos, golpe y mirada cortados por voxeles—, (4) generacion
+  y calibracion (`tools/analyze-world.ts`), (5) en otra tanda, excavar y
+  construir. Las ediciones del terreno tendran su propia capa, como el overlay
+  de `World.setFeature` (regla 4).
+
+**Aparcado dentro de esta tanda**: el animal que cae de un escalon cuando el
+centro de su tronco pasa el borde, con las patas traseras quedando dentro del
+bloque de arriba (lo vio el autor, 2026-10-05). La propuesta que quedo en la
+mesa: **que caiga solo cuando todo su cuerpo cabe abajo**. Como con voxeles esa
+fisica se reescribe entera, se resuelve ahi.
 
 ## Esperando tu juicio
 

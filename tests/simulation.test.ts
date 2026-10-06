@@ -55,10 +55,10 @@ function flatOpenSpot(world: World, half = 3): { x: number; y: number } {
       for (let dx = -radius; dx <= radius; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
         let clear = true;
-        const level = world.levelAt(dx, dy);
+        const level = world.flatTopAt(dx, dy);
         for (let ty = -half; ty <= half && clear; ty++) {
           for (let tx = -half; tx <= half; tx++) {
-            if (world.isSolidAt(dx + tx, dy + ty) || world.levelAt(dx + tx, dy + ty) !== level) {
+            if (level === null || world.isSolidAt(dx + tx, dy + ty) || world.flatTopAt(dx + tx, dy + ty) !== level) {
               clear = false;
               break;
             }
@@ -509,12 +509,12 @@ describe('Mirada y golpe', () => {
     world.setNow(0);
     for (let y = -60; y < 60; y++) {
       for (let x = -60; x < 60; x++) {
-        const level = world.levelAt(x, y);
-        if (level < 0) continue;
+        const level = world.flatTopAt(x, y);
+        if (level === null || level < 0) continue;
         let ok = true;
         for (let dy = -1; dy <= 1 && ok; dy++) {
           for (let dx = -1; dx <= 2 && ok; dx++) {
-            ok = world.levelAt(x + dx, y + dy) === level && world.rampDirAt(x + dx, y + dy) < 0;
+            ok = world.flatTopAt(x + dx, y + dy) === level;
           }
         }
         if (!ok) continue;

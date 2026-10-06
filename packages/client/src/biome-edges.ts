@@ -18,7 +18,7 @@
  */
 
 import { biomeOfTerrain, CHUNK_SIZE, type Terrain } from '@verdant/shared';
-import { groundHeight, type Chunk, type World } from '@verdant/sim';
+import { CHUNK_COLUMNS, topOf, VOXEL, VOXELS_PER_TILE, type Chunk, type World } from '@verdant/sim';
 
 /**
  * Segmentos `[x0, h0, z0, x1, h1, z1, ...]` del contorno de biomas de un chunk.
@@ -58,20 +58,25 @@ export function collectBiomeEdges(world: World, chunk: Chunk): number[] {
       const mine = biomeAt(lx, ly);
       const wx = baseX + lx;
       const wy = baseY + ly;
-      const level = chunk.level[idx];
-      const ramp = chunk.rampDir[idx];
-
-      const push = (dx0: number, dy0: number, dx1: number, dy1: number): void => {
-        segments.push(
-          wx + dx0, groundHeight(level, ramp, dx0, dy0), wy + dy0,
-          wx + dx1, groundHeight(level, ramp, dx1, dy1), wy + dy1,
-        );
-      };
+      /** El techo de la columna (`sx`, `sy`) ∈ {0, 1}² de esta casilla. */
+      const top = (sx: number, sy: number): number =>
+        topOf(chunk.height[(ly * VOXELS_PER_TILE + sy) * CHUNK_COLUMNS + lx * VOXELS_PER_TILE + sx]);
 
       // La arista que se comparte con el vecino del este va de la esquina (1,0)
-      // a la (1,1); la del sur, de la (1,1) a la (0,1).
-      if (biomeAt(lx + 1, ly) !== mine) push(1, 0, 1, 1);
-      if (biomeAt(lx, ly + 1) !== mine) push(1, 1, 0, 1);
+      // a la (1,1); la del sur, de la (1,1) a la (0,1). Cada una, en dos tramos
+      // de medio bloque, cada tramo a la altura de su columna.
+      if (biomeAt(lx + 1, ly) !== mine) {
+        for (let s = 0; s < VOXELS_PER_TILE; s++) {
+          const h = top(VOXELS_PER_TILE - 1, s);
+          segments.push(wx + 1, h, wy + s * VOXEL, wx + 1, h, wy + (s + 1) * VOXEL);
+        }
+      }
+      if (biomeAt(lx, ly + 1) !== mine) {
+        for (let s = 0; s < VOXELS_PER_TILE; s++) {
+          const h = top(s, VOXELS_PER_TILE - 1);
+          segments.push(wx + (s + 1) * VOXEL, h, wy + 1, wx + s * VOXEL, h, wy + 1);
+        }
+      }
     }
   }
 

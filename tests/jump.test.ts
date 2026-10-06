@@ -25,7 +25,6 @@ import {
   EntityKind,
   EntityStore,
   GRAVITY,
-  groundHeight,
   JUMP_HEIGHT,
   JUMP_SPEED,
   moveAirborne,
@@ -48,15 +47,8 @@ import {
  * falta, que es como aviso cuando las estaciones pasaron a ser suelo y cuando
  * los objetos pasaron a tener caja (`boxes.ts`).
  */
-function heightField(
-  levelAt: (x: number, y: number) => number,
-  rampAt: (x: number, y: number) => number = () => -1,
-): World {
-  const groundHeightAt = (wx: number, wy: number) => {
-    const tx = Math.floor(wx);
-    const ty = Math.floor(wy);
-    return groundHeight(levelAt(tx, ty), rampAt(tx, ty), wx - tx, wy - ty);
-  };
+function heightField(levelAt: (x: number, y: number) => number): World {
+  const groundHeightAt = (wx: number, wy: number) => levelAt(Math.floor(wx), Math.floor(wy));
   return {
     levelAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)),
     groundHeightAt,
@@ -185,18 +177,16 @@ describe('Ya no se cambia de nivel andando', () => {
     expect(Math.floor(out.y)).toBe(0);
   });
 
-  it('un talud si se sube andando, que es para lo que esta', () => {
-    // La casilla (0,-1) es un talud de nivel 1 que sube hacia el norte, y la
-    // (0,-2) ya es el nivel 2 al que lleva.
-    const world = heightField(
-      (_x, y) => (y <= -2 ? 2 : 1),
-      (_x, y) => (y === -1 ? 0 : -1),
-    );
+  it('una escalera de medio bloque se sube andando: sin rampas, es la que las sustituye', () => {
+    // Al norte, dos escalones de medio bloque (el autor, 2026-10-06: lo que
+    // mide <= 0,5 se sube andando, y es de la fisica, no de cada cosa).
+    const stairs = (_x: number, y: number) => (y < -0.5 ? 2 : y < 0 ? 1.5 : 1);
+    const world = { ...heightField(() => 0), groundHeightAt: stairs, featureAt: () => Feature.None } as unknown as World;
     const out = run(world, { x: 0.5, y: 0.5 }, { moveY: -1, ticks: HASTA_QUE_CAIGA });
 
     expect(out.z).toBe(2);
     expect(out.grounded).toBe(true);
-    expect(Math.floor(out.y)).toBeLessThanOrEqual(-2);
+    expect(out.y).toBeLessThan(-0.5);
   });
 
   it('salir de un borde es caerse, no bajar de golpe', () => {
@@ -422,8 +412,8 @@ describe('El auto salto', () => {
     expect(out.x).toBeLessThan(3);
   });
 
-  it('un talud se anda: no hace saltar', () => {
-    const talud = floors((x) => Math.min(1, Math.max(0, x - 3)));
+  it('una escalera de medio bloque se anda: no hace saltar', () => {
+    const talud = floors((x) => (x < 3 ? 0 : x < 3.5 ? 0.5 : 1));
     const out = walkEast(talud, { auto: true });
     expect(out.jumps).toBe(0);
     expect(out.z).toBe(1);

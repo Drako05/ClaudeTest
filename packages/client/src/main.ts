@@ -46,6 +46,7 @@ import {
   EYE_HEIGHT,
   footing,
   hitboxAt,
+  objectBase,
   lookVector,
   gazeTarget,
   groundHit,
@@ -75,7 +76,7 @@ import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
 import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
-import { chunkMesh, cornerHeight } from './terrain-mesh.js';
+import { chunkMesh, columnTopFor } from './terrain-mesh.js';
 import { FovPanel } from './fov-panel.js';
 import { InventoryUi } from './inventory-ui.js';
 import { MouseLook } from './pointer-lock.js';
@@ -578,7 +579,8 @@ function buildChunk(cx: number, cy: number): ChunkView {
       const wy = cy * CHUNK_SIZE + ly;
       const x = wx + 0.5;
       const y = wy + 0.5;
-      const ground = state.world.groundHeightAt(x, y);
+      // Donde se apoya: la misma base que su caja en el nucleo (`objectBase`).
+      const ground = objectBase(state.world, wx, wy, feature);
       // Las estaciones son cajas, no aspas (decision del autor).
       if (isStation(feature)) {
         const box = stations.spawn(feature, wx, wy, ground, seed, state.world.stationFacingAt(wx, wy));
@@ -599,10 +601,8 @@ function buildChunk(cx: number, cy: number): ChunkView {
   }
   // Todas las sombras del chunk en una malla: una draw call en vez de una por
   // elemento. Cada una cae sobre la MISMA superficie que dibuja el terreno,
-  // casilla por casilla, aunque asome a un chunk vecino. Ver `shadows.ts`.
-  const shadows = buildShadows(spots, (tx, ty, fx, fy) =>
-    cornerHeight(state.world, chunk, tx, ty, fx, fy),
-  );
+  // columna por columna, aunque asome a un chunk vecino. Ver `shadows.ts`.
+  const shadows = buildShadows(spots, (vx, vy) => columnTopFor(state.world, chunk, vx, vy));
   if (shadows) scene.add(shadows);
   return { mesh, props, shadows, triangles: data.triangles, revision: chunk.revision };
 }
@@ -942,7 +942,7 @@ function frame(now: number): void {
         hit.x,
         hit.y,
         debrisPalette(hit.feature),
-        state.world.levelAt(hit.x, hit.y),
+        box ? box.z0 : state.world.groundHeightAt(hit.x + 0.5, hit.y + 0.5),
         box ? box.z1 - box.z0 : 1,
       );
     }
@@ -956,13 +956,13 @@ function frame(now: number): void {
       // La rama de un arbol a mano no lo derriba: sus esquirlas ya salieron.
       if (!hit.felled) continue;
       gathered += hit.amount + hit.seeds;
-      // Los escombros se posan en la cima del tile del que salieron, no en el
+      // Los escombros se posan donde se apoyaba lo que se rompio, no en el
       // plano cero: talar en una meseta no puede tirar la madera al mar.
       effects.spawnDebris(
         hit.tileX,
         hit.tileY,
         debrisPalette(hit.feature),
-        state.world.levelAt(hit.tileX, hit.tileY),
+        objectBase(state.world, hit.tileX, hit.tileY, hit.feature),
       );
     }
     accumulator -= TICK_DT;
@@ -1222,7 +1222,8 @@ Object.defineProperty(window, '__verdant', {
       reach: actionReach(state.world, e, id).map((t) => [t.x, t.y]),
       plantTile: ((t) => (t ? [t.x, t.y] : null))(targetTile(state.world, e, id)),
       terrain: TERRAIN_NAMES[state.world.terrainAt(tx, ty)],
-      level: state.world.levelAt(tx, ty),
+      /** La altura del suelo bajo los pies, en bloques de 1 (de medio en medio). */
+      level: state.world.groundHeightAt(e.x[id], e.y[id]),
       biome: BIOME_NAMES[biome],
       balanced: state.world.isBiomeBalanced(toChunkCoord(tx), toChunkCoord(ty), biome),
       x: e.x[id],

@@ -1,35 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { groundHeight } from '@verdant/sim';
+import { VOXEL } from '@verdant/sim';
 import { addShadowPatches, type PatchBuffers, type Surface } from '../packages/client/src/shadow-patches.js';
 
 /**
- * La sombra cae al suelo de cada casilla que pisa, no a la altura del pie.
- * Antes, un arbol al borde de un desnivel dejaba media sombra en el aire.
+ * La sombra cae al suelo de cada columna de 0,5 que pisa, no a la altura del
+ * pie. Antes, un arbol al borde de un desnivel dejaba media sombra en el aire.
  */
 const LIFT = 0.03;
 
-/** Un escalon: la casilla x < 5 esta a nivel 3 y el resto a 0. */
-const cliff: Surface = (tx) => (tx < 5 ? 3 : 0);
+/** Un escalon: lo que esta a x < 5 (columnas < 10) mide 3, y el resto 0. */
+const cliff: Surface = (cx) => (cx * VOXEL < 5 ? 3 : 0);
 
 function build(cx: number, cz: number, side: number, surface: Surface): PatchBuffers {
   const out: PatchBuffers = { positions: [], uvs: [], indices: [] };
-  addShadowPatches(cx, cz, side, surface, LIFT, out);
+  addShadowPatches(cx, cz, side, surface, LIFT, out, VOXEL);
   return out;
 }
 
-/** Cada vertice, con la altura del suelo de SU casilla debajo. */
+/** Cada vertice, con la altura del suelo de SU columna debajo. */
 function vertices(out: PatchBuffers, surface: Surface) {
   const list: Array<{ x: number; y: number; z: number; floor: number }> = [];
   for (let q = 0; q < out.positions.length / 12; q++) {
-    // Los cuatro vertices de un trozo son de la misma casilla: se saca de su centro.
+    // Los cuatro vertices de un trozo son de la misma columna: se saca de su centro.
     const cxq = (out.positions[q * 12] + out.positions[q * 12 + 6]) / 2;
     const czq = (out.positions[q * 12 + 2] + out.positions[q * 12 + 8]) / 2;
-    const tx = Math.floor(cxq);
-    const tz = Math.floor(czq);
+    const tx = Math.floor(cxq / VOXEL);
+    const tz = Math.floor(czq / VOXEL);
     for (let v = 0; v < 4; v++) {
       const i = q * 12 + v * 3;
       const [x, y, z] = [out.positions[i], out.positions[i + 1], out.positions[i + 2]];
-      list.push({ x, y, z, floor: surface(tx, tz, x - tx, z - tz) });
+      list.push({ x, y, z, floor: surface(tx, tz) });
     }
   }
   return list;
@@ -74,17 +74,16 @@ describe('sombras pegadas al suelo', () => {
     expect(Math.max(...out.uvs)).toBeCloseTo(1, 9);
   });
 
-  it('sobre un talud, sigue la rampa', () => {
-    // Nivel 2 con talud hacia +x (dir 1): sube de 2 a 3 a lo ancho.
-    const ramp: Surface = (_tx, _tz, fx, fy) => groundHeight(2, 1, fx, fy);
-    const verts = vertices(build(0.5, 0.5, 0.8, ramp), ramp);
+  it('sobre una escalera de medio bloque, cada trozo a la altura de su columna', () => {
+    // Cada columna, medio bloque mas alta que la anterior hacia +x.
+    const stairs: Surface = (cx) => cx * VOXEL;
+    const verts = vertices(build(1, 1, 1.6, stairs), stairs);
     for (const v of verts) expect(v.y).toBeCloseTo(v.floor + LIFT, 6);
-    const ys = verts.map((v) => v.y);
-    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(0.8, 6);
+    expect(new Set(verts.map((v) => v.y)).size).toBe(4);
   });
 
-  it('una sombra dentro de su casilla sigue siendo un solo cuadrilatero', () => {
-    const out = build(2.5, 2.5, 0.7, cliff);
+  it('una sombra dentro de su columna sigue siendo un solo cuadrilatero', () => {
+    const out = build(2.25, 2.25, 0.3, cliff);
     expect(out.positions.length / 12).toBe(1);
     expect(out.indices).toHaveLength(6);
   });

@@ -34,6 +34,7 @@ function flat(objects: Record<string, Feature>): World {
     levelAt: () => 0,
     rampDirAt: () => -1,
     groundHeightAt: () => 0,
+    columnTop: () => 0,
     featureAt: (x: number, y: number) => objects[`${Math.floor(x)},${Math.floor(y)}`] ?? Feature.None,
     isSolidAt: () => false,
     isTerrainSolidAt: () => false,
