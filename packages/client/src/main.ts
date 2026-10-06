@@ -96,6 +96,7 @@ import {
 import { skyTint, tintCss } from './sky.js';
 import {
   faunaShownFromLocation,
+  onlySlashFromLocation,
   randomSeed,
   seedFromLocation,
   startGame,
@@ -420,6 +421,8 @@ const stations = new StationSet();
 const faunaView = new FaunaView(scene);
 /** Sin animales dibujados con `?fauna=0` (`start.ts`), para medir sin ellos. */
 const showFauna = faunaShownFromLocation();
+/** Del golpe, solo el barrido con `?efectos=barrido` (`start.ts`), para medirlo solo. */
+const onlySlash = onlySlashFromLocation();
 const player = billboards.spawnPlayer();
 if (player) scene.add(player);
 
@@ -936,7 +939,7 @@ function frame(now: number): void {
     }
     // Lo golpeado que siguio en pie suelta esquirlas: mas pequenas, apagadas y
     // semitransparentes que los escombros de romper (decision del autor).
-    for (const hit of state.lastHits) {
+    for (const hit of onlySlash ? [] : state.lastHits) {
       const box = hitboxAt(state.world, hit.x, hit.y);
       effects.spawnChips(
         hit.x,
@@ -948,7 +951,7 @@ function frame(now: number): void {
     }
     // El impacto, donde el golpe toco cada cosa que se puede romper (pedido
     // del autor, 2026-10-03). Del nucleo al mundo de three.js: `y` arriba.
-    for (const p of state.lastImpacts) effects.spawnImpact({ x: p.x, y: p.z, z: p.y });
+    if (!onlySlash) for (const p of state.lastImpacts) effects.spawnImpact({ x: p.x, y: p.z, z: p.y });
     // Un animal no suelta fragmentos, ni golpeado ni al morir (decision del
     // autor, 2026-10-03): solo su impacto.
     for (const hit of state.lastAnimalHits) if (hit.killed) animalsKilled++;
@@ -956,6 +959,7 @@ function frame(now: number): void {
       // La rama de un arbol a mano no lo derriba: sus esquirlas ya salieron.
       if (!hit.felled) continue;
       gathered += hit.amount + hit.seeds;
+      if (onlySlash) continue;
       // Los escombros se posan donde se apoyaba lo que se rompio, no en el
       // plano cero: talar en una meseta no puede tirar la madera al mar.
       effects.spawnDebris(

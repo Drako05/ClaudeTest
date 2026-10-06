@@ -11,6 +11,10 @@
  * - `?fauna=0` no dibuja los animales. Solo el dibujo: la simulacion los sigue
  *   moviendo igual. Lo usa `tools/slash.mjs`, que mide pixeles del barrido y
  *   no puede dejar que un animal que pasea se cruce por delante.
+ * - `?efectos=barrido` dibuja, de los efectos del golpe, solo el barrido: ni
+ *   impacto, ni esquirlas, ni escombros. Tambien para `tools/slash.mjs`: el
+ *   impacto es un destello blanco sin prueba de profundidad, y con el barrido
+ *   sin ancho la vista normal contaba 25.506 pixeles suyos en un pinar.
  *
  * Todo envuelto en try/catch: en un iframe con sandbox restrictivo el acceso a
  * `location` puede lanzar, y entonces se juega un mundo al azar.
@@ -43,6 +47,11 @@ export function viewFromLocation(): Projection | null {
 /** Si se dibujan los animales: si, salvo con `?fauna=0`. */
 export function faunaShownFromLocation(): boolean {
   return param('fauna') !== '0';
+}
+
+/** Si de los efectos del golpe solo se dibuja el barrido: con `?efectos=barrido`. */
+export function onlySlashFromLocation(): boolean {
+  return param('efectos') === 'barrido';
 }
 
 export function seedFromLocation(): number {

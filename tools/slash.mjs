@@ -88,7 +88,12 @@ page.on('pageerror', (e) => problems.push(String(e)));
 // barrido. En la CI dio una vez 16 pixeles en la vista normal (suelo 20, lo
 // normal ~190) con el mismo codigo que habia pasado dos veces (auditoria del
 // 2026-10-04).
-await page.goto(`http://127.0.0.1:${port}/?seed=12345&view=perspectiva&fauna=0`, { waitUntil: 'load' });
+//
+// Y del golpe, solo el barrido (`?efectos=barrido`): el impacto es un destello
+// blanco sin prueba de profundidad, como el barrido, y las esquirlas y los
+// escombros tambien aclaran. Con el barrido SIN ANCHO, en un pinar, la vista
+// normal contaba 25.506 pixeles de impactos: la medida pasaba sin barrido.
+await page.goto(`http://127.0.0.1:${port}/?seed=12345&view=perspectiva&fauna=0&efectos=barrido`, { waitUntil: 'load' });
 await page.waitForTimeout(3500);
 
 const spawn = await page.evaluate(() => window.__verdant);
@@ -308,7 +313,8 @@ for (const r of results) {
 console.log('');
 console.log('«pixeles aclarados» es el barrido llegando a pantalla; en la vista normal, el');
 console.log('MEJOR de cuatro rumbos, y en la giratoria y la primera persona, el PEOR. Con');
-console.log('«recogido» a cero no hay escombros de por medio y todo lo aclarado es del barrido.');
+console.log('?efectos=barrido no se dibujan impactos, esquirlas ni escombros: todo lo');
+console.log('aclarado es del barrido, aunque «recogido» no sea cero.');
 console.log('');
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 
