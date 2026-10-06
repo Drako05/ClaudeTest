@@ -42,23 +42,21 @@ export const GRAVITY = 62;
 export const JUMP_SPEED = 12;
 
 /**
- * Desnivel que se sube andando. Por encima, hay que saltar.
+ * Desnivel que se sube andando, inclusive. Por encima, hay que saltar.
  *
- * No es una altura de escalon elegida a ojo: es la holgura que separa un talud
- * de una pared. Subiendo un talud a paso completo el suelo asciende
- * `WALK_SPEED · TICK_DT ≈ 0.087` niveles por tick, y la pared mas baja del mundo
- * mide 1 entero. Cualquier valor entre esas dos cifras da el mismo mundo; medio
- * nivel esta comodamente lejos de las dos.
+ * **Medio bloque** (decision del autor, 2026-10-06): todo lo que mida ≤ 0,5 se
+ * sube andando —el voxel del terreno, una caja baja—, y es una caracteristica
+ * de la fisica, no de cada cosa. La pared mas baja que pide saltar mide 1.
  */
 export const STEP_UP = 0.5;
 
 /**
  * Cuanto se pega a un suelo que baja antes de considerarlo una caida.
  *
- * Mismo argumento por el otro lado: bajando un talud el suelo se aleja de los
- * pies esos mismos 0.087 por tick, y sin holgura el personaje iria dando
- * saltitos ladera abajo, en el aire media vida. Un borde de verdad son 1 nivel
- * o mas y sigue tirandote.
+ * El gemelo de `STEP_UP` por el otro lado: un escalon de medio bloque se baja
+ * andando, y sin esta holgura el personaje iria dando saltitos escalera abajo,
+ * en el aire media vida. Un borde de verdad es de 1 bloque o mas y sigue
+ * tirandote.
  */
 export const SNAP_DOWN = 0.5;
 

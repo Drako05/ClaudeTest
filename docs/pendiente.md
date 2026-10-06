@@ -26,7 +26,7 @@ mas abajo.
 
 ---
 
-## PROXIMA TANDA: el mundo de voxeles de 0,5 — decidido (2026-10-06), sin empezar
+## TANDA EN CURSO: el mundo de voxeles de 0,5 — fase 1 hecha (2026-10-06)
 
 **Empieza aqui.** El autor decidio pasar el terreno de mapa de alturas (un
 nivel y una rampa por casilla de 1) a **voxeles de 0,5 × 0,5 × 0,5**, «para
@@ -99,6 +99,46 @@ bloque de arriba (lo vio el autor, 2026-10-05). La propuesta que quedo en la
 mesa: **que caiga solo cuando todo su cuerpo cabe abajo**. Como con voxeles esa
 fisica se reescribe entera, se resuelve ahi.
 
+**Al empezar la tanda, el autor decidio ademas** (2026-10-06):
+- **sin rampas**: «Elimina las rampas por completo, el terreno solo se genera en
+  bloques de 0.5»;
+- **el escalon natural, de medio bloque en alto y en planta**: la misma
+  elevacion de hoy, leida cada 0,5;
+- **el bioma, la vida y los recursos siguen por casilla de 1**;
+- **el terreno tambien se pisa con la huella entera**, y los animales caen
+  solo cuando el cuerpo cabe abajo (fase 2);
+- **cada fase a `main`** cuando su CI este en verde.
+
+El plan, por fases: (1) el terreno de voxeles, su generacion y su dibujo, con
+la fisica de antes adaptada a columnas; (2) la fisica de voxeles —el jugador
+como caja de 0,68 × 0,68 × 1,8 con techos, subir ≤ 0,5 igual para terreno y
+cajas, apoyo por la huella entera, animales que caen solo cuando caben, rayos
+por voxeles—; (3) medir y optimizar el movil, decidiendo el autor a la vista de
+los numeros.
+
+### Fase 1 — HECHA (2026-10-06)
+
+- **El dato**: cada chunk guarda la altura de sus 64 × 64 columnas en medios
+  bloques (`Chunk.height`); `World.columnTop`, `isSolidVoxel` y
+  `groundHeightAt` (el techo de la columna que se pisa). `WorldGen.columnTopAt`
+  es puro, para el dibujo y las sondas. Fuera `levelAt`, `rampDirAt`,
+  `groundHeight`, `rampDirOf`, `isRampEdge`, `RAMP_SHARE` y la regla 15.
+- **La generacion**: ver `docs/relieve.md`, «Voxeles de 0,5». Medido, el
+  mundo y su conectividad salen como antes.
+- **Lo que se apoya**: lo generado, en la columna mas baja de su casilla; las
+  estaciones, en la mas alta (`objectBase`).
+- **El nacimiento y las medidas de conectividad** van por columnas.
+- **El dibujo**: una tapa por columna, o una sola por casilla si sus cuatro
+  columnas estan a la misma altura (el terreno llano cuesta lo de antes), y una
+  pared por vecina mas baja. Las sombras, la reticula, la rejilla de chunks y
+  los bordes de bioma, por columnas.
+- **El auto salto sigue la escalera**: decide contra el escalon anterior, no
+  contra los pies, asi que una escalera de medio bloque se anda.
+- **La fisica sigue siendo la de antes** (el terreno en el centro), sobre las
+  columnas; la de voxeles es la fase 2.
+- **El tick medio**: ~0,75 → ~1,0 ms (los escalones de las partes de los
+  animales, ahora por columnas). Muy por debajo de los 8.
+
 ## Esperando tu juicio
 
 Todo esto esta **vivo en el codigo** y funcionando; son numeros y criterios que
@@ -107,6 +147,10 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
+| Voxeles: **la columna interpola el relieve entre las esquinas de su casilla**, sin ruido nuevo; consecuencia, **las cordilleras ya no dan acantilados de dos**, sino paredes de un bloque que se saltan, y las paredes de dos o mas solo salen de los salientes | `docs/relieve.md`, voxeles | la formula de `columnFrom` |
+| Voxeles: **lo que es agua lo decide la casilla** (sus cuatro columnas a -1), asi la costa no se mueve | `docs/relieve.md`, voxeles | una regla en `generateChunk` |
+| Voxeles: **el arbol, el arbusto y el brote van con lo generado** (columna mas baja), aunque el brote lo siembre el jugador; solo las estaciones van sobre lo que tocan | `sim/boxes.ts`, `objectBase` | una regla |
+| Voxeles: las **estaciones siguen ocupando una casilla de 1** (colocarlas a medio bloque romperia «un objeto por casilla» mientras la vida va por casilla de 1) | Fase 1, arriba | la tanda de construir |
 | Una caja por objeto: los animales **se apoyan en sus partes mas bajas** (las patas; el caparazon del cangrejo; el tronco de la gaviota) | Una caja por objeto, mas abajo | una funcion en `boxes.ts` |
 | Una caja por objeto: una caja que asoma **mas de `STEP_UP` sobre los pies no se pisa** —un arbol que crece bajo la huella deja al cuerpo metido, no lo sube de golpe a su techo— | Una caja por objeto, mas abajo | un parametro en `jump.ts` |
 | Una caja por objeto: las **medidas por casilla** (el nacimiento, `reachableArea`, `analyze-world`) siguen contando una casilla con tronco o roca como que no se cruza: miden **por lo bajo** de lo que el cuerpo recorre | Una caja por objeto, mas abajo | una regla en `World.isSolidAt` |

@@ -426,14 +426,16 @@ describe('Capitulo I — «Existen el pasar del tiempo y las leyes fisicas funda
         const intent = emptyIntent();
         intent.moveX = mx;
         intent.moveY = my;
-        let previo = world.levelAt(Math.floor(e.x[p]), Math.floor(e.y[p]));
+        // Sin rampas, el suelo sube a escalones de medio bloque: andando, como
+        // mucho uno por tick.
+        let previo = world.groundHeightAt(e.x[p], e.y[p]);
         for (let t = 0; t < 240; t++) {
           step(state, intent);
-          const ahora = world.levelAt(Math.floor(e.x[p]), Math.floor(e.y[p]));
+          const ahora = world.groundHeightAt(e.x[p], e.y[p]);
           expect(
             ahora - previo,
-            `semilla ${seed} hacia ${mx},${my}: subio ${ahora - previo} niveles de golpe`,
-          ).toBeLessThanOrEqual(1);
+            `semilla ${seed} hacia ${mx},${my}: subio ${ahora - previo} de golpe`,
+          ).toBeLessThanOrEqual(0.5 + 1e-9);
           previo = ahora;
         }
       }

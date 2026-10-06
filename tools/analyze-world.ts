@@ -9,7 +9,7 @@
  *   npx vite-node tools/analyze-world.ts
  */
 
-import { createGame, MAX_LEVEL, World, WorldGen } from '@verdant/sim';
+import { createGame, JUMP_HALVES, MAX_HEIGHT, reachableArea, VOXELS_PER_TILE, WALK_HALVES, World, WorldGen } from '@verdant/sim';
 import { Terrain } from '@verdant/shared';
 
 const SEEDS = [12345, 7, 999];
@@ -57,7 +57,11 @@ function reportFields(seed: number): void {
   }
 }
 
-/** Fraccion de tiles libres alcanzables a pie desde el spawn. */
+/**
+ * Fraccion de tiles libres alcanzables desde el spawn, con la misma regla de
+ * transito que el juego (`reachableArea`: por columnas de 0,5, medio bloque
+ * andando y uno entero de un salto).
+ */
 export function navigability(world: World, sx: number, sy: number, half = 100): number {
   let free = 0;
   for (let y = sy - half; y < sy + half; y++) {
@@ -65,20 +69,7 @@ export function navigability(world: World, sx: number, sy: number, half = 100): 
       if (!world.isSolidAt(x, y)) free++;
     }
   }
-  const seen = new Set<string>();
-  const stack: Array<[number, number]> = [[sx, sy]];
-  let reached = 0;
-  while (stack.length) {
-    const [x, y] = stack.pop()!;
-    if (x < sx - half || x >= sx + half || y < sy - half || y >= sy + half) continue;
-    const key = `${x},${y}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (world.isSolidAt(x, y)) continue;
-    reached++;
-    stack.push([x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]);
-  }
-  return free === 0 ? 0 : reached / free;
+  return free === 0 ? 0 : reachableArea(world, sx, sy, half) / free;
 }
 
 for (const seed of SEEDS) {
@@ -123,33 +114,36 @@ for (const seed of SEEDS) {
  * relieve que no lo es.
  */
 function reportRelief(seed: number): void {
-  const gen = new WorldGen(seed);
-  const R = 180;
+  // Por columnas de 0,5, leidas de los chunks (generar por chunk reparte el
+  // ruido entre sus columnas; pedir cada columna suelta lo repetiria).
+  const world = new World(seed);
+  const gen: WorldGen = world.gen;
+  const R = 180 * VOXELS_PER_TILE;
   const side = R * 2;
-  const level = new Int8Array(side * side);
-  const at = (x: number, y: number) => level[(y + R) * side + (x + R)];
+  const height = new Int16Array(side * side);
+  const at = (x: number, y: number) => height[(y + R) * side + (x + R)];
 
   let land = 0;
   let raised = 0;
-  const histogram = new Array(MAX_LEVEL + 1).fill(0);
+  const histogram = new Array(MAX_HEIGHT + 1).fill(0);
   for (let y = -R; y < R; y++) {
     for (let x = -R; x < R; x++) {
-      const lvl = gen.levelAt(x, y);
-      level[(y + R) * side + (x + R)] = lvl;
-      if (lvl < 0) continue;
+      const h = world.columnTop(x, y);
+      height[(y + R) * side + (x + R)] = h;
+      if (h < 0) continue;
       land++;
-      histogram[lvl]++;
-      if (gen.isOutcrop(x, y)) raised++;
+      histogram[h]++;
+      if (gen.isOutcrop(Math.floor(x / VOXELS_PER_TILE), Math.floor(y / VOXELS_PER_TILE))) raised++;
     }
   }
 
-  /** Mayor componente conexa bajo «se sube como mucho `climb` niveles». */
+  /** Mayor componente conexa bajo «se sube como mucho `climb` medios bloques». */
   function largestComponent(climb: number): number {
     const seen = new Uint8Array(side * side);
     let best = 0;
     const stack: number[] = [];
     for (let start = 0; start < seen.length; start++) {
-      if (seen[start] || level[start] < 0) continue;
+      if (seen[start] || height[start] < 0) continue;
       let size = 0;
       stack.push(start);
       seen[start] = 1;
@@ -158,7 +152,7 @@ function reportRelief(seed: number): void {
         size++;
         const x = (i % side) - R;
         const y = Math.floor(i / side) - R;
-        const here = level[i];
+        const here = height[i];
         for (const [dx, dy] of [
           [1, 0],
           [-1, 0],
@@ -182,41 +176,41 @@ function reportRelief(seed: number): void {
     return best;
   }
 
-  // Paredes de dos o mas bloques: son las que obligan a buscar otro punto por
-  // donde subir, y sin ellas el encargo del autor no esta cumplido.
+  // Paredes de dos o mas bloques de 1 (cuatro medios): son las que obligan a
+  // buscar otro punto por donde subir. Y las de uno, que piden saltar.
   let tallWalls = 0;
+  let jumpWalls = 0;
   for (let y = -R + 1; y < R - 1; y++) {
     for (let x = -R + 1; x < R - 1; x++) {
       const here = at(x, y);
       if (here < 0) continue;
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        if (at(x + dx, y + dy) - here >= 2) {
-          tallWalls++;
-          break;
-        }
-      }
+      let rise = 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) rise = Math.max(rise, at(x + dx, y + dy) - here);
+      if (rise >= 2 * VOXELS_PER_TILE) tallWalls++;
+      else if (rise > WALK_HALVES) jumpWalls++;
     }
   }
 
-  const base = largestComponent(99); // solo el agua separa
-  const real = largestComponent(1); // se sube un bloque de un salto
+  const base = largestComponent(9999); // solo el agua separa
+  const walk = largestComponent(WALK_HALVES); // andando: medio bloque
+  const real = largestComponent(JUMP_HALVES); // se sube un bloque de un salto
   let peak = 0;
   for (let i = 0; i < histogram.length; i++) if (histogram[i]) peak = i;
-  // Reparto por franjas: el detalle nivel a nivel deja de caber con 40 alturas.
-  const bands = [0, 1, 3, 6, 10, 16, 24, MAX_LEVEL + 1];
+  // Reparto por franjas, en bloques de 1.
+  const bands = [0, 1, 3, 6, 10, 16, 24, MAX_HEIGHT / VOXELS_PER_TILE + 1];
   const spread: string[] = [];
   for (let b = 0; b + 1 < bands.length; b++) {
     let sum = 0;
-    for (let i = bands[b]; i < bands[b + 1]; i++) sum += histogram[i];
+    for (let i = bands[b] * VOXELS_PER_TILE; i < bands[b + 1] * VOXELS_PER_TILE && i < histogram.length; i++) sum += histogram[i];
     if (sum) spread.push(`n${bands[b]}-${bands[b + 1] - 1} ${((100 * sum) / land).toFixed(1)}%`);
   }
-  console.log(`  alturas: pico n${peak} | ${spread.join('  ')}`);
+  console.log(`  alturas: pico ${peak / VOXELS_PER_TILE} | ${spread.join('  ')}`);
   console.log(
     `  salientes: ${((100 * raised) / land).toFixed(1)}% de la tierra | ` +
-      `conexo base ${((100 * base) / land).toFixed(1)}% -> con relieve ${((100 * real) / land).toFixed(1)}% ` +
-      `(pierde ${((100 * (base - real)) / land).toFixed(2)} pt)`,
+      `conexo base ${((100 * base) / land).toFixed(1)}% -> andando ${((100 * walk) / land).toFixed(1)}% ` +
+      `-> con salto ${((100 * real) / land).toFixed(1)}% (pierde ${((100 * (base - real)) / land).toFixed(2)} pt)`,
   );
-  console.log(`  al pie de una pared de 2+ bloques: ${tallWalls} tiles`);
+  console.log(`  columnas al pie de una pared de 2+ bloques: ${tallWalls}; de 1 (salto): ${jumpWalls}`);
 }
 
 console.log('\n===== relieve =====');

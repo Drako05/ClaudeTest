@@ -73,14 +73,15 @@ describe('calidad del mundo generado', () => {
     const world = game.world;
     const sx = Math.floor(game.entities.x[game.playerId]);
     const sy = Math.floor(game.entities.y[game.playerId]);
-    const level = world.levelAt(sx, sy);
+    const level = world.flatTopAt(sx, sy);
+    expect(level, 'la casilla de nacer tiene un escalon dentro').not.toBeNull();
 
     // Un rellano: las ocho vecinas pisables y al mismo nivel. De ahi salen a la
     // vez que se pueda andar en cualquier direccion y que ningun escalon corte
     // el golpe por delante.
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
-        expect(world.levelAt(sx + dx, sy + dy), `vecina ${dx},${dy} a otro nivel`).toBe(level);
+        expect(world.flatTopAt(sx + dx, sy + dy), `vecina ${dx},${dy} a otro nivel`).toBe(level);
         expect(world.isSolidAt(sx + dx, sy + dy), `vecina ${dx},${dy} solida`).toBe(false);
       }
     }

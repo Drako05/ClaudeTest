@@ -48,7 +48,9 @@ export function riseTime(rise: number): number {
  *   **justo a la distancia** que se recorre mientras los pies pasan de su
  *   borde. Asi se llega por encima y no se roza la cara: es lo «fluido».
  *
- * Los taludes suben de poco en poco y se andan, asi que no hacen saltar.
+ * Una escalera de medio bloque se anda (lo que mide <= 0,5 se sube andando),
+ * asi que no hace saltar: el sondeo la sigue escalon a escalon, y lo que decide
+ * es el primer punto que sube mas de `STEP_UP` **sobre el escalon anterior**.
  */
 export function autoJumpDue(
   world: World,
@@ -68,13 +70,21 @@ export function autoJumpDue(
   // Mas alla de esto ni el bloque mas alto que se sube pide saltar ya.
   const reach = speed * (riseTime(JUMP_HEIGHT) + TICK_DT);
 
+  let walked = feet;
   for (let s = PROBE_STEP; s <= reach + PROBE_STEP; s += PROBE_STEP) {
     const px = store.x[id] + dirX * s;
     const py = store.y[id] + dirY * s;
     if (collides(world, px, py)) return false;
-    const rise = squareFloor(world, px, py, BODY_RADIUS) - feet;
-    if (rise <= STEP_UP) continue;
-    // El primer punto que estorba decide: o se sube de un salto, o nada.
+    const floor = squareFloor(world, px, py, BODY_RADIUS);
+    if (floor - walked <= STEP_UP) {
+      // Se llega andando: el siguiente escalon se mide desde este.
+      walked = floor;
+      continue;
+    }
+    // El primer punto que estorba decide: o se sube de un salto desde aqui, o
+    // nada (si hay que subir antes un escalon, se saltara desde el).
+    if (walked !== feet) return false;
+    const rise = floor - feet;
     if (rise > JUMP_HEIGHT) return false;
     // Un tick de mas de anticipacion: se decide despues de haber andado el de
     // ahora, y el sondeo encuentra el borde con un paso de retraso. Sin el, a

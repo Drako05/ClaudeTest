@@ -178,19 +178,21 @@ describe('Colocar una estacion', () => {
 
   it('mirando a una pared, aparece delante de ella y se posa en su suelo', () => {
     // Un llano de dos casillas al pie de una pared de dos o mas bloques, hacia +x.
+    // Con voxeles, esas paredes solo las dan los salientes (regla 14), que son
+    // escasos: hay que mirar lejos.
     for (const seed of [12345, 999, 4242, 31337, 7]) {
       const state = createGame(seed);
       const w = state.world;
       const id = state.playerId;
       const sx = Math.floor(state.entities.x[id]);
       const sy = Math.floor(state.entities.y[id]);
-      for (let dy = -30; dy <= 30; dy++) {
-        for (let dx = -30; dx <= 30; dx++) {
+      for (let dy = -90; dy <= 90; dy++) {
+        for (let dx = -90; dx <= 90; dx++) {
           const x = sx + dx;
           const y = sy + dy;
-          const level = w.levelAt(x, y);
-          if (level < 0 || w.levelAt(x + 1, y) !== level || w.levelAt(x + 2, y) < level + 2) continue;
-          if (w.rampDirAt(x, y) >= 0 || w.rampDirAt(x + 1, y) >= 0) continue;
+          const level = w.flatTopAt(x, y);
+          const wall = w.flatTopAt(x + 2, y);
+          if (level === null || level < 0 || w.flatTopAt(x + 1, y) !== level || wall === null || wall < level + 2) continue;
           w.setFeature(x, y, Feature.None);
           w.setFeature(x + 1, y, Feature.None);
           state.entities.x[id] = x + 0.5;
@@ -234,30 +236,26 @@ describe('Colocar una estacion', () => {
     throw new Error('ninguna semilla tiene agua cerca del nacimiento');
   });
 
-  it('no se coloca en un talud', () => {
-    // Un talud cualquiera cerca del nacimiento de alguna semilla.
-    for (const seed of [12345, 999, 4242, 31337, 7]) {
-      const { state, tx, ty } = atSpawn(seed);
-      const w = state.world;
-      for (let dy = -20; dy <= 20; dy++) {
-        for (let dx = -20; dx <= 20; dx++) {
-          const x = tx + dx;
-          const y = ty + dy;
-          if (w.rampDirAt(x, y) < 0 || w.terrainAt(x, y) === Terrain.Water) continue;
-          // Se pone al jugador a una casilla del talud, mirandolo.
-          const id = state.playerId;
-          state.entities.x[id] = x - 0.5;
-          state.entities.y[id] = y + 0.5;
-          state.entities.z[id] = w.groundHeightAt(x - 0.5, y + 0.5);
-          w.setFeature(x, y, Feature.None);
-          state.inventory.add(Resource.Workbench, 1);
-          use(state, 1, 0, 60);
-          expect(w.featureAt(x, y)).not.toBe(Feature.Workbench);
-          return;
-        }
+  it('sobre una casilla con escalon dentro, la estacion se apoya en lo mas alto; lo generado, en lo mas bajo', () => {
+    // El autor (2026-10-06): lo que pone el jugador se queda sobre lo que toque;
+    // lo generado va apoyado entero. Una caja centrada pisa las cuatro columnas
+    // de 0,5 de su casilla.
+    const { state, tx, ty } = atSpawn(7);
+    const w = state.world;
+    for (let dy = -40; dy <= 40; dy++) {
+      for (let dx = -40; dx <= 40; dx++) {
+        const x = tx + dx;
+        const y = ty + dy;
+        if (w.flatTopAt(x, y) !== null || w.terrainAt(x, y) === Terrain.Water) continue;
+        const tops = [0, 1, 2, 3].map((s) => w.columnTop(x * 2 + (s % 2), y * 2 + Math.floor(s / 2)) / 2);
+        w.setFeature(x, y, Feature.Workbench);
+        expect(hitboxAt(w, x, y)!.z0).toBe(Math.max(...tops));
+        w.setFeature(x, y, Feature.RockNode);
+        expect(hitboxAt(w, x, y)!.z0).toBe(Math.min(...tops));
+        return;
       }
     }
-    throw new Error('ninguna semilla tiene un talud cerca del nacimiento');
+    throw new Error('no hay ninguna casilla con escalon dentro cerca del nacimiento');
   });
 });
 

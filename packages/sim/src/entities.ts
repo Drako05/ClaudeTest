@@ -30,8 +30,7 @@ export class EntityStore {
    *
    * La misma vara que `footing` (`boxes.ts`), y a proposito: pisar suelo es
    * exactamente `z === footing(...)` —el terreno y, encima, el techo de las
-   * cajas que toca la huella—, sin conversiones ni casos especiales para los
-   * taludes.
+   * cajas que toca la huella—, sin conversiones ni casos especiales.
    */
   readonly z: Float64Array;
   /** Velocidad vertical, en niveles por segundo. */

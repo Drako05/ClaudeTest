@@ -45,7 +45,7 @@ import {
 } from '@verdant/shared';
 import { collectBiome, type BiomeStats } from './biome.js';
 import { chunkKey, localCoord, toChunkCoord } from './coords.js';
-import { canClimbTo, groundHeight, NO_RAMP } from './relief.js';
+import { canClimbTo, topOf, VOXELS_PER_TILE, voxelOf, WATER_HEIGHT } from './relief.js';
 
 /**
  * Casillas que tiene que haber al alcance para nacer en un sitio, contando con
@@ -87,7 +87,7 @@ const SPAWN_ROOM_HALF = 24;
  */
 const SPAWN_LANDING_HALF = 1;
 import { hash2D, hash2DFloat } from './rng.js';
-import { generateChunk, WorldGen } from './worldgen.js';
+import { CHUNK_COLUMNS, generateChunk, WorldGen } from './worldgen.js';
 import { faunaOf, type Animal } from './fauna.js';
 
 export { chunkKey, localCoord, toChunkCoord } from './coords.js';
@@ -98,10 +98,11 @@ export interface Chunk {
   readonly terrain: Uint8Array;
   /** Potencial pristino del generador. Los cambios viven en los overrides. */
   readonly feature: Uint8Array;
-  /** Altura entera de cada tile. Negativa es agua. */
-  readonly level: Int8Array;
-  /** Direccion del talud de cada tile, o `NO_RAMP` si es plano. */
-  readonly rampDir: Int8Array;
+  /**
+   * Altura de cada columna de 0,5, en medios bloques (`CHUNK_COLUMNS` por lado).
+   * `WATER_HEIGHT` es agua. El terreno son voxeles: solidos de ahi para abajo.
+   */
+  readonly height: Int16Array;
   /** Sube cuando lo visible cambia; el renderer lo usa para invalidar cache. */
   revision: number;
 }
@@ -189,8 +190,7 @@ export class World {
       cy,
       terrain: raw.terrain,
       feature: new Uint8Array(raw.feature),
-      level: raw.level,
-      rampDir: raw.rampDir,
+      height: raw.height,
       revision: 0,
     };
     this.chunks.set(key, chunk);
@@ -324,50 +324,66 @@ export class World {
   }
 
   /**
-   * Altura entera del tile. Negativa es agua.
+   * Altura de una columna de 0,5 (en coordenadas de voxel), en medios bloques.
+   * `WATER_HEIGHT` es agua.
    *
    * Sale del chunk y no del generador: es el mismo dato que dibuja el cliente y
-   * el mismo con el que chocara el jugador, que es la regla de la fuente unica
-   * de verdad aplicada al relieve.
+   * el mismo con el que choca el jugador, que es la regla de la fuente unica de
+   * verdad aplicada al relieve.
    */
-  levelAt(wx: number, wy: number): number {
-    const chunk = this.getChunk(toChunkCoord(wx), toChunkCoord(wy));
-    return chunk.level[localCoord(wy) * CHUNK_SIZE + localCoord(wx)];
-  }
-
-  /** Direccion del talud de un tile, o `NO_RAMP`. */
-  rampDirAt(wx: number, wy: number): number {
-    const chunk = this.getChunk(toChunkCoord(wx), toChunkCoord(wy));
-    return chunk.rampDir[localCoord(wy) * CHUNK_SIZE + localCoord(wx)];
+  columnTop(vx: number, vy: number): number {
+    const tx = Math.floor(vx / VOXELS_PER_TILE);
+    const ty = Math.floor(vy / VOXELS_PER_TILE);
+    const chunk = this.getChunk(toChunkCoord(tx), toChunkCoord(ty));
+    const lx = vx - chunk.cx * CHUNK_COLUMNS;
+    const ly = vy - chunk.cy * CHUNK_COLUMNS;
+    return chunk.height[ly * CHUNK_COLUMNS + lx];
   }
 
   /**
-   * Altura real del suelo en un punto, con decimales.
-   *
-   * Es lo que convierte el relieve en un campo continuo: en un tile plano vale
-   * su nivel, y sobre un talud sube poco a poco. De aqui saldra la fisica —no se
-   * entra donde el suelo esta por encima de los pies— sin necesidad de tratar
-   * las rampas como un caso aparte.
+   * La altura (en el mundo) de una casilla si sus cuatro columnas de 0,5 estan
+   * a la misma, o `null` si la casilla tiene escalon dentro. El agua, a -1.
+   */
+  flatTopAt(tx: number, ty: number): number | null {
+    const h = this.columnTop(tx * VOXELS_PER_TILE, ty * VOXELS_PER_TILE);
+    for (let s = 1; s < VOXELS_PER_TILE * VOXELS_PER_TILE; s++) {
+      const vx = tx * VOXELS_PER_TILE + (s % VOXELS_PER_TILE);
+      const vy = ty * VOXELS_PER_TILE + Math.floor(s / VOXELS_PER_TILE);
+      if (this.columnTop(vx, vy) !== h) return null;
+    }
+    return topOf(h);
+  }
+
+  /**
+   * Si el voxel (`vx`, `vy`, `vz`) es terreno solido. Hoy la generacion da una
+   * superficie sin huecos —solido de la altura de su columna para abajo—, pero
+   * la pregunta ya es en 3D: las cuevas y lo que se excave o construya cambiaran
+   * de donde sale la respuesta, no quien la hace.
+   */
+  isSolidVoxel(vx: number, vy: number, vz: number): boolean {
+    return vz < this.columnTop(vx, vy);
+  }
+
+  /**
+   * Altura del suelo en un punto: el techo de la columna de 0,5 que lo contiene.
+   * Sin rampas (el autor, 2026-10-06), el relieve sube a escalones de medio
+   * bloque.
    */
   groundHeightAt(wx: number, wy: number): number {
-    const tx = Math.floor(wx);
-    const ty = Math.floor(wy);
-    return groundHeight(this.levelAt(tx, ty), this.rampDirAt(tx, ty), wx - tx, wy - ty);
+    return topOf(this.columnTop(voxelOf(wx), voxelOf(wy)));
   }
 
   /**
-   * Lo mas bajo y lo mas alto del suelo de una casilla, en `out[0]` y
-   * `out[1]`: en una rampa, su pie y su cima. Es lo que mira el choque de las
-   * partes de un animal contra los escalones (`body.ts`), y sale del nivel y
-   * de la rampa sin muestrear la altura. Solo el terreno: lo que hay encima
-   * tiene su caja (`boxes.ts`).
+   * Lo mas bajo y lo mas alto del suelo de una columna (`vx`, `vy`), en el
+   * mundo, en `out[0]` y `out[1]`. Sin rampas, los dos son su techo; se queda
+   * con las dos cifras porque lo que mira el choque de las partes de un animal
+   * contra los escalones (`body.ts`) compara el pie de una con la cima de la
+   * vecina. Solo el terreno: lo que hay encima tiene su caja (`boxes.ts`).
    */
-  floorRangeAt(tx: number, ty: number, out: Float64Array): void {
-    const chunk = this.getChunk(toChunkCoord(tx), toChunkCoord(ty));
-    const idx = localCoord(ty) * CHUNK_SIZE + localCoord(tx);
-    const low = chunk.level[idx];
-    out[0] = low;
-    out[1] = chunk.rampDir[idx] === NO_RAMP ? low : low + 1;
+  floorRangeAt(vx: number, vy: number, out: Float64Array): void {
+    const top = topOf(this.columnTop(vx, vy));
+    out[0] = top;
+    out[1] = top;
   }
 
   /** Lo que hay realmente en un tile. Unica fuente de verdad. */
@@ -830,14 +846,21 @@ export class World {
     );
   }
 
-  /** True si el tile y sus ocho vecinas son pisables y estan al mismo nivel. */
+  /**
+   * True si la casilla y sus ocho vecinas son pisables y todas sus columnas
+   * estan a la misma altura: un rellano llano de verdad, sin medio bloque suelto.
+   */
   private isLanding(sx: number, sy: number): boolean {
-    const level = this.levelAt(sx, sy);
-    if (level < 0) return false;
+    const height = this.columnTop(sx * VOXELS_PER_TILE, sy * VOXELS_PER_TILE);
+    if (height <= WATER_HEIGHT) return false;
     for (let dy = -SPAWN_LANDING_HALF; dy <= SPAWN_LANDING_HALF; dy++) {
       for (let dx = -SPAWN_LANDING_HALF; dx <= SPAWN_LANDING_HALF; dx++) {
-        if (this.levelAt(sx + dx, sy + dy) !== level) return false;
         if (this.isSolidAt(sx + dx, sy + dy)) return false;
+        for (let v = 0; v < VOXELS_PER_TILE * VOXELS_PER_TILE; v++) {
+          const vx = (sx + dx) * VOXELS_PER_TILE + (v % VOXELS_PER_TILE);
+          const vy = (sy + dy) * VOXELS_PER_TILE + Math.floor(v / VOXELS_PER_TILE);
+          if (this.columnTop(vx, vy) !== height) return false;
+        }
       }
     }
     return true;
@@ -853,27 +876,31 @@ export class World {
    * normal termina enseguida.
    */
   private roamRoom(sx: number, sy: number, climbing: boolean): number {
-    const cap = climbing ? SPAWN_MIN_ROOM : SPAWN_MIN_FLOOR;
+    // Por columnas de 0,5: el area se cuenta en casillas (cuatro columnas cada
+    // una), y la ventana, en casillas a cada lado.
+    const perTile = VOXELS_PER_TILE * VOXELS_PER_TILE;
+    const cap = (climbing ? SPAWN_MIN_ROOM : SPAWN_MIN_FLOOR) * perTile;
+    const half = SPAWN_ROOM_HALF * VOXELS_PER_TILE;
+    const ox = sx * VOXELS_PER_TILE;
+    const oy = sy * VOXELS_PER_TILE;
     const seen = new Set<number>();
-    const stack: Array<[number, number]> = [[sx, sy]];
+    const stack: Array<[number, number]> = [[ox, oy]];
     let reached = 0;
     while (stack.length) {
       const [x, y] = stack.pop()!;
-      if (Math.abs(x - sx) > SPAWN_ROOM_HALF || Math.abs(y - sy) > SPAWN_ROOM_HALF) continue;
+      if (Math.abs(x - ox) > half || Math.abs(y - oy) > half) continue;
       // Clave numerica: la ventana es pequena y cabe en un solo entero.
-      const key = (x - sx + SPAWN_ROOM_HALF) * 256 + (y - sy + SPAWN_ROOM_HALF);
+      const key = (x - ox + half) * 1024 + (y - oy + half);
       if (seen.has(key)) continue;
       seen.add(key);
-      if (this.isSolidAt(x, y)) continue;
-      if (++reached >= cap) return reached;
-      const level = this.levelAt(x, y);
+      if (this.isSolidAt(Math.floor(x / VOXELS_PER_TILE), Math.floor(y / VOXELS_PER_TILE))) continue;
+      if (++reached >= cap) return Math.floor(reached / perTile);
+      const height = this.columnTop(x, y);
       for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
-        const next = this.levelAt(nx, ny);
-        // Andando solo se baja o se sigue igual; saltando se gana un nivel.
-        const ok = climbing ? canClimbTo(level, next) : next >= 0 && next <= level;
-        if (ok) stack.push([nx, ny]);
+        // Andando se sube medio bloque; saltando, uno entero.
+        if (canClimbTo(height, this.columnTop(nx, ny), climbing)) stack.push([nx, ny]);
       }
     }
-    return reached;
+    return Math.floor(reached / perTile);
   }
 }

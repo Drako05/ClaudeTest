@@ -1,176 +1,116 @@
 /**
- * El relieve: alturas discretas, paredes y taludes.
+ * El relieve: columnas de medio bloque.
  *
- * Modulo propio y sin dependencias cruzadas —solo `rng.ts`, que no importa a
- * nadie— por la misma razon que `aim.ts` y `coords.ts`: lo necesitan a la vez el
- * generador, el mundo y el cliente, y si viviera dentro de `worldgen.ts` o de
- * `world.ts` habria ciclo de importacion.
+ * Modulo propio y sin dependencias cruzadas por la misma razon que `aim.ts` y
+ * `coords.ts`: lo necesitan a la vez el generador, el mundo y el cliente, y si
+ * viviera dentro de `worldgen.ts` o de `world.ts` habria ciclo de importacion.
  *
- * La idea entera cabe en una frase: **el mundo es un campo de alturas**. Cada
- * tile tiene un nivel entero, y `groundHeight` devuelve la altura real de un
- * punto dentro de el —el nivel a secas si es plano, o interpolada si es un
- * talud—. Todo lo demas sale de ahi: no se puede entrar donde el suelo esta por
- * encima de los pies, se aterriza cuando la altura propia toca la del suelo, y
- * un talud se sube andando porque su suelo sube poco a poco.
+ * **El terreno son voxeles de 0,5** (decision del autor, 2026-10-06), pensando
+ * en excavar y construir. En esta primera tanda la generacion da una
+ * superficie sin huecos: cada **columna** de 0,5 × 0,5 tiene una altura entera
+ * en **medios bloques**, y es solida de ahi para abajo. Una casilla de 1 son
+ * 2 × 2 columnas. **Sin rampas** (el autor): el relieve sube a escalones de
+ * medio bloque, que se suben andando, y lo que sube de golpe uno entero o mas
+ * es pared.
+ *
+ * Las alturas se cuentan en medios bloques (enteros); en el mundo, un medio
+ * bloque mide `VOXEL`.
  */
 
-import { hash2DFloat } from './rng.js';
+/** Lo que mide un voxel, en unidades del mundo (una casilla mide 1). */
+export const VOXEL = 0.5;
+
+/** Columnas por casilla en cada eje. */
+export const VOXELS_PER_TILE = 2;
 
 /**
  * Elevacion a la que empieza la tierra. Es el mismo umbral que ya separaba el
- * agua en `terrainAt`, no uno nuevo: el nivel de la tierra arranca en 0 y el
- * agua queda en negativo, asi que el mundo generado no cambia de forma.
+ * agua en `terrainAt`, no uno nuevo: la tierra arranca en 0 y el agua queda en
+ * negativo, asi que el mundo generado no cambia de forma.
  */
 export const SEA_LEVEL = 0.42;
 
-/** Cuanta elevacion vale un nivel. */
+/**
+ * Cuanta elevacion vale un bloque de 1: el escalon del autor, que no se toca sin
+ * preguntarle. Con voxeles de 0,5 la altura se lee cada medio bloque, asi que un
+ * medio bloque vale la mitad (`HALF_STEP`).
+ */
 export const LEVEL_STEP = 0.06;
 
+/** Cuanta elevacion vale un medio bloque. */
+export const HALF_STEP = LEVEL_STEP / VOXELS_PER_TILE;
+
 /**
- * Nivel mas alto posible.
- *
- * Cuarenta y uno contando el cero. Es numero del autor: queria montanas que
- * haya que rodear o escalar en serio, y con cubos de 16 px eso son 640 px de
- * cima, casi una pantalla entera. Fuera de las cordilleras el mundo sigue sin
- * pasar de seis o siete, que es lo que daba el campo de elevacion a secas.
+ * Bloque de 1 mas alto posible: 40, numero del autor. Queria montanas que haya
+ * que rodear o escalar en serio. Fuera de las cordilleras el mundo sigue sin
+ * pasar de seis o siete.
  */
 export const MAX_LEVEL = 40;
 
-/** Nivel que se le asigna al agua. Uno solo: el fondo no se pisa. */
-export const WATER_LEVEL = -1;
+/** La altura mas alta de una columna, en medios bloques. */
+export const MAX_HEIGHT = MAX_LEVEL * VOXELS_PER_TILE;
+
+/** Altura de las columnas de agua, en medios bloques: el fondo, a -1. */
+export const WATER_HEIGHT = -VOXELS_PER_TILE;
 
 /**
- * Que fraccion de las fronteras entre niveles es transitable.
- *
- * El resto son paredes. Es lo que obliga a buscar por donde subir en vez de
- * poder trepar por cualquier lado, y con el 15 % una ladera larga tiene algun
- * paso pero no muchos.
- */
-export const RAMP_SHARE = 0.15;
-
-/**
- * Cuanto levanta un saliente.
+ * Cuanto levanta un saliente, en bloques de 1.
  *
  * De aqui salen las paredes altas: el campo de elevacion es tan suave que sin
- * salientes casi todas las paredes del mundo serian de un bloque y se subirian
- * todas de un salto. Una cordillera tampoco las fabrica —amplifica la pendiente,
- * pero partiendo de 0.03 niveles por casilla haria falta un factor de sesenta
- * para llegar al escalon de dos—, asi que altura y muros son dos mecanismos
- * distintos y hacen falta los dos.
+ * salientes casi todo el relieve serian escalones que se suben andando. Una
+ * cordillera tampoco las fabrica del todo —amplifica la pendiente—, asi que
+ * altura y muros son dos mecanismos distintos y hacen falta los dos (regla 14).
  */
 export const OUTCROP_RISE = 3;
 
-/** Direcciones ortogonales, en el orden en que se busca por donde sube un talud. */
-export const RAMP_DIRS: ReadonlyArray<{ readonly x: number; readonly y: number }> = [
-  { x: 0, y: -1 },
-  { x: 1, y: 0 },
-  { x: 0, y: 1 },
-  { x: -1, y: 0 },
-];
-
-/** Ningun talud. */
-export const NO_RAMP = -1;
+/**
+ * Cuantos medios bloques se suben andando de una columna a la vecina: uno. Lo
+ * que mide ≤ 0,5 se sube andando, y es una caracteristica de la fisica, no de
+ * cada cosa (el autor, 2026-10-06; `STEP_UP` en `jump.ts`).
+ */
+export const WALK_HALVES = 1;
 
 /**
- * Cuantos niveles se ganan pasando de un tile al vecino.
- *
- * Uno: o hay talud y se sube andando, o se sube de un salto —el apice del salto
- * son 1.16 niveles a una casilla exacta, que es justo lo que hace falta—. Dos ya
- * es pared, y de eso van los salientes.
+ * Cuantos medios bloques se ganan de un salto: dos. El apice del salto son 1,16
+ * bloques, justo lo que hace falta para un bloque de 1. Tres ya es pared.
  *
  * Vive aqui, en el modulo sin dependencias, porque lo necesitan a la vez el
  * mundo (para no nacer en un pozo), el medidor de conectividad y quien mida el
- * relieve desde fuera. En `movement.ts` no puede estar: `world.ts` tendria que
- * importarlo y ese es justo el ciclo que el proyecto ya se comio una vez.
+ * relieve desde fuera.
  */
-export const CLIMB_LIMIT = 1;
+export const JUMP_HALVES = 2;
 
 /**
- * Si se puede pasar de un nivel al vecino. Bajar siempre se puede: caer es caer.
+ * Si se puede pasar de una columna a la vecina, saltando o no. Bajar siempre se
+ * puede: caer es caer. Al agua no se pasa (regla 9).
  *
- * **Es un modelo, no la fisica.** La fisica de verdad esta en `movement.ts` y
- * mide alturas continuas; esto compara niveles enteros para poder recorrer el
- * mapa a saltos de casilla. Se queda del lado optimista —da por hecho que hay
- * carrerilla para el salto—, asi que lo que declare inconexo lo es de verdad.
+ * **Es un modelo, no la fisica.** La fisica de verdad esta en `movement.ts`;
+ * esto compara alturas enteras para recorrer el mapa a saltos de columna, y se
+ * queda del lado optimista —da por hecho que hay carrerilla para el salto—, asi
+ * que lo que declare inconexo lo es de verdad.
  */
-export function canClimbTo(fromLevel: number, toLevel: number): boolean {
-  if (toLevel < 0) return false;
-  return toLevel - fromLevel <= CLIMB_LIMIT;
-}
-
-/** Nivel entero que corresponde a una elevacion. Negativo es agua. */
-export function levelFrom(elevation: number): number {
-  if (elevation < SEA_LEVEL) return WATER_LEVEL;
-  const level = Math.floor((elevation - SEA_LEVEL) / LEVEL_STEP);
-  return level > MAX_LEVEL ? MAX_LEVEL : level;
+export function canClimbTo(from: number, to: number, jumping = true): boolean {
+  if (to <= WATER_HEIGHT) return false;
+  return to - from <= (jumping ? JUMP_HALVES : WALK_HALVES);
 }
 
 /**
- * Si la frontera entre dos tiles vecinos es talud o pared.
- *
- * La clave se canoniza al tile de coordenada menor mas el eje, de forma que la
- * respuesta sea **la misma mirada desde los dos lados**. Sin eso se podria subir
- * una pared por un lado y no por el otro, y peor: el dibujo y la colision
- * podrian discrepar sobre la misma arista.
+ * Altura de una columna, en medios bloques, para una elevacion de tierra. No
+ * baja de 0: lo que es agua lo decide el terreno de la casilla, no la columna
+ * (`WorldGen.columnTopAt`).
  */
-export function isRampEdge(seed: number, ax: number, ay: number, bx: number, by: number): boolean {
-  const horizontal = ay === by;
-  const x = ax < bx ? ax : bx;
-  const y = ay < by ? ay : by;
-  return hash2DFloat(seed ^ (horizontal ? 0x1b873593 : 0x7f4a7c15), x, y) < RAMP_SHARE;
+export function heightFrom(elevation: number): number {
+  if (elevation < SEA_LEVEL) return 0;
+  const h = Math.floor((elevation - SEA_LEVEL) / HALF_STEP);
+  return h > MAX_HEIGHT ? MAX_HEIGHT : h;
 }
 
-/**
- * Por donde sube el talud de un tile, o `NO_RAMP` si es plano.
- *
- * `levelOf` da el nivel de un vecino. Solo se hace talud hacia un vecino que este
- * **exactamente un nivel** por encima: dos niveles son siempre pared, que es de
- * donde vienen los muros infranqueables que pidio el autor.
- *
- * Con dos vecinos candidatos gana el primero del orden de `RAMP_DIRS`. Es
- * arbitrario pero determinista, que es lo unico que importa: un tile no puede
- * inclinarse hacia dos sitios a la vez.
- */
-export function rampDirOf(
-  seed: number,
-  wx: number,
-  wy: number,
-  level: number,
-  levelOf: (x: number, y: number) => number,
-): number {
-  if (level < 0) return NO_RAMP;
-  for (let dir = 0; dir < RAMP_DIRS.length; dir++) {
-    const d = RAMP_DIRS[dir];
-    const nx = wx + d.x;
-    const ny = wy + d.y;
-    if (levelOf(nx, ny) !== level + 1) continue;
-    if (isRampEdge(seed, wx, wy, nx, ny)) return dir;
-  }
-  return NO_RAMP;
+/** La altura en el mundo del techo de una columna de `height` medios bloques. */
+export function topOf(height: number): number {
+  return height * VOXEL;
 }
 
-/**
- * Altura del suelo en un punto dentro de un tile.
- *
- * `fx` y `fy` son la posicion dentro de la casilla, en [0, 1). En un tile plano
- * la altura es su nivel y ya esta; en un talud sube linealmente de `level` a
- * `level + 1` en la direccion en la que se inclina.
- *
- * Que la rampa sea propiedad del **tile bajo** y no de la arista es lo que hace
- * continuo este campo. Con la rampa en la arista habria un escalon vertical en
- * el limite entre las dos casillas, que es justo lo que un talud no tiene.
- */
-export function groundHeight(level: number, rampDir: number, fx: number, fy: number): number {
-  switch (rampDir) {
-    case 0:
-      return level + (1 - fy);
-    case 1:
-      return level + fx;
-    case 2:
-      return level + fy;
-    case 3:
-      return level + (1 - fx);
-    default:
-      return level;
-  }
+/** La columna (en coordenadas de voxel) que contiene la coordenada del mundo `w`. */
+export function voxelOf(w: number): number {
+  return Math.floor(w * VOXELS_PER_TILE);
 }

@@ -3,7 +3,7 @@
  * puedan comprobar el mundo sin dibujar nada.
  */
 
-import { canClimbTo } from './relief.js';
+import { canClimbTo, VOXELS_PER_TILE } from './relief.js';
 import type { World } from './world.js';
 import type { WorldGen } from './worldgen.js';
 import { generateChunk } from './worldgen.js';
@@ -43,26 +43,30 @@ export function hashRegion(
  * un bolsillo diminuto, y eso es justo lo que este numero detecta.
  */
 export function reachableArea(world: World, sx: number, sy: number, half = 100): number {
-  const seen = new Set<string>();
-  const stack: Array<[number, number]> = [[sx, sy]];
+  // Por columnas de 0,5, contando el area en casillas (cuatro columnas cada una).
+  const ox = sx * VOXELS_PER_TILE;
+  const oy = sy * VOXELS_PER_TILE;
+  const h = half * VOXELS_PER_TILE;
+  const seen = new Set<number>();
+  const stack: Array<[number, number]> = [[ox, oy]];
   let reached = 0;
   while (stack.length) {
     const [x, y] = stack.pop()!;
-    if (x < sx - half || x >= sx + half || y < sy - half || y >= sy + half) continue;
-    const key = `${x},${y}`;
+    if (x < ox - h || x >= ox + h || y < oy - h || y >= oy + h) continue;
+    const key = (x - ox + h) * 4096 + (y - oy + h);
     if (seen.has(key)) continue;
     seen.add(key);
-    if (world.isSolidAt(x, y)) continue;
+    if (world.isSolidAt(Math.floor(x / VOXELS_PER_TILE), Math.floor(y / VOXELS_PER_TILE))) continue;
     reached++;
     // La altura estorba desde la fase 2, asi que este recorrido tiene que
     // obedecerla: antes inundaba mirando solo los solidos y desde que una pared
     // detiene el paso eso dejo de medir lo que el jugador puede recorrer. El
     // presupuesto de conectividad del relieve se fijo con la version vieja, asi
     // que las cifras de antes y las de ahora **no son comparables**.
-    const level = world.levelAt(x, y);
+    const height = world.columnTop(x, y);
     for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
-      if (canClimbTo(level, world.levelAt(nx, ny))) stack.push([nx, ny]);
+      if (canClimbTo(height, world.columnTop(nx, ny))) stack.push([nx, ny]);
     }
   }
-  return reached;
+  return Math.floor(reached / (VOXELS_PER_TILE * VOXELS_PER_TILE));
 }

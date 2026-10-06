@@ -15,44 +15,46 @@
  * la cabeza de un bisonte pasa por encima de una roca, sus patas no.
  *
  * **Un escalon estorba a cada parte** (la regla 21 extendida a las partes,
- * *mi deduccion*): una casilla estorba a una parte si entre ella y la casilla
- * vecina hacia los pies hay un escalon —su suelo mas bajo pasa de `STEP_UP`
- * sobre el mas alto de la vecina— y ese suelo queda por encima de la base de
- * la parte. Una rampa no tiene escalon: deja pasar, aunque un cuerpo que no se
- * inclina asome sobre su pendiente; un escalon de un nivel no deja meter una
+ * *mi deduccion*): una columna de 0,5 estorba a una parte si entre ella y la
+ * columna vecina hacia los pies hay un escalon —su techo pasa de `STEP_UP`
+ * sobre el de la vecina— y ese techo queda por encima de la base de la parte.
+ * Un medio bloque no es escalon: se sube andando, aunque un cuerpo que no se
+ * inclina asome sobre la escalera; un escalon de un bloque no deja meter una
  * cabeza. Los pies siguen con su regla del centro y `STEP_UP` (`movement.ts`).
  *
  * Coordenadas del nucleo: `x`, `y` en el suelo y `z` hacia arriba.
  */
 
-import { groundHigh, groundLow, overlapsSquare, solidBox, terrainSolid, type OrientedBox } from './boxes.js';
+import { columnTopIn, overlapsSquare, solidBox, terrainSolid, type OrientedBox } from './boxes.js';
+import { VOXEL, voxelOf } from './relief.js';
 import { STEP_UP } from './systems/jump.js';
 import type { World } from './world.js';
 
 export { bodyBoxes, groundRound, type OrientedBox } from './boxes.js';
 
 /**
- * Si la casilla (`tx`, `ty`) tiene un escalon que la separa de su vecina hacia
- * los pies (`feetX`, `feetY`), la altura de su suelo; si no, `-Infinity`. La
- * casilla de los pies no tiene escalon hacia si misma.
+ * Si la columna de 0,5 (`vx`, `vy`) tiene un escalon que la separa de su vecina
+ * hacia los pies (`feetX`, `feetY`), la altura de su techo; si no, `-Infinity`.
+ * La columna de los pies no tiene escalon hacia si misma. Un medio bloque no es
+ * escalon: se sube andando.
  */
-function stepTop(world: World, tx: number, ty: number, feetX: number, feetY: number): number {
-  const ftx = Math.floor(feetX);
-  const fty = Math.floor(feetY);
-  if (tx === ftx && ty === fty) return -Infinity;
-  const dx = ftx - tx;
-  const dy = fty - ty;
-  const [nx, ny] = Math.abs(dx) >= Math.abs(dy) ? [tx + Math.sign(dx), ty] : [tx, ty + Math.sign(dy)];
-  const low = groundLow(world, tx, ty);
-  return low - groundHigh(world, nx, ny) > STEP_UP ? low : -Infinity;
+function stepTop(world: World, vx: number, vy: number, feetX: number, feetY: number): number {
+  const fvx = voxelOf(feetX);
+  const fvy = voxelOf(feetY);
+  if (vx === fvx && vy === fvy) return -Infinity;
+  const dx = fvx - vx;
+  const dy = fvy - vy;
+  const [nx, ny] = Math.abs(dx) >= Math.abs(dy) ? [vx + Math.sign(dx), vy] : [vx, vy + Math.sign(dy)];
+  const top = columnTopIn(world, vx, vy);
+  return top - columnTopIn(world, nx, ny) > STEP_UP ? top : -Infinity;
 }
 
 /**
  * Cuantas veces se mete el cuerpo en el terreno: un punto por cada (parte,
- * casilla) en que la casilla es agua, tiene, hacia los pies en
- * (`feetX`, `feetY`), un escalon que pasa de la base de la parte, o tiene un
- * objeto cuya caja la estorba. Cero es que cabe. Dentro de una ronda
- * (`groundRound`), cada casilla se lee una vez.
+ * casilla) en que la casilla es agua o tiene un objeto cuya caja la estorba, y
+ * por cada (parte, columna de 0,5) con un escalon hacia los pies en
+ * (`feetX`, `feetY`) que pasa de la base de la parte. Cero es que cabe. Dentro
+ * de una ronda (`groundRound`), cada casilla y cada columna se leen una vez.
  */
 export function bodyClashes(world: World, boxes: readonly OrientedBox[], feetX: number, feetY: number): number {
   let clashes = 0;
@@ -61,10 +63,16 @@ export function bodyClashes(world: World, boxes: readonly OrientedBox[], feetX: 
     const ry = b.hl * Math.abs(b.uy) + b.hw * Math.abs(b.ux);
     const base = b.cz - b.hh;
     const top = b.cz + b.hh;
+    for (let vy = voxelOf(b.cy - ry); vy <= voxelOf(b.cy + ry); vy++) {
+      for (let vx = voxelOf(b.cx - rx); vx <= voxelOf(b.cx + rx); vx++) {
+        if (!overlapsSquare(b, (vx + 0.5) * VOXEL, (vy + 0.5) * VOXEL, VOXEL / 2)) continue;
+        if (stepTop(world, vx, vy, feetX, feetY) > base + 1e-6) clashes++;
+      }
+    }
     for (let ty = Math.floor(b.cy - ry); ty <= Math.floor(b.cy + ry); ty++) {
       for (let tx = Math.floor(b.cx - rx); tx <= Math.floor(b.cx + rx); tx++) {
         if (!overlapsSquare(b, tx + 0.5, ty + 0.5, 0.5)) continue;
-        if (terrainSolid(world, tx, ty) || stepTop(world, tx, ty, feetX, feetY) > base + 1e-6) {
+        if (terrainSolid(world, tx, ty)) {
           clashes++;
           continue;
         }

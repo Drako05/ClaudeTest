@@ -84,3 +84,8 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `isFeatureSolid|floorHeightAt` — el choque de casilla entera de arboles, roca y minerales, y lo que pisaba el cuerpo medido en el centro con la estacion de su casilla; desde el 2026-10-05 cada objeto tiene una caja que golpea y, si su tipo choca, choca (`blocksBody`, `solidBoxAt`), y el cuerpo pisa con su huella (`squareFloor`, `footing`). Permitido en: `docs/pendiente.md`, `docs/reglas.md`, `docs/devtools.md` (cuentan el antes).
 - `casilla entera (de lo que|en cian)|choque dibujado hasta el alto` — el primer dibujo de las cajas del panel, con el choque de casilla entera en cian (unas horas del 2026-10-05). Permitido en: `docs/pendiente.md`, `docs/devtools.md`.
 - `patas finas, la cola|la cola, las patas y las orejas no|las patas finas.{0,20}no chocan` — las patas sin caja; desde el 2026-10-05 la cabeza, el cuello, las extremidades y el tronco golpean y chocan (el autor). Permitido en: `docs/pendiente.md`.
+
+## Rampas y relieve por casilla
+
+- `rampDir|RAMP_SHARE|RAMP_DIRS|NO_RAMP|isRampEdge|rampDirOf|levelAt\(|levelFromRelief|levelFrom\(|WATER_LEVEL|CLIMB_LIMIT|cornerHeight|groundHeight\(` — el relieve como un nivel entero y una rampa por casilla de 1, con el 15 % de fronteras en rampa; desde el 2026-10-06 son columnas de voxel de 0,5 sin rampas (`columnTop`, `columnTopAt`, `heightFrom`, `WALK_HALVES`/`JUMP_HALVES`, `columnTopFor`). Permitido en: `docs/pendiente.md`, `docs/relieve.md`, `docs/isometrico.md`, `CLAUDE.md` (cuentan el antes).
+- `\btalud(es)?\b` — el talud que se subia andando; hoy un escalon de medio bloque. Permitido en: `docs/pendiente.md`, `docs/relieve.md`, `docs/isometrico.md`, `docs/reglas.md`, `CLAUDE.md`.

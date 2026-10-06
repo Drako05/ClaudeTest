@@ -28,6 +28,7 @@ import {
   MeshBasicMaterial,
   type Texture,
 } from 'three';
+import { VOXEL } from '@verdant/sim';
 import { addShadowPatches, type PatchBuffers, type Surface } from './shadow-patches.js';
 
 /** Lado del lienzo de la mancha. Pequeno: es un degradado, no un dibujo. */
@@ -35,7 +36,7 @@ const BLOB_PX = 64;
 
 /**
  * Cuanto se levanta del suelo: lo justo para no pelear en profundidad con el
- * terreno. Como cada trozo sigue a su casilla, tambien sobre un talud.
+ * terreno. Cada trozo sigue a su columna de 0,5.
  */
 export const LIFT = 0.03;
 
@@ -76,7 +77,7 @@ export interface ShadowSpot {
 
 /**
  * Todas las sombras de un chunk en una sola malla, cada una pegada al suelo de
- * las casillas que pisa (`surface`, la misma que dibuja el terreno).
+ * las columnas de 0,5 que pisa (`surface`, la misma que dibuja el terreno).
  *
  * Devuelve `null` si no hay ninguna, para no meter mallas vacias en la escena.
  */
@@ -87,7 +88,7 @@ export function buildShadows(spots: readonly ShadowSpot[], surface: Surface): Me
 
   const buffers: PatchBuffers = { positions: [], uvs: [], indices: [] };
   for (const spot of spots) {
-    addShadowPatches(spot.x, spot.z, spot.width * SPREAD, surface, LIFT, buffers);
+    addShadowPatches(spot.x, spot.z, spot.width * SPREAD, surface, LIFT, buffers, VOXEL);
   }
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(new Float32Array(buffers.positions), 3));

@@ -19,7 +19,7 @@ import {
   speciesFor,
   Terrain,
 } from '@verdant/shared';
-import { levelFrom, MAX_LEVEL, OUTCROP_RISE, rampDirOf, SEA_LEVEL } from './relief.js';
+import { heightFrom, MAX_HEIGHT, OUTCROP_RISE, SEA_LEVEL, VOXELS_PER_TILE, WATER_HEIGHT } from './relief.js';
 import { hash2DFloat, SimplexNoise } from './rng.js';
 
 /** Guijarros: fraccion de las casillas vacias de tierra, y de roca. **Propuesta mia.** */
@@ -241,35 +241,67 @@ export class WorldGen {
   }
 
   /**
-   * Altura entera del tile. Negativa es agua.
+   * Altura de una columna de 0,5, en medios bloques: `WATER_HEIGHT` en una
+   * casilla de agua, y de 0 para arriba en una de tierra.
    *
    * Sale de la MISMA elevacion que clasifica el terreno, asi que el relieve y
-   * los biomas no pueden discrepar: una costa es una costa en los dos.
+   * los biomas no pueden discrepar: una costa es una costa en los dos. Lo que es
+   * agua lo decide la casilla (su esquina, como `terrainAt`), no la columna.
+   *
+   * La columna no muestrea ruido propio: **interpola el relieve y el saliente
+   * entre las cuatro esquinas de su casilla** (`columnFrom`). La columna de la
+   * esquina es la casilla tal cual, y las otras tres caen entre medias. Asi el
+   * mundo es el de siempre, leido cada 0,5, y generar no cuesta cuatro veces
+   * mas. **Deduccion mia.**
+   *
+   * Pura y sin estado: la pueden pedir el dibujo y las sondas sin registrar el
+   * chunk.
    */
-  levelAt(wx: number, wy: number): number {
-    return this.levelFromRelief(this.reliefAt(wx, wy), wx, wy);
+  columnTopAt(vx: number, vy: number): number {
+    const tx = Math.floor(vx / VOXELS_PER_TILE);
+    const ty = Math.floor(vy / VOXELS_PER_TILE);
+    if (this.elevationAt(tx, ty) < SEA_LEVEL) return WATER_HEIGHT;
+    const corner = (x: number, y: number): [number, number] => [this.reliefAt(x, y), this.outcropAt(x, y)];
+    return this.columnFrom(vx - tx * VOXELS_PER_TILE, vy - ty * VOXELS_PER_TILE, corner(tx, ty), corner(tx + 1, ty), corner(tx, ty + 1), corner(tx + 1, ty + 1));
   }
 
-  /** Como `levelAt`, con el relieve ya calculado. */
-  levelFromRelief(relief: number, wx: number, wy: number): number {
-    const base = levelFrom(relief);
-    // El agua no se levanta: un saliente en mitad del mar seria una isla que el
-    // terreno no conoce, y el terreno es quien manda sobre lo que es agua.
-    if (base < 0) return base;
-    if (!this.isOutcrop(wx, wy)) return base;
-    const raised = base + OUTCROP_RISE;
-    return raised > MAX_LEVEL ? MAX_LEVEL : raised;
+  /**
+   * La altura de la columna de la esquina de una casilla —la que coincide con
+   * ella, `(tx·2, ty·2)`—: la mas barata de pedir, con un solo punto de ruido.
+   * Para recorrer el mapa a saltos de casilla (las sondas del humo).
+   */
+  tileTopAt(tx: number, ty: number): number {
+    const e = this.elevationAt(tx, ty);
+    if (e < SEA_LEVEL) return WATER_HEIGHT;
+    const c: [number, number] = [this.reliefFrom(e, tx, ty), this.outcropAt(tx, ty)];
+    return this.columnFrom(0, 0, c, c, c, c);
   }
 
-  /** Si un tile de tierra pertenece a un saliente. */
+  /**
+   * La altura de la columna (`sx`, `sy`) ∈ {0, 1}² de una casilla de tierra, con
+   * el relieve y el saliente de sus esquinas: la de la propia casilla (`a`), la
+   * del este (`b`), la del sur (`c`) y la del sureste (`d`).
+   */
+  columnFrom(sx: number, sy: number, a: [number, number], b: [number, number], c: [number, number], d: [number, number]): number {
+    const fx = sx / VOXELS_PER_TILE;
+    const fy = sy / VOXELS_PER_TILE;
+    const lerp2 = (i: 0 | 1) =>
+      a[i] * (1 - fx) * (1 - fy) + b[i] * fx * (1 - fy) + c[i] * (1 - fx) * fy + d[i] * fx * fy;
+    const base = heightFrom(lerp2(0));
+    // El agua no se levanta: lo decide la casilla, y aqui ya es tierra.
+    if (lerp2(1) <= OUTCROP_THRESHOLD) return base;
+    const raised = base + OUTCROP_RISE * VOXELS_PER_TILE;
+    return raised > MAX_HEIGHT ? MAX_HEIGHT : raised;
+  }
+
+  /** Si la esquina (`wx`, `wy`) de una casilla cae en un saliente. */
   isOutcrop(wx: number, wy: number): boolean {
-    const raw = this.outcrop.fbm(wx * OUTCROP_SCALE, wy * OUTCROP_SCALE, 2) * 0.5 + 0.5;
-    return raw > OUTCROP_THRESHOLD;
+    return this.outcropAt(wx, wy) > OUTCROP_THRESHOLD;
   }
 
-  /** Por donde se inclina el talud de un tile, o `NO_RAMP` si es plano. */
-  rampDirAt(wx: number, wy: number): number {
-    return rampDirOf(this.seed, wx, wy, this.levelAt(wx, wy), (x, y) => this.levelAt(x, y));
+  /** El valor del ruido de salientes en un punto, en [0, 1]: es saliente por encima de `OUTCROP_THRESHOLD`. */
+  outcropAt(wx: number, wy: number): number {
+    return this.outcrop.fbm(wx * OUTCROP_SCALE, wy * OUTCROP_SCALE, 2) * 0.5 + 0.5;
   }
 
   /**
@@ -345,14 +377,20 @@ export class WorldGen {
   }
 }
 
+/** Columnas de un chunk en cada eje. */
+export const CHUNK_COLUMNS = CHUNK_SIZE * VOXELS_PER_TILE;
+
 /** Datos crudos de un chunk recien generado, sin mutaciones aplicadas. */
 export interface GeneratedChunk {
+  /** Por casilla de 1. */
   readonly terrain: Uint8Array;
+  /** Por casilla de 1. */
   readonly feature: Uint8Array;
-  /** Altura entera de cada tile. Negativa es agua. */
-  readonly level: Int8Array;
-  /** Direccion del talud de cada tile, o `NO_RAMP`. */
-  readonly rampDir: Int8Array;
+  /**
+   * Altura de cada columna de 0,5, en medios bloques (`CHUNK_COLUMNS` por lado,
+   * indice `ly * CHUNK_COLUMNS + lx`). `WATER_HEIGHT` es agua.
+   */
+  readonly height: Int16Array;
 }
 
 /**
@@ -364,53 +402,55 @@ export function generateChunk(gen: WorldGen, cx: number, cy: number): GeneratedC
   const n = CHUNK_SIZE * CHUNK_SIZE;
   const terrain = new Uint8Array(n);
   const feature = new Uint8Array(n);
-  const level = new Int8Array(n);
-  const rampDir = new Int8Array(n);
+  const height = new Int16Array(CHUNK_COLUMNS * CHUNK_COLUMNS);
   const baseX = cx * CHUNK_SIZE;
   const baseY = cy * CHUNK_SIZE;
 
-  // Los niveles se calculan con un tile de MARGEN alrededor del chunk. Un talud
-  // mira a sus cuatro vecinos, y los del borde caen fuera: sin el margen, el
-  // relieve del limite de un chunk dependeria de por donde se generase, que es
-  // exactamente lo que la pureza de `generateChunk` promete que no pasa.
+  // Las esquinas de las casillas, con una de MARGEN por el este y el sur: las
+  // columnas interpolan hacia la esquina siguiente, y sin el margen la altura
+  // del limite de un chunk dependeria de por donde se generase, que es justo lo
+  // que la pureza de `generateChunk` promete que no pasa.
   //
   // La elevacion se guarda de paso: es con diferencia lo mas caro del generador
-  // —dos ruidos de deformacion y un fbm de cinco octavas por tile— y la
-  // necesitan tanto el terreno como la altura. Calculandola una sola vez, el
-  // margen sale casi gratis.
-  const side = CHUNK_SIZE + 2;
-  const padded = new Int8Array(side * side);
+  // —dos ruidos de deformacion y un fbm de cinco octavas por punto— y la
+  // necesitan el terreno y la altura. Calculandola una vez, el margen sale casi
+  // gratis.
+  const side = CHUNK_SIZE + 1;
   const elevations = new Float64Array(side * side);
-  const reliefs = new Float64Array(side * side);
+  const corners: Array<[number, number]> = new Array(side * side);
   for (let py = 0; py < side; py++) {
     for (let px = 0; px < side; px++) {
-      const wx = baseX + px - 1;
-      const wy = baseY + py - 1;
+      const wx = baseX + px;
+      const wy = baseY + py;
       const e = gen.elevationAt(wx, wy);
-      const relief = gen.reliefFrom(e, wx, wy);
       elevations[py * side + px] = e;
-      reliefs[py * side + px] = relief;
-      padded[py * side + px] = gen.levelFromRelief(relief, wx, wy);
+      corners[py * side + px] = [gen.reliefFrom(e, wx, wy), gen.outcropAt(wx, wy)];
     }
   }
-  const levelOf = (x: number, y: number): number => padded[(y - baseY + 1) * side + (x - baseX + 1)];
 
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
       const wx = baseX + lx;
       const wy = baseY + ly;
       const idx = ly * CHUNK_SIZE + lx;
-      const padIdx = (ly + 1) * side + (lx + 1);
-      const t = gen.terrainFrom(elevations[padIdx], reliefs[padIdx], wx, wy);
+      const at = ly * side + lx;
+      const e = elevations[at];
+      const t = gen.terrainFrom(e, corners[at][0], wx, wy);
       terrain[idx] = t;
       feature[idx] = gen.featureAt(wx, wy, t);
-      const lvl = padded[padIdx];
-      level[idx] = lvl;
-      rampDir[idx] = rampDirOf(gen.seed, wx, wy, lvl, levelOf);
+      const water = e < SEA_LEVEL;
+      for (let sy = 0; sy < VOXELS_PER_TILE; sy++) {
+        for (let sx = 0; sx < VOXELS_PER_TILE; sx++) {
+          const col = (ly * VOXELS_PER_TILE + sy) * CHUNK_COLUMNS + lx * VOXELS_PER_TILE + sx;
+          height[col] = water
+            ? WATER_HEIGHT
+            : gen.columnFrom(sx, sy, corners[at], corners[at + 1], corners[at + side], corners[at + side + 1]);
+        }
+      }
     }
   }
 
-  return { terrain, feature, level, rampDir };
+  return { terrain, feature, height };
 }
 
 function clamp01(v: number): number {

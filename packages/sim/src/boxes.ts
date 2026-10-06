@@ -27,6 +27,7 @@ import {
   hitPartsOf,
   isInert,
   isSapling,
+  isStation,
   Station,
   stationHeight,
   stationOfFeature,
@@ -35,6 +36,7 @@ import {
 } from '@verdant/shared';
 import type { Hitbox } from './aim.js';
 import { EntityKind, type EntityStore } from './entities.js';
+import { topOf, VOXELS_PER_TILE } from './relief.js';
 import { treeTrunkAt } from './trunk.js';
 import type { World } from './world.js';
 
@@ -95,8 +97,35 @@ export function featureBox(world: World, tx: number, ty: number): Hitbox | null 
   }
   const cx = tx + 0.5;
   const cy = ty + 0.5;
-  const z0 = world.groundHeightAt(cx, cy);
+  const z0 = objectBase(world, tx, ty, feature);
   return { x0: cx - half, x1: cx + half, y0: cy - half, y1: cy + half, z0, z1: z0 + height };
+}
+
+/**
+ * Donde se apoya el objeto de una casilla: la altura de la base de su caja.
+ *
+ * Una caja centrada en su casilla, por fina que sea, pisa sus cuatro columnas
+ * de 0,5 (el centro es la esquina de las cuatro). Reglas del autor
+ * (2026-10-06):
+ * - **lo generado va apoyado entero**: si su sitio es un escalon suelto, baja
+ *   un nivel y vuelve a mirar, hasta que toda su cara de abajo pise terreno.
+ *   Cerrado en una formula, es **la columna mas baja** de las que pisa;
+ * - **lo que pone el jugador se queda sobre lo que toque**, por poco que sea:
+ *   **la columna mas alta**. Hoy son las estaciones.
+ *
+ * Que el arbol, el arbusto o el brote que nace de la vida van con lo generado,
+ * aunque el brote lo siembre el jugador, es **deduccion mia**.
+ */
+export function objectBase(world: World, tx: number, ty: number, feature: Feature): number {
+  const highest = isStation(feature);
+  let base = highest ? -Infinity : Infinity;
+  for (let sy = 0; sy < VOXELS_PER_TILE; sy++) {
+    for (let sx = 0; sx < VOXELS_PER_TILE; sx++) {
+      const top = topOf(world.columnTop(tx * VOXELS_PER_TILE + sx, ty * VOXELS_PER_TILE + sy));
+      base = highest ? Math.max(base, top) : Math.min(base, top);
+    }
+  }
+  return base;
 }
 
 /** La caja de la casilla si choca (`blocksBody`), o `null`. */
@@ -197,6 +226,8 @@ export function overlapsSquare(b: OrientedBox, cx: number, cy: number, half: num
  */
 const MEMO_R = 4;
 const MEMO_SIDE = 2 * MEMO_R + 1;
+/** Las columnas de 0,5 de la misma ventana. */
+const MEMO_COLS = MEMO_SIDE * VOXELS_PER_TILE;
 const memo = {
   world: null as World | null,
   gen: 0,
@@ -204,11 +235,10 @@ const memo = {
   oy: 0,
   stamp: new Int32Array(MEMO_SIDE * MEMO_SIDE),
   water: new Uint8Array(MEMO_SIDE * MEMO_SIDE),
-  low: new Float64Array(MEMO_SIDE * MEMO_SIDE),
-  high: new Float64Array(MEMO_SIDE * MEMO_SIDE),
   box: new Array<Hitbox | null>(MEMO_SIDE * MEMO_SIDE).fill(null),
+  colStamp: new Int32Array(MEMO_COLS * MEMO_COLS),
+  colTop: new Float64Array(MEMO_COLS * MEMO_COLS),
 };
-const range = new Float64Array(2);
 
 /**
  * Una ronda de consultas del terreno alrededor de (`x`, `y`): lo que `body`
@@ -239,9 +269,6 @@ function tile(world: World, tx: number, ty: number): number {
   if (memo.stamp[i] !== memo.gen) {
     memo.stamp[i] = memo.gen;
     memo.water[i] = world.isTerrainSolidAt(tx, ty) ? 1 : 0;
-    world.floorRangeAt(tx, ty, range);
-    memo.low[i] = range[0];
-    memo.high[i] = range[1];
     memo.box[i] = solidBoxAt(world, tx, ty);
   }
   return i;
@@ -253,20 +280,19 @@ export function terrainSolid(world: World, tx: number, ty: number): boolean {
   return i >= 0 ? memo.water[i] === 1 : world.isTerrainSolidAt(tx, ty);
 }
 
-/** El suelo mas bajo del terreno de la casilla, dentro de una ronda o no. */
-export function groundLow(world: World, tx: number, ty: number): number {
-  const i = tile(world, tx, ty);
-  if (i >= 0) return memo.low[i];
-  world.floorRangeAt(tx, ty, range);
-  return range[0];
-}
-
-/** El suelo mas alto del terreno de la casilla, dentro de una ronda o no. */
-export function groundHigh(world: World, tx: number, ty: number): number {
-  const i = tile(world, tx, ty);
-  if (i >= 0) return memo.high[i];
-  world.floorRangeAt(tx, ty, range);
-  return range[1];
+/** El techo de la columna de 0,5 (`vx`, `vy`), en el mundo, dentro de una ronda o no. */
+export function columnTopIn(world: World, vx: number, vy: number): number {
+  const lx = vx - memo.ox * VOXELS_PER_TILE;
+  const ly = vy - memo.oy * VOXELS_PER_TILE;
+  if (memo.world !== world || lx < 0 || ly < 0 || lx >= MEMO_COLS || ly >= MEMO_COLS) {
+    return topOf(world.columnTop(vx, vy));
+  }
+  const i = ly * MEMO_COLS + lx;
+  if (memo.colStamp[i] !== memo.gen) {
+    memo.colStamp[i] = memo.gen;
+    memo.colTop[i] = topOf(world.columnTop(vx, vy));
+  }
+  return memo.colTop[i];
 }
 
 /** `solidBoxAt`, dentro de una ronda o no. */
