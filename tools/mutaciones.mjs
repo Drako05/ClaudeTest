@@ -56,4 +56,13 @@ export default [
     a: '      if (rise === 99) halfSteps++;',
     prueba: 'smoke:relief',
   },
+  {
+    // La vista normal se queda ahora con el MEJOR de cuatro rumbos: tiene que
+    // seguir cayendo si el barrido de tercera persona no se ve en ninguno.
+    nombre: 'el barrido de tercera persona no tiene ancho',
+    fichero: 'packages/client/src/effects.ts',
+    de: 'export const SLASH_HALF_WIDTH = 0.06;',
+    a: 'export const SLASH_HALF_WIDTH = 0;',
+    prueba: 'slash',
+  },
 ];
