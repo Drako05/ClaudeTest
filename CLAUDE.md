@@ -115,35 +115,35 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     delante de la pared que toca (`aimSurface`). **El texto entero —medidas,
     hitboxes, la estocada, por que cayeron los dos modelos anteriores— esta en
     `docs/reglas.md`: leelo antes de tocar el golpe, sembrar o colocar.**
-13. **El relieve sale de la misma elevacion que el terreno.** `levelFrom` no es
-    mas que otra forma de leer el `e < 0.42` que ya separaba el agua, asi que
-    `terrainAt` no cambia y los umbrales de bioma siguen calibrados. Si mueves el
-    nivel del mar sin mover el umbral de agua, `tests/relief.test.ts` te avisa.
+13. **El relieve sale de la misma elevacion que el terreno, en voxeles de 0,5**
+    (decision del autor, 2026-10-06). Cada columna de 0,5 × 0,5 tiene su altura
+    en medios bloques (`heightFrom`, 0,03 de elevacion cada uno: el 0,06 del
+    autor partido en dos), interpolando el relieve entre las esquinas de su
+    casilla; lo que es agua lo decide la casilla, el mismo `e < 0.42` de
+    siempre, asi que `terrainAt` no cambia y los umbrales de bioma siguen
+    calibrados. El bioma, la vida y los objetos siguen por casilla de 1. Si
+    mueves el nivel del mar sin mover el umbral de agua,
+    `tests/relief.test.ts` te avisa.
 14. **La altura y los muros son dos mecanismos distintos.** Las **cordilleras**
     amplifican el desnivel sobre el nivel del mar, y de ahi salen la altitud y
     las laderas escalonadas; los **salientes** levantan +3 de golpe y de ahi
-    salen las mesetas. Medido, una cordillera tambien produce acantilados
-    naturales —la pendiente amplificada pasa de un nivel por casilla— y **le
-    salen gratis**: un acantilado a media ladera siempre se rodea porque la
-    escalera sigue al lado. Los salientes, en cambio, se pagan en conectividad, y
+    salen las mesetas. Con voxeles de 0,5, la ladera de una cordillera sale en
+    paredes de un bloque, que se saltan, y las paredes de dos o mas solo las dan
+    los salientes (medido, 2026-10-06). Los salientes se pagan en conectividad, y
     su densidad esta calibrada, no elegida. Antes de tocar `OUTCROP_THRESHOLD`,
     `RIDGE_GAIN` o sus escalas, vuelve a medir con
     `npx vite-node tools/analyze-world.ts` y mira la **linea base solo-agua**: el
     mundo plano tampoco es del todo conexo, y comparar contra el 100 % hace pasar
     por sano un relieve que no lo es. El presupuesto acordado es un punto.
-15. **La rampa es propiedad del tile bajo, no de la arista.** Es lo que hace
-    continuo el campo de alturas: con la rampa en la arista habria un escalon
-    vertical justo en el limite entre las dos casillas, que es lo que un talud no
-    tiene. Y por eso un talud se dibuja como un rombo torcido, sin forma
-    especial. Las caras se calculan con las alturas de los **dos extremos** de
-    cada borde: comparando niveles enteros, el costado de un talud se quedaria
-    sin su cuna y se veria el fondo por el agujero.
+15. *(Retirada con los voxeles, 2026-10-06: la rampa. El autor elimino las
+    rampas; el relieve sube a escalones de medio bloque, que se suben andando.
+    Ver `docs/relieve.md`.)*
 16-20. *(Retiradas con el isometrico: el orden por antidiagonales, el recorte
     por bloques, la silueta del jugador, la fila de su casilla y el filo de los
     escalones. Ver `docs/isometrico.md`.)*
 21. **La altura estorba, y estorba con UNA regla: no se entra donde el suelo
     esta por encima de los pies.** Andando hay un margen, `STEP_UP`; volando,
-    ninguno: de ahi salen el talud que se sube, la pared que no y el bloque
+    ninguno: de ahi salen el medio bloque que se sube, la pared que no y el bloque
     contra el que uno se estampa en el aire. La altura del personaje es
     **suya** (`entities.z`) y es la que se dibuja; la gravedad se integra con el
     **promedio de las dos velocidades**, que da la parabola exacta; y **los
@@ -151,7 +151,8 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     huella entera** del cuerpo (`squareFloor`, `footing`): se choca de lado,
     se sube saltando y encima se esta de pie. El terreno, en el centro.
     **Texto entero, con el porque de cada numero, en `docs/reglas.md`.**
-22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano de 3x3,
+22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano de 3x3
+    casillas con todas sus columnas de 0,5 a la misma altura,
     sitio para andar sin saltar, sitio del que salir contando con el salto, y
     terreno que **sostenga vida**. **Texto entero, con lo medido, en
     `docs/reglas.md`.**
@@ -161,8 +162,10 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
     recorre. Sus cifras de antes y las de ahora **no son comparables**.
     `tools/analyze-world.ts` ya lo hacia bien —mide con «se sube un bloque de un
     salto»—, asi que la calibracion de la regla 14 estaba hecha para esta fisica
-    y aguanta: el relieve cuesta 0.14-0.77 puntos sobre la linea base solo-agua,
-    por debajo del punto acordado.
+    y aguanta. Desde los voxeles (2026-10-06) las tres medidas van **por
+    columnas de 0,5**: medio bloque andando, uno de un salto (`canClimbTo`). El
+    relieve cuesta 0,14-0,76 puntos sobre la linea base solo-agua, lo mismo que
+    antes, por debajo del punto acordado.
 
 ## Regla de trabajo con el autor
 

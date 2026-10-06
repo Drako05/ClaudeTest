@@ -36,7 +36,7 @@ const BLOB_PX = 64;
 
 /**
  * Cuanto se levanta del suelo: lo justo para no pelear en profundidad con el
- * terreno. Como cada trozo sigue a su casilla, tambien sobre un talud.
+ * terreno. Cada trozo sigue a su columna de 0,5.
  */
 export const LIFT = 0.03;
 

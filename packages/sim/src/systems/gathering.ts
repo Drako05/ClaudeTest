@@ -710,9 +710,10 @@ export function placeTarget(world: World, store: EntityStore, id: number): Place
 /**
  * Coloca la estacion de la mano donde la mirada toca el suelo, o delante de la
  * pared que mira, a menos del alcance (decisiones del autor). Hace falta una
- * casilla vacia, sin agua, **sin talud** —una caja sobre una rampa quedaria
- * colgando por un lado— y que no pise el cuerpo del jugador, que quedaria
- * dentro de ella (las dos, propuesta mia). Devuelve donde, o `null`.
+ * casilla vacia, sin agua, y que no pise el cuerpo del jugador, que quedaria
+ * dentro de ella (propuesta mia). Se apoya sobre lo mas alto que toque de su
+ * casilla, por poco que sea (el autor, 2026-10-06; `objectBase`). Devuelve
+ * donde, o `null`.
  */
 export function tryPlace(world: World, store: EntityStore, id: number, inventory: Inventory): Placed | null {
   const item = inventory.inHand();

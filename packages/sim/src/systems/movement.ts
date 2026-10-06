@@ -6,8 +6,8 @@
  *
  * **La altura estorba, y estorba con una sola regla**: no se entra donde el
  * suelo esta por encima de los pies. De ahi salen las tres cosas a la vez, sin
- * casos especiales — un talud se sube andando porque su suelo sube poco a poco,
- * una pared no se sube porque el suyo sube de golpe, y en el aire uno se estampa
+ * casos especiales — un escalon de medio bloque se sube andando, una pared de
+ * uno no se sube porque pasa del margen, y en el aire uno se estampa
  * contra la cara de un bloque porque a esa altura su suelo sigue estando encima.
  * Lo unico que cambia entre andar y volar es **cuanto** margen hay: andando,
  * `STEP_UP`; volando, ninguno.
@@ -36,11 +36,9 @@ export const WALK_SPEED = 5.2;
  * verdad sin que el mundo pase volando— y esta expresado como multiplicador
  * justo para que cambiarlo sea una linea.
  *
- * No obliga a recalibrar nada de lo que ya habia, y esta comprobado: subiendo un
- * talud a la carrera el suelo asciende `RUN_SPEED · TICK_DT ≈ 0.139` niveles por
- * tick, todavia muy por debajo del medio nivel de `STEP_UP` (regla 21), y el
- * paso por tick sigue siendo mucho menor que `BODY_RADIUS`, asi que no se
- * atraviesan paredes.
+ * No obliga a recalibrar nada de lo que ya habia, y esta comprobado: el paso por
+ * tick a la carrera (`RUN_SPEED · TICK_DT ≈ 0.139`) sigue siendo mucho menor
+ * que `BODY_RADIUS`, asi que no se atraviesan paredes.
  */
 export const RUN_MULTIPLIER = 1.6;
 

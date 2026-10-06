@@ -25,9 +25,40 @@ altitud si se recalibraron, pero **sumando** reglas a las viejas en vez de
 sustituirlas, para no mover el mundo llano ni un tile.
 
 Numeros del autor, que no se tocan sin preguntarle: el escalon (0.06), los 16 px
-por nivel, el 15 % de fronteras que son rampa y el tope de 40 niveles. El umbral
-de salientes y la ganancia de cordillera, en cambio, son calibraciones: se eligen
-midiendo (regla 14).
+por nivel y el tope de 40 niveles. El umbral de salientes y la ganancia de
+cordillera, en cambio, son calibraciones: se eligen midiendo (regla 14).
+
+## Voxeles de 0,5 (2026-10-06)
+
+**El terreno son voxeles de 0,5 × 0,5 × 0,5** (decision del autor, pensando en
+excavar y construir): cada **columna** de medio bloque de lado tiene una altura
+entera en **medios bloques**, y es solida de ahi para abajo. Una casilla de 1
+son 2 × 2 columnas. Lo que decidio el autor:
+- **sin rampas** —el 15 % de fronteras que eran rampa se retiro, y con el la
+  regla 15—: el relieve sube a escalones de medio bloque, que se suben andando;
+- **el escalon natural mide 0,5 en alto y en planta**: la misma elevacion de
+  siempre, leida cada 0,5. El escalon de elevacion de un medio bloque es
+  **0,03**, el 0,06 del autor partido en dos;
+- **el bioma, la vida y los objetos siguen por casilla de 1**.
+
+Lo que es **deduccion mia**:
+- **la columna interpola el relieve y el saliente entre las cuatro esquinas de
+  su casilla** (`WorldGen.columnFrom`), sin ruido nuevo: la columna de la
+  esquina es la casilla tal cual, y generar no cuesta cuatro veces mas;
+- **lo que es agua lo decide la casilla**: una casilla de agua tiene sus cuatro
+  columnas a -1 y una de tierra, todas de 0 para arriba. Asi la costa y los
+  biomas no se mueven ni un tile.
+
+Medido (`tools/analyze-world.ts`, tres semillas):
+- **el reparto de alturas es el de antes**, y el relieve cuesta **0,14, 0,76 y
+  0,61 puntos** de conectividad sobre la linea base solo-agua, lo mismo que con
+  rampas: no hizo falta recalibrar los salientes;
+- **andando, casi todo se recorre**: la componente andando es practicamente la
+  de con salto, porque en llano dos columnas vecinas nunca se llevan mas de
+  medio bloque (un test lo afirma);
+- **las cordilleras ya no dan acantilados de dos**: la interpolacion reparte su
+  pendiente en paredes de un bloque, que se saltan. Las paredes de dos o mas
+  solo las dan los salientes, que son escasos.
 
 El salto, ya implementado: parabola simetrica con el apice **a una casilla
 exacta** y alcance dos andando, y el agua es muro tambien volando. **El salto

@@ -89,18 +89,18 @@ un indice de estos documentos).
 
 21. **La altura estorba, y estorba con UNA regla: no se entra donde el suelo
     esta por encima de los pies.** De ahi salen las tres cosas a la vez y sin
-    casos especiales — un talud se sube andando porque su suelo sube poco a
-    poco, una pared no se sube porque el suyo sube de golpe, y en el aire uno se
-    estampa contra la cara de un bloque porque a esa altura su suelo sigue
-    estando encima. Lo unico que cambia entre andar y volar es **cuanto** margen
-    hay: andando, `STEP_UP`; volando, ninguno.
+    casos especiales — un escalon de medio bloque se sube andando, una pared de
+    uno no, y en el aire uno se estampa contra la cara de un bloque porque a esa
+    altura su suelo sigue estando encima. Lo unico que cambia entre andar y
+    volar es **cuanto** margen hay: andando, `STEP_UP`; volando, ninguno.
 
-    Ese margen y su gemelo `SNAP_DOWN` no son alturas de escalon elegidas a ojo:
-    son la holgura que separa un talud de una pared. Subiendo un talud a paso
-    completo el suelo asciende `WALK_SPEED · TICK_DT ≈ 0.087` niveles por tick y
-    la pared mas baja mide 1 entero, asi que cualquier valor entre esas dos
-    cifras da el mismo mundo. Sin la holgura de bajada el personaje iria dando
-    saltitos ladera abajo.
+    **`STEP_UP` es 0,5, inclusive**: todo lo que mida ≤ 0,5 se sube andando, y es
+    una caracteristica de la fisica, no de cada cosa (decision del autor,
+    2026-10-06, con el terreno de voxeles de 0,5). Hasta entonces era la holgura
+    que separaba un talud de una pared; las rampas se retiraron y el relieve
+    sube a escalones de medio bloque, que es justo lo que ese margen deja
+    pasar. `SNAP_DOWN`, su gemelo de bajada, sigue en 0,5: sin el, el personaje
+    iria dando saltitos escalera abajo.
 
     La altura del personaje es **suya** (`entities.z`), no la del suelo bajo sus
     pies, y el que dibuja tiene que leer esa. Leyendo el suelo el personaje
@@ -144,10 +144,11 @@ un indice de estos documentos).
     **Los animales llevan la regla a sus partes** (2026-10-03, ver
     `docs/fauna.md`). Sus pies, como el jugador: centro y `STEP_UP` contra el
     terreno. Ademas, cada parte de su cuerpo que choca (`hit`), girada con su
-    rumbo, no puede solapar una casilla de agua, ni una casilla que, hacia sus
-    pies, tenga un escalon de mas de `STEP_UP` cuya cima pase de la base de la
-    parte, ni la caja de un objeto cuyo techo pase de esa base (`sim/body.ts`,
-    *deduccion*). Una rampa no tiene escalon y deja pasar. Se apoyan en las
+    rumbo, no puede solapar una casilla de agua, ni una columna de 0,5 que,
+    hacia sus pies, tenga un escalon de mas de `STEP_UP` cuya cima pase de la
+    base de la parte, ni la caja de un objeto cuyo techo pase de esa base
+    (`sim/body.ts`, *deduccion*). Un medio bloque no es escalon: se sube
+    andando. Se apoyan en las
     cajas que tocan **sus partes mas bajas** —las patas; el caparazon del
     cangrejo; el tronco de la gaviota— (*deduccion*). La decision del autor es
     que choquen las cajas de sus partes; como se mide la altura contra ellas es
@@ -161,6 +162,10 @@ un indice de estos documentos).
     — un rellano llano de 3x3, sitio para andar sin saltar, y sitio del que
     salir contando con el salto—. Medido en nueve semillas, cuesta mover el
     nacimiento entre 8 y 15 casillas, que en un mundo infinito no es nada.
+
+    Con los voxeles de 0,5 (2026-10-06), el rellano pide que **las 36 columnas**
+    de sus 3 × 3 casillas esten a la misma altura, y los dos recorridos van por
+    columnas: medio bloque andando, uno de un salto (`canClimbTo`).
 
     El rellano nacio cuando la accion solo alcanzaba casillas a la altura
     propia: en terreno escalonado llegaba a una de tres y el juego empezaba

@@ -64,7 +64,7 @@ todas sus instancias; antes cada sprite se creaba su material.
 el autor vio medias sombras flotando sobre el hueco en los arboles al borde de
 un desnivel. `shadow-patches.ts` parte el cuadrado por casillas y apoya cada
 trozo en la superficie de la suya, que es **la misma que dibuja el terreno**
-(`cornerHeight` de `terrain-mesh.ts`, que tampoco registra chunks vecinos). Como
+(`columnTopFor` de `terrain-mesh.ts`, que tampoco registra chunks vecinos). Como
 dentro de una casilla el suelo es lineal, un cuadrilatero por trozo es exacto, y
 una sombra que cabe en su casilla sigue siendo uno solo. Por eso dejo de ser un
 `InstancedMesh`: ya no es la misma geometria repetida. `tests/shadow-patches.test.ts`

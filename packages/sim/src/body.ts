@@ -15,11 +15,11 @@
  * la cabeza de un bisonte pasa por encima de una roca, sus patas no.
  *
  * **Un escalon estorba a cada parte** (la regla 21 extendida a las partes,
- * *mi deduccion*): una casilla estorba a una parte si entre ella y la casilla
- * vecina hacia los pies hay un escalon —su suelo mas bajo pasa de `STEP_UP`
- * sobre el mas alto de la vecina— y ese suelo queda por encima de la base de
- * la parte. Una rampa no tiene escalon: deja pasar, aunque un cuerpo que no se
- * inclina asome sobre su pendiente; un escalon de un nivel no deja meter una
+ * *mi deduccion*): una columna de 0,5 estorba a una parte si entre ella y la
+ * columna vecina hacia los pies hay un escalon —su techo pasa de `STEP_UP`
+ * sobre el de la vecina— y ese techo queda por encima de la base de la parte.
+ * Un medio bloque no es escalon: se sube andando, aunque un cuerpo que no se
+ * inclina asome sobre la escalera; un escalon de un bloque no deja meter una
  * cabeza. Los pies siguen con su regla del centro y `STEP_UP` (`movement.ts`).
  *
  * Coordenadas del nucleo: `x`, `y` en el suelo y `z` hacia arriba.

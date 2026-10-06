@@ -47,15 +47,14 @@ import {
  * falta, que es como aviso cuando las estaciones pasaron a ser suelo y cuando
  * los objetos pasaron a tener caja (`boxes.ts`).
  */
-function heightField(levelAt: (x: number, y: number) => number): World {
-  const groundHeightAt = (wx: number, wy: number) => levelAt(Math.floor(wx), Math.floor(wy));
+function heightField(heightOf: (x: number, y: number) => number): World {
+  const groundHeightAt = (wx: number, wy: number) => heightOf(Math.floor(wx), Math.floor(wy));
   return {
-    levelAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)),
     groundHeightAt,
     featureAt: () => Feature.None,
     // Solo el agua detiene el paso (regla 9), y el agua es nivel negativo.
-    isSolidAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)) < 0,
-    isTerrainSolidAt: (x: number, y: number) => levelAt(Math.floor(x), Math.floor(y)) < 0,
+    isSolidAt: (x: number, y: number) => heightOf(Math.floor(x), Math.floor(y)) < 0,
+    isTerrainSolidAt: (x: number, y: number) => heightOf(Math.floor(x), Math.floor(y)) < 0,
   } as unknown as World;
 }
 
@@ -337,7 +336,6 @@ describe('El auto salto', () => {
   /** Un mundo de suelos a mano: `floorAt` es lo que pisa el cuerpo. */
   function floors(floorAt: (x: number, y: number) => number, solidAt: (x: number) => boolean = () => false): World {
     return {
-      levelAt: (x: number, y: number) => Math.floor(floorAt(x, y)),
       groundHeightAt: floorAt,
       featureAt: () => Feature.None,
       isSolidAt: (x: number) => solidAt(x),

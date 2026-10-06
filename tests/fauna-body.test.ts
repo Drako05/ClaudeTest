@@ -159,7 +159,7 @@ describe('el cuerpo choca con el terreno', () => {
     expect(bison.store.facingX[bison.id]).toBeLessThan(0.95);
   });
 
-  it('no mete la cabeza en un escalon de un nivel: lo salta, y una liebre sube una rampa', () => {
+  it('no mete la cabeza en un escalon de un bloque: lo salta, y una liebre sube una escalera de medio bloque', () => {
     const step = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
     for (const species of [Species.Bison, Species.Hare]) {
       const a = lone(species, 0, 0.5, 1, 0);
@@ -175,8 +175,8 @@ describe('el cuerpo choca con el terreno', () => {
       expect(a.store.z[a.id]).toBe(1);
       expect(a.store.x[a.id]).toBeGreaterThan(4);
     }
-    // La rampa sube un nivel en una casilla, de x = 2 a x = 3: se sube andando.
-    const ramp = fakeWorld(() => false, (x) => Math.max(0, Math.min(1, x - 2)));
+    // Una escalera de medio bloque, de x = 2 a x = 3: se sube andando.
+    const ramp = fakeWorld(() => false, (x) => (x < 2.5 ? 0 : x < 3 ? 0.5 : 1));
     const hare = lone(Species.Hare, 0, 0.5, 1, 0);
     walk(ramp, hare.store, hare.id, 1, 0, 5, () => expect(hare.store.grounded[hare.id]).toBe(1));
     expect(hare.store.x[hare.id]).toBeGreaterThan(3.5);
