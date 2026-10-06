@@ -141,7 +141,9 @@ los numeros.
 - **La CI fallo una vez en `slash`, y no por los voxeles.** El paseo acabo en
   un pinar, y alli la vista normal da 12-16 pixeles en la mayoria de rumbos,
   tambien con el build de `main`. Ahora esa vista se queda con el mejor de
-  cuatro rumbos (`docs/efectos.md`), con una mutacion que lo hace caer.
+  cuatro rumbos (`docs/efectos.md`), con una mutacion que lo hace caer. Esa
+  mutacion destapo otro agujero que ya estaba: la medida contaba tambien los
+  impactos. Ahora `slash.mjs` abre con `?efectos=barrido` y solo ve el barrido.
 
 ## Esperando tu juicio
 

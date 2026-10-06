@@ -102,6 +102,13 @@ maquina, y esa vez se quedo en un pinar, en 13.9, 11.2. **Una puerta que
 depende de donde acaba un paseo cronometrado falla a suertes**. La primera
 persona sigue con el peor de cuatro, y la camara baja con su unico rumbo.
 
+Y **la medida solo ve el barrido** (`?efectos=barrido`, el mismo dia): sin
+impactos, esquirlas ni escombros. El impacto es otro destello blanco sin prueba
+de profundidad, y la mutacion que deja el barrido sin ancho no caia: en el
+pinar, la vista normal contaba 25.506 pixeles de impactos contra los troncos.
+Es la leccion de siempre, un escalon mas abajo: **contar pixeles no basta si
+se cuentan los de otro**.
+
 Ojo tambien con lo que se cuenta: la primera version buscaba pixeles «casi
 blancos» y daba cero con el barrido perfectamente visible, porque el trazo es
 translucido y blanco al 50 % sobre hierba es un verde palido.
