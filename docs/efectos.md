@@ -91,6 +91,17 @@ con el jugador y la camara quietos dos fotogramas son identicos. Y compara
 orientacion van y vienen segun se gire, y mirando desde el sitio afortunado se
 ven perfectos.
 
+**Salvo en la vista normal, que se queda con el MEJOR de cuatro** (2026-10-06).
+Lo que vigila es el recorte por frustum, y ese borra el barrido en todos los
+rumbos a la vez. Con la camara a 31 m mirando por la linea de la mirada, el
+plano del sector pasa por la camara y el arco se ve de canto, como un hilo de
+3 px. En un pinar daba 12-16 pixeles en cinco rumbos de ocho, contra un suelo
+de 20, y con el build de `main` igual. La CI fallo asi en la fase 1 de los
+voxeles: el paseo de `slash.mjs` acaba donde le deja la velocidad de la
+maquina, y esa vez se quedo en un pinar, en 13.9, 11.2. **Una puerta que
+depende de donde acaba un paseo cronometrado falla a suertes**. La primera
+persona sigue con el peor de cuatro, y la camara baja con su unico rumbo.
+
 Ojo tambien con lo que se cuenta: la primera version buscaba pixeles «casi
 blancos» y daba cero con el barrido perfectamente visible, porque el trazo es
 translucido y blanco al 50 % sobre hierba es un verde palido.

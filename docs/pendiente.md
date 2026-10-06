@@ -138,6 +138,10 @@ los numeros.
   columnas; la de voxeles es la fase 2.
 - **El tick medio**: ~0,75 → ~1,0 ms (los escalones de las partes de los
   animales, ahora por columnas). Muy por debajo de los 8.
+- **La CI fallo una vez en `slash`, y no por los voxeles.** El paseo acabo en
+  un pinar, y alli la vista normal da 12-16 pixeles en la mayoria de rumbos,
+  tambien con el build de `main`. Ahora esa vista se queda con el mejor de
+  cuatro rumbos (`docs/efectos.md`), con una mutacion que lo hace caer.
 
 ## Esperando tu juicio
 

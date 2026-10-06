@@ -222,7 +222,16 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
   // Desde que el barrido va delante de la mirada y no clavado a las casillas
   // (regla 12, con el cono), sale en todos los rumbos: ya no hay rumbos «sin
   // arco» que contar aparte, y un cero es de verdad el barrido esfumandose.
-  const turns = view === 'de cerca, girando' || view === 'primera persona' ? 4 : 1;
+  //
+  // La vista normal tambien mide cuatro rumbos, pero se queda con el MEJOR: lo
+  // que vigila es el recorte por frustum, que borra el barrido en todos los
+  // rumbos a la vez (0 pixeles). Con un solo rumbo dependia de donde acabara el
+  // paseo, y el paseo depende de la velocidad de la maquina: con la camara a
+  // 31 m el plano del sector pasa por ella, el arco se ve de canto, y metido en
+  // un pinar da 12-16 pixeles en cinco rumbos de ocho y 173 en otro. Paso en la
+  // CI (2026-10-06, en 13.9, 11.2), y el build de `main` daba lo mismo alli.
+  const turns = view === 'camara baja' ? 1 : 4;
+  const keepBest = view === 'normal';
   const box = view === 'primera persona' ? FULL_WIDTH : BOX;
   let worst = null;
   let noise = 0;
@@ -252,13 +261,17 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
 
     // Una captura por tanda y no cuatro: la del fotograma con mas barrido a la
     // vista, que es la que decide si esto se ve o no.
-    if (view === 'normal') await writeFile(new URL('../screenshots/slash.png', import.meta.url), hitting.best);
+    if (view === 'normal' && (worst === null || hitting.max > worst)) {
+      await writeFile(new URL('../screenshots/slash.png', import.meta.url), hitting.best);
+    }
 
-    if (worst === null || hitting.max < worst) worst = hitting.max;
+    if (worst === null || (keepBest ? hitting.max > worst : hitting.max < worst)) worst = hitting.max;
     if (turns > 1) console.log(`  ${view}, rumbo ${turn + 1}: ${hitting.max} pixeles aclarados`);
     sent += after.slashesDrawn - before.slashesDrawn;
     gathered += after.gathered - before.gathered;
   }
+  // La vuelta entera, para que la camara baja mida desde el rumbo de siempre.
+  if (keepBest) await drag(-262, 0);
 
   results.push({ view, pitch, noise, lit: worst, sent, gathered });
 }
@@ -293,16 +306,17 @@ for (const r of results) {
   );
 }
 console.log('');
-console.log('«pixeles aclarados» es el barrido llegando a pantalla; en la vista giratoria,');
-console.log('el PEOR de los cuatro rumbos. Con «recogido» a cero no hay escombros de por');
-console.log('medio y todo lo aclarado es del barrido.');
+console.log('«pixeles aclarados» es el barrido llegando a pantalla; en la vista normal, el');
+console.log('MEJOR de cuatro rumbos, y en la giratoria y la primera persona, el PEOR. Con');
+console.log('«recogido» a cero no hay escombros de por medio y todo lo aclarado es del barrido.');
 console.log('');
 console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` : 'sin errores de consola');
 
 // Desde que corre en la CI (2026-10-02) tiene que poder fallar: una casilla que
 // mide y nunca sale en rojo es verde sin probar nada. Los suelos, entre lo
-// bueno y los fallos que tuvo (0, 2 y 13 pixeles): la vista normal da ~190 y
-// el fallo del frustum 0; la camara baja ~8.000 y los de orientacion 2 y 13;
+// bueno y los fallos que tuvo (0, 2 y 13 pixeles): la vista normal da ~190 en
+// su mejor rumbo —en uno solo bajaba a 12-16 segun donde acabara el paseo— y
+// el fallo del frustum 0 en todos; la camara baja ~8.000 y los de orientacion 2 y 13;
 // la primera persona ~10.000 y la estocada ~8.900.
 //
 // La vista que gira cerca NO hace fallar: en la CI dio 46, 12 y ~190 sobre el
