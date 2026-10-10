@@ -1135,6 +1135,8 @@ Object.defineProperty(window, '__verdant', {
       fovPanel: fovPanel.open,
       /** A que distancia del pivote ha quedado la camara tras la colision. */
       camDistance: camera.camDistance,
+      /** La que querria sin la colision. */
+      camWant: camera.camWant,
       /** Cuanto queda la camara por ENCIMA del suelo que tiene debajo. */
       camClearance:
         camera.active.position.y -
@@ -1198,8 +1200,10 @@ Object.defineProperty(window, '__verdant', {
         facingY: e.facingY[a],
         health: e.health[a],
         maxHealth: e.maxHealth[a],
-        /** Si anda ahora; parado, esta en su punto de paso. */
+        /** Si anda ahora. Parado puede estar atascado: lo dice `atWaypoint`. */
         moving: Math.hypot(e.vx[a], e.vy[a]) > 0,
+        /** Si esta en su punto de paso, que es donde aparece al recargar. */
+        atWaypoint: Math.hypot(e.wanderX[a] - e.x[a], e.wanderY[a] - e.y[a]) <= 0.5,
         /** Ticks que le quedan a su periodo de paseo: lo que tardara en irse. */
         calm: (() => {
           const animal = e.animal[a];

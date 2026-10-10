@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   BODY_RADIUS,
   squareFloor,
+  terrainUnder,
   animalBoxes,
   collides,
   createGame,
   equipSlot,
   EYE_HEIGHT,
   faunaOf,
+  hitboxAt,
   Inventory,
   periodOf,
   skipTime,
@@ -81,10 +83,11 @@ function aimAt(state: GameState, id: number): Intent {
     const px = entities.x[id] + ox;
     const py = entities.y[id] + oy;
     // Ni en el agua ni encima o dentro de un objeto: de pie en el suelo.
-    if (collides(world, px, py) || squareFloor(world, px, py, BODY_RADIUS) > world.groundHeightAt(px, py)) continue;
+    // Con la huella entera (regla 21): lo que pisa no es mas que su terreno.
+    if (collides(world, px, py) || squareFloor(world, px, py, BODY_RADIUS) > terrainUnder(world, px, py, BODY_RADIUS)) continue;
     entities.x[playerId] = px;
     entities.y[playerId] = py;
-    entities.z[playerId] = world.groundHeightAt(px, py);
+    entities.z[playerId] = squareFloor(world, px, py, BODY_RADIUS);
     break;
   }
   // La parte mas grande que golpea: su tronco.
@@ -444,11 +447,21 @@ describe('Fauna: cazar', () => {
     inv.select(0);
     inv.move(1, equipSlot(Equip.Weapon));
     const id = someAnimal(state, (a) => state.entities.maxHealth[a] > 50);
-    const intent = { ...aimAt(state, id), precise: false };
+    aimAt(state, id);
     // Una roca en la casilla del animal: el sector toca a los dos. El hacha no
     // puede con ella, pero la toca, y eso gasta.
-    const { entities, world } = state;
-    world.setFeature(Math.floor(entities.x[id]), Math.floor(entities.y[id]), Feature.RockNode);
+    const { entities, world, playerId } = state;
+    const tx = Math.floor(entities.x[id]);
+    const ty = Math.floor(entities.y[id]);
+    world.setFeature(tx, ty, Feature.RockNode);
+    // Se apunta al techo de la roca, bajo las patas: desde que todas sus cajas
+    // chocan (2026-10-10), el animal se sube a ella si asoma medio bloque, y
+    // apuntando a su tronco el barrido pasaba por encima de la roca.
+    const rock = hitboxAt(world, tx, ty)!;
+    const dx = (rock.x0 + rock.x1) / 2 - entities.x[playerId];
+    const dy = (rock.y0 + rock.y1) / 2 - entities.y[playerId];
+    const dz = rock.z1 - (entities.z[playerId] + EYE_HEIGHT);
+    const intent = { ...emptyIntent(), aimX: dx, aimY: dy, aimZ: dz / Math.hypot(dx, dy, dz), harvest: true, precise: false };
     const full = entities.maxHealth[id];
     step(state, intent);
     expect(entities.health[id]).toBe(full - 30);

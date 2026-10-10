@@ -5,6 +5,7 @@ import {
   applyVertical,
   bodyBoxes,
   bodyClashes,
+  brakeAnimal,
   EntityKind,
   EntityStore,
   hitboxAt,
@@ -45,9 +46,11 @@ function lone(species: Species, x: number, y: number, fx: number, fy: number) {
   return { store, id };
 }
 
+/** Cuantas cajas del animal estan metidas en algo, sin margen: cero es que cabe. */
 function clashesOf(world: World, store: EntityStore, id: number): number {
   const a = store.animal[id]!;
-  return bodyClashes(world, bodyBoxes(a.species, a.stage, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]), store.x[id], store.y[id]);
+  const z = store.z[id];
+  return bodyClashes(world, bodyBoxes(a.species, a.stage, store.x[id], store.y[id], z, store.facingX[id], store.facingY[id]), z, 0);
 }
 
 /**
@@ -156,7 +159,8 @@ describe('el cuerpo choca con el terreno', () => {
     expect(clashesOf(wall, bison.store, bison.id)).toBe(0);
     walk(wall, bison.store, bison.id, 1, 0, 3, () => expect(clashesOf(wall, bison.store, bison.id)).toBe(0));
     // Mirando a +x su hocico llegaria mas alla de x = 2: no termino de girar.
-    expect(bison.store.facingX[bison.id]).toBeLessThan(0.95);
+    // (Con la inercia, 2026-10-10, frena deslizandose y se queda a ~0,951.)
+    expect(bison.store.facingX[bison.id]).toBeLessThan(0.99);
   });
 
   it('no mete la cabeza en un escalon de un bloque: lo salta, y una liebre sube una escalera de medio bloque', () => {
@@ -210,7 +214,8 @@ describe('el cuerpo choca con el terreno', () => {
     // Una pared de dos niveles a lo largo de y: no se salta, se recorre.
     const cliff = fakeWorld(() => false, (x) => (x >= 3 ? 2 : 0));
     const c = lone(Species.Hare, 0.5, 0.5, 1, 0);
-    walk(cliff, c.store, c.id, 1, 0, 6, () => expect(c.store.z[c.id]).toBeLessThan(1));
+    // Ocho segundos: cada rodeo arranca y frena con la inercia (2026-10-10).
+    walk(cliff, c.store, c.id, 1, 0, 8, () => expect(c.store.z[c.id]).toBeLessThan(1));
     expect(c.store.x[c.id]).toBeLessThan(3);
     expect(Math.abs(c.store.y[c.id] - 0.5)).toBeGreaterThan(2);
   });
@@ -239,7 +244,7 @@ describe('el cuerpo choca con el terreno', () => {
     // Las patas solas ya chocan: puesto con la pata delantera dentro de la roca.
     const legs = bodyBoxes(Species.RedDeer, Stage.Adult, rock.x0 - 0.3, 0.5, 0, 1, 0, true);
     expect(legs.length).toBe(4);
-    expect(bodyClashes(world, legs, rock.x0 - 0.3, 0.5)).toBeGreaterThan(0);
+    expect(bodyClashes(world, legs, 0, 0.5)).toBeGreaterThan(0);
     // Andando, salta encima, se apoya en ella y sigue.
     const deer = lone(Species.RedDeer, 0, 0.5, 1, 0);
     let stood = 0;
@@ -274,5 +279,61 @@ describe('el cuerpo choca con el terreno', () => {
     expect(lowest(Species.RedDeer)).toEqual({ n: 4, base: 0 });
     expect(lowest(Species.Crab).n).toBe(1);
     expect(lowest(Species.Gull).n).toBe(1);
+  });
+});
+
+/**
+ * La fisica del 2026-10-10 (el autor): todas las cajas chocan con el terreno
+ * en todo momento, solo subir medio bloque es de golpe, saltan como el jugador
+ * —a su paso— y arrancan y frenan con inercia.
+ */
+describe('todas sus cajas chocan siempre, saltan a su paso y tienen inercia', () => {
+  it('bajando un escalon no cae hasta que caben todas sus cajas: las patas traseras no se meten en el', () => {
+    // Arriba a 1 hasta x = 3; abajo, a 0.
+    const ledge = fakeWorld(() => false, (x) => (x < 3 ? 1 : 0));
+    const bison = lone(Species.Bison, 1, 0.5, 1, 0);
+    bison.store.z[bison.id] = 1;
+    let fell = false;
+    walk(ledge, bison.store, bison.id, 1, 0, 6, () => {
+      // Ninguna caja dentro del escalon, ni cayendo ni de pie.
+      expect(clashesOf(ledge, bison.store, bison.id)).toBe(0);
+      if (!bison.store.grounded[bison.id]) fell = true;
+    });
+    expect(fell).toBe(true);
+    expect(bison.store.z[bison.id]).toBe(0);
+    expect(bison.store.x[bison.id]).toBeGreaterThan(4);
+  });
+
+  it('salta un escalon de un bloque a su paso: en el aire no va mas deprisa que andando', () => {
+    const step = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
+    for (const species of [Species.Bison, Species.Hare, Species.RedDeer]) {
+      const a = lone(species, 0, 0.5, 1, 0);
+      let flew = false;
+      walk(step, a.store, a.id, 1, 0, 6, () => {
+        if (a.store.grounded[a.id]) return;
+        flew = true;
+        // El paso del ayudante `walk` es 1.
+        expect(Math.hypot(a.store.vx[a.id], a.store.vy[a.id])).toBeLessThanOrEqual(1 + 1e-9);
+      });
+      expect(flew, Species[species]).toBe(true);
+      expect(a.store.z[a.id], Species[species]).toBe(1);
+    }
+  });
+
+  it('arranca en 0,1 s, y al llegar no se para en seco: frena deslizandose 0,1 s', () => {
+    const open = fakeWorld(() => false);
+    const hare = lone(Species.Hare, 0.5, 0.5, 1, 0);
+    walkAnimal(open, hare.store, hare.id, 1, 0, 1, 1 / 60);
+    expect(hare.store.vx[hare.id]).toBeCloseTo(1 / 6, 9);
+    walk(open, hare.store, hare.id, 1, 0, 1);
+    expect(hare.store.vx[hare.id]).toBeCloseTo(1, 9);
+    const x0 = hare.store.x[hare.id];
+    let ticks = 0;
+    while (hare.store.vx[hare.id] > 0 && ticks < 60) {
+      brakeAnimal(open, hare.store, hare.id, 1, 1 / 60);
+      ticks++;
+    }
+    expect(hare.store.x[hare.id]).toBeGreaterThan(x0);
+    expect(ticks).toBeLessThanOrEqual(6);
   });
 });

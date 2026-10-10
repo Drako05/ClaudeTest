@@ -10,8 +10,10 @@
  * - `gestures` o `slash`: esas herramientas;
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: fisicas, fase A (2026-10-10): el jugador pisa el terreno con la huella
- * entera, baja cayendo, choca la cabeza y anda con inercia.
+ * Ronda: fisicas, fases A y B (2026-10-10): el jugador pisa el terreno con la
+ * huella entera, baja cayendo, choca la cabeza y anda con inercia; los animales
+ * chocan con todas sus cajas, saltan a su paso y tienen inercia. Y la vista
+ * normal de `slash`, que ahora cuenta solo los rumbos con la camara libre.
  */
 export default [
   {
@@ -62,5 +64,56 @@ export default [
     de: 'b.z0 < head &&',
     a: 'b.z0 < Infinity &&',
     prueba: 'test:tests/body-physics.test.ts',
+  },
+  {
+    nombre: 'las partes del animal no cuentan su altura sobre los pies',
+    fichero: 'packages/sim/src/boxes.ts',
+    de: 'const lift = p.cz - p.hh - z;',
+    a: 'const lift = 0;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'el animal choca con margen de sobra',
+    fichero: 'packages/sim/src/body.ts',
+    de: 'if (partsRest(world, [b], feet) > feet + margin + 1e-6) clashes++;',
+    a: 'if (partsRest(world, [b], feet) > feet + margin + 99) clashes++;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'el animal salta con impulso de mas',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'if (!rehearseJump(world, store, id, speed, dt, keep)) return false;',
+    a: 'if (!rehearseJump(world, store, id, speed * 3, dt, keep)) return false;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'el animal arranca sin inercia',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'const pace = Math.min(speed, before + accel);',
+    a: 'const pace = speed;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  {
+    nombre: 'el animal se para en seco al llegar',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'before - (speed / INERTIA_TIME) * dt), dt, keep),',
+    a: 'before - 99), dt, keep),',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  // La vista normal de `slash` cuenta solo los rumbos con la camara libre y su
+  // suelo baja a 5 pixeles: tiene que seguir cayendo con lo que vigila.
+  {
+    nombre: 'barrido recortado por el frustum',
+    fichero: 'packages/client/src/effects-view.ts',
+    de: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = false;',
+    a: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = true;',
+    prueba: 'slash',
+  },
+  {
+    nombre: 'el barrido de tercera persona no tiene ancho',
+    fichero: 'packages/client/src/effects.ts',
+    de: 'export const SLASH_HALF_WIDTH = 0.06;',
+    a: 'export const SLASH_HALF_WIDTH = 0;',
+    prueba: 'slash',
   },
 ];

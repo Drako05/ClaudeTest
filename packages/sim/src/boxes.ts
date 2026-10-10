@@ -408,49 +408,76 @@ export function headroom(world: World, store: EntityStore, id: number): number {
 }
 
 /**
- * Lo que pisan unas cajas giradas (las partes que sostienen a un animal), con
- * el terreno medido en (`x`, `y`): el terreno y el techo de cada caja que choca
- * y solapa alguna.
+ * **La altura de reposo** de un cuerpo de cajas giradas con los pies a `z`: lo
+ * mas bajo a que pueden estar los pies sin que **ninguna** caja quede dentro del
+ * terreno o de la caja de un objeto (el autor, 2026-10-10: «todas las cajas
+ * chocan con el terreno en todo momento»). Es, sobre cada caja, lo mas alto que
+ * hay bajo ella —el techo de cada columna de 0,5 y de cada caja de objeto que
+ * solapa— menos lo que esa caja esta por encima de los pies. **Deduccion mia.**
+ *
+ * Asi la cabeza de un bisonte pasa por encima de una pared que sus patas no, y
+ * un animal con las patas traseras sobre un escalon no cae hasta que todas sus
+ * cajas caben abajo. Las cajas de objeto que empiezan por encima de una parte
+ * no cuentan para ella. Con `upTo`, solo cuenta lo que no pide subir los pies
+ * mas alla de ahi (`footing`); `-Infinity` si no queda nada.
  */
-export function partsFloor(world: World, boxes: readonly OrientedBox[], x: number, y: number, upTo = Infinity): number {
-  let floor = world.groundHeightAt(x, y);
+export function partsRest(world: World, boxes: readonly OrientedBox[], z: number, upTo = Infinity): number {
+  let rest = -Infinity;
   for (const p of boxes) {
+    const lift = p.cz - p.hh - z;
+    const top = p.cz + p.hh;
     const rx = p.hl * Math.abs(p.ux) + p.hw * Math.abs(p.uy);
     const ry = p.hl * Math.abs(p.uy) + p.hw * Math.abs(p.ux);
+    for (let vy = voxelOf(p.cy - ry); vy <= voxelOf(p.cy + ry); vy++) {
+      for (let vx = voxelOf(p.cx - rx); vx <= voxelOf(p.cx + rx); vx++) {
+        if (!overlapsSquare(p, (vx + 0.5) * VOXEL, (vy + 0.5) * VOXEL, VOXEL / 2)) continue;
+        const feet = columnTopIn(world, vx, vy) - lift;
+        if (feet > rest && feet <= upTo) rest = feet;
+      }
+    }
     for (let ty = Math.floor(p.cy - ry); ty <= Math.floor(p.cy + ry); ty++) {
       for (let tx = Math.floor(p.cx - rx); tx <= Math.floor(p.cx + rx); tx++) {
         const b = solidBox(world, tx, ty);
-        if (!b || b.z1 <= floor || b.z1 > upTo) continue;
-        if (overlapsSquare(p, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2)) floor = b.z1;
+        if (!b || b.z0 >= top) continue;
+        const feet = b.z1 - lift;
+        if (feet <= rest || feet > upTo) continue;
+        if (overlapsSquare(p, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2)) rest = feet;
       }
     }
   }
-  return floor;
+  return rest;
 }
 
 /**
  * Lo que pisa una entidad donde esta: el jugador con su huella
- * (`BODY_RADIUS`), un animal con sus partes mas bajas. Es la vara de los pies
- * —caer, aterrizar, estar de pie— en `applyVertical`.
+ * (`BODY_RADIUS`), un animal con todas sus cajas (`partsRest`; hasta el
+ * 2026-10-10, solo con las mas bajas y el terreno en el centro). Es la vara de
+ * los pies —caer, aterrizar, estar de pie— en `applyVertical`.
  *
  * Solo cuentan las cajas cuyo techo no pasa de `upTo` (los pies mas lo que se
  * sube andando): una caja que asoma por encima de eso no se pisa, se esta
  * metido en ella —un arbol que crecio encima, un animal que no cabe y anda
  * solo con los pies—, y no puede subir el cuerpo de golpe a su techo.
- * **Deduccion mia.** Desde el 2026-10-10, al jugador le pasa lo mismo con el
- * terreno: una columna que asoma mas de `STEP_UP` no lo sube de golpe (solo se
- * sube de golpe lo que se sube andando, el autor), y si toda su huella esta
- * metida en el terreno, se queda donde esta.
+ * **Deduccion mia.** Desde el 2026-10-10 vale igual para el terreno y para
+ * todo el cuerpo: si lo que pisa —la huella del jugador, todas las cajas del
+ * animal— pide subir mas de `upTo`, el cuerpo **se queda donde esta**, ni se
+ * sube de golpe a lo alto (solo se sube de golpe lo que se sube andando, el
+ * autor) ni a medias apoyado en otra cosa.
  */
 export function footing(world: World, store: EntityStore, id: number, upTo = Infinity): number {
   const x = store.x[id];
   const y = store.y[id];
+  const z = store.z[id];
+  let rest: number;
   if (store.kind[id] === EntityKind.Player) {
-    const floor = squareFloor(world, x, y, BODY_RADIUS, upTo, store.z[id] + PLAYER_HEIGHT);
-    return floor === -Infinity ? store.z[id] : floor;
+    rest = squareFloor(world, x, y, BODY_RADIUS, Infinity, z + PLAYER_HEIGHT);
+  } else {
+    const animal = store.animal[id];
+    if (!animal) return world.groundHeightAt(x, y);
+    rest = partsRest(world, bodyBoxes(animal.species, animal.stage, x, y, z, store.facingX[id], store.facingY[id]), z);
   }
-  const animal = store.animal[id];
-  if (!animal) return world.groundHeightAt(x, y);
-  const feet = bodyBoxes(animal.species, animal.stage, x, y, store.z[id], store.facingX[id], store.facingY[id], true);
-  return partsFloor(world, feet, x, y, upTo);
+  // Metido en algo mas de lo que se sube de golpe: se queda donde esta, sin
+  // subirse a medias apoyado en otra cosa. Andando no pasa nunca —no se entra
+  // donde el suelo pasa de los pies—; pasa al aparecer o si algo crece debajo.
+  return rest > upTo || rest === -Infinity ? z : rest;
 }

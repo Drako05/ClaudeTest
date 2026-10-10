@@ -104,6 +104,8 @@ export class OrbitCamera {
    * despues de la colision. Cero en primera persona.
    */
   camDistance = 0;
+  /** La distancia que querria sin la colision: si `camDistance` es menor, algo la acerca. */
+  camWant = 0;
   /**
    * El catalejo: fraccion del campo de vision de la primera persona. Vale 1 sin
    * catalejo; la pinza o + y - lo bajan y `relaxSpyglass` lo devuelve.
@@ -270,6 +272,7 @@ export class OrbitCamera {
     this.firstPerson.updateMatrixWorld();
     if (this.projection === 'primera') {
       this.camDistance = 0;
+      this.camWant = 0;
       this.resize(width, height);
       return;
     }
@@ -277,6 +280,7 @@ export class OrbitCamera {
     // ortografica; en esta la distancia no cambia el tamano de nada.
     const want = this.projection === 'orto' ? ORTHO_DISTANCE : this.distance * PERSPECTIVE_PULL;
     const back = look.clone().negate();
+    this.camWant = want;
     this.camDistance = clearance ? clearance(back, want) : want;
 
     const camera = this.active;

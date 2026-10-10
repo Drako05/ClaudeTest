@@ -374,17 +374,29 @@ su cabeza entrara en una pared, no gira.
   los minerales, las estaciones— si el techo de la caja pasa de la base de la
   parte. La cabeza de un bisonte pasa por encima de una roca; sus patas no, y
   la roca (1,0) se salta (`ANIMAL_JUMP_UP`).
-- **Apoyo** *(deduccion)*: se esta de pie sobre el terreno en el centro y,
-  encima, el techo de las cajas que tocan **sus partes mas bajas**: las patas;
-  el caparazon del cangrejo; el tronco de la gaviota.
-- **Escalones** *(deduccion, la regla 21 extendida a las partes)*:
-  - una casilla estorba a una parte si, entre ella y su vecina hacia los pies,
-    hay un escalon de mas de `STEP_UP` cuya cima pasa de la base de la parte;
-  - **una rampa no tiene escalon y deja pasar**, aunque un cuerpo que no se
-    inclina asome sobre su pendiente;
-  - se probo primero con «el suelo mas bajo de la casilla», y una liebre no
-    terminaba de subir una rampa;
-  - los pies, como siempre: centro y `STEP_UP`.
+- **Todas sus cajas chocan siempre** (el autor, 2026-10-10: «todas las cajas
+  chocan con el terreno en todo momento»). Cada parte `hit` mide **su altura
+  de reposo** (`partsRest`, *deduccion*): lo mas alto bajo ella —el techo de
+  cada columna de 0,5 y de cada caja de objeto que solapa— menos lo que esa
+  parte esta por encima de los pies. El cuerpo reposa en el maximo de todas:
+  - **apoyo**: se esta de pie mientras alguna caja toque; **un animal con las
+    patas traseras sobre un escalon no cae hasta que todas sus cajas caben
+    abajo** (lo que el autor vio el 2026-10-05, ya resuelto);
+  - **choque**: una parte estorba si pide subir los pies mas de `STEP_UP`
+    andando, o mas de nada en el aire; la cabeza de un bisonte pasa por encima
+    de una pared que sus patas no;
+  - **solo subir medio bloque es de golpe**, y bajar es caer con la gravedad,
+    como el jugador (regla 21);
+  - si algo le crece debajo y asoma mas de lo que se sube, **se queda donde
+    esta**, sin subirse a medias;
+  - una cabeza que toca el borde de una pared a menos de medio bloque por
+    encima de su base sube al animal entero, como cualquier escalon: es el
+    precio de que ninguna caja entre nunca en nada *(deduccion)*;
+  - hasta el 2026-10-10 el terreno se media en el centro de los pies y cada
+    parte miraba una heuristica de escalones hacia los pies.
+- **Inercia** (el autor, 2026-10-10): su avance arranca y frena en
+  `INERTIA_TIME`, 0,1 s; al llegar a su punto de paso, o girando sin avanzar,
+  se desliza frenando por su rumbo (`brakeAnimal`).
 - **El giro**: hacia su destino a **180°/s** *(deduccion)*. Un paso de giro que
   meteria una parte en el terreno no se da.
 - **El avance**: a lo largo de su rumbo, eje a eje, cuando el rumbo esta a
@@ -399,8 +411,8 @@ su cabeza entrara en una pared, no gira.
   momento).
 - **Lo que cuesta**: hasta cuatro posturas por tick, sobre casi las mismas
   casillas.
-  - Cada ronda (`groundRound`) lee cada casilla una vez, y su suelo sale del
-    nivel y la rampa (`World.floorRangeAt`).
+  - Cada ronda (`groundRound`) lee cada casilla y cada columna de 0,5 una vez
+    (`columnTopIn`); hasta los voxeles, el suelo salia del nivel y la rampa.
   - Con 63 animales el tick paso de 0,17 ms a 2,2 ms sin la ronda, y a
     0,26 ms con ella.
 
@@ -425,12 +437,13 @@ Lo que eligio el autor, y como esta hecho (`movement.ts`, `walkAnimal`):
   - Salta cuando el avance no progresa y, a lo largo de su rumbo, el suelo
     sube mas de `STEP_UP` y no mas de un nivel, sin nada solido ni fuera de su
     bioma antes del borde.
-  - **En el aire avanza lo justo para que sus pies pasen el borde en lo alto
-    del salto**, y nunca mas despacio que su paso *(deduccion)*. Un animal
-    largo topa con la cabeza teniendo los pies lejos del borde: al bisonte
-    adulto le quedan 1,7 bloques, y a la velocidad del jugador (5,2, la del
-    plan) llegaba cayendo. Si asi no llega, prueba a pasarlo a tres cuartos
-    del ascenso y a la mitad *(deduccion)*.
+  - **En el aire avanza a su paso**, como el jugador (el autor, 2026-10-10:
+    «usando las mismas físicas que el jugador»). Hasta entonces avanzaba lo
+    justo para que sus pies pasaran el borde en lo alto del salto, mas deprisa
+    que su paso si hacia falta, porque un bisonte topaba con la cabeza con los
+    pies lejos del borde; desde que todas sus cajas chocan, sus patas
+    delanteras se apoyan arriba antes que el resto, y a su paso le basta.
+    Cada salto se ensaya entero antes de darlo; si no llega, lo bordea.
   - En el aire no gira, y se estampa como el jugador contra lo que no alcanza.
   - Si se cae andando por un borde, cae avanzando a su paso.
 - **Lo que no se salta lo bordea**: pared alta, agua, arbol, el borde de su

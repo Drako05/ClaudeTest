@@ -28,7 +28,7 @@ import { toChunkCoord, type World } from '../world.js';
 import { BODY_RADIUS, footing } from '../boxes.js';
 import { applyVertical, STEP_UP } from './jump.js';
 import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
-import { airborneAnimal, collides, walkAnimal } from './movement.js';
+import { airborneAnimal, brakeAnimal, collides, walkAnimal } from './movement.js';
 
 /** Los animales materializados, por su clave: la entidad que es cada uno. */
 export type FaunaIndex = Map<string, number>;
@@ -100,7 +100,7 @@ function faceToFit(world: World, store: EntityStore, id: number, animal: Animal,
     let angle = start;
     for (let k = 0; k < 8; k++) {
       const a = start + (k * Math.PI) / 4;
-      const clashes = bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, Math.cos(a), Math.sin(a)), x, y);
+      const clashes = bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, Math.cos(a), Math.sin(a)), z, STEP_UP);
       if (clashes < fewest) {
         fewest = clashes;
         angle = a;
@@ -189,8 +189,7 @@ export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, t
       } else if (Math.hypot(dx, dy) > ARRIVE_DISTANCE) {
         walkAnimal(world, store, id, dx, dy, info.speed, TICK_DT, keep);
       } else {
-        store.vx[id] = 0;
-        store.vy[id] = 0;
+        brakeAnimal(world, store, id, info.speed, TICK_DT, keep);
       }
       applyVertical(world, store, id, TICK_DT);
     });
