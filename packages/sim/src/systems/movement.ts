@@ -101,7 +101,7 @@ function blocked(
   // huella: un tronco, una roca o una mesa estorban de lado como una pared, y
   // lo que no pasa del salto se sube saltando (decisiones del autor,
   // 2026-09-30 y 2026-10-05).
-  return squareFloor(world, cx, cy, BODY_RADIUS, Infinity, feet + PLAYER_HEIGHT) > feet + margin;
+  return squareFloor(world, cx, cy, BODY_RADIUS, feet + PLAYER_HEIGHT) > feet + margin;
 }
 
 /**

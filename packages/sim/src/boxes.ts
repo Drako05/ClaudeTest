@@ -324,17 +324,15 @@ function columnSpan(c: number, half: number): [number, number] {
 /**
  * Lo mas alto del terreno bajo una huella cuadrada de medio lado `half`
  * centrada en (`x`, `y`): el techo de cada columna de 0,5 que solapa. Con
- * `half` 0, el de la columna del punto. Con `upTo`, solo las columnas que no
- * pasan de ahi, como las cajas (`footing`); `-Infinity` si no queda ninguna.
+ * `half` 0, el de la columna del punto.
  */
-export function terrainUnder(world: World, x: number, y: number, half: number, upTo = Infinity): number {
+export function terrainUnder(world: World, x: number, y: number, half: number): number {
   const [vx0, vx1] = columnSpan(x, half);
   const [vy0, vy1] = columnSpan(y, half);
   let top = -Infinity;
   for (let vy = vy0; vy <= vy1; vy++) {
     for (let vx = vx0; vx <= vx1; vx++) {
-      const column = columnTopIn(world, vx, vy);
-      if (column <= upTo) top = Math.max(top, column);
+      top = Math.max(top, columnTopIn(world, vx, vy));
     }
   }
   return top;
@@ -344,20 +342,17 @@ export function terrainUnder(world: World, x: number, y: number, half: number, u
  * Lo que pisa una huella cuadrada de medio lado `half` centrada en (`x`, `y`):
  * el terreno bajo la huella entera (`terrainUnder`) y, encima, el techo de cada
  * caja que choca y la solapa. Con `half` 0, lo que hay justo en ese punto. Con
- * `upTo`, solo el terreno y las cajas cuyo techo no pasa de ahi (ver
- * `footing`); `-Infinity` si no queda nada debajo de eso. Con
- * `head`, solo las que empiezan por debajo de ahi: las de mas arriba no se
- * pisan, son techo (`headroom`).
+ * `head`, solo las cajas que empiezan por debajo de ahi: las de mas arriba no
+ * se pisan, son techo (`headroom`).
  */
-export function squareFloor(world: World, x: number, y: number, half: number, upTo = Infinity, head = Infinity): number {
-  let floor = terrainUnder(world, x, y, half, upTo);
+export function squareFloor(world: World, x: number, y: number, half: number, head = Infinity): number {
+  let floor = terrainUnder(world, x, y, half);
   for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
     for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
       const b = solidBox(world, tx, ty);
       if (
         b &&
         b.z1 > floor &&
-        b.z1 <= upTo &&
         b.z0 < head &&
         b.x0 < x + half &&
         b.x1 > x - half &&
@@ -418,10 +413,9 @@ export function headroom(world: World, store: EntityStore, id: number): number {
  * Asi la cabeza de un bisonte pasa por encima de una pared que sus patas no, y
  * un animal con las patas traseras sobre un escalon no cae hasta que todas sus
  * cajas caben abajo. Las cajas de objeto que empiezan por encima de una parte
- * no cuentan para ella. Con `upTo`, solo cuenta lo que no pide subir los pies
- * mas alla de ahi (`footing`); `-Infinity` si no queda nada.
+ * no cuentan para ella.
  */
-export function partsRest(world: World, boxes: readonly OrientedBox[], z: number, upTo = Infinity): number {
+export function partsRest(world: World, boxes: readonly OrientedBox[], z: number): number {
   let rest = -Infinity;
   for (const p of boxes) {
     const lift = p.cz - p.hh - z;
@@ -432,7 +426,7 @@ export function partsRest(world: World, boxes: readonly OrientedBox[], z: number
       for (let vx = voxelOf(p.cx - rx); vx <= voxelOf(p.cx + rx); vx++) {
         if (!overlapsSquare(p, (vx + 0.5) * VOXEL, (vy + 0.5) * VOXEL, VOXEL / 2)) continue;
         const feet = columnTopIn(world, vx, vy) - lift;
-        if (feet > rest && feet <= upTo) rest = feet;
+        if (feet > rest) rest = feet;
       }
     }
     for (let ty = Math.floor(p.cy - ry); ty <= Math.floor(p.cy + ry); ty++) {
@@ -440,7 +434,7 @@ export function partsRest(world: World, boxes: readonly OrientedBox[], z: number
         const b = solidBox(world, tx, ty);
         if (!b || b.z0 >= top) continue;
         const feet = b.z1 - lift;
-        if (feet <= rest || feet > upTo) continue;
+        if (feet <= rest) continue;
         if (overlapsSquare(p, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2)) rest = feet;
       }
     }
@@ -454,15 +448,13 @@ export function partsRest(world: World, boxes: readonly OrientedBox[], z: number
  * 2026-10-10, solo con las mas bajas y el terreno en el centro). Es la vara de
  * los pies —caer, aterrizar, estar de pie— en `applyVertical`.
  *
- * Solo cuentan las cajas cuyo techo no pasa de `upTo` (los pies mas lo que se
- * sube andando): una caja que asoma por encima de eso no se pisa, se esta
- * metido en ella —un arbol que crecio encima, un animal que no cabe y anda
- * solo con los pies—, y no puede subir el cuerpo de golpe a su techo.
- * **Deduccion mia.** Desde el 2026-10-10 vale igual para el terreno y para
- * todo el cuerpo: si lo que pisa —la huella del jugador, todas las cajas del
- * animal— pide subir mas de `upTo`, el cuerpo **se queda donde esta**, ni se
- * sube de golpe a lo alto (solo se sube de golpe lo que se sube andando, el
- * autor) ni a medias apoyado en otra cosa.
+ * Si lo que pisa —la huella del jugador, todas las cajas del animal— pide
+ * subir mas de `upTo` (los pies mas lo que se sube andando), se esta metido en
+ * algo —un arbol que crecio encima, un animal que nacio sin caber— y el cuerpo
+ * **se queda donde esta**: ni se sube de golpe a lo alto (solo se sube de golpe
+ * lo que se sube andando, el autor, 2026-10-10) ni a medias apoyado en otra
+ * cosa. **Deduccion mia.** Hasta la fase B de la tanda de fisicas se filtraba
+ * caja a caja (las que asomaban no se pisaban), y eso si subia a medias.
  */
 export function footing(world: World, store: EntityStore, id: number, upTo = Infinity): number {
   const x = store.x[id];
@@ -470,7 +462,7 @@ export function footing(world: World, store: EntityStore, id: number, upTo = Inf
   const z = store.z[id];
   let rest: number;
   if (store.kind[id] === EntityKind.Player) {
-    rest = squareFloor(world, x, y, BODY_RADIUS, Infinity, z + PLAYER_HEIGHT);
+    rest = squareFloor(world, x, y, BODY_RADIUS, z + PLAYER_HEIGHT);
   } else {
     const animal = store.animal[id];
     if (!animal) return world.groundHeightAt(x, y);

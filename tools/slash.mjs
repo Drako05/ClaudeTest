@@ -180,16 +180,19 @@ if (walked < 18) console.log('AVISO: no se ha alejado lo bastante; el recorte po
 //    esto casi nunca tiene que buscar; se queda como guarda, porque una medida
 //    que puede dar cero por otra causa es justo el error que ya costo caro.
 //
-//    Y con la camara libre al menos en el rumbo de salida: la vista normal
-//    solo cuenta los rumbos en que la colision no la mete en la cabeza (ver
-//    `MIN_NORMAL`), y sin ninguno no habria medida.
-let reaches = (await probe()) && (await cameraFree());
+//    Y en un claro: con la camara libre en los cuatro rumbos que se miden. El
+//    paseo acaba donde lo deja la velocidad de la maquina, y metido entre
+//    arboles la colision mete la camara en la cabeza, que es justo lo que
+//    cada vista mide de otra manera: la normal salia a 12, 0 o 14.825 segun el
+//    rumbo y la camara baja a 0 (CI de la tanda de fisicas, 2026-10-10, en
+//    13.9, 23.1, con la camara a 0,3, 2,1 y 5,4 de 31,4).
+let reaches = (await probe()) && (await inTheOpen());
 for (let tries = 0; tries < 8 && !reaches; tries++) {
   await push(['KeyD', 'KeyS', 'KeyA', 'KeyW'][tries % 4], 700);
-  reaches = (await probe()) && (await cameraFree());
+  reaches = (await probe()) && (await inTheOpen());
 }
 if (!reaches) {
-  console.log('NO se ha encontrado sitio con alcance completo; la medida no valdria');
+  console.log('NO se ha encontrado un claro con alcance completo; la medida no valdria');
   await browser.close();
   server.close();
   process.exit(1);
@@ -389,6 +392,16 @@ async function push(key, ms) {
 async function cameraFree() {
   const s = await page.evaluate(() => window.__verdant);
   return s.camDistance >= 0.9 * s.camWant;
+}
+
+/** Si esta libre en los cuatro rumbos que se miden; acaba en el de salida. */
+async function inTheOpen() {
+  let open = true;
+  for (let turn = 0; turn < 4; turn++) {
+    open = open && (await cameraFree());
+    await drag(-262, 0);
+  }
+  return open;
 }
 
 /**

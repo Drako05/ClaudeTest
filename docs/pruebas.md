@@ -105,7 +105,10 @@ normal cuenta solo los rumbos con la camara libre y su suelo es 5**: el sector
 sale de los ojos por la mirada, que en esa vista es la de la camara, y se ve de
 canto, 12 pixeles en cualquier rumbo libre. Los ~190 y 9.001 de antes salian de
 rumbos con la camara metida en la cabeza por la colision, que dan eso o 0 segun
-el instante; lo que vigila es el recorte por frustum, que da 0 en todos), todas a la vez; y un trabajo final, «CI completa», que solo sale
+el instante; lo que vigila es el recorte por frustum, que da 0 en todos. Y se
+mide **en un claro**, con la camara libre en los cuatro rumbos: el paseo acaba
+donde lo deja la velocidad de la maquina, y entre arboles la camara baja dio 0),
+todas a la vez; y un trabajo final, «CI completa», que solo sale
 verde si todo lo esta. La preparacion —Node, dependencias y Chromium con su
 cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
 tandas. Cada pasada se lanza por el prefijo de su nombre
