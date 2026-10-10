@@ -23,7 +23,7 @@ Formato (el escaner lo lee):
 - `preserveDrawingBuffer` — opcion de WebGL. En: `tools/slash.mjs`.
 - `pixi.js` — la biblioteca del isometrico, que se retiro. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 - `highRefresh` — prefijo de la pasada `highRefreshPass` del humo, como se escribe en la linea de ordenes. En: `docs/pruebas.md`.
-- `devTools` — prefijo de la pasada `devToolsPass`, que es el nombre de su casilla en la matriz de CI. En: `docs/pruebas.md`.
+- `devTools` — prefijo de la pasada `devToolsPass`, que es el nombre de su casilla en la matriz de CI. En: `docs/pruebas.md`, `docs/pendiente.md`, `docs/historia.md`.
 
 ## Historia que se cuenta a proposito
 
@@ -53,3 +53,12 @@ Formato (el escaner lo lee):
 - `tests/terrain-draw.test.ts` — isometrico. En: `docs/isometrico.md`.
 - `tiles.ts` — isometrico. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 - `tests/biome-edges-3d.test.ts` — nombre de entonces; la tabla anota el de hoy. En: `docs/isometrico.md`.
+- `isFeatureSolid` — el choque de casilla entera, sustituido por `blocksBody` el 2026-10-05; la seccion de aquella tanda lo cuenta. En: `docs/historia.md`.
+- `SNAP_DOWN` — el margen que pegaba los pies al bajar, retirado el 2026-10-10; se cuenta como se fue. En: `docs/pendiente.md`, `docs/reglas.md`, `docs/juicio.md`, `docs/historia.md`.
+- `levelAt` — el nivel entero por casilla, retirado con los voxeles (2026-10-06); la fase 1 lo cuenta. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `rampDirAt` — la rampa por casilla, idem. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `groundHeight` — la altura por casilla, idem (hoy `groundHeightAt`). En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `rampDirOf` — idem. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `isRampEdge` — idem. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `RAMP_SHARE` — idem. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `footPartsOf` — el apoyo de los animales en sus partes mas bajas, retirado en la auditoria del 2026-10-10, que lo cuenta. En: `docs/pendiente.md`, `docs/historia.md`.

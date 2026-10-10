@@ -76,6 +76,12 @@ function walk(
   }
 }
 
+/** Las cajas mas bajas de un cuerpo: las que tocan el suelo en llano. */
+function lowestOf<T extends { cz: number; hh: number }>(boxes: T[]): T[] {
+  const base = Math.min(...boxes.map((b) => b.cz - b.hh));
+  return boxes.filter((b) => b.cz - b.hh <= base + 1e-6);
+}
+
 /** Hasta donde llega en x el cuerpo que choca, girado con su rumbo. */
 function frontOf(store: EntityStore, id: number): number {
   const a = store.animal[id]!;
@@ -180,9 +186,9 @@ describe('el cuerpo choca con el terreno', () => {
       expect(a.store.x[a.id]).toBeGreaterThan(4);
     }
     // Una escalera de medio bloque, de x = 2 a x = 3: se sube andando.
-    const ramp = fakeWorld(() => false, (x) => (x < 2.5 ? 0 : x < 3 ? 0.5 : 1));
+    const stairs = fakeWorld(() => false, (x) => (x < 2.5 ? 0 : x < 3 ? 0.5 : 1));
     const hare = lone(Species.Hare, 0, 0.5, 1, 0);
-    walk(ramp, hare.store, hare.id, 1, 0, 5, () => expect(hare.store.grounded[hare.id]).toBe(1));
+    walk(stairs, hare.store, hare.id, 1, 0, 5, () => expect(hare.store.grounded[hare.id]).toBe(1));
     expect(hare.store.x[hare.id]).toBeGreaterThan(3.5);
     expect(hare.store.z[hare.id]).toBe(1);
   });
@@ -199,7 +205,7 @@ describe('el cuerpo choca con el terreno', () => {
     expect(bison.store.x[bison.id]).toBeLessThan(x0 - 1);
   });
 
-  it('lo que no se salta se bordea: un pilar, un charco y una pared de dos niveles', () => {
+  it('lo que no se salta se bordea: un pilar, un charco y una pared de dos bloques', () => {
     // Un pilar solido en (3, 0), justo en el camino.
     const pillar = fakeWorld((tx, ty) => tx === 3 && ty === 0);
     const a = lone(Species.Hare, 0.5, 0.5, 1, 0);
@@ -211,7 +217,7 @@ describe('el cuerpo choca con el terreno', () => {
     const b = lone(Species.Hare, 0.5, 0.5, 1, 0);
     walk(open, b.store, b.id, 1, 0, 10, () => expect(dry(b.store.x[b.id], b.store.y[b.id])).toBe(true), dry);
     expect(b.store.x[b.id]).toBeGreaterThan(5);
-    // Una pared de dos niveles a lo largo de y: no se salta, se recorre.
+    // Una pared de dos bloques a lo largo de y: no se salta, se recorre.
     const cliff = fakeWorld(() => false, (x) => (x >= 3 ? 2 : 0));
     const c = lone(Species.Hare, 0.5, 0.5, 1, 0);
     // Ocho segundos: cada rodeo arranca y frena con la inercia (2026-10-10).
@@ -242,7 +248,7 @@ describe('el cuerpo choca con el terreno', () => {
     const world = fakeWorld(() => false, () => 0, (tx, ty) => (tx === 3 && ty === 0 ? Feature.RockNode : Feature.None));
     const rock = hitboxAt(world, 3, 0)!;
     // Las patas solas ya chocan: puesto con la pata delantera dentro de la roca.
-    const legs = bodyBoxes(Species.RedDeer, Stage.Adult, rock.x0 - 0.3, 0.5, 0, 1, 0, true);
+    const legs = lowestOf(bodyBoxes(Species.RedDeer, Stage.Adult, rock.x0 - 0.3, 0.5, 0, 1, 0));
     expect(legs.length).toBe(4);
     expect(bodyClashes(world, legs, 0, 0.5)).toBeGreaterThan(0);
     // Andando, salta encima, se apoya en ella y sigue.
@@ -271,9 +277,9 @@ describe('el cuerpo choca con el terreno', () => {
     expect(boxes.some((b) => rayOrientedBox({ x: 0, y: -5, z }, side, b, 10) !== null)).toBe(false);
   });
 
-  it('se apoya en lo que tocan sus partes mas bajas: las patas, el caparazon, el tronco de la gaviota', () => {
+  it('en llano, lo que toca el suelo son sus partes mas bajas: las patas, el caparazon, el tronco de la gaviota', () => {
     const lowest = (s: Species) => {
-      const boxes = bodyBoxes(s, Stage.Adult, 0, 0, 0, 1, 0, true);
+      const boxes = lowestOf(bodyBoxes(s, Stage.Adult, 0, 0, 0, 1, 0));
       return { n: boxes.length, base: Math.min(...boxes.map((b) => b.cz - b.hh)) };
     };
     expect(lowest(Species.RedDeer)).toEqual({ n: 4, base: 0 });

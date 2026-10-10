@@ -276,7 +276,7 @@ importar la ubicacion del personaje». En las tres vistas el pivote son **los
 ojos perseguidos** (`camera.eyes`), que van tras los de verdad con un retraso
 **exponencial** de constante `CAMERA_LAG = 0,1 s`: subir medio bloque, que en el
 nucleo es de golpe, la camara lo sube en una curva, y andando a ritmo constante
-va justo 0,1 s por detras (la velocidad por el retraso: ~0,5 andando). Y las
+va ~0,1 s por detras (la velocidad por el retraso: ~0,5 andando). Y las
 tres **miran al punto de mira** (`camera.aim`): el primer choque del rayo de la
 mirada desde los ojos DE VERDAD (`rayHit`, con el terreno y los hitboxes, como
 la colision), o su final a 64 si no choca nada. Asi el centro de la pantalla es
@@ -288,6 +288,11 @@ es la del raton o el dedo, `forward()` y `lookPitch`, tal cual. El retraso se
 ajusta en el panel de desarrollo, de 0 a 0,3 (`docs/devtools.md`). Que sea
 exponencial, el salto a 8, el tope de 64 y el minimo de 0,05 del punto de mira
 son deduccion mia (`docs/juicio.md`).
+
+**El autor la probo el mismo dia y no sirve**: «no ayudo en nada, incluso en
+primera persona genera tirones raros, es injugable asi». Esta en el codigo
+hasta que se acuerde el sustituto; las sospechas y la recomendacion, en
+`docs/pendiente.md`.
 
 **Consecuencia a saber**: como la mirada pasa por los ojos del jugador, en
 tercera persona **el personaje tapa el centro de la pantalla**, que es justo

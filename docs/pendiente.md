@@ -8,10 +8,10 @@ Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
 indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `3415d31`, 2026-10-04** (la primera tanda de fauna y
-la de los equipables, desde `8396b7f`). La proxima parte de aqui: ver
-`.claude/skills/auditoria/` y «Auditoria al cerrar la fauna y los equipables»,
-mas abajo.
+**Ultima auditoria: commit `7e2d790`, 2026-10-10** (las tandas de voxeles,
+fisicas y pruebas, desde `3415d31`). La proxima parte de aqui: ver
+`.claude/skills/auditoria/` y «Auditoria al cerrar las fisicas y las
+pruebas», mas abajo.
 
 **Como leerlo.** Desde el 2026-10-10 son tres ficheros, partidos como se partio
 `CLAUDE.md` el 2026-10-02 y por lo mismo: este se lee al empezar cada tanda, y
@@ -32,116 +32,17 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## TANDA EN CURSO: pruebas mas rapidas (2026-10-10)
+## PROXIMA TANDA: lo que dijo el autor al probar las fisicas (2026-10-10)
 
-Pedido del autor, literal: «Cómo podemos hacer para que las pruebas las hagas
-más rápido […] con tal de ahorrarnos esas horas que llega a tomar el proceso de
-pruebas posterior a cada tanda de cambios». Aprobo el plan de tres fases.
-
-**Lo medido.**
-- La CI paso de ~5 minutos (4-5 oct) a ~15. El camino critico era una sola
-  casilla, `slash`, con 845-900 s; todas las demas, por debajo de 340 s. Sus
-  mutaciones tardaban ~1.000 s cada una.
-- El 10-oct hubo 4 rondas en `pruebas` en 3 h 20 min, y tres salieron en rojo,
-  varias por depender de la velocidad de la maquina.
-- Sin GPU, Chromium dibuja por software: ~5 FPS a 1280x720 en el contenedor y
-  1,4 s por captura. Ninguna opcion de arranque de Chromium lo mejora. Un tick
-  de la simulacion cuesta 1,7 ms.
-
-**Las fases.**
-1. **`slash` partido en cinco casillas**, una por parte (`docs/pruebas.md`).
-   **Hecha y en `main`** (`6bab86a`). En la CI de `pruebas`: CI 11 min,
-   mutaciones 7 min 42 s (antes ~15 y ~18). Por el camino se vio que el
-   recorte por frustum no lo caza la vista normal (`docs/juicio.md`).
-2. **`tools/esperar-ci.sh`**: espera a la CI con `gh api` y no con un
-   temporizador fijo. **Hecha y en `main`**.
-3. **Reloj de pruebas** (`?reloj=manual`, `clock.ts`, `window.__reloj`;
-   `docs/pruebas.md`, «El reloj manual»). **Hecho en el arbol**:
-   - Migradas: `life`, `relief`, `fauna`, `devTools`, `stations`,
-     `resources`, `highRefresh` (`hz` 144) y `slash`, con capturas recortadas.
-     Todas dan lo mismo en dos corridas, salvo un contador de `fauna`.
-   - Las mutaciones de la ronda caen todas, en local y en la CI.
-   - **En la CI de `pruebas`** (`30ca220`): CI **6 min 45 s** y mutaciones
-     **2 min 01 s**, frente a ~15 y ~18 al empezar la tanda. Cada parte de
-     `slash` tarda 54-98 s, y las pasadas migradas 33-67 s. El camino critico
-     ya son las tres con el reloj de verdad: `gestures` 394 s, `desktop` 241 y
-     `mobile` 230.
-   - **Queda fuera**: `mobile`, por sus toques sostenidos con temporizadores
-     del navegador. `desktop` y `gestures` siguen con el reloj de verdad a
-     proposito.
-
-   **Decisiones por defecto, del agente y sin aprobar**: frames a 60 Hz con el
-   reloj manual, y una comprobacion que dé otro numero no se reajusta en
-   silencio, sino que se dice con los dos valores y va a `docs/juicio.md`.
-   Alli estan los numeros nuevos de `slash` y la vista «de cerca» que no se
-   acerca.
-
----
-
-## TANDA ABIERTA: fisicas — cajas que chocan siempre, gravedad, inercia, camara (2026-10-10)
-
-Sigue abierta, en `main`: le faltan la auditoria y el plan de lo que dijo el
-autor al probarla (abajo). La de pruebas se metio delante por pedido suyo.
-
-**Empieza aqui.** Es tambien la fase 2 de los voxeles (abajo). El autor, literal
-(2026-10-10):
-
-1. «las entidades y el jugador solo bajan de escalón cuando al caer ninguna de
-   sus cajas choca con algo. lo mismo se aplica para subir. es decir, todas las
-   cajas chocan con el terreno en todo momento.»
-2. «las entidades deben saltar para subir un escalón de mas de 0.5. usando las
-   mismas físicas que el jugador (moverse para desplazarse en el aire y poder
-   subir porque el mero salto solo aplica impulso vertical). creo que aquí se
-   puede aplicar el sistema de salto automático pero para los animales.»
-3. «solo al subir escalones ≤ 0.5 se permite teletransportar a la entidad o el
-   jugador. lo que en la practica, será simplemente como seguir caminando.»
-4. «ahora para cualquier entidad y jugador, debe haber una desaceleración al
-   cambiar la dirección del movimiento, ya sea caminando, corriendo o en el
-   aire (cayendo o saltando). Esta desaceleración también aplica al dejar se
-   avanzar, no se parara el instante, sino que tendrá ese pequeño instante de
-   desplazamiento en la dirección que llevaba (debe ser pequeño, como 0.1s,
-   pero escucho tus sugerencias para este detalle).»
-5. «en todo momento, la cámara debe tener un suavizado/retraso de 0.1s al
-   perseguir al jugador en todas las vistas. (es un tiempo ajustable que
-   juzgare cuando lo pruebe).»
-
-Y sus respuestas a las preguntas:
-- Inercia: **arranque y frenada en 0,1 s**, a ritmo constante.
-- Camara, literal: «el retraso igual en todas las vistas y direcciones, el
-  centro de la pantalla sigue siendo el punto hacia donde mira y apunta el
-  personaje sin importar la ubicación del personaje.»
-- Saltar mientras se cae medio bloque: **sin margen**.
-- Animales en el aire: **como el jugador, a su paso**; saltan justo antes de
-  chocar si llegan arriba, y si no, rodean.
-
-**El plan, en tres fases, cada una a `main` con su CI:** A, el jugador (el
-terreno con la huella entera, sin `SNAP_DOWN`, techos, inercia); B, los animales
-(el reposo por cajas, auto salto a su paso, inercia); C, la camara (retraso
-exponencial ajustable en el panel, y mirando al punto de mira). **El modelo
-comun, deduccion mia: la altura de reposo** de un cuerpo es el maximo, sobre
-cada caja, de lo mas alto bajo su huella menos lo que esa caja esta por encima
-de los pies; andando se sube de golpe hasta `STEP_UP`, por debajo se cae con
-gravedad, y en el aire no se entra donde el reposo pasa de los pies.
-
-**Estado:** A y B hechas y **fueron juntas a `main`**: la CI de A cayo en tres
-pasadas del humo, y cuando estuvieron arregladas B ya estaba en el arbol. Lo
-que ensenaron: `stations` (la deriva al empujar arboles metia la huella en el
-pasillo de la mesa y el horno: orden de teclas), `fauna` (una presa parada
-puede estar atascada lejos de su punto de paso, y al recargar aparece en el:
-se exige `atWaypoint`), y `slash` (ver `docs/pruebas.md`: la vista normal
-cuenta solo rumbos con la camara libre). **C, hecha**: la camara persigue los
-ojos con retraso exponencial de 0,1 s en las tres vistas y mira al punto de
-mira (`docs/controles.md`), con un deslizador en el panel de desarrollo. Las
-tres fueron a `main` juntas, verificadas en la misma CI; por el camino `slash`
-pidio medir en un claro y la camara baja en cuatro rumbos (`docs/pruebas.md`). **Falta la
-`/auditoria`**, que cierra la tanda.
-
-### Lo que dijo el autor al probarla (2026-10-10): hablarlo y hacer el plan en la proxima sesion
+Hablarlo y hacer el plan. La tanda de fisicas, ya cerrada, esta en
+`docs/historia.md` («Fisicas: cajas que chocan siempre…»), con lo que pidio el
+autor literal y el modelo de la altura de reposo.
 
 1. **El bloque a dos casillas que ya se alcanza: aceptado.** El autor, literal:
    «no hay problema en que se alcancen más casillas siempre que se respeten las
-   leyes físicas». Queda quitar la fila de `docs/juicio.md` y el «PENDIENTE DEL
-   AUTOR» de `tests/jump.test.ts`, y dejar el test afirmandolo como decision.
+   leyes físicas». **Hecho en la auditoria del 2026-10-10**: fuera la fila de
+   `docs/juicio.md`, el test lo afirma como decision suya y `docs/reglas.md`
+   (regla 21) lo cuenta.
 2. **Los animales que suben primero la cabeza y luego las patas: se ve mal, hay
    que arreglarlo, y toca debatirlo.** Pasa en los pequenos: el reposo por cajas
    (`partsRest`) sube el cuerpo entero cuando la cabeza toca un borde a menos de
@@ -178,7 +79,7 @@ pidio medir en un claro y la camara baja en cuatro rumbos (`docs/pruebas.md`). *
    entre ticks**. La inercia de camara no la recomendaria: anade latencia a la
    mirada, que es la que apunta el golpe.
 
-Fuera de esta tanda y pendiente del autor: **las paredes de 2+ voxeles**, que el
+Aparte, y pendiente del autor: **las paredes de 2+ voxeles**, que el
 relieve interpolado casi elimino (de 38-47 m de pared de 1 m o mas por 100 m² a
 1,6-3); se le propusieron cuatro opciones (A: interpolar solo los desniveles de
 medio bloque; B: sin interpolar; C: mas relieve; D: zonas de acantilados).
@@ -302,37 +203,74 @@ los numeros.
   mutacion destapo otro agujero que ya estaba: la medida contaba tambien los
   impactos. Ahora `slash.mjs` abre con `?efectos=barrido` y solo ve el barrido.
 
-## Auditoria al cerrar la fauna y los equipables (2026-10-04)
+## Auditoria al cerrar las fisicas y las pruebas (2026-10-10)
 
-Desde `8396b7f` hasta `3415d31`: la primera tanda de fauna (que se cerro sin
-auditar), la guia de arte y los equipables con sus iconos.
+Desde `3415d31` hasta `7e2d790`: los animales que se quedaban clavados, una
+caja por objeto, las cajas en el panel, la fase 1 de los voxeles, las tres
+fases de fisicas y las pruebas mas rapidas (22 commits).
 
 **Corregido:**
-- **El humo `desktop` media el registro de PC con un plazo fijo de 400 ms** y
-  cayo una vez en la CI de `main` (escape 23). Ahora espera hasta que la linea
-  se mueva, con tope dentro de su vida, y una mutacion la ve caer.
-- **`slash` fallo una vez con 16 pixeles en la vista normal** (suelo 20). La
-  sospecha es un animal paseando por delante del barrido; **la causa no esta
-  confirmada**. Ahora mide con `?fauna=0`, que quita solo el dibujo de los
-  animales (escape 24). Si vuelve a caer, la causa era otra.
-- **Dos cabeceras seguian contando a los animales como laminas**
-  (`sprite-depth.ts`, `body-ray.ts`), aunque son de bloques desde `a1168a7`
-  (escape 22). El escaner tiene una categoria nueva que lo habria visto.
-- Un comentario CSS huerfano de la regla `.slot .hint`, que se quito con los
-  iconos.
-- El README no contaba los equipables ni las armas, y `stations.test.ts` y el
-  humo seguian hablando de la ropa como antes.
-- El campo `wornWear` de la sonda `__verdant`, que no leia nadie.
+- **Codigo muerto de un modelo sustituido** (escape 26): `bodyBoxes(…,
+  feetOnly)` y `footPartsOf` (el apoyo de los animales en sus partes mas
+  bajas) ya solo los usaban dos tests desde que `partsRest` mira todas las
+  cajas. Fuera, y los tests calculan lo suyo (`lowestOf`, mutado: caen los
+  dos).
+- **La regla 21 en `docs/reglas.md` contaba a los animales con el modelo de
+  antes de la fase B** (la heuristica de escalones y el apoyo en las partes
+  mas bajas). Ahora dice lo que hace el juego, como `fauna.md`. Y fuera la
+  fila de `docs/juicio.md` que preguntaba por aquel apoyo.
+- **`docs/leyes.md` citaba un test que no existia** con ese nombre (escape
+  25): «andando se sube como mucho medio bloque por tick» se seguia llamando
+  como en tiempos de las rampas. Renombrado, y el escaner tiene una categoria
+  que cruza la tabla con los tests.
+- **Numeros que no casaban** (escape 27): el resbalon al soltar era 0,26 m en
+  `movement.ts` y 0,22 en `reglas.md` y su test (0,26 es la cuenta continua;
+  el juego, a 60 Hz, da 0,22). La camara «exactamente 0,1 s por detras» son
+  0,092 a 60 Hz.
+- **El bloque a dos casillas**: lo acepto el autor; quitada su fila de
+  `juicio.md` y el «PENDIENTE DEL AUTOR» del test, y anotado en la regla 21.
+- **Lo que el autor ya juzgo, en el documento de su parte**: la camara con
+  retraso «injugable» en `docs/controles.md`, y la cabeza que sube primero en
+  `docs/fauna.md`, con su *Luego*.
+- Restos: «talud» en tres tests y el humo, «rampa» y «niveles» en nombres de
+  test y en `fauna.md`; un comentario suelto en `main.ts` (`boxesNear` entre
+  la doc de `__verdant` y la sonda); la cabecera de `terrain-mesh.ts`, que
+  decia que la usaba `shadow-patches.ts` (se la pasa `main.ts` a
+  `buildShadows`).
 
 **Dejado a proposito:**
-- Los 18 avisos de terminos retirados, todos en secciones de historia.
-- `state.lastBroke`: el cliente no lo pinta (no hay avisos en pantalla), pero
-  lo leen los tests, como `lastBlocked`.
+- Los 18 avisos de terminos retirados, todos en historia.
+- **Los animales en el aire no tienen inercia** (lente G): saltan cuando su
+  avance se atasca, casi parados, y en el aire van a su paso desde el primer
+  tick. El autor pidio arranque y frenada de 0,1 s tambien en el aire; esta
+  en «que decides tu», abajo, porque toca la fisica del salto que se va a
+  debatir con la cabeza que sube primero.
+- `mobile` sigue con el reloj de verdad: quedo fuera de la tanda de pruebas.
+- **El registro de PC de `desktop` cayo otra vez en la CI de `pruebas`**
+  (`54028eb`): la linea murio sin verse moverse (`alive: false`, y 623 -> 0),
+  con la pasada a 304 s en un runner lento. Relanzada una vez, paso. Es la
+  comprobacion del escape 23, con el reloj de verdad a proposito; si vuelve a
+  caer, la salida es medir la deriva en la pagina con el tiempo del juego y
+  no con temporizadores del navegador, y no subir el plazo.
 
-**El alcance, dicho claro**: la fauna se audito con el escaner, buscando
-restos de los modelos sustituidos y releyendo las cabeceras de lo que esos
-modelos usaban. Sus comprobaciones ya se mutaron en sus rondas. Los
-equipables, ademas, linea a linea.
+**Verificado**: typecheck y los 515 tests en local; el escaner con su
+autoprueba (13 categorias); `analyze-world` (0,14/0,76/0,61 pt, como en la
+fase 1) y `shots`, que funcionan; y la CI de `pruebas`.
+
+**El alcance, dicho claro**: linea a linea, lo nuevo de fisicas
+(`movement.ts`, `boxes.ts`, `body.ts`, `camera-lag.ts`), el reloj
+(`clock.ts` y el bucle de `main.ts`) y sus documentos; lo demas, con el
+escaner, busquedas por lente y las cabeceras. Las comprobaciones de la tanda
+ya se mutaron en sus rondas; aqui solo las tocadas.
+
+**Aprendido** (fase 6): escapes 25-27 en la skill, la categoria 13 del
+escaner y sus patrones en las lentes A, D y F.
+
+**Que decides tu:**
+1. **Inercia de los animales en el aire**: (a) que arranquen el salto con lo
+   que llevaban y aceleren en el aire en 0,1 s, como el jugador; (b) dejarlo
+   como esta, porque un salto ya es un arranque; (c) decidirlo con lo de la
+   cabeza que sube primero.
 
 ## Guia de arte — en progreso (abierta el 2026-10-04)
 

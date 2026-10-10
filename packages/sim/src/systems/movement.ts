@@ -207,8 +207,9 @@ function walk(
  * Lo que se tarda en arrancar o en pararse: **0,1 s** (el autor, 2026-10-10:
  * «no se parara el instante, sino que tendrá ese pequeño instante de
  * desplazamiento en la dirección que llevaba»; eligio arranque y frenada en
- * 0,1 s). Andando, al soltar se resbalan unos 0,26 m; corriendo, 0,42; y dar
- * media vuelta tarda el doble, 0,2 s. Igual en el suelo y en el aire.
+ * 0,1 s). Andando, al soltar se resbalan unos 0,22 m a 60 Hz; corriendo, 0,35
+ * (en tiempo continuo serian 0,26 y 0,42); y dar media vuelta tarda el doble,
+ * 0,2 s. Igual en el suelo y en el aire.
  */
 export const INERTIA_TIME = 0.1;
 
@@ -690,9 +691,9 @@ function rehearseJump(
 
 /**
  * Un tick de un animal en el aire: no gira, y avanza a lo largo de su rumbo a
- * `leap`, la de su salto o la de su paso si se cayo andando. Sin margen de subida, como el jugador en el aire: se
- * estampa contra la cara de lo que no alcanzo, y cae. La altura la pone
- * despues `applyVertical`.
+ * `leap`, la de su salto o la de su paso si se cayo andando. Sin margen de
+ * subida, como el jugador en el aire: se estampa contra la cara de lo que no
+ * alcanzo, y cae. La altura la pone despues `applyVertical`.
  */
 export function airborneAnimal(
   world: World,

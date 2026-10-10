@@ -126,13 +126,13 @@ describe('El enunciado del autor, como tabla', () => {
     expect(Math.floor(out.y)).toBeLessThanOrEqual(-1);
   });
 
-  it('el bloque a dos casillas a altura 2: con la huella entera, se alcanza (PENDIENTE DEL AUTOR)', () => {
-    // Fila -1 sigue a altura 1; la -2 sube a 2. Su enunciado dice que no se
-    // alcanza, con el terreno medido en el centro del cuerpo. Desde el
-    // 2026-10-10 lo pisa la huella entera («todas las cajas chocan con el
-    // terreno»): el borde delantero llega a su cara con los pies a +1,13 y se
-    // queda de pie en su filo. Las dos decisiones chocan; hasta que el autor
-    // elija, el test afirma lo que pasa hoy (`docs/juicio.md`).
+  it('el bloque a dos casillas a altura 2: con la huella entera, se alcanza', () => {
+    // Fila -1 sigue a altura 1; la -2 sube a 2. Con el terreno medido en el
+    // centro del cuerpo no se alcanzaba; desde el 2026-10-10 lo pisa la huella
+    // entera («todas las cajas chocan con el terreno»): el borde delantero
+    // llega a su cara con los pies a +1,13 y se queda de pie en su filo. El
+    // autor lo acepto ese dia: «no hay problema en que se alcancen más
+    // casillas siempre que se respeten las leyes físicas».
     const world = heightField((_x, y) => (y <= -2 ? 2 : 1));
     const out = run(world, desdeLaCasilla1, { moveY: -1, jump: true, ticks: HASTA_QUE_CAIGA });
 
@@ -450,8 +450,8 @@ describe('El auto salto', () => {
   });
 
   it('una escalera de medio bloque se anda: no hace saltar', () => {
-    const talud = floors((x) => (x < 3 ? 0 : x < 3.5 ? 0.5 : 1));
-    const out = walkEast(talud, { auto: true });
+    const escalera = floors((x) => (x < 3 ? 0 : x < 3.5 ? 0.5 : 1));
+    const out = walkEast(escalera, { auto: true });
     expect(out.jumps).toBe(0);
     expect(out.z).toBe(1);
   });

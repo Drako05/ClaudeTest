@@ -410,10 +410,11 @@ describe('Capitulo I — «Existen el pasar del tiempo y las leyes fisicas funda
     }
   });
 
-  it('no se cambia de nivel andando mas de lo que una rampa permite', () => {
+  it('andando se sube como mucho medio bloque por tick', () => {
     // El teletransporte de un tile bajo a uno alto era exactamente esto: andar
-    // y aparecer arriba. Una rampa sube UN nivel y para eso existe; dos o mas
-    // sin saltar seria atravesar un muro.
+    // y aparecer arriba. Hasta los voxeles una rampa subia UN nivel y para eso
+    // existia; hoy lo hace un escalon de medio bloque, y mas sin saltar seria
+    // atravesar un muro.
     for (const seed of [1, 2024, 31337]) {
       for (const [mx, my] of [
         [0, -1],

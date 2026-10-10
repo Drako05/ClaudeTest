@@ -1123,14 +1123,6 @@ if (manualClock) {
   requestAnimationFrame(frame);
 }
 
-/**
- * Estado legible desde fuera, para la prueba de humo y las medidas: permite a
- * Playwright leer el estado real del juego en vez de adivinarlo por pixeles.
- *
- * Los sitios del mundo a los que ir a mirar algo (`spots()`) son una funcion y
- * no un campo porque recorren cientos de miles de casillas del generador: como
- * campo se pagarian en cada lectura.
- */
 /** Cuantas cajas de objeto hay a `BOX_RADIUS` de (`px`, `py`): las que solo golpean y las que chocan. */
 function boxesNear(px: number, py: number): { hitOnly: number; blocking: number } {
   const out = { hitOnly: 0, blocking: 0 };
@@ -1144,6 +1136,14 @@ function boxesNear(px: number, py: number): { hitOnly: number; blocking: number 
   return out;
 }
 
+/**
+ * Estado legible desde fuera, para la prueba de humo y las medidas: permite a
+ * Playwright leer el estado real del juego en vez de adivinarlo por pixeles.
+ *
+ * Los sitios del mundo a los que ir a mirar algo (`spots()`) son una funcion y
+ * no un campo porque recorren cientos de miles de casillas del generador: como
+ * campo se pagarian en cada lectura.
+ */
 Object.defineProperty(window, '__verdant', {
   get: () => {
     const id = state.playerId;

@@ -131,6 +131,7 @@ export function scan(root) {
     docSuelta: [],
     sinIndice: [],
     usuarios: [],
+    leyes: [],
   };
 
   // 1. Rutas citadas entre comillas invertidas que no existen.
@@ -378,6 +379,32 @@ export function scan(root) {
     }
   }
 
+  // 13. Tests que `docs/leyes.md` cita en su columna «Prueba» y no existen con
+  // ese nombre. La fase 1 de los voxeles anoto «andando se sube como mucho
+  // medio bloque por tick», y el test que lo afirmaba se seguia llamando como
+  // en tiempos de las rampas: la tabla de leyes apuntaba a una prueba que nadie
+  // podia encontrar (escape 25). La cita es un trozo del nombre: basta que un
+  // test lo contenga (los hay con la semilla delante o una etiqueta detras).
+  const leyes = text.get('docs/leyes.md');
+  if (leyes) {
+    const names = [];
+    for (const f of code.filter((c) => c.startsWith('tests/'))) {
+      for (const m of text.get(f).matchAll(/\b(?:it|describe|test)(?:\.each\([^)]*\))?\(\s*(['"`])((?:\\.|(?!\1).)*)\1/g)) {
+        names.push(m[2].replace(/\\(.)/g, '$1'));
+      }
+    }
+    const lines = leyes.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const cells = lines[i].split('|');
+      if (!lines[i].startsWith('| ') || cells.length !== 6) continue;
+      for (const q of cells[4].matchAll(/«([^»]+)»/g)) {
+        const cita = q[1].trim().replace(/…$/, '');
+        const ok = names.some((n) => n.includes(cita));
+        if (!ok) report.leyes.push(`docs/leyes.md:${i + 1}  «${cita}» no es el nombre de ningun test`);
+      }
+    }
+  }
+
   return report;
 }
 
@@ -409,6 +436,7 @@ const TITLES = {
   docSuelta: 'Comentarios de documentacion sueltos, sin nada que documentar (lente E)',
   sinIndice: 'Documentos de docs/ que el indice de CLAUDE.md no nombra (lente F)',
   usuarios: 'Ficheros citados como usuarios de un modulo que no lo importan (lente E)',
+  leyes: 'Tests que docs/leyes.md cita y no existen con ese nombre (lente F)',
 };
 
 function print(report) {
@@ -465,9 +493,15 @@ function selfTest() {
   put('packages/client/src/zoom.ts', 'export const x = 1;\nlet wheelZoom = 1;\nx; wheelZoom;\n// ver `nombreJuzgado`\n');
   put('docs/otra.md', '# Otra\n\nCita `nombreJuzgado` aqui tambien.\n');
   // El indice nombra un documento y se deja el otro.
-  put('CLAUDE.md', '# Notas\n\n| Si tocas | Lee |\n|---|---|\n| Algo | `docs/notas.md` |\n');
+  put('CLAUDE.md', '# Notas\n\n| Si tocas | Lee |\n|---|---|\n| Algo | `docs/notas.md` |\n| Una ley | `docs/leyes.md` |\n');
   put('.claude/skills/auditoria/references/retirados.md', '- `wheelZoom` — la rueda hacia zoom\n');
   put('.claude/skills/auditoria/references/ignorar.md', '- `nombreJuzgado` — juzgado. En: `docs/otra.md`.\n');
+  // La tabla de leyes cita un test que existe, uno por prefijo y uno que no.
+  put('tests/leyes.test.ts', "it('la vida no surge sola', () => {});\nit.each(S)(\"semilla %i: el agua corta el paso, y la piedra no\", () => {});\n");
+  put('docs/leyes.md',
+    '| Ley | Estado | Donde vive | Prueba |\n|---|---|---|---|\n' +
+    '| Una | **Cumplida** | `x` | «la vida no surge sola», «el agua corta el paso…» |\n' +
+    '| Otra | **Cumplida** | `y` | «un test que no existe» |\n');
   const report = scan(root);
   rmSync(root, { recursive: true, force: true });
   const expect = [
@@ -489,6 +523,7 @@ function selfTest() {
     ['doc suelta', (r) => r.docSuelta.length === 1 && r.docSuelta[0].includes('docs.ts:8')],
     ['sin indice', (r) => r.sinIndice.length === 1 && r.sinIndice[0].includes('docs/otra.md')],
     ['usuarios', (r) => r.usuarios.length === 1 && r.usuarios[0].includes('`docs.ts`')],
+    ['leyes', (r) => r.leyes.length === 1 && r.leyes[0].includes('un test que no existe')],
     ['ignorados con ambito', (r) => r.identificadores.some((x) => x.includes('zoom.ts') && x.includes('nombreJuzgado')) &&
       !r.identificadores.some((x) => x.includes('otra.md'))],
   ];

@@ -1376,7 +1376,7 @@ async function resourcesPass(browser, baseUrl) {
  * mina que— los miden `tests/stations.test.ts`.
  *
  * Desde el nacimiento, que es un rellano llano (regla 22): la mesa va a la
- * casilla de delante y el horno a la de al lado, sin talud que lo impida.
+ * casilla de delante y el horno a la de al lado, sin escalon que lo impida.
  */
 async function stationsPass(browser, baseUrl) {
   console.log('\n== estaciones (mesa, horno, metales, ropa) ==');
