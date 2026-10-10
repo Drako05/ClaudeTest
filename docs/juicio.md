@@ -18,6 +18,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
+| **CHOQUE DE DOS DECISIONES TUYAS**: con el terreno pisado con la huella entera (2026-10-10), **el bloque a dos casillas a altura 2 ya se alcanza** de un salto: el borde delantero del cuerpo llega a su cara con los pies a +1,13 y se queda de pie en su filo. Tu enunciado del salto (2026-09-28) decia que no. O se acepta, o se recalibra el salto (`GRAVITY`, `JUMP_SPEED`, que son deduccion mia) | `docs/reglas.md`, regla 21; `tests/jump.test.ts` | dos numeros |
+| Fisicas: la inercia frena y arranca **al ritmo del paso que se lleva puesto**: soltar a la vez la direccion y la carrera frena desde correr al ritmo de andar, en 0,16 s y no en 0,1 | `docs/reglas.md`, regla 21 | una linea en `walk` |
+| Fisicas: contra una pared, **el eje bloqueado pierde su velocidad** (no se acumula impulso que salga disparado al rodearla) | `docs/reglas.md`, regla 21 | una linea en `slide` |
 | Voxeles: **la columna interpola el relieve entre las esquinas de su casilla**, sin ruido nuevo; consecuencia, **las cordilleras ya no dan acantilados de dos**, sino paredes de un bloque que se saltan, y las paredes de dos o mas solo salen de los salientes | `docs/relieve.md`, voxeles | la formula de `columnFrom` |
 | Voxeles: **lo que es agua lo decide la casilla** (sus cuatro columnas a -1), asi la costa no se mueve | `docs/relieve.md`, voxeles | una regla en `generateChunk` |
 | Voxeles: **el arbol, el arbusto y el brote van con lo generado** (columna mas baja), aunque el brote lo siembre el jugador; solo las estaciones van sobre lo que tocan | `sim/boxes.ts`, `objectBase` | una regla |

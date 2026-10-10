@@ -10,59 +10,57 @@
  * - `gestures` o `slash`: esas herramientas;
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: el terreno de voxeles de 0,5, fase 1 (2026-10-06): columnas de medio
- * bloque sin rampas, su dibujo, y lo que se apoya en ellas.
+ * Ronda: fisicas, fase A (2026-10-10): el jugador pisa el terreno con la huella
+ * entera, baja cayendo, choca la cabeza y anda con inercia.
  */
 export default [
   {
-    nombre: 'la columna no interpola: toma la casilla entera',
-    fichero: 'packages/sim/src/worldgen.ts',
-    de: '    const fx = sx / VOXELS_PER_TILE;',
-    a: '    const fx = 0;',
-    prueba: 'test:tests/relief.test.ts',
-  },
-  {
-    nombre: 'lo generado se apoya en lo mas alto',
+    nombre: 'el terreno se mide en el centro',
     fichero: 'packages/sim/src/boxes.ts',
-    de: '  const highest = isStation(feature);',
-    a: '  const highest = true;',
-    prueba: 'test:tests/stations.test.ts',
+    de: 'if (half <= 0) return [voxelOf(c), voxelOf(c)];',
+    a: 'if (half <= 99) return [voxelOf(c), voxelOf(c)];',
+    prueba: 'test:tests/body-physics.test.ts',
   },
   {
-    nombre: 'la casilla con escalon sale sin tapas',
-    fichero: 'packages/client/src/terrain-mesh.ts',
-    de: '        if (!flat) lid(x0, y0, x0 + VOXEL, y0 + VOXEL, top, rgb);',
-    a: '        void lid;',
-    prueba: 'test:tests/terrain-mesh.test.ts',
+    nombre: 'una pared bajo la huella sube el cuerpo de golpe',
+    fichero: 'packages/sim/src/boxes.ts',
+    de: 'if (column <= upTo) top = Math.max(top, column);',
+    a: 'if (column <= Infinity) top = Math.max(top, column);',
+    prueba: 'test:tests/body-physics.test.ts',
   },
   {
-    nombre: 'el auto salto no sigue la escalera',
-    fichero: 'packages/sim/src/systems/autojump.ts',
-    de: '      walked = floor;',
-    a: '      void floor;',
-    prueba: 'test:tests/jump.test.ts',
+    nombre: 'bajar medio bloque vuelve a ser de golpe',
+    fichero: 'packages/sim/src/systems/jump.ts',
+    de: 'if (store.z[id] <= ground + 1e-9) {',
+    a: 'if (store.z[id] <= ground + 0.5) {',
+    prueba: 'test:tests/body-physics.test.ts',
   },
   {
-    nombre: 'el chunk y el generador discrepan en el borde',
-    fichero: 'packages/sim/src/worldgen.ts',
-    de: '            : gen.columnFrom(sx, sy, corners[at], corners[at + 1], corners[at + side], corners[at + side + 1]);',
-    a: '            : gen.columnFrom(sx, sy, corners[at], corners[at], corners[at + side], corners[at + side + 1]);',
-    prueba: 'test:tests/relief.test.ts',
+    nombre: 'sin inercia: la velocidad cambia de golpe',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'if (gap <= reach + 1e-9) {',
+    a: 'if (gap <= reach + 99) {',
+    prueba: 'test:tests/body-physics.test.ts',
   },
   {
-    nombre: 'la sonda del humo no ve escalones de medio bloque',
-    fichero: 'packages/client/src/probes.ts',
-    de: '      if (rise === 1) halfSteps++;',
-    a: '      if (rise === 99) halfSteps++;',
-    prueba: 'smoke:relief',
+    nombre: 'contra una pared se acumula velocidad',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'else store.vx[id] = 0;',
+    a: 'else void 0;',
+    prueba: 'test:tests/body-physics.test.ts',
   },
   {
-    // La vista normal se queda ahora con el MEJOR de cuatro rumbos: tiene que
-    // seguir cayendo si el barrido de tercera persona no se ve en ninguno.
-    nombre: 'el barrido de tercera persona no tiene ancho',
-    fichero: 'packages/client/src/effects.ts',
-    de: 'export const SLASH_HALF_WIDTH = 0.06;',
-    a: 'export const SLASH_HALF_WIDTH = 0;',
-    prueba: 'slash',
+    nombre: 'la cabeza atraviesa el techo',
+    fichero: 'packages/sim/src/systems/jump.ts',
+    de: 'if (top > ceiling) {',
+    a: 'if (top > ceiling + 99) {',
+    prueba: 'test:tests/body-physics.test.ts',
+  },
+  {
+    nombre: 'lo que queda sobre la cabeza estorba de lado',
+    fichero: 'packages/sim/src/boxes.ts',
+    de: 'b.z0 < head &&',
+    a: 'b.z0 < Infinity &&',
+    prueba: 'test:tests/body-physics.test.ts',
   },
 ];

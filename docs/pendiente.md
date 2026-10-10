@@ -32,7 +32,54 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## TANDA EN CURSO: el mundo de voxeles de 0,5 — fase 1 hecha (2026-10-06)
+## TANDA EN CURSO: fisicas — cajas que chocan siempre, gravedad, inercia, camara (2026-10-10)
+
+**Empieza aqui.** Es tambien la fase 2 de los voxeles (abajo). El autor, literal
+(2026-10-10):
+
+1. «las entidades y el jugador solo bajan de escalón cuando al caer ninguna de
+   sus cajas choca con algo. lo mismo se aplica para subir. es decir, todas las
+   cajas chocan con el terreno en todo momento.»
+2. «las entidades deben saltar para subir un escalón de mas de 0.5. usando las
+   mismas físicas que el jugador (moverse para desplazarse en el aire y poder
+   subir porque el mero salto solo aplica impulso vertical). creo que aquí se
+   puede aplicar el sistema de salto automático pero para los animales.»
+3. «solo al subir escalones ≤ 0.5 se permite teletransportar a la entidad o el
+   jugador. lo que en la practica, será simplemente como seguir caminando.»
+4. «ahora para cualquier entidad y jugador, debe haber una desaceleración al
+   cambiar la dirección del movimiento, ya sea caminando, corriendo o en el
+   aire (cayendo o saltando). Esta desaceleración también aplica al dejar se
+   avanzar, no se parara el instante, sino que tendrá ese pequeño instante de
+   desplazamiento en la dirección que llevaba (debe ser pequeño, como 0.1s,
+   pero escucho tus sugerencias para este detalle).»
+5. «en todo momento, la cámara debe tener un suavizado/retraso de 0.1s al
+   perseguir al jugador en todas las vistas. (es un tiempo ajustable que
+   juzgare cuando lo pruebe).»
+
+Y sus respuestas a las preguntas:
+- Inercia: **arranque y frenada en 0,1 s**, a ritmo constante.
+- Camara, literal: «el retraso igual en todas las vistas y direcciones, el
+  centro de la pantalla sigue siendo el punto hacia donde mira y apunta el
+  personaje sin importar la ubicación del personaje.»
+- Saltar mientras se cae medio bloque: **sin margen**.
+- Animales en el aire: **como el jugador, a su paso**; saltan justo antes de
+  chocar si llegan arriba, y si no, rodean.
+
+**El plan, en tres fases, cada una a `main` con su CI:** A, el jugador (el
+terreno con la huella entera, sin `SNAP_DOWN`, techos, inercia); B, los animales
+(el reposo por cajas, auto salto a su paso, inercia); C, la camara (retraso
+exponencial ajustable en el panel, y mirando al punto de mira). **El modelo
+comun, deduccion mia: la altura de reposo** de un cuerpo es el maximo, sobre
+cada caja, de lo mas alto bajo su huella menos lo que esa caja esta por encima
+de los pies; andando se sube de golpe hasta `STEP_UP`, por debajo se cae con
+gravedad, y en el aire no se entra donde el reposo pasa de los pies.
+
+Fuera de esta tanda y pendiente del autor: **las paredes de 2+ voxeles**, que el
+relieve interpolado casi elimino (de 38-47 m de pared de 1 m o mas por 100 m² a
+1,6-3); se le propusieron cuatro opciones (A: interpolar solo los desniveles de
+medio bloque; B: sin interpolar; C: mas relieve; D: zonas de acantilados).
+
+## El mundo de voxeles de 0,5 — fase 1 hecha (2026-10-06)
 
 **Empieza aqui.** El autor decidio pasar el terreno de mapa de alturas (un
 nivel y una rampa por casilla de 1) a **voxeles de 0,5 × 0,5 × 0,5**, «para

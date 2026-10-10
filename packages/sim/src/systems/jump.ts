@@ -19,8 +19,8 @@
  * **alcance dos**. `tests/jump.test.ts` lo tiene como tabla.
  */
 
-import { footing } from '../boxes.js';
-import type { EntityStore } from '../entities.js';
+import { footing, headroom, PLAYER_HEIGHT } from '../boxes.js';
+import { EntityKind, type EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 
 /**
@@ -47,18 +47,13 @@ export const JUMP_SPEED = 12;
  * **Medio bloque** (decision del autor, 2026-10-06): todo lo que mida ≤ 0,5 se
  * sube andando —el voxel del terreno, una caja baja—, y es una caracteristica
  * de la fisica, no de cada cosa. La pared mas baja que pide saltar mide 1.
+ *
+ * Y **solo subir es de golpe** (el autor, 2026-10-10): «solo al subir escalones
+ * ≤ 0.5 se permite teletransportar». Bajar, por poco que sea, es caer con la
+ * gravedad: un escalon de medio bloque tarda 0,13 s, y mientras se cae no se
+ * salta (sin margen, decision suya del mismo dia).
  */
 export const STEP_UP = 0.5;
-
-/**
- * Cuanto se pega a un suelo que baja antes de considerarlo una caida.
- *
- * El gemelo de `STEP_UP` por el otro lado: un escalon de medio bloque se baja
- * andando, y sin esta holgura el personaje iria dando saltitos escalera abajo,
- * en el aire media vida. Un borde de verdad es de 1 bloque o mas y sigue
- * tirandote.
- */
-export const SNAP_DOWN = 0.5;
 
 /**
  * Despegue. **Solo empuja hacia arriba** (decision del autor, 2026-09-30): lo
@@ -86,17 +81,20 @@ export function takeOff(store: EntityStore, id: number): boolean {
  * comparacion mirada desde los dos lados: en el aire se aterriza cuando los pies
  * alcanzan el suelo, y en el suelo se cae cuando el suelo se aleja de los pies.
  * **Caer es caer**: salir de un borde no es un estado distinto de saltar, es la
- * misma parabola con `vz = 0`.
+ * misma parabola con `vz = 0`. Y desde el 2026-10-10 bajar un escalon, por
+ * pequeno que sea, tambien: solo se sube de golpe (`STEP_UP`).
  */
 export function applyVertical(world: World, store: EntityStore, id: number, dt: number): void {
-  // Lo que se pisa, con las cajas que tocan la huella: encima de una roca o de
-  // una mesa se esta de pie, y al bajarse o si se desmonta, se cae. Una caja que
-  // asoma mas de lo que se sube andando no se pisa (`footing`).
+  // Lo que se pisa, con la huella entera: el terreno y las cajas que la tocan;
+  // encima de una roca o de una mesa se esta de pie, y al bajarse o si se
+  // desmonta, se cae. Una caja que asoma mas de lo que se sube andando no se
+  // pisa (`footing`).
   const ground = footing(world, store, id, store.z[id] + STEP_UP);
 
   if (store.grounded[id]) {
-    if (store.z[id] <= ground + SNAP_DOWN) {
-      // Andando por terreno continuo: los pies siguen al suelo, suba o baje.
+    if (store.z[id] <= ground + 1e-9) {
+      // El suelo sigue a la misma altura, o sube lo que se sube andando: los
+      // pies lo siguen de golpe.
       store.z[id] = ground;
       return;
     }
@@ -114,8 +112,16 @@ export function applyVertical(world: World, store: EntityStore, id: number, dt: 
   // para que subirse a un bloque no fuera al milimetro: 1.06 deja un pelo de un
   // pixel.
   const vz0 = store.vz[id];
+  const ceiling = vz0 > 0 ? headroom(world, store, id) : Infinity;
   store.vz[id] = vz0 - GRAVITY * dt;
   store.z[id] += ((vz0 + store.vz[id]) / 2) * dt;
+
+  // La cabeza contra un techo corta la subida: se queda debajo y empieza a caer.
+  const top = store.z[id] + (store.kind[id] === EntityKind.Player ? PLAYER_HEIGHT : 0);
+  if (top > ceiling) {
+    store.z[id] -= top - ceiling;
+    store.vz[id] = Math.min(0, store.vz[id]);
+  }
 
   // Solo se aterriza cayendo: subiendo se atraviesa el suelo de un saliente por
   // debajo sin quedarse pegado a el.

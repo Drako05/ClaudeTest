@@ -20,7 +20,7 @@
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
-import { BODY_RADIUS, squareFloor } from '../boxes.js';
+import { BODY_RADIUS, PLAYER_HEIGHT, squareFloor } from '../boxes.js';
 import { applyVertical, GRAVITY, JUMP_SPEED, STEP_UP, takeOff } from './jump.js';
 
 /** Medio ancho del cuerpo del jugador, en tiles: su huella. Vive en `boxes.ts`. */
@@ -77,12 +77,15 @@ export function collides(world: World, cx: number, cy: number): boolean {
 }
 
 /**
- * True si se puede poner el cuerpo en (cx, cy) teniendo los pies a `feet`.
+ * True si NO se puede poner el cuerpo en (cx, cy) teniendo los pies a `feet`.
  *
- * La altura se mide en el CENTRO y no en el contorno del cuerpo, al reves que
- * los solidos. Con el contorno, arrimarse a una pared bastaria para que el
- * maximo de las casillas solapadas fuera la propia pared y el personaje se
- * subiria a ella de lado. El centro es lo que de verdad se pisa.
+ * La altura se mide con la **huella entera** (el autor, 2026-10-10: «todas las
+ * cajas chocan con el terreno en todo momento»): lo mas alto que toca la
+ * huella, terreno o caja, no puede pasar de los pies mas `margin`. Hasta
+ * entonces el terreno se media en el centro, para no subirse de lado a una
+ * pared al arrimarse; con la huella eso no pasa, porque arrimarse es tocar la
+ * cara, no solaparla. Las cajas que empiezan por encima de la cabeza no
+ * estorban: son techo.
  */
 function blocked(
   world: World,
@@ -94,11 +97,11 @@ function blocked(
 ): boolean {
   if (collides(world, cx, cy)) return true;
   if (keep && !keep(cx, cy)) return true;
-  // El terreno en el centro y, encima, el techo de cada caja que toca la
+  // El terreno bajo la huella y, encima, el techo de cada caja que toca la
   // huella: un tronco, una roca o una mesa estorban de lado como una pared, y
   // lo que no pasa del salto se sube saltando (decisiones del autor,
   // 2026-09-30 y 2026-10-05).
-  return squareFloor(world, cx, cy, BODY_RADIUS) > feet + margin;
+  return squareFloor(world, cx, cy, BODY_RADIUS, Infinity, feet + PLAYER_HEIGHT) > feet + margin;
 }
 
 /**
@@ -118,18 +121,22 @@ function slide(
   const feet = store.z[id];
   const curY = store.y[id];
 
+  // Un eje que no se puede andar pierde su velocidad: contra una pared no se
+  // acumula impulso que salga disparado al rodearla.
   const nextX = store.x[id] + stepX;
-  if (!blocked(world, nextX, curY, feet, margin, keep)) store.x[id] = nextX;
+  if (stepX !== 0 && !blocked(world, nextX, curY, feet, margin, keep)) store.x[id] = nextX;
+  else store.vx[id] = 0;
 
   const nextY = curY + stepY;
-  if (!blocked(world, store.x[id], nextY, feet, margin, keep)) store.y[id] = nextY;
+  if (stepY !== 0 && !blocked(world, store.x[id], nextY, feet, margin, keep)) store.y[id] = nextY;
+  else store.vy[id] = 0;
 }
 
 /**
  * Movimiento en el suelo.
  *
- * Deja tambien `vx`/`vy` puestas aunque la posicion la escriba directamente:
- * son la velocidad que se lleva, y quien dibuja o mide la lee de ahi.
+ * `vx`/`vy` son la velocidad que se lleva, **con inercia** (`steer`): la
+ * posicion avanza con ella, y quien dibuja o mide la lee de ahi.
  */
 export function moveEntity(
   world: World,
@@ -146,9 +153,9 @@ export function moveEntity(
 /**
  * Movimiento en el aire: **igual que en el suelo** (decision del autor,
  * 2026-09-30). El salto solo empuja hacia arriba, y lo horizontal lo pone el
- * mando a la velocidad de andar o de correr; sin mando no se avanza. Hasta
- * entonces se conservaba el impulso del despegue y solo se admitia un 30 % de
- * desviacion.
+ * mando a la velocidad de andar o de correr; sin mando se frena, con la misma
+ * inercia que en el suelo (`INERTIA_TIME`). Hasta entonces se conservaba el
+ * impulso del despegue y solo se admitia un 30 % de desviacion.
  *
  * Lo unico que cambia es que va **sin margen de subida**, que es lo que
  * convierte la cara de un bloque en una pared contra la que estamparse: por
@@ -177,24 +184,55 @@ function walk(
   margin: number,
 ): void {
   const len = Math.hypot(moveX, moveY);
-  if (len <= 1e-6) {
-    store.vx[id] = 0;
-    store.vy[id] = 0;
-    return;
+  const speed = speedOf(running);
+  let targetX = 0;
+  let targetY = 0;
+  if (len > 1e-6) {
+    // La direccion se normaliza, y con eso la diagonal deja de ser mas rapida
+    // que la ortogonal. La magnitud NO se mira: el vector es direccion y ya esta.
+    const dirX = moveX / len;
+    const dirY = moveY / len;
+    store.facingX[id] = dirX;
+    store.facingY[id] = dirY;
+    targetX = dirX * speed;
+    targetY = dirY * speed;
   }
 
-  // La direccion se normaliza, y con eso la diagonal deja de ser mas rapida que
-  // la ortogonal. La magnitud NO se mira: el vector es direccion y ya esta.
-  const dirX = moveX / len;
-  const dirY = moveY / len;
-  store.facingX[id] = dirX;
-  store.facingY[id] = dirY;
+  steer(store, id, targetX, targetY, speed / INERTIA_TIME, dt);
+  if (store.vx[id] === 0 && store.vy[id] === 0) return;
+  slide(world, store, id, store.vx[id] * dt, store.vy[id] * dt, margin);
+}
 
-  const speed = speedOf(running);
-  store.vx[id] = dirX * speed;
-  store.vy[id] = dirY * speed;
+/**
+ * Lo que se tarda en arrancar o en pararse: **0,1 s** (el autor, 2026-10-10:
+ * «no se parara el instante, sino que tendrá ese pequeño instante de
+ * desplazamiento en la dirección que llevaba»; eligio arranque y frenada en
+ * 0,1 s). Andando, al soltar se resbalan unos 0,26 m; corriendo, 0,42; y dar
+ * media vuelta tarda el doble, 0,2 s. Igual en el suelo y en el aire.
+ */
+export const INERTIA_TIME = 0.1;
 
-  slide(world, store, id, dirX * speed * dt, dirY * speed * dt, margin);
+/**
+ * La inercia: la velocidad (`vx`, `vy`) va hacia la que se quiere
+ * (`targetX`, `targetY`) cambiando como mucho `accel · dt` por tick, en linea
+ * recta entre las dos. Con `accel` = velocidad del paso / `INERTIA_TIME`,
+ * arrancar y parar duran 0,1 s a ritmo constante. **Deduccion mia**: el ritmo
+ * es el del paso que se lleva puesto, asi que soltar a la vez la direccion y la
+ * carrera frena desde correr al ritmo de andar, en 0,16 s.
+ */
+export function steer(store: EntityStore, id: number, targetX: number, targetY: number, accel: number, dt: number): void {
+  const dx = targetX - store.vx[id];
+  const dy = targetY - store.vy[id];
+  const gap = Math.hypot(dx, dy);
+  const reach = accel * dt;
+  // Con una holgura de redondeo: 0,1 s son 6 ticks justos, no 7.
+  if (gap <= reach + 1e-9) {
+    store.vx[id] = targetX;
+    store.vy[id] = targetY;
+    return;
+  }
+  store.vx[id] += (dx / gap) * reach;
+  store.vy[id] += (dy / gap) * reach;
 }
 
 /** Cuanto gira un animal, en radianes por segundo: media vuelta por segundo. **Deduccion mia.** */

@@ -20,7 +20,7 @@
  * `location` puede lanzar, y entonces se juega un mundo al azar.
  */
 
-import { createGame, type GameState } from '@verdant/sim';
+import { BODY_RADIUS, createGame, squareFloor, type GameState } from '@verdant/sim';
 import { PROJECTIONS, type Projection } from './camera.js';
 
 function param(name: string): string | null {
@@ -89,8 +89,10 @@ export function startGame(seed: number, fromUrl: boolean, radius: number): GameS
     state.entities.x[id] = place.x;
     state.entities.y[id] = place.y;
     // Y los pies en el suelo del sitio nuevo: llegar a una cima de nivel 27 con
-    // la altura de la costa seria una caida de 27 bloques nada mas abrir.
-    state.entities.z[id] = state.world.groundHeightAt(place.x, place.y);
+    // la altura de la costa seria una caida de 27 bloques nada mas abrir. Lo
+    // que pisa la huella entera, no el centro (regla 21): con el centro, un
+    // sitio pegado a una pared dejaba el cuerpo metido en ella.
+    state.entities.z[id] = squareFloor(state.world, place.x, place.y, BODY_RADIUS);
     state.entities.vz[id] = 0;
     state.entities.grounded[id] = 1;
   }

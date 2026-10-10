@@ -195,8 +195,32 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     2026-10-06, con el terreno de voxeles de 0,5). Hasta entonces era la holgura
     que separaba un talud de una pared; las rampas se retiraron y el relieve
     sube a escalones de medio bloque, que es justo lo que ese margen deja
-    pasar. `SNAP_DOWN`, su gemelo de bajada, sigue en 0,5: sin el, el personaje
-    iria dando saltitos escalera abajo.
+    pasar.
+
+    **Solo subir es de golpe; bajar es caer** (el autor, 2026-10-10: «solo al
+    subir escalones ≤ 0.5 se permite teletransportar»; «solo bajan de escalón
+    cuando al caer ninguna de sus cajas choca con algo»). Hasta entonces
+    `SNAP_DOWN`, el gemelo de bajada de `STEP_UP`, pegaba los pies al suelo
+    medio bloque para no ir dando saltitos escalera abajo; se retiro. Ahora un
+    escalon de medio bloque tarda 0,13 s en caerse, y **cayendo no se salta**:
+    el autor eligio no dar margen (2026-10-10). Y nada sube mas de golpe: una
+    columna que asoma mas de `STEP_UP` sobre los pies no se pisa, igual que una
+    caja (*deduccion*); si un cuerpo aparece con la huella metida en una pared
+    —puesto a mano con `?x=&y=`—, se queda al pie en vez de subir a lo alto, y
+    al aparecer los pies van a lo que pisa la huella, no el centro.
+
+    **Inercia** (el autor, 2026-10-10): arrancar y frenar duran `INERTIA_TIME`,
+    0,1 s, a ritmo constante, en el suelo y en el aire (`steer`,
+    `systems/movement.ts`). Andando se resbalan ~0,22 m al soltar a 60 Hz, y
+    dar media vuelta tarda 0,2 s. El ritmo es el del paso que se lleva puesto
+    (*deduccion*): soltar a la vez la direccion y la carrera frena desde
+    correr al ritmo de andar. Contra una pared, el eje bloqueado pierde su
+    velocidad: no se acumula impulso.
+
+    **La cabeza choca** (el cuerpo mide `PLAYER_HEIGHT`, 1,8, del autor): una
+    caja que empieza por encima de la cabeza no estorba de lado, es techo, y un
+    salto debajo se corta contra ella (`ceilingOver`, `headroom`). El mundo de
+    hoy no genera nada colgado; lo afirma un test con un mundo a mano.
 
     La altura del personaje es **suya** (`entities.z`), no la del suelo bajo sus
     pies, y el que dibuja tiene que leer esa. Leyendo el suelo el personaje
@@ -216,9 +240,11 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     arbol, la roca, los minerales y las estaciones; el arbusto, el brote y los
     guijarros no), entra en el suelo que se pisa. **El cuerpo se apoya y choca
     con su huella entera** (`BODY_RADIUS` por lado), tambien contra las
-    estaciones, mientras el **terreno** se sigue midiendo en el centro. Lo que
-    pisa el cuerpo es `squareFloor` (`sim/boxes.ts`): el terreno en el centro
-    y, encima, el techo de cada caja que toca la huella; lo usan el choque, la
+    estaciones y, desde el 2026-10-10, **tambien contra el terreno** («todas
+    las cajas chocan con el terreno en todo momento», el autor): hasta
+    entonces el terreno se media en el centro. Lo que pisa el cuerpo es
+    `squareFloor` (`sim/boxes.ts`): cada columna de 0,5 que toca la huella
+    (`terrainUnder`) y, encima, el techo de cada caja que la toca; lo usan el choque, la
     vertical (`footing`) y el auto salto, y nada mas —el terreno que se dibuja,
     el golpe y sembrar siguen con `groundHeightAt`—. De ahi, sin casos
     especiales:

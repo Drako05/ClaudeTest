@@ -20,11 +20,13 @@ import { describe, expect, it } from 'vitest';
 import { emptyIntent, Feature, TICK_DT } from '@verdant/shared';
 import {
   applyVertical,
+  BODY_RADIUS,
   autoJumpDue,
   createGame,
   EntityKind,
   EntityStore,
   GRAVITY,
+  INERTIA_TIME,
   JUMP_HEIGHT,
   JUMP_SPEED,
   moveAirborne,
@@ -51,6 +53,9 @@ function heightField(heightOf: (x: number, y: number) => number): World {
   const groundHeightAt = (wx: number, wy: number) => heightOf(Math.floor(wx), Math.floor(wy));
   return {
     groundHeightAt,
+    // La columna de 0,5, en medios bloques: la de su casilla. Es la que mide
+    // la huella entera desde el 2026-10-10.
+    columnTop: (vx: number, vy: number) => Math.round(heightOf(Math.floor(vx / 2), Math.floor(vy / 2)) * 2),
     featureAt: () => Feature.None,
     // Solo el agua detiene el paso (regla 9), y el agua es nivel negativo.
     isSolidAt: (x: number, y: number) => heightOf(Math.floor(x), Math.floor(y)) < 0,
@@ -121,15 +126,21 @@ describe('El enunciado del autor, como tabla', () => {
     expect(Math.floor(out.y)).toBeLessThanOrEqual(-1);
   });
 
-  it('el bloque a dos casillas a altura 2: se estampa y cae en el de altura 1', () => {
-    // Fila -1 sigue a altura 1; la -2 sube a 2. Es la pared que no se alcanza.
+  it('el bloque a dos casillas a altura 2: con la huella entera, se alcanza (PENDIENTE DEL AUTOR)', () => {
+    // Fila -1 sigue a altura 1; la -2 sube a 2. Su enunciado dice que no se
+    // alcanza, con el terreno medido en el centro del cuerpo. Desde el
+    // 2026-10-10 lo pisa la huella entera («todas las cajas chocan con el
+    // terreno»): el borde delantero llega a su cara con los pies a +1,13 y se
+    // queda de pie en su filo. Las dos decisiones chocan; hasta que el autor
+    // elija, el test afirma lo que pasa hoy (`docs/juicio.md`).
     const world = heightField((_x, y) => (y <= -2 ? 2 : 1));
     const out = run(world, desdeLaCasilla1, { moveY: -1, jump: true, ticks: HASTA_QUE_CAIGA });
 
     expect(out.grounded).toBe(true);
-    expect(out.z).toBe(1);
-    // Aterriza en el bloque 2 —la casilla intermedia—, sin llegar a la de altura 2.
-    expect(Math.floor(out.y)).toBe(-1);
+    expect(out.z).toBe(2);
+    // Apoyado por el borde de la huella: el centro aun no ha pasado la cara.
+    expect(out.y + BODY_RADIUS).toBeGreaterThan(-1);
+    expect(out.y - BODY_RADIUS).toBeLessThan(-1);
   });
 
   it('el apice cae a una casilla y por encima de un bloque', () => {
@@ -180,7 +191,12 @@ describe('Ya no se cambia de nivel andando', () => {
     // Al norte, dos escalones de medio bloque (el autor, 2026-10-06: lo que
     // mide <= 0,5 se sube andando, y es de la fisica, no de cada cosa).
     const stairs = (_x: number, y: number) => (y < -0.5 ? 2 : y < 0 ? 1.5 : 1);
-    const world = { ...heightField(() => 0), groundHeightAt: stairs, featureAt: () => Feature.None } as unknown as World;
+    const world = {
+      ...heightField(() => 0),
+      groundHeightAt: stairs,
+      columnTop: (_vx: number, vy: number) => stairs(0, (vy + 0.5) / 2) * 2,
+      featureAt: () => Feature.None,
+    } as unknown as World;
     const out = run(world, { x: 0.5, y: 0.5 }, { moveY: -1, ticks: HASTA_QUE_CAIGA });
 
     expect(out.z).toBe(2);
@@ -279,13 +295,21 @@ describe('En el aire se anda como en el suelo', () => {
   });
 
   it('en el aire se va a la velocidad de andar o de correr, como en el suelo', () => {
+    // Con la inercia (el autor, 2026-10-10): en 0,1 s se llega a su velocidad,
+    // y de ahi no pasa.
     for (const running of [false, true]) {
       const store = new EntityStore(4);
       const id = store.spawn(EntityKind.Player, 0.5, 0.5);
       store.z[id] = 0;
       takeOff(store, id);
       applyVertical(llano, store, id, TICK_DT);
-      const x0 = store.x[id];
+      let x0 = store.x[id];
+      for (let t = 0; t * TICK_DT < INERTIA_TIME - 1e-9; t++) {
+        x0 = store.x[id];
+        moveAirborne(llano, store, id, 1, 0, TICK_DT, running);
+      }
+      expect(store.x[id] - x0).toBeCloseTo((running ? WALK_SPEED * RUN_MULTIPLIER : WALK_SPEED) * TICK_DT, 9);
+      x0 = store.x[id];
       moveAirborne(llano, store, id, 1, 0, TICK_DT, running);
       expect(store.x[id] - x0).toBeCloseTo((running ? WALK_SPEED * RUN_MULTIPLIER : WALK_SPEED) * TICK_DT, 9);
     }
@@ -297,22 +321,34 @@ describe('En el aire se anda como en el suelo', () => {
     expect(out.peak).toBeGreaterThan(1);
   });
 
-  it('en el aire se puede dar media vuelta', () => {
+  it('en el aire se puede dar media vuelta, con la inercia de siempre: 0,2 s', () => {
     // Despega hacia el este a paso completo y pide ir al oeste todo el vuelo:
-    // va al oeste a paso completo desde el primer tick en el aire.
+    // frena 0,1 s, acelera otros 0,1 s y va al oeste a paso completo.
     const store = new EntityStore(4);
     const id = store.spawn(EntityKind.Player, 0.5, 0.5);
     store.z[id] = 0;
+    store.vx[id] = WALK_SPEED;
     moveEntity(llano, store, id, 1, 0, TICK_DT);
     takeOff(store, id);
     applyVertical(llano, store, id, TICK_DT);
     const alDespegar = store.x[id];
+    let ticks = 0;
+    let last = store.vx[id];
+    for (; ticks < HASTA_QUE_CAIGA && !store.grounded[id]; ticks++) {
+      moveAirborne(llano, store, id, -1, 0, TICK_DT);
+      applyVertical(llano, store, id, TICK_DT);
+      // Nunca da un tiron: baja tick a tick.
+      expect(store.vx[id]).toBeLessThanOrEqual(last);
+      last = store.vx[id];
+      if (store.vx[id] === -WALK_SPEED) break;
+    }
+    expect(store.vx[id]).toBe(-WALK_SPEED);
+    expect((ticks + 1) * TICK_DT).toBeCloseTo(2 * INERTIA_TIME, 9);
     for (let t = 0; t < HASTA_QUE_CAIGA && !store.grounded[id]; t++) {
       moveAirborne(llano, store, id, -1, 0, TICK_DT);
       applyVertical(llano, store, id, TICK_DT);
-      expect(store.vx[id]).toBe(-WALK_SPEED);
     }
-    expect(store.x[id]).toBeLessThan(alDespegar - 1.5);
+    expect(store.x[id]).toBeLessThan(alDespegar);
   });
 
   it('en el aire no se salta otra vez', () => {
@@ -337,6 +373,9 @@ describe('El auto salto', () => {
   function floors(floorAt: (x: number, y: number) => number, solidAt: (x: number) => boolean = () => false): World {
     return {
       groundHeightAt: floorAt,
+      // Cada columna de 0,5, a lo que pide `floorAt` en su centro, en medios
+      // bloques: lo que mide la huella entera.
+      columnTop: (vx: number, vy: number) => Math.round(floorAt((vx + 0.5) / 2, (vy + 0.5) / 2) * 2),
       featureAt: () => Feature.None,
       isSolidAt: (x: number) => solidAt(x),
       isTerrainSolidAt: (x: number) => solidAt(x),

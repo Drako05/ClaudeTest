@@ -89,3 +89,8 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 
 - `rampDir|RAMP_SHARE|RAMP_DIRS|NO_RAMP|isRampEdge|rampDirOf|levelAt\(|levelFromRelief|levelFrom\(|WATER_LEVEL|CLIMB_LIMIT|cornerHeight|groundHeight\(` — el relieve como un nivel entero y una rampa por casilla de 1, con el 15 % de fronteras en rampa; desde el 2026-10-06 son columnas de voxel de 0,5 sin rampas (`columnTop`, `columnTopAt`, `heightFrom`, `WALK_HALVES`/`JUMP_HALVES`, `columnTopFor`). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/relieve.md`, `docs/isometrico.md`, `CLAUDE.md` (cuentan el antes).
 - `\btalud(es)?\b` — el talud que se subia andando; hoy un escalon de medio bloque. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/relieve.md`, `docs/isometrico.md`, `docs/reglas.md`, `CLAUDE.md`.
+
+## Fisicas: bajar de golpe y el terreno en el centro (2026-10-10)
+
+- `SNAP_DOWN|se pega al suelo|saltitos escalera abajo` — el margen que pegaba los pies al suelo al bajar medio bloque; desde el 2026-10-10 bajar es caer con la gravedad. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/reglas.md`.
+- `terreno (se mide |sigue midiendose |medido )?en el centro|el terreno, en el centro` — el terreno pisado en el centro del cuerpo; desde el 2026-10-10, con la huella entera (los animales, en la fase B de la tanda). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/reglas.md`, `docs/fauna.md`, `packages/sim/src/systems/movement.ts`, `packages/sim/src/boxes.ts`.
