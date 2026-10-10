@@ -17,13 +17,16 @@
  * vista sin medir las de antes.
  */
 export default [
-  // La vista normal vigila el recorte por frustum: da 0 en todos los rumbos.
+  // El recorte por frustum lo cazan la camara baja, la primera persona y la
+  // estocada, no la vista normal: con `slash` entero cayeron esas tres a 0 y
+  // la normal paso (CI, 2026-10-10, 6f55459), y con `slash:normal` NO CAE
+  // (d096e92).
   {
     nombre: 'barrido recortado por el frustum',
     fichero: 'packages/client/src/effects-view.ts',
     de: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = false;',
     a: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = true;',
-    prueba: 'slash:normal',
+    prueba: 'slash:baja',
   },
   // La camara baja vigila la cinta de tercera persona: sin ancho, de canto.
   {
