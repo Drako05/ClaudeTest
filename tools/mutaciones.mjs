@@ -10,9 +10,10 @@
  * - `gestures` o `slash`: esas herramientas;
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: fisicas, fases A y B (2026-10-10): el jugador pisa el terreno con la
- * huella entera, baja cayendo, choca la cabeza y anda con inercia; los animales
- * chocan con todas sus cajas, saltan a su paso y tienen inercia. Y la vista
+ * Ronda: fisicas, fases A, B y C (2026-10-10): el jugador pisa el terreno con
+ * la huella entera, baja cayendo, choca la cabeza y anda con inercia; los
+ * animales chocan con todas sus cajas, saltan a su paso y tienen inercia; la
+ * camara persigue los ojos con retraso y mira al punto de mira. Y la vista
  * normal de `slash`, que ahora cuenta solo los rumbos con la camara libre.
  */
 export default [
@@ -26,8 +27,8 @@ export default [
   {
     nombre: 'una pared bajo la huella sube el cuerpo de golpe',
     fichero: 'packages/sim/src/boxes.ts',
-    de: 'if (column <= upTo) top = Math.max(top, column);',
-    a: 'if (column <= Infinity) top = Math.max(top, column);',
+    de: 'return rest > upTo || rest === -Infinity ? z : rest;',
+    a: 'return rest === -Infinity ? z : rest;',
     prueba: 'test:tests/body-physics.test.ts',
   },
   {
@@ -99,6 +100,49 @@ export default [
     de: 'before - (speed / INERTIA_TIME) * dt), dt, keep),',
     a: 'before - 99), dt, keep),',
     prueba: 'test:tests/fauna-body.test.ts',
+  },
+  // Fase C: la camara con retraso, mirando al punto de mira.
+  {
+    nombre: 'la camara va sin retraso',
+    fichero: 'packages/client/src/camera-lag.ts',
+    de: 'const k = lag <= 0 || gap > CAMERA_SNAP ? 1 : 1 - Math.exp(-Math.max(0, dt) / lag);',
+    a: 'const k = 1;',
+    prueba: 'test:tests/camera-lag.test.ts',
+  },
+  {
+    nombre: 'la camara no salta al aparecer lejos',
+    fichero: 'packages/client/src/camera-lag.ts',
+    de: 'const k = lag <= 0 || gap > CAMERA_SNAP ? 1 :',
+    a: 'const k = lag <= 0 ? 1 :',
+    prueba: 'test:tests/camera-lag.test.ts',
+  },
+  {
+    nombre: 'la camara mira a sus ojos rezagados, no al punto de mira',
+    fichero: 'packages/client/src/camera.ts',
+    de: 'camera.lookAt(this.aim);',
+    a: 'camera.lookAt(this.eyes);',
+    prueba: 'test:tests/camera-lag.test.ts',
+  },
+  {
+    nombre: 'la primera persona mira por su linea, no al punto de mira',
+    fichero: 'packages/client/src/camera.ts',
+    de: 'this.firstPerson.lookAt(this.aim);',
+    a: 'this.firstPerson.lookAt(this.eyes.clone().add(look));',
+    prueba: 'test:tests/camera-lag.test.ts',
+  },
+  {
+    nombre: 'el punto de mira sale de los ojos rezagados',
+    fichero: 'packages/client/src/camera.ts',
+    de: 'const point = aimPoint(target, look,',
+    a: 'const point = aimPoint(this.eyes, look,',
+    prueba: 'test:tests/camera-lag.test.ts',
+  },
+  {
+    nombre: 'en el juego la camara va sin retraso',
+    fichero: 'packages/client/src/main.ts',
+    de: '  camera.lag = dev.cameraLag;',
+    a: '  camera.lag = 0;',
+    prueba: 'smoke:relief',
   },
   // La vista normal de `slash` cuenta solo los rumbos con la camara libre y su
   // suelo baja a 5 pixeles: tiene que seguir cayendo con lo que vigila.

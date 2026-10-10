@@ -74,13 +74,17 @@ cada caja, de lo mas alto bajo su huella menos lo que esa caja esta por encima
 de los pies; andando se sube de golpe hasta `STEP_UP`, por debajo se cae con
 gravedad, y en el aire no se entra donde el reposo pasa de los pies.
 
-**Estado:** A y B hechas y **van juntas a `main`**: la CI de A cayo en tres
+**Estado:** A y B hechas y **fueron juntas a `main`**: la CI de A cayo en tres
 pasadas del humo, y cuando estuvieron arregladas B ya estaba en el arbol. Lo
 que ensenaron: `stations` (la deriva al empujar arboles metia la huella en el
 pasillo de la mesa y el horno: orden de teclas), `fauna` (una presa parada
 puede estar atascada lejos de su punto de paso, y al recargar aparece en el:
 se exige `atWaypoint`), y `slash` (ver `docs/pruebas.md`: la vista normal
-cuenta solo rumbos con la camara libre). **Falta C.**
+cuenta solo rumbos con la camara libre). **C, hecha**: la camara persigue los
+ojos con retraso exponencial de 0,1 s en las tres vistas y mira al punto de
+mira (`docs/controles.md`), con un deslizador en el panel de desarrollo. Las
+tres fueron a `main` juntas, tras una sola tanda de CI. **Falta la
+`/auditoria`**, que cierra la tanda.
 
 Fuera de esta tanda y pendiente del autor: **las paredes de 2+ voxeles**, que el
 relieve interpolado casi elimino (de 38-47 m de pared de 1 m o mas por 100 m² a

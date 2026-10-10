@@ -269,6 +269,26 @@ perspectiva, de 0,5 a 0,1, porque la camara puede quedar a un palmo del suelo.
 Con la camara a menos de 1 bloque el sprite del jugador se oculta. Los rayos no
 salen de los chunks cargados: el mas largo mide 60 y se carga radio 3 de 32.
 
+**Y va con retraso** (pedido del autor, 2026-10-10; `camera-lag.ts`, puro). El
+autor, literal: «el retraso igual en todas las vistas y direcciones, el centro
+de la pantalla sigue siendo el punto hacia donde mira y apunta el personaje sin
+importar la ubicacion del personaje». En las tres vistas el pivote son **los
+ojos perseguidos** (`camera.eyes`), que van tras los de verdad con un retraso
+**exponencial** de constante `CAMERA_LAG = 0,1 s`: subir medio bloque, que en el
+nucleo es de golpe, la camara lo sube en una curva, y andando a ritmo constante
+va justo 0,1 s por detras (la velocidad por el retraso: ~0,5 andando). Y las
+tres **miran al punto de mira** (`camera.aim`): el primer choque del rayo de la
+mirada desde los ojos DE VERDAD (`rayHit`, con el terreno y los hitboxes, como
+la colision), o su final a 64 si no choca nada. Asi el centro de la pantalla es
+siempre donde apunta, este donde este la camara; sin retraso es lo de antes,
+porque ese punto esta sobre la linea de la mirada. La colision sale del pivote
+perseguido. Mas lejos de 8, la camara no persigue: salta (nacer, reaparecer,
+`?x=&y=`). **La mirada que viaja en la `Intent` no lleva retraso** (regla 5):
+es la del raton o el dedo, `forward()` y `lookPitch`, tal cual. El retraso se
+ajusta en el panel de desarrollo, de 0 a 0,3 (`docs/devtools.md`). Que sea
+exponencial, el salto a 8, el tope de 64 y el minimo de 0,05 del punto de mira
+son deduccion mia (`docs/juicio.md`).
+
 **Consecuencia a saber**: como la mirada pasa por los ojos del jugador, en
 tercera persona **el personaje tapa el centro de la pantalla**, que es justo
 hacia donde se golpea. Un encuadre «por encima del hombro» lo resolveria, y es

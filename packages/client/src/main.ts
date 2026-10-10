@@ -1030,15 +1030,22 @@ function frame(now: number): void {
   // La camara no atraviesa bloques ni objetos (pedido del autor): choca con el
   // mismo terreno y los mismos hitboxes que el golpe. Los ejes de three.js
   // (`y` arriba) pasan a los del nucleo (`z` arriba).
-  const pivot = { x: px, y: py, z: ph + EYE_HEIGHT };
-  camera.follow(px, ph, py, w, h, (back, want) =>
-    cameraClearance(
-      pivot,
-      { x: back.x, y: back.z, z: back.y },
-      want,
-      (x, y) => state.world.groundHeightAt(x, y),
-      (tx, ty) => hitboxAt(state.world, tx, ty),
-    ),
+  // Con retraso (`camera-lag.ts`): la colision, desde los ojos que persigue; el
+  // punto al que mira, con el rayo de la mirada desde los de verdad.
+  const ground = (x: number, y: number) => state.world.groundHeightAt(x, y);
+  const boxAt = (tx: number, ty: number) => hitboxAt(state.world, tx, ty);
+  camera.lag = dev.cameraLag;
+  camera.follow(
+    px,
+    ph,
+    py,
+    w,
+    h,
+    (from, back, want) =>
+      cameraClearance({ x: from.x, y: from.z, z: from.y }, { x: back.x, y: back.z, z: back.y }, want, ground, boxAt),
+    (from, dir, far) =>
+      rayHit({ x: from.x, y: from.z, z: from.y }, { x: dir.x, y: dir.z, z: dir.y }, far, ground, boxAt),
+    dt,
   );
   // La fauna, cada modelo en sus pies y girado con su rumbo.
   if (showFauna) faunaView.update(state.fauna, state.entities);
@@ -1137,6 +1144,19 @@ Object.defineProperty(window, '__verdant', {
       camDistance: camera.camDistance,
       /** La que querria sin la colision. */
       camWant: camera.camWant,
+      /** El retraso de la camara, y lo que van sus ojos por detras de los de verdad. */
+      camLag: camera.lag,
+      camLagGap: camera.eyes.distanceTo(
+        new Vector3(e.x[state.playerId], e.z[state.playerId] + EYE_HEIGHT, e.y[state.playerId]),
+      ),
+      /** Alto de los ojos que persigue la camara, en coordenadas del nucleo. */
+      camEyesZ: camera.eyes.y,
+      /** El punto que mira el personaje, en la pantalla (-1 a 1): el centro es 0, 0. */
+      aimScreen: (() => {
+        camera.active.updateMatrixWorld();
+        const p = camera.aim.clone().project(camera.active);
+        return [p.x, p.y];
+      })(),
       /** Cuanto queda la camara por ENCIMA del suelo que tiene debajo. */
       camClearance:
         camera.active.position.y -

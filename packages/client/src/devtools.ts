@@ -11,6 +11,7 @@
  */
 
 import { BIOME_NAMES, DAY_TICKS } from '@verdant/shared';
+import { CAMERA_LAG, CAMERA_LAG_MAX } from './camera-lag.js';
 import { deltaText, inventoryDelta } from './pickup-feed.js';
 
 /** Multiplicadores de velocidad del tiempo. */
@@ -56,6 +57,12 @@ export class DevTools {
    * panel es el que mata: saltar un dia gasta 264 puntos de hambre.
    */
   freezeSurvival = true;
+  /**
+   * El retraso de la camara (`camera-lag.ts`), para que el autor lo ajuste
+   * jugando. **No vuelve a su valor al cerrar el panel**, a diferencia de lo
+   * demas: es un ajuste, no un estado que pille a nadie por sorpresa.
+   */
+  cameraLag = CAMERA_LAG;
 
   /** Se llama al abrir o cerrar el panel: el boton del movil se enciende con el. */
   onToggle: ((open: boolean) => void) | null = null;
@@ -178,6 +185,10 @@ export class DevTools {
     }
   }
 
+  private lagText(): string {
+    return `${this.cameraLag.toFixed(2)} s`;
+  }
+
   private build(): void {
     const root = document.createElement('div');
     root.id = 'devPanel';
@@ -212,6 +223,10 @@ export class DevTools {
         </div>
         <p class="devNote">Cajas: <b class="boxHit">golpe</b>, <b class="boxSolid">choque</b>,
           <b class="boxBoth">las dos</b>.</p>
+        <label class="devLabel">Retraso de la camara <b id="devLag">${this.lagText()}</b>
+          <input id="devLagRange" type="range" min="0" max="${CAMERA_LAG_MAX}" step="0.01"
+            value="${this.cameraLag}">
+        </label>
         <span class="devLabel">Pisando <b id="devBiome">—</b></span>
       </div>
       <div class="devGroup">
@@ -224,6 +239,11 @@ export class DevTools {
     this.logList = root.querySelector('#devLog');
     this.speedLabel = root.querySelector('#devSpeed');
     this.statusLabel = root.querySelector('#devBiome');
+    const lagLabel = root.querySelector('#devLag');
+    root.querySelector('#devLagRange')?.addEventListener('input', (e) => {
+      this.cameraLag = Number((e.target as HTMLInputElement).value);
+      if (lagLabel) lagLabel.textContent = this.lagText();
+    });
 
     root.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest('button');

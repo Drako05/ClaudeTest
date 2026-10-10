@@ -69,6 +69,12 @@ Se rehacen enteras en cada fotograma: son unas 600 casillas, cuesta poco, y no
 hay cache que se quede vieja al talar algo o al pasar un animal. El humo las
 cuenta (`__verdant.debugBoxes`) y `tests/debug-boxes.test.ts` mide la parte pura.
 
+**El retraso de la camara** (2026-10-10): un deslizador del grupo Vista lo
+mueve de 0 a 0,3 s (`CAMERA_LAG_MAX`), para que el autor lo ajuste jugando; el
+de partida es el suyo, 0,1 (`docs/controles.md`). **A diferencia de lo demas,
+no vuelve a su valor al cerrar el panel** (propuesta mia): es un ajuste, no un
+estado que deje el juego raro sin el panel a la vista. Se olvida al recargar.
+
 **En el movil, que no tiene F3**, el panel se abre con el cuarto boton de la
 columna de OTROS, una llave inglesa bajo el bioma (`#devToggle`, pedido del
 autor, 2026-10-05), y se abre al lado de la columna, como el HUD: abajo a la

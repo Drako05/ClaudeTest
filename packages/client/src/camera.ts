@@ -19,10 +19,17 @@
  * y cambiar de vista sigue mirando exactamente al mismo sitio. Mirar hacia
  * arriba en tercera persona es bajar la camara por detras; para eso la camara
  * choca con el terreno y los hitboxes (`camera-collision.ts`).
+ *
+ * **Y va con retraso** (pedido del autor, 2026-10-10; `camera-lag.ts`): en las
+ * tres vistas persigue los ojos con 0,1 s de retraso y mira al punto que mira
+ * el personaje, asi que el centro de la pantalla sigue siendo donde apunta
+ * aunque la camara vaya rezagada. Sin retraso es lo de antes: ese punto esta
+ * sobre la linea de la mirada, igual que el pivote.
  */
 
 import { EYE_HEIGHT } from '@verdant/sim';
 import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three';
+import { aimPoint, CAMERA_LAG, chase } from './camera-lag.js';
 
 /** Apertura vertical de la perspectiva, en grados. */
 const FOV = 45;
@@ -106,6 +113,17 @@ export class OrbitCamera {
   camDistance = 0;
   /** La distancia que querria sin la colision: si `camDistance` es menor, algo la acerca. */
   camWant = 0;
+  /** El retraso con que persigue los ojos, en segundos (`camera-lag.ts`). */
+  lag = CAMERA_LAG;
+  /**
+   * Los ojos que persigue, con retraso: el pivote de las tres vistas. En
+   * coordenadas de three.js (`y` es la altura).
+   */
+  readonly eyes = new Vector3();
+  /** El punto que mira el personaje, al que mira la camara: el centro de la pantalla. */
+  readonly aim = new Vector3();
+  /** Si `eyes` ya ha salido de algun sitio: la primera vez se pone, no persigue. */
+  private chasing = false;
   /**
    * El catalejo: fraccion del campo de vision de la primera persona. Vale 1 sin
    * catalejo; la pinza o + y - lo bajan y `relaxSpyglass` lo devuelve.
@@ -246,12 +264,17 @@ export class OrbitCamera {
 
   /**
    * Recoloca la camara. `x`/`z` son las coordenadas del mundo y `y` la altura de
-   * los pies; el pivote son los ojos, `EYE_HEIGHT` por encima.
+   * los pies; los ojos, `EYE_HEIGHT` por encima. `dt` es el tiempo real del
+   * fotograma, para el retraso; sin el, la camara va en los ojos, sin retraso.
    *
-   * En primera persona la camara esta en el pivote. En las otras dos, detras de
-   * el sobre la linea de la mirada y mirandolo, a la distancia que deje libre
-   * `clearance` (la colision: recibe la direccion del pivote a la camara y la
+   * El pivote son los ojos perseguidos (`eyes`), no los de verdad. En primera
+   * persona la camara esta en el pivote. En las otras dos, detras de el sobre
+   * la linea de la mirada, a la distancia que deje libre `clearance` (la
+   * colision: recibe el pivote, la direccion del pivote a la camara y la
    * distancia que se quiere, y devuelve la que cabe). Sin ella, a la que toque.
+   * Las tres miran a `aim`: el primer choque del rayo de la mirada desde los
+   * ojos DE VERDAD (`hit`: recibe ojos, direccion y tope, y devuelve la
+   * distancia). Sin `hit`, el final del rayo.
    */
   follow(
     x: number,
@@ -259,16 +282,25 @@ export class OrbitCamera {
     z: number,
     width: number,
     height: number,
-    clearance?: (back: Vector3, want: number) => number,
+    clearance?: (from: Vector3, back: Vector3, want: number) => number,
+    hit?: (from: Vector3, dir: Vector3, far: number) => number,
+    dt = Infinity,
   ): void {
     this.target.set(x, y + FP_EYE, z);
+    if (this.chasing) chase(this.eyes, this.target, this.lag, dt);
+    else this.eyes.copy(this.target);
+    this.chasing = true;
     const look = this.look();
+    const target = this.target;
+    const point = aimPoint(target, look, (far) => (hit ? hit(target, look, far) : far));
+    this.aim.set(point.x, point.y, point.z);
     // La de primera persona va SIEMPRE en los ojos, se dibuje con ella o no:
     // la estocada sale de un punto de su pantalla, y asi hace el mismo
     // recorrido en el mundo en las tres vistas (pedido del autor, 2026-10-01;
-    // con la camara activa nacia lejos del jugador en tercera persona).
-    this.firstPerson.position.copy(this.target);
-    this.firstPerson.lookAt(this.target.clone().add(look));
+    // con la camara activa nacia lejos del jugador en tercera persona). En los
+    // perseguidos, como las otras dos: es la que se ve en primera persona.
+    this.firstPerson.position.copy(this.eyes);
+    this.firstPerson.lookAt(this.aim);
     this.firstPerson.updateMatrixWorld();
     if (this.projection === 'primera') {
       this.camDistance = 0;
@@ -281,11 +313,11 @@ export class OrbitCamera {
     const want = this.projection === 'orto' ? ORTHO_DISTANCE : this.distance * PERSPECTIVE_PULL;
     const back = look.clone().negate();
     this.camWant = want;
-    this.camDistance = clearance ? clearance(back, want) : want;
+    this.camDistance = clearance ? clearance(this.eyes, back, want) : want;
 
     const camera = this.active;
-    camera.position.copy(this.target).addScaledVector(back, this.camDistance);
-    camera.lookAt(this.target);
+    camera.position.copy(this.eyes).addScaledVector(back, this.camDistance);
+    camera.lookAt(this.aim);
     this.resize(width, height);
   }
 
