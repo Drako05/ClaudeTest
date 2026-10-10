@@ -38,16 +38,18 @@ jobs:
       matrix:
         # Una casilla por pasada de `tools/smoke.mjs` (se lanza por el prefijo
         # de su nombre), los gestos con toques de verdad y el barrido en
-        # pixeles. Si se anade una pasada al humo, va aqui tambien: el escaner
-        # de la auditoria lo cruza.
-        pasada: [desktop, resources, stations, mobile, devTools, life, relief, highRefresh, fauna, gestures, slash]
+        # pixeles, una casilla por parte (`tools/slash-partes.mjs`): entero
+        # eran ~15 minutos y marcaba lo que tardaba la CI (2026-10-10). Si se
+        # anade una pasada al humo o una parte al barrido, va aqui tambien: el
+        # escaner de la auditoria lo cruza.
+        pasada: [desktop, resources, stations, mobile, devTools, life, relief, highRefresh, fauna, gestures, slash-normal, slash-baja, slash-cerca, slash-primera, slash-estocada]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/preparar
       - name: Build del cliente
         run: npm run build
       - name: Prueba de humo, pasada ${{ matrix.pasada }}
-        if: matrix.pasada != 'gestures' && matrix.pasada != 'slash'
+        if: matrix.pasada != 'gestures' && !startsWith(matrix.pasada, 'slash-')
         run: node tools/smoke.mjs ${{ matrix.pasada }}
       # Los gestos con dedos de verdad (CDP): arrastrar, sostener el ojo, la
       # barra del angulo, el dedo de ATAQUE que gira. El humo usa toques
@@ -55,11 +57,13 @@ jobs:
       - name: Gestos tactiles con toques de verdad
         if: matrix.pasada == 'gestures'
         run: node tools/gestures.mjs
-      # El barrido contado en pixeles, en las tres vistas y en el peor de
-      # cuatro rumbos: que se MANDE dibujar no dice que se VEA.
+      # El barrido contado en pixeles, una parte por casilla: que se MANDE
+      # dibujar no dice que se VEA.
       - name: Barrido en pixeles
-        if: matrix.pasada == 'slash'
-        run: node tools/slash.mjs
+        if: startsWith(matrix.pasada, 'slash-')
+        run: node tools/slash.mjs "${PASADA#slash-}"
+        env:
+          PASADA: ${{ matrix.pasada }}
       - name: Guardar capturas
         if: always()
         uses: actions/upload-artifact@v4

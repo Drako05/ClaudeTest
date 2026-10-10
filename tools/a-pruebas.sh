@@ -46,6 +46,7 @@ sha=$(git commit-tree "$arbol" -p "$padre" -m "$mensaje")
 for intento in 1 2 3 4; do
   if git push -q origin "$sha:refs/heads/pruebas"; then
     echo "pruebas <- $sha"
+    echo "para esperar a la CI, en segundo plano: tools/esperar-ci.sh $sha"
     exit 0
   fi
   sleep $((2 ** intento))

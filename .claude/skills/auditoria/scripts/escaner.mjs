@@ -290,9 +290,27 @@ export function scan(root) {
     for (const p of passes) {
       if (!cells.some((c) => p.startsWith(c))) report.matriz.push(`tools/smoke.mjs  ${p} no tiene casilla en la matriz de CI`);
     }
+    // Las partes del barrido, cada una con su casilla `slash-<parte>`
+    // (2026-10-10): las vistas de `SLASH_VIEWS` y lo que `SLASH_PARTS` anade.
+    const partsText = text.get('tools/slash-partes.mjs') ?? '';
+    const parts = [
+      ...[...(/SLASH_VIEWS = \{([^}]*)\}/.exec(partsText)?.[1] ?? '').matchAll(/^\s*(\w+):/gm)].map((m) => m[1]),
+      ...[...(/SLASH_PARTS = \[([^\]]*)\]/.exec(partsText)?.[1] ?? '').matchAll(/'(\w+)'/g)].map((m) => m[1]),
+    ];
     for (const c of cells) {
       // Las casillas de herramientas propias, no del humo.
-      if (!['gestures', 'slash'].includes(c) && !passes.some((p) => p.startsWith(c))) report.matriz.push(`CI  la casilla «${c}» no coincide con ninguna pasada`);
+      if (c.startsWith('slash-')) {
+        if (!parts.includes(c.slice('slash-'.length))) report.matriz.push(`CI  la casilla «${c}» no es ninguna parte de tools/slash-partes.mjs`);
+      } else if (!['gestures', 'slash'].includes(c) && !passes.some((p) => p.startsWith(c))) {
+        report.matriz.push(`CI  la casilla «${c}» no coincide con ninguna pasada`);
+      }
+    }
+    // Una parte sin casilla no se mide nunca en la CI, salvo que la casilla
+    // `slash` a secas las mida todas.
+    if (!cells.includes('slash')) {
+      for (const p of parts) {
+        if (!cells.includes(`slash-${p}`)) report.matriz.push(`tools/slash-partes.mjs  ${p} no tiene casilla slash-${p} en la matriz de CI`);
+      }
     }
   }
 
@@ -420,8 +438,10 @@ function selfTest() {
   put('tools/bien.mjs', "import './lib-usada.mjs';\nexport {};\n");
   put('tools/lib-usada.mjs', 'export {};\n');
   put('tools/suelta.mjs', 'export {};\n');
-  put('.github/workflows/ci.yml', 'matrix:\n  pasada: [alfa, fantasma, gestures, slash]\nsteps:\n  - run: node tools/bien.mjs\n  - run: node tools/smoke.mjs\n');
+  put('.github/workflows/ci.yml', 'matrix:\n  pasada: [alfa, fantasma, gestures, slash-uno, slash-tres, slash-nada]\nsteps:\n  - run: node tools/bien.mjs\n  - run: node tools/smoke.mjs\n  - run: node tools/slash-partes.mjs\n');
   put('tools/smoke.mjs', 'const passes = { alfaPass, betaPass };\n');
+  // Tres partes: `uno` y `tres` con casilla, `dos` sin ella, y `slash-nada` de mas.
+  put('tools/slash-partes.mjs', "export const SLASH_VIEWS = {\n  uno: 'a',\n  dos: 'b',\n};\nexport const SLASH_PARTS = [...Object.keys(SLASH_VIEWS), 'tres'];\n");
   put('packages/client/index.html',
     '<style>#vivo { color: #fff; } #muerto { top: 0; } .viva { x: 1; } .clase-sin-uso { x: 2.5; }</style>\n' +
     '<div id="vivo" class="viva"></div>\n');
@@ -461,8 +481,9 @@ function selfTest() {
     ['scripts', (r) => r.scripts.length === 1 && r.scripts[0].includes('no-existe')],
     ['fuera de CI', (r) => r.fueraDeCi.includes('tools/suelta.mjs') && !r.fueraDeCi.includes('tools/lib-usada.mjs') &&
       !r.fueraDeCi.includes('tools/bien.mjs')],
-    ['matriz', (r) => r.matriz.length === 2 && r.matriz.some((x) => x.includes('betaPass')) &&
-      r.matriz.some((x) => x.includes('fantasma'))],
+    ['matriz', (r) => r.matriz.length === 4 && r.matriz.some((x) => x.includes('betaPass')) &&
+      r.matriz.some((x) => x.includes('fantasma')) && r.matriz.some((x) => x.includes('slash-nada')) &&
+      r.matriz.some((x) => x.includes('slash-dos'))],
     ['retirados', (r) => r.retirados.some((x) => !x.startsWith('[historia]') && x.includes('zoom.ts')) &&
       r.retirados.some((x) => x.startsWith('[historia]') && x.includes('notas.md'))],
     ['doc suelta', (r) => r.docSuelta.length === 1 && r.docSuelta[0].includes('docs.ts:8')],

@@ -8,6 +8,8 @@
  * auditoria). Cada ronda escribe las suyas en `tools/mutaciones.mjs`.
  */
 
+import { SLASH_PARTS } from './slash-partes.mjs';
+
 /**
  * El texto con la mutacion puesta. `de` tiene que aparecer EXACTAMENTE una
  * vez: si no aparece, la lista se quedo vieja; si aparece mas, no se sabe
@@ -33,6 +35,8 @@ export function pasadasDelHumo(smoke) {
  * La orden de una `prueba`, y si necesita el cliente compilado:
  * - `smoke:<pasada>`: una pasada del humo, por el prefijo de su nombre;
  * - `gestures` y `slash`: sus herramientas;
+ * - `slash:<parte>`: una sola parte del barrido (`slash-partes.mjs`), que es
+ *   lo que tarda ~5 minutos y no ~15;
  * - `test:<fichero>`: un fichero de vitest, sin navegador.
  */
 export function orden(prueba, pasadas) {
@@ -46,12 +50,19 @@ export function orden(prueba, pasadas) {
   }
   if (prueba === 'gestures') return { cmd: ['node', 'tools/gestures.mjs'], navegador: true };
   if (prueba === 'slash') return { cmd: ['node', 'tools/slash.mjs'], navegador: true };
+  if (prueba.startsWith('slash:')) {
+    const parte = prueba.slice('slash:'.length);
+    if (!SLASH_PARTS.includes(parte)) {
+      throw new Error(`no hay parte del barrido «${parte}»; hay: ${SLASH_PARTS.join(', ')}`);
+    }
+    return { cmd: ['node', 'tools/slash.mjs', parte], navegador: true };
+  }
   if (prueba.startsWith('test:')) {
     const fichero = prueba.slice('test:'.length);
     if (!fichero) throw new Error('`test:` sin fichero');
     return { cmd: ['npx', 'vitest', 'run', fichero], navegador: false };
   }
-  throw new Error(`prueba desconocida «${prueba}»: smoke:<pasada>, gestures, slash o test:<fichero>`);
+  throw new Error(`prueba desconocida «${prueba}»: smoke:<pasada>, gestures, slash, slash:<parte> o test:<fichero>`);
 }
 
 /**
