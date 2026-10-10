@@ -106,7 +106,7 @@ arriba en todas, `camera.turn`—, y para eso el navegador **captura** el cursor
 - Muerto, el cursor se suelta para poder pulsar «Reiniciar», y reiniciar lo
   vuelve a capturar.
 
-Deducciones mias, en `docs/pendiente.md`: la sensibilidad (`MOUSE_TURN`,
+Deducciones mias, en `docs/juicio.md`: la sensibilidad (`MOUSE_TURN`,
 0,0025 rad por pixel), que un clic sea un golpe sin repetir, lo de la muerte, lo
 del tactil y los textos del aviso.
 
@@ -278,7 +278,7 @@ El cuerpo del jugador no se dibuja desde dentro. Los numeros —ojos a 1,75, la
 inclinacion de arranque −0,62 (los 35 grados de la perspectiva de siempre), el
 tope de ±83 grados, catalejo hasta 15°, la vuelta del
 catalejo con raton a los 0,8 s, el margen de 0,3 y los topes de la colision— son
-deduccion mia; estan en `docs/pendiente.md`.
+deduccion mia; estan en `docs/juicio.md`.
 
 Ojo con una diferencia entre los dos mandos, que es deliberada: **el boton repite
 al mantenerlo** (cuatro veces por segundo, la cadencia de siempre) y **el raton

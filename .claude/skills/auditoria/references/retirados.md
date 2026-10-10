@@ -37,16 +37,16 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 
 ## Fisica y supervivencia
 
-- `AIR_CONTROL|airVelocity|takeoffV[xy]|impulso del despegue` — el salto que conservaba el impulso y admitia un 30 % de desvio; desde el 2026-09-30 en el aire se anda como en el suelo. Permitido en: `docs/relieve.md`, `docs/pendiente.md`, `packages/sim/src/systems/movement.ts` (lo cuenta como historia).
-- `vac[ií]an? en un d[ií]a|un 1 ?% (de hambre )?por salto|salto cuesta (un )?0[,.]5` — el hambre en un dia y el salto al 1 % y al 0,5 %; hoy dos dias y 0,25 %. Permitido en: `docs/pendiente.md`.
+- `AIR_CONTROL|airVelocity|takeoffV[xy]|impulso del despegue` — el salto que conservaba el impulso y admitia un 30 % de desvio; desde el 2026-09-30 en el aire se anda como en el suelo. Permitido en: `docs/relieve.md`, `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `packages/sim/src/systems/movement.ts` (lo cuenta como historia).
+- `vac[ií]an? en un d[ií]a|un 1 ?% (de hambre )?por salto|salto cuesta (un )?0[,.]5` — el hambre en un dia y el salto al 1 % y al 0,5 %; hoy dos dias y 0,25 %. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 
 ## Interfaz
 
-- `healthBar|healthFill|hungerBar|hungerFill|vitalBars|franja de barras` — la franja de salud y hambre del movil; desde el 2026-09-30, los anillos. Permitido en: `docs/controles.md`, `docs/pendiente.md`.
-- `reticleTiles|marcos? de lo alcanzado` — la reticula que marcaba lo que el golpe alcanzaba; retirada el 2026-09-30. Permitido en: `docs/pendiente.md`.
+- `healthBar|healthFill|hungerBar|hungerFill|vitalBars|franja de barras` — la franja de salud y hambre del movil; desde el 2026-09-30, los anillos. Permitido en: `docs/controles.md`, `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `reticleTiles|marcos? de lo alcanzado` — la reticula que marcaba lo que el golpe alcanzaba; retirada el 2026-09-30. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 - `centro del jugador al centro de su casilla` — los 3 de la estacion medidos de centro a centro; desde el 2026-10-01, `stationNear` de los ojos a su caja.
 - `arranca en perspectiva|vista de arranque es la perspectiva` — se arranca en primera persona desde el 2026-10-02.
-- `Esc .{0,40}sin pedir capturar|no pide capturar` — Esc con el inventario abierto captura al soltar desde el 2026-10-02 (`captureSoft`). Permitido en: `docs/pendiente.md`, `.claude/skills/auditoria/references/escapes.md`.
+- `Esc .{0,40}sin pedir capturar|no pide capturar` — Esc con el inventario abierto captura al soltar desde el 2026-10-02 (`captureSoft`). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `.claude/skills/auditoria/references/escapes.md`.
 
 - `items-ui|ItemsUi` — el panel de antes, sustituido por `inventory-ui.ts`.
 - `pageNext|pagePrev|pageNav` — las flechas del panel del movil; hoy pestanas. Permitido en: `tools/smoke.mjs`.
@@ -56,7 +56,7 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `50-100|50 a 100` — el rango viejo del angulo de vision; hoy 70-120. Permitido en: `tests/fov-panel.test.ts`, `packages/client/src/camera.ts`, `docs/controles.md`.
 - `mantener (pulsado )?2 s` — fabricar en 2 s; hoy 1,5.
 - `mas de 1 s` — sostener el ojo 1 s; hoy 0,5.
-- `onFreeCursor|CTRL mantenido|fromBottom` — CTRL soltaba el cursor (retirado por el autor el 2026-10-02) y el registro de PC contaba desde abajo. Permitido en: `docs/pendiente.md`.
+- `onFreeCursor|CTRL mantenido|fromBottom` — CTRL soltaba el cursor (retirado por el autor el 2026-10-02) y el registro de PC contaba desde abajo. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 - `STATION_RANGE|flashPass|PASS_MS|litPass|lastSweepEnds` — la distancia propia de las estaciones (hoy el alcance), el destello aparte de la rueda y los extremos del barrido para el humo (hoy `lastSweep`).
 
 ## Proporciones y camara
@@ -72,20 +72,20 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 
 ## Equipables
 
-- `EQUIP_WAIST|EQUIP_BACK|wearOfSlot|WEAR_SLOTS|garmentOf|Wear\.(Waist|Back)|enum Wear\b|rangeOf\(|rangeEmpty\(` — la ropa en dos huecos, cintura (bolsa) y espalda (mochila), cada uno con su tramo; desde el 2026-10-04 hay catorce equipables (`Equip`) y bolsa y mochila van al Bolso, una sola (`equipOf`, `bagCapacity`, `bagRange`, `bagEmpty`). Permitido en: `docs/pendiente.md`.
-- `'Cintura'|'Espalda'|bolsa a la cintura|mochila a la espalda|bolsa en la cintura|mochila en la espalda` — los nombres de aquellos huecos. Permitido en: `docs/pendiente.md`, `docs/recoleccion.md` (cuenta el antes).
-- `EQUIP_SLOTS = 10|WORN_AT|tres equipables a cada lado|cuatro debajo` — la rejilla de PERSONAJE de diez casillas; desde el 2026-10-04 son catorce en cinco columnas, con iconos. Permitido en: `docs/pendiente.md`.
-- `\b24 casillas|16, 18, 22 o 24` — el maximo con bolsa y mochila puestas a la vez; hoy 22. Permitido en: `docs/pendiente.md`.
-- `golpe util|lo que no es suyo no la gasta|no se gasta en ella` — la herramienta solo se gastaba con lo suyo; desde el 2026-10-04 todo golpe que toca algo gasta (el autor). Permitido en: `docs/pendiente.md`, `docs/recoleccion.md` (cuenta el antes).
-- `caballo de(l)? ajedrez|capa con capucha|capa de espaldas|escudo con (una )?cruz|huella, herradura|iconos de trazo` — los dibujos de los equipables que el autor hizo rehacer el 2026-10-04: los primeros de trazo fino (con una herradura), y luego la capa con capucha y despues de espaldas, el caballo de ajedrez y el escudo con cruz como Emblema. Hoy: siluetas rellenas, capa de frente, cabeza de caballo de perfil y medalla de pecho. Permitido en: `docs/pendiente.md`, `docs/guia-de-arte.md` (describe la referencia del autor, que tiene una capa con capucha).
+- `EQUIP_WAIST|EQUIP_BACK|wearOfSlot|WEAR_SLOTS|garmentOf|Wear\.(Waist|Back)|enum Wear\b|rangeOf\(|rangeEmpty\(` — la ropa en dos huecos, cintura (bolsa) y espalda (mochila), cada uno con su tramo; desde el 2026-10-04 hay catorce equipables (`Equip`) y bolsa y mochila van al Bolso, una sola (`equipOf`, `bagCapacity`, `bagRange`, `bagEmpty`). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `'Cintura'|'Espalda'|bolsa a la cintura|mochila a la espalda|bolsa en la cintura|mochila en la espalda` — los nombres de aquellos huecos. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/recoleccion.md` (cuenta el antes).
+- `EQUIP_SLOTS = 10|WORN_AT|tres equipables a cada lado|cuatro debajo` — la rejilla de PERSONAJE de diez casillas; desde el 2026-10-04 son catorce en cinco columnas, con iconos. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `\b24 casillas|16, 18, 22 o 24` — el maximo con bolsa y mochila puestas a la vez; hoy 22. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+- `golpe util|lo que no es suyo no la gasta|no se gasta en ella` — la herramienta solo se gastaba con lo suyo; desde el 2026-10-04 todo golpe que toca algo gasta (el autor). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/recoleccion.md` (cuenta el antes).
+- `caballo de(l)? ajedrez|capa con capucha|capa de espaldas|escudo con (una )?cruz|huella, herradura|iconos de trazo` — los dibujos de los equipables que el autor hizo rehacer el 2026-10-04: los primeros de trazo fino (con una herradura), y luego la capa con capucha y despues de espaldas, el caballo de ajedrez y el escudo con cruz como Emblema. Hoy: siluetas rellenas, capa de frente, cabeza de caballo de perfil y medalla de pecho. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/guia-de-arte.md` (describe la referencia del autor, que tiene una capa con capucha).
 
 ## Cajas de los objetos
 
-- `isFeatureSolid|floorHeightAt` — el choque de casilla entera de arboles, roca y minerales, y lo que pisaba el cuerpo medido en el centro con la estacion de su casilla; desde el 2026-10-05 cada objeto tiene una caja que golpea y, si su tipo choca, choca (`blocksBody`, `solidBoxAt`), y el cuerpo pisa con su huella (`squareFloor`, `footing`). Permitido en: `docs/pendiente.md`, `docs/reglas.md`, `docs/devtools.md` (cuentan el antes).
-- `casilla entera (de lo que|en cian)|choque dibujado hasta el alto` — el primer dibujo de las cajas del panel, con el choque de casilla entera en cian (unas horas del 2026-10-05). Permitido en: `docs/pendiente.md`, `docs/devtools.md`.
-- `patas finas, la cola|la cola, las patas y las orejas no|las patas finas.{0,20}no chocan` — las patas sin caja; desde el 2026-10-05 la cabeza, el cuello, las extremidades y el tronco golpean y chocan (el autor). Permitido en: `docs/pendiente.md`.
+- `isFeatureSolid|floorHeightAt` — el choque de casilla entera de arboles, roca y minerales, y lo que pisaba el cuerpo medido en el centro con la estacion de su casilla; desde el 2026-10-05 cada objeto tiene una caja que golpea y, si su tipo choca, choca (`blocksBody`, `solidBoxAt`), y el cuerpo pisa con su huella (`squareFloor`, `footing`). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/reglas.md`, `docs/devtools.md` (cuentan el antes).
+- `casilla entera (de lo que|en cian)|choque dibujado hasta el alto` — el primer dibujo de las cajas del panel, con el choque de casilla entera en cian (unas horas del 2026-10-05). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/devtools.md`.
+- `patas finas, la cola|la cola, las patas y las orejas no|las patas finas.{0,20}no chocan` — las patas sin caja; desde el 2026-10-05 la cabeza, el cuello, las extremidades y el tronco golpean y chocan (el autor). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 
 ## Rampas y relieve por casilla
 
-- `rampDir|RAMP_SHARE|RAMP_DIRS|NO_RAMP|isRampEdge|rampDirOf|levelAt\(|levelFromRelief|levelFrom\(|WATER_LEVEL|CLIMB_LIMIT|cornerHeight|groundHeight\(` — el relieve como un nivel entero y una rampa por casilla de 1, con el 15 % de fronteras en rampa; desde el 2026-10-06 son columnas de voxel de 0,5 sin rampas (`columnTop`, `columnTopAt`, `heightFrom`, `WALK_HALVES`/`JUMP_HALVES`, `columnTopFor`). Permitido en: `docs/pendiente.md`, `docs/relieve.md`, `docs/isometrico.md`, `CLAUDE.md` (cuentan el antes).
-- `\btalud(es)?\b` — el talud que se subia andando; hoy un escalon de medio bloque. Permitido en: `docs/pendiente.md`, `docs/relieve.md`, `docs/isometrico.md`, `docs/reglas.md`, `CLAUDE.md`.
+- `rampDir|RAMP_SHARE|RAMP_DIRS|NO_RAMP|isRampEdge|rampDirOf|levelAt\(|levelFromRelief|levelFrom\(|WATER_LEVEL|CLIMB_LIMIT|cornerHeight|groundHeight\(` — el relieve como un nivel entero y una rampa por casilla de 1, con el 15 % de fronteras en rampa; desde el 2026-10-06 son columnas de voxel de 0,5 sin rampas (`columnTop`, `columnTopAt`, `heightFrom`, `WALK_HALVES`/`JUMP_HALVES`, `columnTopFor`). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/relieve.md`, `docs/isometrico.md`, `CLAUDE.md` (cuentan el antes).
+- `\btalud(es)?\b` — el talud que se subia andando; hoy un escalon de medio bloque. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/relieve.md`, `docs/isometrico.md`, `docs/reglas.md`, `CLAUDE.md`.

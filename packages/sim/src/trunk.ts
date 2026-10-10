@@ -31,7 +31,7 @@ import { hash2DFloat } from './rng.js';
 /**
  * El tronco de cada especie de arbol: media y desviacion de su tramo desnudo, y
  * su grosor en el pie para el arbol de tronco medio, en bloques. Del porte real
- * de cada especie; los numeros son deduccion mia (estan en `docs/pendiente.md`).
+ * de cada especie; los numeros son deduccion mia (estan en `docs/juicio.md`).
  * La forma de la copa va aparte, en el cliente (`tree-shapes.ts`): es solo arte.
  */
 export interface TreeTrunk {

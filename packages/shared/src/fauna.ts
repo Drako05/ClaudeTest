@@ -10,7 +10,7 @@
  * densidad, tamano de grupo— y de formulas comunes, para que una especie nueva
  * se anada con sus datos y no con numeros elegidos a ojo. Que formula y que
  * constante son del autor y cuales deduccion mia lo dice cada una, y las
- * deducciones estan en `docs/pendiente.md`.
+ * deducciones estan en `docs/juicio.md`.
  *
  * Solo depende de `base.ts`: `index.ts` reexporta este modulo, y lo que necesita
  * los recursos (el botin) vive alli, para no cerrar un ciclo de importacion.

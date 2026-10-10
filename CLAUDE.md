@@ -337,8 +337,13 @@ con fecha, o la leccion de un fallo que ya paso.
 | Algo que viene del isometrico retirado (reglas 6, 7 y 16-20) | `docs/isometrico.md` |
 | Una ley del libro | `docs/leyes.md` y `docs/el-libro-del-mundo.md` |
 
-Y **`docs/pendiente.md` primero, siempre**: decisiones pendientes, deducciones
-que esperan el juicio del autor y la historia de cada tanda.
+Y **`docs/pendiente.md` primero, siempre**: la tanda en curso, las decisiones
+del autor que aun no son codigo y lo aparcado. Desde el 2026-10-10 lo demas va
+aparte, para que leerlo primero no cueste 35.000 tokens:
+**`docs/juicio.md`**, las deducciones que esperan el juicio del autor (se buscan
+las filas de la parte que se toca; las nuevas se anaden alli), y
+**`docs/historia.md`**, las tandas cerradas (se consulta, no se lee de corrido;
+al cerrar una tanda, su seccion «HECHA» se mueve alli).
 
 **Al cambiar algo, se actualiza el documento de su parte**, no `CLAUDE.md`,
 salvo que cambie una regla dura, el procedimiento o este indice. Y si una parte

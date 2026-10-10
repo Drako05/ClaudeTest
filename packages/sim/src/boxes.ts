@@ -46,7 +46,7 @@ export const BODY_RADIUS = 0.34;
 /**
  * Medidas de las cajas que no son arboles: medio ancho y alto, en bloques.
  * Salen de lo que mide cada dibujo (1,17 el arbusto, 1,09 la roca, 0,88 el
- * brote) y son **deduccion mia**; estan en `docs/pendiente.md`.
+ * brote) y son **deduccion mia**; estan en `docs/juicio.md`.
  */
 const BUSH_BOX = { half: 0.45, height: 1.1 };
 const ROCK_BOX = { half: 0.45, height: 1.0 };
@@ -182,7 +182,7 @@ const footCache = new Map<number, ReturnType<typeof hitPartsOf>>();
 /**
  * Las partes con caja mas bajas de un animal, las que lo sostienen: las patas
  * del cuadrupedo, el caparazon del cangrejo, el tronco de la gaviota.
- * **Deduccion mia** (`docs/pendiente.md`).
+ * **Deduccion mia** (`docs/juicio.md`).
  */
 function footPartsOf(species: Species, stage: Stage): ReturnType<typeof hitPartsOf> {
   const key = species * 8 + stage;

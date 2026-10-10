@@ -42,7 +42,7 @@ Salen de fallos reales (`references/escapes.md`), no de un manual.
    cambio, en que ficheros.
 3. Haz la **lista de decisiones de la tanda**: cada valor, tecla, nombre,
    modelo o texto que cambio o se retiro. Sale de los mensajes de commit, de
-   las secciones «HECHO» de `pendiente.md` y del diff.
+   las secciones «HECHO» de `pendiente.md` (o ya de `historia.md`) y del diff.
 4. **Antes de buscar nada**, anade lo retirado a
    `references/retirados.md`, con su patron. Lo que no este ahi no lo busca
    nadie.
@@ -143,6 +143,8 @@ until grep -q '^fin:' LOG; do sleep 10; done
      es el punto de partida de la siguiente;
    - anade una seccion breve con lo encontrado, lo corregido y lo dejado a
      proposito, con su motivo.
+   - mueve la seccion de la auditoria anterior, entera, a `docs/historia.md`
+     (desde el 2026-10-10 `pendiente.md` guarda solo la ultima).
 3. **Informe al autor**, en su idioma y sin jerga: que se encontro, que se
    corrigio, que se dejo y por que, y **que decide el** (con opciones).
 

@@ -234,7 +234,7 @@ Encima de eso, lo que vino despues:
 **Antes del multijugador quedan cabos de la camara nueva:** los sprites de
 varias direcciones para el personaje y agrupar las aspas para bajar las draw
 calls. Los cabos sueltos y las decisiones que esperan al autor estan en
-`docs/pendiente.md`.
+`docs/pendiente.md` y `docs/juicio.md`.
 
 Despues, y en este orden:
 
