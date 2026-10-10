@@ -87,6 +87,48 @@ tres fueron a `main` juntas, verificadas en la misma CI; por el camino `slash`
 pidio medir en un claro y la camara baja en cuatro rumbos (`docs/pruebas.md`). **Falta la
 `/auditoria`**, que cierra la tanda.
 
+### Lo que dijo el autor al probarla (2026-10-10): hablarlo y hacer el plan en la proxima sesion
+
+1. **El bloque a dos casillas que ya se alcanza: aceptado.** El autor, literal:
+   «no hay problema en que se alcancen más casillas siempre que se respeten las
+   leyes físicas». Queda quitar la fila de `docs/juicio.md` y el «PENDIENTE DEL
+   AUTOR» de `tests/jump.test.ts`, y dejar el test afirmandolo como decision.
+2. **Los animales que suben primero la cabeza y luego las patas: se ve mal, hay
+   que arreglarlo, y toca debatirlo.** Pasa en los pequenos: el reposo por cajas
+   (`partsRest`) sube el cuerpo entero cuando la cabeza toca un borde a menos de
+   medio bloque sobre su base. La idea del autor, literal: «cuando los animales
+   choquen las paredes primero con algo diferente a sus patas, tengan que saltar
+   (no teletransportarse) desde el punto de impacto si quieren subir, esto
+   provocaría que su velocidad de movimiento —si no es suficiente para la
+   maniobra— deba ser aumentada al mínimo requerido para que pueda saltar un
+   escalón o un escalón doble (1m) (para los animales más altos) desde el punto
+   donde golpea su cabeza». Preguntas a llevar: que cuenta como «chocar con algo
+   que no son las patas» (cabeza, cuello, tronco, cola); si el impulso minimo
+   rompe «saltan a su paso» (decision suya del mismo dia) o es la excepcion; que
+   animales llegan a 1 m; y si las patas siguen subiendo medio bloque de golpe.
+3. **La camara con retraso no sirve: «no ayudo en nada, incluso en primera
+   persona genera tirones raros, es injugable asi».** Pide un metodo de suavizado
+   de verdad, y deja la recomendacion al agente (sugiere, sin cerrarlo, inercia
+   en la camara). Sospechas a comprobar antes de proponer, por orden:
+   - **No hay interpolacion para el render** (regla 8 dice que es cosa del
+     cliente, y `main.ts` dibuja la `x/y/z` del ultimo tick): a una frecuencia de
+     pantalla que no es 60 Hz unos fotogramas avanzan dos ticks y otros cero, y
+     una persecucion sobre un blanco a saltos da tirones. Probablemente el
+     tiron de fondo, con o sin retraso.
+   - **Mirar al punto de mira desde unos ojos desplazados** hace que la
+     direccion de la camara salte cuando el rayo pasa de algo cercano a algo
+     lejano (un tronco, el suelo del fondo): en primera persona, con los ojos
+     medio bloque por debajo tras un escalon, eso es un cabeceo brusco al girar.
+   - El retraso en horizontal sobra: lo que el autor pidio suavizar es el
+     escalon, que es vertical.
+   Recomendacion a llevar (deduccion mia, no aprobada): quitar el retraso
+   general y hacer lo que hacen los juegos de primera persona con las
+   escaleras —**suavizar solo el salto vertical de subir un escalon** (un
+   desfase que nace al subir de golpe y se apaga en ~0,1 s, la camara mirando
+   en la direccion de la mirada, sin punto de mira)— mas **interpolar el render
+   entre ticks**. La inercia de camara no la recomendaria: anade latencia a la
+   mirada, que es la que apunta el golpe.
+
 Fuera de esta tanda y pendiente del autor: **las paredes de 2+ voxeles**, que el
 relieve interpolado casi elimino (de 38-47 m de pared de 1 m o mas por 100 m² a
 1,6-3); se le propusieron cuatro opciones (A: interpolar solo los desniveles de
