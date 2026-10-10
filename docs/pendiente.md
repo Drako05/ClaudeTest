@@ -32,7 +32,51 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## TANDA EN CURSO: fisicas — cajas que chocan siempre, gravedad, inercia, camara (2026-10-10)
+## TANDA EN CURSO: pruebas mas rapidas (2026-10-10)
+
+Pedido del autor, literal: «Cómo podemos hacer para que las pruebas las hagas
+más rápido […] con tal de ahorrarnos esas horas que llega a tomar el proceso de
+pruebas posterior a cada tanda de cambios». Aprobo el plan de tres fases.
+
+**Lo medido.**
+- La CI paso de ~5 minutos (4-5 oct) a ~15. El camino critico era una sola
+  casilla, `slash`, con 845-900 s; todas las demas, por debajo de 340 s. Sus
+  mutaciones tardaban ~1.000 s cada una.
+- El 10-oct hubo 4 rondas en `pruebas` en 3 h 20 min, y tres salieron en rojo,
+  varias por depender de la velocidad de la maquina.
+- Sin GPU, Chromium dibuja por software: ~5 FPS a 1280x720 en el contenedor y
+  1,4 s por captura. Ninguna opcion de arranque de Chromium lo mejora. Un tick
+  de la simulacion cuesta 1,7 ms.
+
+**Las fases.**
+1. **`slash` partido en cinco casillas**, una por parte (`docs/pruebas.md`).
+   **Hecha, falta verla en la CI.**
+2. **`tools/esperar-ci.sh`**: espera a la CI con `gh api` y no con un
+   temporizador fijo. **Hecha**: probada contra tandas pasadas, verdes y rojas.
+3. **Reloj de pruebas, pendiente.** Un modo `?reloj=manual` en el cliente con
+   `window.__reloj.avanzar(ms, { hz })`, que corre frames sin dibujar, y
+   `dibujar()`. Con eso el humo deja de esperar en tiempo real y da el mismo
+   resultado en cualquier maquina. El detalle:
+   - Un `clock.ts` con `now()` para lo que se mira dentro del frame: la caida
+     de las estaciones, la receta mantenida y el catalejo.
+   - `frame` partido en `step(dt, draw)`.
+   - En `smoke.mjs`, ayudantes conscientes del reloj (`jugar`, `waitForLoop`,
+     `hold`, `captura`).
+   - `highRefresh` con `hz: 144`.
+   - Migracion pasada a pasada: `life` de piloto. `desktop` y `gestures` se
+     quedan con el reloj real.
+   - `slash` con capturas recortadas a la caja que mide.
+
+   **Decisiones por defecto, del agente y sin aprobar**: frames a 60 Hz con el
+   reloj manual, y una comprobacion que dé otro numero no se reajusta en
+   silencio, sino que se dice con los dos valores y va a `docs/juicio.md`.
+
+---
+
+## TANDA ABIERTA: fisicas — cajas que chocan siempre, gravedad, inercia, camara (2026-10-10)
+
+Sigue abierta, en `main`: le faltan la auditoria y el plan de lo que dijo el
+autor al probarla (abajo). La de pruebas se metio delante por pedido suyo.
 
 **Empieza aqui.** Es tambien la fase 2 de los voxeles (abajo). El autor, literal
 (2026-10-10):

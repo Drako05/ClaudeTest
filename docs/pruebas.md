@@ -16,8 +16,9 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
 
 **Lo pesado se verifica en la CI, en la rama `pruebas`** (decision del autor,
 2026-10-02). En local el humo va en serie —humo, gestos y barrido, unos 22
-minutos, y cada mutacion 4-5 mas— y la CI lo reparte en maquinas a la vez: unos
-5 minutos todo, mutaciones incluidas. Pero **a `main` no se empuja para
+minutos, y cada mutacion 4-5 mas— y la CI lo reparte en maquinas a la vez: lo
+que tarde la casilla mas lenta, mutaciones incluidas (llego a 15 minutos con
+`slash` de una pieza; partido en partes, el 2026-10-10, se espera la mitad). Pero **a `main` no se empuja para
 probar**: `deploy.yml` publica el juego en cada push a `main` sin esperar a la
 CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
 
@@ -32,24 +33,28 @@ CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
    de su punta, avance rapido, sin tocar `main` ni el indice. Antes comprueba
    que la lista de mutaciones aplica.
 4. **Esperar las dos tandas en verde**: «CI completa» (`ci.yml`) y «Mutaciones
-   completas» (`mutaciones.yml`). Sin `gh` ni API: un temporizador en segundo
-   plano (`sleep 300` con `run_in_background`) y despues las herramientas MCP
-   de GitHub: `actions_list` con `list_workflow_runs`, `resource_id` `ci.yml`
-   o `mutaciones.yml` y una sola por pagina, da el estado y la conclusion de cada
-   tanda (se comprueba que su SHA es el que imprimio el guion; filtrar por la
-   rama devolvio una vez la lista vacia); si alguna sale en rojo, `get_job_logs` con su `run_id`,
-   `failed_only` y `tail_lines` ~40 da solo lo que fallo —el resumen de
-   `mutar.mjs` y los `FALLO` del humo quedan unas 20 lineas antes del final—.
-   **No listar los trabajos** (`list_workflow_jobs`) salvo que haga falta: con
-   veinte trabajos son ~10.000 tokens de pasos. Mientras la CI esta en cola
-   —son unos 25 trabajos para 20 maquinas— se sigue con otra cosa, como la
-   documentacion. Lo que falle se arregla y se vuelve al 3.
+   completas» (`mutaciones.yml`). **`tools/esperar-ci.sh <sha>` en segundo
+   plano** (`run_in_background`), con el SHA que imprimio el guion: pregunta a
+   la API cada 30 s con `gh api` y sale cuando las tandas de ese commit
+   terminan, asi que la sesion despierta en el acto y no a ciegas. Imprime la
+   conclusion y la duracion de cada tanda y, si alguna sale en rojo, sus
+   trabajos fallidos con su `job_id`. Sus logs, con la herramienta MCP
+   `get_job_logs` por `job_id` (o `run_id` con `failed_only`) y `tail_lines`
+   ~40 —el resumen de `mutar.mjs` y los `FALLO` del humo quedan unas 20 lineas
+   antes del final—: `gh` no los baja, porque GitHub los sirve desde otro
+   dominio. **No listar los trabajos** (`list_workflow_jobs`) salvo que haga
+   falta: con veinte trabajos son ~10.000 tokens de pasos. Mientras la CI esta
+   en cola —son unos 30 trabajos para 20 maquinas— se sigue con otra cosa,
+   como la documentacion. Lo que falle se arregla y se vuelve al 3.
+
+   Hasta el 2026-10-10 esto se decia «sin `gh` ni API» y se esperaba con un
+   temporizador fijo de 5 minutos; en este entorno `gh api` ya funciona.
 5. **Solo entonces**, commit y push a `main`. Esa CI **confirma, pero no se
    espera** (decision del autor, 2026-09-29): se informa al autor en el acto,
    diciendo que esta en marcha, y se mira **al empezar el siguiente turno**; si
    salio en rojo, se dice y se arregla antes que nada.
 
-El humo completo en local (`npm run smoke`, mas `gestures` y `slash`) queda para
+El humo completo en local (`npm run smoke`, mas `gestures` y `slash` entero) queda para
 cuando la CI no este disponible. La rama `pruebas` se queda en el remoto para
 siempre —el proxy no deja borrar ramas, y no hace falta— y un push nuevo cancela
 la tanda anterior que siguiera en marcha.
@@ -59,7 +64,8 @@ test): cada comprobacion nueva se ve **caer** rompiendo a proposito lo que
 afirma; si no cae, no comprueba nada (lente B). La lista de la ronda es
 `tools/mutaciones.mjs` —nombre, fichero, el texto `de` que tiene que aparecer
 exactamente una vez, el `a` que lo rompe, y la `prueba`: `smoke:<pasada>`,
-`gestures`, `slash` o `test:<fichero de vitest>`—; se reescribe en cada ronda y
+`gestures`, `slash`, `slash:<parte>` (una sola parte del barrido, que es lo
+que conviene: entero tarda tres veces mas) o `test:<fichero de vitest>`—; se reescribe en cada ronda y
 la de antes queda en la historia. En la CI cada mutacion es un trabajo con su
 nombre, que sale en verde si su prueba CAE. En local:
 `node tools/mutar.mjs --comprobar` (segundos) o `node tools/mutar.mjs [nombre…]`
@@ -69,9 +75,10 @@ es justo el escape P3 —se midio una vez con el build viejo—. Asi que una
 mutacion de un comentario, que el minificador borra, sale en rojo.
 
 **La CI va repartida** (`.github/workflows/ci.yml`): typecheck y tests, una
-maquina por pasada del humo mas `gestures` y `slash`, y un trabajo final, «CI
-completa», que solo sale verde si todo lo esta. **Si anades una pasada al humo,
-anadela a la matriz**, o no correra nunca en CI. Las puertas de `slash`, la
+maquina por pasada del humo mas `gestures` y una por cada parte de `slash`, y
+un trabajo final, «CI completa», que solo sale verde si todo lo esta. **Si
+anades una pasada al humo o una parte al barrido, anadela a la matriz**, o no
+correra nunca en CI. Las puertas de `slash`, la
 accion compartida y lo que ensenaron el humo y sus fallos estan en
 `docs/pruebas.md`: **leelo antes de escribir o tocar una comprobacion.**
 
@@ -116,7 +123,22 @@ la deja a 0,84 de los ojos, y la caja central pillaba el trazo en una captura
 de ocho o en ninguna. Y como la normal, se queda con **el mejor de cuatro
 rumbos**: lo que vigila, la cinta orientada hacia el ojo, la borraba en todos a
 la vez, y en un claro dio 0 en el rumbo de salida y 3.966 en otro), todas a la vez; y un trabajo final, «CI completa», que solo sale
-verde si todo lo esta. La preparacion —Node, dependencias y Chromium con su
+verde si todo lo esta.
+
+**`slash` va partido en cinco casillas** desde el 2026-10-10: `slash-normal`,
+`slash-baja`, `slash-cerca`, `slash-primera` y `slash-estocada`
+(`node tools/slash.mjs <parte>`; las partes, en `tools/slash-partes.mjs`). De
+una pieza tardaba 845-900 s y marcaba lo que tardaba la CI entera, con todas las
+demas casillas por debajo de 340 s: unos 3 minutos de preparacion (plantar el
+primer golpe, el paseo, buscar el claro) y ~40 s por rumbo y vista. Cada parte
+repite la preparacion y llega a su vista **por el mismo camino** que la medida
+completa —los arrastres, giros, ruedas y teclas de las vistas anteriores—, pero
+sin medirlas; las puertas son las mismas, aplicadas a lo medido. Una parte que
+no existe sale en rojo, y una pedida que no llega a medirse, tambien («sin
+medida»). Lo que cambia: cada vista se mide antes en el tiempo del juego que
+de una pieza, y sin los golpes de las vistas de antes. Las mutaciones del
+barrido piden la parte que vigila lo que rompen (`slash:normal` el recorte por
+frustum, `slash:baja` el ancho de la cinta). La preparacion —Node, dependencias y Chromium con su
 cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
 tandas. Cada pasada se lanza por el prefijo de su nombre
 (`node tools/smoke.mjs life`). **Si anades una pasada al humo, anadela a la

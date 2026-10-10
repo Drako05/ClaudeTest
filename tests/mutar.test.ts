@@ -31,6 +31,7 @@ describe('La prueba de cada mutacion', () => {
     expect(orden('smoke:desk', PASADAS)).toEqual({ cmd: ['node', 'tools/smoke.mjs', 'desk'], navegador: true });
     expect(orden('gestures', PASADAS).navegador).toBe(true);
     expect(orden('slash', PASADAS).cmd).toEqual(['node', 'tools/slash.mjs']);
+    expect(orden('slash:baja', PASADAS)).toEqual({ cmd: ['node', 'tools/slash.mjs', 'baja'], navegador: true });
     expect(orden('test:tests/x.test.ts', PASADAS)).toEqual({
       cmd: ['npx', 'vitest', 'run', 'tests/x.test.ts'],
       navegador: false,
@@ -42,6 +43,9 @@ describe('La prueba de cada mutacion', () => {
     expect(() => orden('smoke:', PASADAS)).toThrow(/no hay pasada/);
     expect(() => orden('humo', PASADAS)).toThrow(/desconocida/);
     expect(() => orden('test:', PASADAS)).toThrow(/sin fichero/);
+    // Por nombre exacto, no por prefijo: `slash:` a secas no puede ser «todas».
+    expect(() => orden('slash:nada', PASADAS)).toThrow(/no hay parte/);
+    expect(() => orden('slash:', PASADAS)).toThrow(/no hay parte/);
   });
 
   it('las pasadas se leen del propio humo', () => {

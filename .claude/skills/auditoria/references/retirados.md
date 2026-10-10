@@ -95,3 +95,8 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `SNAP_DOWN|se pega al suelo|saltitos escalera abajo` — el margen que pegaba los pies al suelo al bajar medio bloque; desde el 2026-10-10 bajar es caer con la gravedad. Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/reglas.md`.
 - `terreno (se mide |sigue midiendose |medido )?en el centro|el terreno, en el centro` — el terreno pisado en el centro del cuerpo; desde el 2026-10-10, con la huella entera (los animales, en la fase B de la tanda). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/reglas.md`, `docs/fauna.md`, `packages/sim/src/systems/movement.ts`, `packages/sim/src/boxes.ts`.
 - `LEAP_SHARES|partsFloor|stepTop` — el salto del animal con impulso de mas (a su paso, a tres cuartos o a la mitad) y su apoyo solo en las cajas mas bajas; desde el 2026-10-10 (fase B) salta con la fisica del jugador, a su paso, y reposa con todas sus cajas (`partsRest`). Permitido en: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
+
+## Pruebas: slash de una pieza y el temporizador de la CI (2026-10-10)
+
+- `pasada == 'slash'|prueba: 'slash'|casilla `slash`|\[[^\]]*\bslash\]` — `slash` como una sola casilla de la CI o una sola prueba de mutacion; desde el 2026-10-10 va en partes (`slash-<parte>`, `slash:<parte>`, `tools/slash-partes.mjs`). Permitido en: `docs/historia.md`.
+- `sleep 300|sin .gh. ni API` — esperar la CI con un temporizador fijo de 5 minutos porque no habia API; desde el 2026-10-10, `tools/esperar-ci.sh` con `gh api`. Permitido en: `docs/pruebas.md` (cuenta el cambio), `docs/historia.md`.

@@ -16,6 +16,13 @@
  * echarlo a suertes.
  *
  *   npm run slash
+ *   node tools/slash.mjs primera     # una sola parte, tras `npm run build`
+ *
+ * Las partes son las cuatro vistas y la estocada. En la CI va cada una en su
+ * maquina: medidas en serie eran ~15 minutos, y esta casilla sola marcaba lo
+ * que tardaba la CI entera (2026-10-10). Cada parte repite la preparacion y
+ * llega a su vista por el mismo camino que la medida completa —los mismos
+ * arrastres, giros y teclas de las vistas de antes—, pero sin medirlas.
  */
 
 import { chromium } from 'playwright';
@@ -23,6 +30,21 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { inflateSync } from 'node:zlib';
+import { SLASH_PARTS, SLASH_VIEWS } from './slash-partes.mjs';
+
+const VIEWS = SLASH_VIEWS;
+const PARTS = SLASH_PARTS;
+const only = process.argv[2];
+// Pedir una parte que no existe no puede salir en verde: en la CI cada parte
+// es una casilla, y una errata seria una casilla verde que no mide nada.
+if (only !== undefined && !PARTS.includes(only)) {
+  console.log(`FALLO: no hay ninguna parte «${only}»; las hay: ${PARTS.join(', ')}`);
+  process.exit(1);
+}
+/** Si esta parte se mide en esta corrida. */
+const measures = (part) => only === undefined || only === part;
+/** La ultima vista que hay que recorrer: la pedida, o todas si se pide la estocada o nada. */
+const lastView = only in VIEWS ? VIEWS[only] : VIEWS.primera;
 
 // En un repositorio recien clonado (la CI) la carpeta de capturas no existe, y
 // sin ella la herramienta revienta antes de medir nada.
@@ -208,7 +230,11 @@ const spot = await page.evaluate(() => window.__verdant);
 console.log(`acciona con alcance completo en ${spot.x.toFixed(1)}, ${spot.y.toFixed(1)}, altura ${spot.z.toFixed(1)}, camara a ${spot.camDistance.toFixed(1)} de ${spot.camWant.toFixed(1)}`);
 
 const results = [];
-for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera persona']) {
+for (const [part, view] of Object.entries(VIEWS)) {
+  // Las vistas de antes de la pedida se recorren sin medir: dejan la camara
+  // como la deja la medida completa —mismos arrastres, mismos giros—, que es
+  // de donde parte la siguiente.
+  const measured = measures(part);
   if (view === 'primera persona') {
     // Desde los ojos, que es donde el arco mas facil podria salirse de
     // pantalla: queda a la altura del pecho, por debajo de la mirada. P dos
@@ -267,6 +293,7 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
   let pitch = 0;
   for (let turn = 0; turn < turns; turn++) {
     if (turn > 0) await drag(-262, 0);
+    if (!measured) continue;
     const here = await page.evaluate(() => window.__verdant);
     pitch = here.pitch;
 
@@ -308,7 +335,8 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
   // La vuelta entera, para que la camara baja mida desde el rumbo de siempre.
   if (keepBest) await drag(-262, 0);
 
-  results.push({ view, pitch, noise, lit: worst, sent, gathered });
+  if (measured) results.push({ view, pitch, noise, lit: worst, sent, gathered });
+  if (view === lastView) break;
 }
 
 // La estocada del modo preciso (TAB), en primera persona: nace abajo a la
@@ -317,19 +345,22 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
 // cuadrante de abajo a la derecha sin el centro ni los botones, asi que la de
 // antes daria cero aqui.
 const STAB_BOX = { x0: 700, y0: 400, x1: 1040, y1: 560 };
-await page.keyboard.press('Tab');
-await page.waitForTimeout(300);
-const stabRef = decodePng(await page.screenshot());
-const stabNoise = (await sample(stabRef, 2, STAB_BOX)).max;
-const stabBefore = await page.evaluate(() => window.__verdant);
-await page.hover('#action');
-await page.mouse.down();
-await page.waitForTimeout(300);
-const stabbing = await sample(stabRef, 8, STAB_BOX);
-await page.mouse.up();
-await writeFile(new URL('../screenshots/estocada.png', import.meta.url), stabbing.best);
-const stabAfter = await page.evaluate(() => window.__verdant);
-console.log(`estocada (preciso ${stabAfter.precise}): ${stabbing.max} pixeles aclarados abajo a la derecha, ruido ${stabNoise}, ${stabAfter.slashesDrawn - stabBefore.slashesDrawn} mandadas`);
+let stabbing = null;
+if (measures('estocada')) {
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(300);
+  const stabRef = decodePng(await page.screenshot());
+  const stabNoise = (await sample(stabRef, 2, STAB_BOX)).max;
+  const stabBefore = await page.evaluate(() => window.__verdant);
+  await page.hover('#action');
+  await page.mouse.down();
+  await page.waitForTimeout(300);
+  stabbing = await sample(stabRef, 8, STAB_BOX);
+  await page.mouse.up();
+  await writeFile(new URL('../screenshots/estocada.png', import.meta.url), stabbing.best);
+  const stabAfter = await page.evaluate(() => window.__verdant);
+  console.log(`estocada (preciso ${stabAfter.precise}): ${stabbing.max} pixeles aclarados abajo a la derecha, ruido ${stabNoise}, ${stabAfter.slashesDrawn - stabBefore.slashesDrawn} mandadas`);
+}
 
 console.log('');
 console.log('vista               elevacion  ruido  pixeles aclarados  barridos mandados  recogido');
@@ -374,7 +405,13 @@ const SIN_PUERTA = new Set(['de cerca, girando']);
 const fallos = results
   .filter((r) => !SIN_PUERTA.has(r.view) && !(r.lit >= (r.view === 'normal' ? MIN_NORMAL : MIN_LIT)))
   .map((r) => `${r.view}: ${r.lit ?? 'sin medida'} pixeles`);
-if (!(stabbing.max >= MIN_STAB)) fallos.push(`estocada: ${stabbing.max} pixeles`);
+if (stabbing && !(stabbing.max >= MIN_STAB)) fallos.push(`estocada: ${stabbing.max} pixeles`);
+// Lo pedido tiene que haberse medido: una parte que se salta sin querer saldria
+// en verde sin una sola puerta.
+for (const [part, view] of Object.entries(VIEWS)) {
+  if (measures(part) && !results.some((r) => r.view === view)) fallos.push(`${view}: sin medida`);
+}
+if (measures('estocada') && !stabbing) fallos.push('estocada: sin medida');
 if (problems.length) fallos.push('errores de consola');
 if (fallos.length) {
   console.log(`FALLO: el barrido no llega a verse: ${fallos.join(' | ')}`);
