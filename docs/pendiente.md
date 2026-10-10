@@ -83,7 +83,8 @@ se exige `atWaypoint`), y `slash` (ver `docs/pruebas.md`: la vista normal
 cuenta solo rumbos con la camara libre). **C, hecha**: la camara persigue los
 ojos con retraso exponencial de 0,1 s en las tres vistas y mira al punto de
 mira (`docs/controles.md`), con un deslizador en el panel de desarrollo. Las
-tres fueron a `main` juntas, tras una sola tanda de CI. **Falta la
+tres fueron a `main` juntas, verificadas en la misma CI; por el camino `slash`
+pidio medir en un claro y la camara baja en cuatro rumbos (`docs/pruebas.md`). **Falta la
 `/auditoria`**, que cierra la tanda.
 
 Fuera de esta tanda y pendiente del autor: **las paredes de 2+ voxeles**, que el
