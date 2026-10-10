@@ -304,6 +304,25 @@ describe('todas sus cajas chocan siempre, saltan a su paso y tienen inercia', ()
     expect(bison.store.x[bison.id]).toBeGreaterThan(4);
   });
 
+  it('cada caja choca a su altura: la cabeza pasa por encima de lo que no le llega, y no por dentro', () => {
+    const bison = lone(Species.Bison, 0, 0.5, 1, 0);
+    const boxes = bodyBoxes(Species.Bison, Stage.Adult, 0, 0.5, 0, 1, 0);
+    // La cabeza es la caja mas adelantada; debajo no hay otra (la joroba si
+    // tiene el tronco debajo).
+    const head = boxes.reduce((a, b) => (b.cx > a.cx ? b : a));
+    const base = head.cz - head.hh;
+    const below = Math.floor(base * 2) / 2;
+    expect(below).toBeGreaterThan(0);
+    // Una columna sola, bajo el centro de la cabeza: a la altura de medio
+    // bloque por debajo de su base no estorba; medio bloque mas alta, si.
+    const vx = Math.floor(head.cx * 2);
+    const vy = Math.floor(head.cy * 2);
+    const pillar = (h: number) =>
+      fakeWorld(() => false, (x, y) => (Math.floor(x * 2) === vx && Math.floor(y * 2) === vy ? h : 0));
+    expect(clashesOf(pillar(below), bison.store, bison.id)).toBe(0);
+    expect(clashesOf(pillar(below + 0.5), bison.store, bison.id)).toBeGreaterThan(0);
+  });
+
   it('salta un escalon de un bloque a su paso: en el aire no va mas deprisa que andando', () => {
     const step = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
     for (const species of [Species.Bison, Species.Hare, Species.RedDeer]) {

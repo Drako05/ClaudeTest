@@ -51,8 +51,15 @@ const BOX = { x0: 320, y0: 120, x1: 960, y1: 520 };
  */
 const FULL_WIDTH = { x0: 0, y0: 60, x1: 1280, y1: 540 };
 
-/** Cuanto tiene que subir un canal para contar como aclarado por el efecto. */
+/**
+ * Cuanto tiene que subir un canal para contar como aclarado por el efecto: 12,
+ * o la mitad de lo que le queda hasta 255 si le queda menos (y al menos 1).
+ * Sobre el cielo el azul ya va por 240 y no puede subir 12: con el trazo
+ * translucido subia 10, y la camara baja contaba 0 con el barrido a la vista
+ * (tanda de fisicas, 2026-10-10, mirando arriba en un claro).
+ */
 const LIFT = 12;
+const rose = (before, after) => after - before >= Math.max(1, Math.min(LIFT, (255 - before) / 2));
 
 const file = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
 const html = await readFile(file);
@@ -180,16 +187,19 @@ if (walked < 18) console.log('AVISO: no se ha alejado lo bastante; el recorte po
 //    esto casi nunca tiene que buscar; se queda como guarda, porque una medida
 //    que puede dar cero por otra causa es justo el error que ya costo caro.
 //
-//    Y con la camara libre al menos en el rumbo de salida: la vista normal
-//    solo cuenta los rumbos en que la colision no la mete en la cabeza (ver
-//    `MIN_NORMAL`), y sin ninguno no habria medida.
-let reaches = (await probe()) && (await cameraFree());
+//    Y en un claro: con la camara libre en los cuatro rumbos que se miden. El
+//    paseo acaba donde lo deja la velocidad de la maquina, y metido entre
+//    arboles la colision mete la camara en la cabeza, que es justo lo que
+//    cada vista mide de otra manera: la normal salia a 12, 0 o 14.825 segun el
+//    rumbo y la camara baja a 0 (CI de la tanda de fisicas, 2026-10-10, en
+//    13.9, 23.1, con la camara a 0,3, 2,1 y 5,4 de 31,4).
+let reaches = (await probe()) && (await inTheOpen());
 for (let tries = 0; tries < 8 && !reaches; tries++) {
   await push(['KeyD', 'KeyS', 'KeyA', 'KeyW'][tries % 4], 700);
-  reaches = (await probe()) && (await cameraFree());
+  reaches = (await probe()) && (await inTheOpen());
 }
 if (!reaches) {
-  console.log('NO se ha encontrado sitio con alcance completo; la medida no valdria');
+  console.log('NO se ha encontrado un claro con alcance completo; la medida no valdria');
   await browser.close();
   server.close();
   process.exit(1);
@@ -241,7 +251,10 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
   // CI (2026-10-06, en 13.9, 11.2), y el build de `main` daba lo mismo alli.
   const turns = view === 'camara baja' ? 1 : 4;
   const keepBest = view === 'normal';
-  const box = view === 'primera persona' ? FULL_WIDTH : BOX;
+  // La camara baja, tambien: mirando arriba la colision la deja a un palmo de
+  // los ojos (0,84 en un claro, tanda de fisicas), casi en primera persona, y
+  // la caja central pillaba el trazo en una captura de ocho, o en ninguna.
+  const box = view === 'primera persona' || view === 'camara baja' ? FULL_WIDTH : BOX;
   let worst = null;
   let noise = 0;
   let sent = 0;
@@ -391,6 +404,16 @@ async function cameraFree() {
   return s.camDistance >= 0.9 * s.camWant;
 }
 
+/** Si esta libre en los cuatro rumbos que se miden; acaba en el de salida. */
+async function inTheOpen() {
+  let open = true;
+  for (let turn = 0; turn < 4; turn++) {
+    open = open && (await cameraFree());
+    await drag(-262, 0);
+  }
+  return open;
+}
+
 /**
  * ¿Alcanza la accion las casillas del anillo desde aqui? (Las que barre el arco;
  * la que se pisa se alcanza siempre, pero no se barre.)
@@ -443,11 +466,8 @@ function brightened(reference, shot, box = BOX) {
   for (let y = box.y0; y < box.y1; y++) {
     for (let x = box.x0; x < box.x1; x++) {
       const i = (y * width + x) * 4;
-      if (
-        shot.data[i] - reference.data[i] >= LIFT &&
-        shot.data[i + 1] - reference.data[i + 1] >= LIFT &&
-        shot.data[i + 2] - reference.data[i + 2] >= LIFT
-      ) n++;
+      if (rose(reference.data[i], shot.data[i]) && rose(reference.data[i + 1], shot.data[i + 1]) &&
+        rose(reference.data[i + 2], shot.data[i + 2])) n++;
     }
   }
   return n;

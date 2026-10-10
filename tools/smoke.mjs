@@ -2403,12 +2403,20 @@ async function reliefPass(browser, baseUrl) {
     // Correr: la VELOCIDAD que da el nucleo, no la distancia, que la contesta
     // el paisaje.
     await open(page, baseUrl, at);
+    // De paso, la camara (tanda de fisicas, 2026-10-10): andando va rezagada
+    // —sus ojos, por detras de los del personaje— y aun asi el punto que mira
+    // el personaje esta en el centro de la pantalla.
+    let lagGap = 0;
+    let aimOff = 0;
     const pushSpeed = async () => {
       await page.keyboard.down('KeyD');
       let best = 0;
       for (let i = 0; i < 6; i++) {
         await page.waitForTimeout(120);
-        best = Math.max(best, (await state(page)).speed);
+        const s = await state(page);
+        best = Math.max(best, s.speed);
+        lagGap = Math.max(lagGap, s.camLagGap);
+        aimOff = Math.max(aimOff, Math.abs(s.aimScreen[0]), Math.abs(s.aimScreen[1]));
       }
       await page.keyboard.up('KeyD');
       return best;
@@ -2425,6 +2433,19 @@ async function reliefPass(browser, baseUrl) {
     check(trasShift === true && trasSegundo === false, 'Shift no se comporta como interruptor');
     check(vAndando > 0, 'andando la velocidad salio cero');
     check(vCorriendo > vAndando * 1.15, `correr no acelero: ${vAndando} vs ${vCorriendo}`);
+
+    // Parado, la camara alcanza al personaje.
+    await page.waitForTimeout(800);
+    const still = await state(page);
+    console.log(`  camara: retraso ${still.camLag} s, hasta ${lagGap.toFixed(2)} por detras andando, ` +
+      `${still.camLagGap.toFixed(3)} parado; punto de mira a ${aimOff.toFixed(4)} del centro`);
+    // Sin retraso da 0 exacto: la camara se recoloca en el mismo fotograma en
+    // que se mueve el personaje. Con el, ~0,5 a 60 fotogramas por segundo, y
+    // menos cuantos menos haya (0,19 en una maquina lenta).
+    check(lagGap > 0.08, `andando, la camara no va rezagada: ${lagGap}`);
+    check(lagGap < 2, `la camara se queda demasiado atras: ${lagGap}`);
+    check(still.camLagGap < 0.05, `parado, la camara no alcanza al personaje: ${still.camLagGap}`);
+    check(aimOff < 0.01, `el punto de mira no esta en el centro de la pantalla: ${aimOff}`);
   }
 
   // La cima.
