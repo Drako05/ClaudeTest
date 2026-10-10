@@ -70,7 +70,9 @@ profundidad o no las necesita:
 - la proyeccion, el orden por antidiagonales y el recorte por bloques de 8x8;
 - las caras de relieve dibujadas como sprites y el filo de los escalones;
 - la atenuacion de lo que tapa al jugador y su silueta. El equivalente 3D —que
-  el terreno tape al jugador— sigue pendiente, en `docs/pendiente.md`.
+  el terreno tape al jugador— se resolvio el 2026-09-28 con la colision de la
+  camara (`camera-collision.ts`; «Decision tomada: el juego pasa a 3D», en
+  `docs/historia.md`).
 
 ## Las reglas de la camara isometrica
 

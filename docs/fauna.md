@@ -29,7 +29,7 @@ Lo que decidio el autor al responder a la propuesta:
    plumas y caparazon se guardan sin uso todavia.
 
 Lo marcado *(deduccion)* es mio y esta en «Esperando tu juicio» de
-`docs/pendiente.md`.
+`docs/juicio.md`.
 
 ## El sistema de puntos de vida
 
@@ -460,7 +460,7 @@ queda es sobre todo de cuerpos grandes en sitios estrechos —el jabali (40-47 %
 y el ciervo (16-23 %) entre los arboles del bosque, el bisonte (19-34 %), el
 ibice en algun risco (0-22 %)—: un cuerpo de dos bloques que no cabe al girar
 entre arboles a dos casillas. Esta en «Esperando tu
-juicio» de `docs/pendiente.md`. El tick no cambia: 0,26 ms de media.
+juicio» de `docs/juicio.md`. El tick no cambia: 0,26 ms de media.
 
 ### El modelo (`client/src/fauna-model.ts`, `fauna-view.ts`)
 

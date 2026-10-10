@@ -13,6 +13,7 @@ import {
   treeTrunkAt,
   moveEntity,
   RUN_MULTIPLIER,
+  INERTIA_TIME,
   RUN_SPEED,
   skipTime,
   step,
@@ -255,10 +256,15 @@ describe('marcha y carrera', () => {
     expect(corriendo / andando).toBeCloseTo(RUN_MULTIPLIER, 6);
   });
 
-  it('las velocidades son las dos constantes que las nombran', () => {
+  it('las velocidades son las dos constantes que las nombran, tras arrancar en 0,1 s', () => {
     const ticks = 30;
-    expect(travel(1, 0, false, ticks)).toBeCloseTo(WALK_SPEED * ticks * TICK_DT, 6);
-    expect(travel(1, 0, true, ticks)).toBeCloseTo(RUN_SPEED * ticks * TICK_DT, 6);
+    // La inercia (el autor, 2026-10-10): el arranque sube la velocidad a ritmo
+    // constante durante `INERTIA_TIME`, n ticks, y cuesta (n − 1) / 2 ticks de
+    // paso; despues se anda a la velocidad que nombra la constante.
+    const n = Math.round(INERTIA_TIME / TICK_DT);
+    const lost = (n - 1) / 2;
+    expect(travel(1, 0, false, ticks)).toBeCloseTo(WALK_SPEED * (ticks - lost) * TICK_DT, 6);
+    expect(travel(1, 0, true, ticks)).toBeCloseTo(RUN_SPEED * (ticks - lost) * TICK_DT, 6);
   });
 
   it('el teclado sigue recorriendo lo mismo en diagonal que en ortogonal', () => {

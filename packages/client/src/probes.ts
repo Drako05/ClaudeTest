@@ -20,7 +20,7 @@ import {
   Resource,
   Terrain,
 } from '@verdant/shared';
-import { topOf, VOXELS_PER_TILE, type GameState, type WorldGen } from '@verdant/sim';
+import { topOf, voxelOf, VOXELS_PER_TILE, type GameState, type WorldGen } from '@verdant/sim';
 
 /**
  * Donde ponerse en una casilla para pisar su columna de esquina, la que mide
@@ -62,24 +62,38 @@ export function peakSpot(state: GameState): { stand: { x: number; y: number }; l
  * Igual que `mineralSpot`, existe para que la prueba de humo no juegue a la
  * loteria: el relieve alto es escaso a proposito —esa fue la calibracion— y
  * esperar a tropezar con uno paseando fallaria por azar y no por un fallo.
+ *
+ * Por columnas de 0,5 (2026-10-10): el sitio es el centro de una columna cuyas
+ * ocho vecinas estan a su misma altura —la huella entera del cuerpo, 0,68, cae
+ * en esas nueve—, y a dos columnas, en algun eje, hay una pared que pide saltar
+ * (un bloque o mas). Desde que el terreno se pisa con la huella, el sitio de
+ * antes, la esquina de una casilla, podia tener ya bajo la huella una columna
+ * interpolada un bloque mas alta, y el cuerpo quedaba metido en la pared.
  */
 export function cliffSpot(state: GameState): { stand: { x: number; y: number }; drop: number } | null {
-  const px = Math.floor(state.entities.x[state.playerId]);
-  const py = Math.floor(state.entities.y[state.playerId]);
+  const pvx = voxelOf(state.entities.x[state.playerId]);
+  const pvy = voxelOf(state.entities.y[state.playerId]);
   const gen = state.world.gen;
+  const R = 220 * VOXELS_PER_TILE;
 
   let best: { stand: { x: number; y: number }; drop: number; d: number } | null = null;
-  for (let y = py - 220; y <= py + 220; y += 2) {
-    for (let x = px - 220; x <= px + 220; x += 2) {
-      const level = topOf(gen.tileTopAt(x, y));
-      if (level < 0) continue;
+  for (let vy = pvy - R; vy <= pvy + R; vy += 2) {
+    for (let vx = pvx - R; vx <= pvx + R; vx += 2) {
+      const d = Math.max(Math.abs(vx - pvx), Math.abs(vy - pvy));
+      if (best && d >= best.d) continue;
+      const h = gen.columnTopAt(vx, vy);
+      if (h < 0) continue;
+      let flat = true;
+      for (let dy = -1; dy <= 1 && flat; dy++) {
+        for (let dx = -1; dx <= 1 && flat; dx++) flat = gen.columnTopAt(vx + dx, vy + dy) === h;
+      }
+      if (!flat) continue;
       let drop = 0;
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-        drop = Math.max(drop, topOf(gen.tileTopAt(x + dx, y + dy)) - level);
+        drop = Math.max(drop, gen.columnTopAt(vx + 2 * dx, vy + 2 * dy) - h);
       }
-      if (drop < 2) continue;
-      const d = Math.max(Math.abs(x - px), Math.abs(y - py));
-      if (!best || d < best.d) best = { stand: { x: x + CORNER, y: y + CORNER }, drop, d };
+      if (drop < VOXELS_PER_TILE) continue;
+      best = { stand: { x: (vx + 0.5) / VOXELS_PER_TILE, y: (vy + 0.5) / VOXELS_PER_TILE }, drop: topOf(drop), d };
     }
   }
   return best ? { stand: best.stand, drop: best.drop } : null;

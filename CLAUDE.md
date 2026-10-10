@@ -50,122 +50,53 @@ literales. Sus numeros se quedan vacios a proposito: el codigo cita «regla 21»
 
 ## Reglas duras
 
-1. **`packages/sim` jamas toca el navegador.** Sin DOM, canvas, WebGL, three.js ni
-   `Math.random`. El mismo modulo debe correr en Node (servidor autoritativo,
-   tests) y en el navegador. `tests/purity.test.ts` lo verifica.
-2. **Toda aleatoriedad viene de una semilla explicita.** Usa `mulberry32` o
-   `hash2D` de `packages/sim/src/rng.ts`.
-3. **La generacion del mundo es pura.** `generateChunk(gen, cx, cy)` no puede
-   depender del orden en que se llame ni de estado previo. Un chunk se descarta y
-   se regenera constantemente.
-4. **Las mutaciones van al overlay** de `World.setFeature`, nunca escribiendo el
-   array del chunk directamente: el chunk es cache desechable. Lo que hay en un
-   tile es `override ?? potencial`, y esa es la **unica fuente de verdad**: la
-   usan por igual el dibujo, la colision y la recoleccion. Que el renderer leyera
-   el potencial crudo por su cuenta fue justo el bug de las plantas que no
-   desaparecian al recolectarlas.
-5. **El input produce `Intent`; nunca muta el estado.** Es lo que permitira
-   enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
-   fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
-   nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`, y `aimZ` para su
-   inclinacion), y es **la de la camara**, decision del autor: cada tick sale de
-   `camera.forward()` y `camera.lookPitch`, que son **la misma en las tres
-   vistas**, y el nucleo la usa **tal cual, sin encajarla en ocho
-   direcciones**: inclina el sector del golpe (regla 12). Se acciona hacia donde se mira; y
-   como el movimiento tambien se rota con la camara antes de entrar en la
-   Intent, la Intent sigue siendo de mundo y puede viajar por red.
+Aqui va el enunciado de cada una, con el numero que cita el codigo. **El texto
+entero —el porque, las medidas y el fallo que motivo cada una— esta en
+`docs/reglas.md`, y se lee antes de tocar lo que regula.**
 
-   **`moveX`/`moveY` son DIRECCION, no velocidad.** Su magnitud no dice nada. Lo
-   cambio el autor al pedir la carrera: el joystick hacia de acelerador —cuanto
-   mas desplazado, mas rapido— y eso se sustituyo por dos velocidades discretas
-   que elige `run`. Un mando analogico apunta; no dosifica. La zona muerta se
-   queda, pero vive en el cliente: el nucleo solo ve direcciones.
-6. *(Retirada con el isometrico: la vista isometrica girable. Ver
-   `docs/isometrico.md`.)*
-7. *(Retirada con el isometrico: la capa ordenada por profundidad. Ver
-   `docs/isometrico.md`.)*
-8. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
-   interpolacion para el render es cosa del cliente.
-9. **Lo unico que detiene el paso es el agua.** La roca estuvo en
-   `isTerrainSolid` y eso convertia el bioma de montana entero en un muro contra
-   el que se chocaba; de paso explicaba que no tuviera nada dentro. Si algo tiene
-   que estorbar, que sea una feature, no el terreno.
-10. **El bioma es del tile, no del chunk.** La contabilidad de vida va por
-   `(chunk, bioma, tipo)` y `World.biomeAt` devuelve el bioma del suelo que se
-   pisa. Etiquetar el chunk entero con su terreno predominante hacia que el panel
-   anunciara «Bosque» estando en pradera y que dos especies distintas compartieran
-   referente. Un brote solo puede salir en un tile de su propio bioma.
-11. **Un paso de vida lee estado congelado y escribe en otro.** La colonizacion
-    mira si hay vida cerca en `ChunkRecord.live`, que es la foto del inicio del
-    paso, nunca los vecinos en curso. Leyendo el estado vivo, que un chunk
-    arrasado reviviera dependia del orden en que se generaron los chunks —es
-    decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
-    que ningun test evidente lo delate.
+1. **`packages/sim` jamas toca el navegador**: sin DOM, canvas, WebGL, three.js
+   ni `Math.random`; corre igual en Node y en el navegador
+   (`tests/purity.test.ts`).
+2. **Toda aleatoriedad viene de una semilla explicita** (`mulberry32` o
+   `hash2D`, de `sim/rng.ts`).
+3. **La generacion del mundo es pura**: `generateChunk` no depende del orden en
+   que se llame ni de estado previo.
+4. **Las mutaciones van al overlay** de `World.setFeature`: lo que hay en un
+   tile es `override ?? potencial`, la **unica fuente de verdad** para el
+   dibujo, la colision y la recoleccion.
+5. **El input produce `Intent`; nunca muta el estado.** La mirada viaja en ella
+   y es la de la camara, tal cual; `moveX`/`moveY` son **direccion, no
+   velocidad**.
+6-7. *(Retiradas con el isometrico. Ver `docs/isometrico.md`.)*
+8. **Paso de tiempo fijo** (`TICK_DT`); la interpolacion para el render es cosa
+   del cliente.
+9. **Lo unico que detiene el paso es el agua**; si algo tiene que estorbar, que
+   sea una feature, no el terreno.
+10. **El bioma es del tile, no del chunk** (`World.biomeAt`).
+11. **Un paso de vida lee estado congelado y escribe en otro**
+    (`ChunkRecord.live`), o se rompe la ley del observador.
 12. **El golpe es un SECTOR PLANO que sale de los ojos y cuenta solo si toca
-    un hitbox** (`sim/aim.ts`), decision del autor: **3 bloques y 90 grados**
-    en el plano de la mirada, recorridos con 33 rayos que **el terreno corta**.
-    El plano puede girar alrededor de la mirada (`aimRoll`, lo usa el modo TAP).
-    El hitbox del arbol es **solo su tronco desnudo**, que vive en el nucleo
-    (`sim/trunk.ts`) para que el que se ve y el que se golpea sean el mismo.
-    **Cada objeto tiene una caja** (`sim/boxes.ts`), que se golpea y, si su
-    tipo choca (`blocksBody`), tambien choca (regla 21).
-    Hay dos modos: el **barrido** y el **preciso** (`preciseTarget`, el primer
-    objetivo en el centro de la mira). **Sembrar** va donde la mirada toca la
-    cara de arriba del suelo, a menos de 3 en horizontal, y **colocar** ahi o
-    delante de la pared que toca (`aimSurface`). **El texto entero —medidas,
-    hitboxes, la estocada, por que cayeron los dos modelos anteriores— esta en
-    `docs/reglas.md`: leelo antes de tocar el golpe, sembrar o colocar.**
-13. **El relieve sale de la misma elevacion que el terreno, en voxeles de 0,5**
-    (decision del autor, 2026-10-06). Cada columna de 0,5 × 0,5 tiene su altura
-    en medios bloques (`heightFrom`, 0,03 de elevacion cada uno: el 0,06 del
-    autor partido en dos), interpolando el relieve entre las esquinas de su
-    casilla; lo que es agua lo decide la casilla, el mismo `e < 0.42` de
-    siempre, asi que `terrainAt` no cambia y los umbrales de bioma siguen
-    calibrados. El bioma, la vida y los objetos siguen por casilla de 1. Si
-    mueves el nivel del mar sin mover el umbral de agua,
-    `tests/relief.test.ts` te avisa.
-14. **La altura y los muros son dos mecanismos distintos.** Las **cordilleras**
-    amplifican el desnivel sobre el nivel del mar, y de ahi salen la altitud y
-    las laderas escalonadas; los **salientes** levantan +3 de golpe y de ahi
-    salen las mesetas. Con voxeles de 0,5, la ladera de una cordillera sale en
-    paredes de un bloque, que se saltan, y las paredes de dos o mas solo las dan
-    los salientes (medido, 2026-10-06). Los salientes se pagan en conectividad, y
-    su densidad esta calibrada, no elegida. Antes de tocar `OUTCROP_THRESHOLD`,
-    `RIDGE_GAIN` o sus escalas, vuelve a medir con
-    `npx vite-node tools/analyze-world.ts` y mira la **linea base solo-agua**: el
-    mundo plano tampoco es del todo conexo, y comparar contra el 100 % hace pasar
-    por sano un relieve que no lo es. El presupuesto acordado es un punto.
-15. *(Retirada con los voxeles, 2026-10-06: la rampa. El autor elimino las
-    rampas; el relieve sube a escalones de medio bloque, que se suben andando.
-    Ver `docs/relieve.md`.)*
-16-20. *(Retiradas con el isometrico: el orden por antidiagonales, el recorte
-    por bloques, la silueta del jugador, la fila de su casilla y el filo de los
-    escalones. Ver `docs/isometrico.md`.)*
+    un hitbox** (`sim/aim.ts`): 3 bloques y 90 grados, 33 rayos que el
+    terreno corta. Cada objeto tiene una caja (`sim/boxes.ts`). Sembrar y
+    colocar van donde la mirada toca el suelo o la pared (`aimSurface`).
+13. **El relieve sale de la misma elevacion que el terreno, en voxeles de 0,5**:
+    cada columna lleva su altura en medios bloques; el agua, el bioma, la vida y
+    los objetos siguen por casilla de 1.
+14. **La altura y los muros son dos mecanismos distintos** (cordilleras y
+    salientes). Antes de tocar su calibracion se mide con
+    `npx vite-node tools/analyze-world.ts` contra la **linea base solo-agua**:
+    el presupuesto acordado es un punto.
+15. *(Retirada con los voxeles: la rampa. Ver `docs/relieve.md`.)*
+16-20. *(Retiradas con el isometrico. Ver `docs/isometrico.md`.)*
 21. **La altura estorba, y estorba con UNA regla: no se entra donde el suelo
-    esta por encima de los pies.** Andando hay un margen, `STEP_UP`; volando,
-    ninguno: de ahi salen el medio bloque que se sube, la pared que no y el bloque
-    contra el que uno se estampa en el aire. La altura del personaje es
-    **suya** (`entities.z`) y es la que se dibuja; la gravedad se integra con el
-    **promedio de las dos velocidades**, que da la parabola exacta; y **los
-    objetos que chocan entran en el suelo que se pisa por su caja, con la
-    huella entera** del cuerpo (`squareFloor`, `footing`): se choca de lado,
-    se sube saltando y encima se esta de pie. El terreno, en el centro.
-    **Texto entero, con el porque de cada numero, en `docs/reglas.md`.**
-22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano de 3x3
-    casillas con todas sus columnas de 0,5 a la misma altura,
-    sitio para andar sin saltar, sitio del que salir contando con el salto, y
-    terreno que **sostenga vida**. **Texto entero, con lo medido, en
-    `docs/reglas.md`.**
-23. **Cualquier medida de conectividad tiene que obedecer la fisica.** El
-    recorrido de `debug.reachableArea` inundaba mirando solo los solidos, y
-    desde que una pared detiene el paso eso dejo de medir lo que el jugador
-    recorre. Sus cifras de antes y las de ahora **no son comparables**.
-    `tools/analyze-world.ts` ya lo hacia bien —mide con «se sube un bloque de un
-    salto»—, asi que la calibracion de la regla 14 estaba hecha para esta fisica
-    y aguanta. Desde los voxeles (2026-10-06) las tres medidas van **por
-    columnas de 0,5**: medio bloque andando, uno de un salto (`canClimbTo`). El
-    relieve cuesta 0,14-0,76 puntos sobre la linea base solo-agua, lo mismo que
-    antes, por debajo del punto acordado.
+    esta por encima de los pies** (`STEP_UP` andando, ninguno volando). El
+    terreno y los objetos que chocan se pisan con la huella entera
+    (`squareFloor`); **solo subir es de golpe: bajar es caer** con la gravedad.
+    Se anda con inercia (`INERTIA_TIME`, 0,1 s) y la cabeza choca (1,8).
+22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano, del
+    que se pueda salir, en terreno que sostenga vida.
+23. **Cualquier medida de conectividad tiene que obedecer la fisica**: por
+    columnas de 0,5, medio bloque andando y uno de un salto (`canClimbTo`).
 
 ## Regla de trabajo con el autor
 
@@ -197,28 +128,10 @@ Sus leyes se traducen a tests en `tests/world-laws.test.ts`, y el estado de cada
 una se lleva en `docs/leyes.md`, que si mantiene el agente. Al implementar algo
 que cumpla o acerque una ley, actualiza esa tabla en el mismo cambio.
 
-**`docs/pendiente.md` es lo primero que hay que leer al empezar una tanda.** Lleva
-las decisiones del autor que aun no son codigo —el diseno del salto con su
-enunciado literal, el giro a 3D ya decidido— y los cabos sueltos. Esta en el repo
-a proposito: las notas de trabajo del agente viven en un contenedor efimero y
-mueren con la sesion, asi que lo que no este aqui se pierde.
-
-Tres leyes condicionan el diseno entero y conviene tenerlas presentes antes de
-tocar la simulacion:
-
-- **«El mundo existe independientemente de cualquier observador»** prohibe
-  simular solo lo que rodea al jugador. La vida avanza en pasos globales fijos
-  (`LIFE_STEP_TICKS`) sobre todos los chunks perturbados a la vez, de modo que
-  ponerse al dia de golpe y simular continuamente dan el mismo resultado. Si
-  anades un proceso que dependa del orden fino entre chunks, esa equivalencia se
-  rompe y el test de independencia del observador te avisara.
-- **«Las entidades vivas no surgen automaticamente»** prohibe generar vida de la
-  nada. El paso de vida vive en `sim/world.ts` (`lifeStep`) con sus constantes en
-  `shared/ecology.ts`, y ahi esta codificado en la aritmetica: con densidad cero
-  el crecimiento vale exactamente cero.
-- **«Segun su naturaleza, pueden ser finitos, consumibles y renovables»**: no
-  todo recurso vuelve. `lifeKindOf` devuelve `null` para lo inerte —roca y
-  minerales—, que asi queda fuera del paso de vida: ni crece ni se repone.
+Tres leyes condicionan el diseno entero —la del observador, la de que la vida
+no surge sola y la de que no todo recurso vuelve—: **antes de tocar la
+simulacion, lee como se cumplen en `docs/leyes.md`**, «Las tres que condicionan
+el diseno».
 
 ## Como trabajar sin quemar la ventana de uso
 
@@ -242,89 +155,39 @@ donde se fue el gasto.
 ## Antes de dar algo por bueno
 
 **Lo pesado se verifica en la CI, en la rama `pruebas`** (decision del autor,
-2026-10-02). En local el humo va en serie —humo, gestos y barrido, unos 22
-minutos, y cada mutacion 4-5 mas— y la CI lo reparte en maquinas a la vez: unos
-5 minutos todo, mutaciones incluidas. Pero **a `main` no se empuja para
-probar**: `deploy.yml` publica el juego en cada push a `main` sin esperar a la
-CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
+2026-10-02), y **a `main` no se empuja para probar**: `deploy.yml` publica el
+juego en cada push a `main` sin esperar a la CI. El detalle de cada paso —como
+mirar la CI sin gastar, las mutaciones, la matriz, la auditoria— esta en
+`docs/pruebas.md`, «El procedimiento, paso a paso»: **leelo antes de la primera
+ronda de cada sesion.**
 
-1. **En local, mientras se trabaja**: `npm run typecheck && npm test` (~20 s) y
-   **solo la pasada que se esta escribiendo o tocando**
-   (`npm run build && node tools/smoke.mjs <pasada>`), las veces que haga falta.
+1. **En local**: `npm run typecheck && npm test` (~20 s) y **solo la pasada que
+   se toca** (`npm run build && node tools/smoke.mjs <pasada>`).
 2. **La ronda de mutaciones** en `tools/mutaciones.mjs`: cada comprobacion
-   nueva, con lo que la rompe (ver abajo).
-3. **`tools/a-pruebas.sh "que se prueba"`**, con `FIRMA` puesta a las lineas de
-   atribucion de la sesion. Lleva el arbol de trabajo tal cual, cambios sin
-   commit incluidos, a la rama `pruebas`: commit con un indice temporal encima
-   de su punta, avance rapido, sin tocar `main` ni el indice. Antes comprueba
-   que la lista de mutaciones aplica.
-4. **Esperar las dos tandas en verde**: «CI completa» (`ci.yml`) y «Mutaciones
-   completas» (`mutaciones.yml`). Sin `gh` ni API: un temporizador en segundo
-   plano (`sleep 300` con `run_in_background`) y despues las herramientas MCP
-   de GitHub: `actions_list` con `list_workflow_runs`, `resource_id` `ci.yml`
-   o `mutaciones.yml` y una sola por pagina, da el estado y la conclusion de cada
-   tanda (se comprueba que su SHA es el que imprimio el guion; filtrar por la
-   rama devolvio una vez la lista vacia); si alguna sale en rojo, `get_job_logs` con su `run_id`,
-   `failed_only` y `tail_lines` ~40 da solo lo que fallo —el resumen de
-   `mutar.mjs` y los `FALLO` del humo quedan unas 20 lineas antes del final—.
-   **No listar los trabajos** (`list_workflow_jobs`) salvo que haga falta: con
-   veinte trabajos son ~10.000 tokens de pasos. Mientras la CI esta en cola
-   —son unos 25 trabajos para 20 maquinas— se sigue con otra cosa, como la
-   documentacion. Lo que falle se arregla y se vuelve al 3.
+   nueva, con lo que la rompe. Si no cae, no comprueba nada.
+3. **`tools/a-pruebas.sh "que se prueba"`**, con `FIRMA` puesta a las lineas
+   de atribucion de la sesion.
+4. **Esperar las dos tandas en verde**: «CI completa» y «Mutaciones completas».
+   Lo que falle se arregla y se vuelve al 3.
 5. **Solo entonces**, commit y push a `main`. Esa CI **confirma, pero no se
-   espera** (decision del autor, 2026-09-29): se informa al autor en el acto,
-   diciendo que esta en marcha, y se mira **al empezar el siguiente turno**; si
-   salio en rojo, se dice y se arregla antes que nada.
+   espera**: se avisa al autor y se mira **al empezar el siguiente turno**.
 
-El humo completo en local (`npm run smoke`, mas `gestures` y `slash`) queda para
-cuando la CI no este disponible. La rama `pruebas` se queda en el remoto para
-siempre —el proxy no deja borrar ramas, y no hace falta— y un push nuevo cancela
-la tanda anterior que siguiera en marcha.
-
-**Las mutaciones** (`tools/mutar.mjs`, con lo puro en `mutar-lib.mjs` y su
-test): cada comprobacion nueva se ve **caer** rompiendo a proposito lo que
-afirma; si no cae, no comprueba nada (lente B). La lista de la ronda es
-`tools/mutaciones.mjs` —nombre, fichero, el texto `de` que tiene que aparecer
-exactamente una vez, el `a` que lo rompe, y la `prueba`: `smoke:<pasada>`,
-`gestures`, `slash` o `test:<fichero de vitest>`—; se reescribe en cada ronda y
-la de antes queda en la historia. En la CI cada mutacion es un trabajo con su
-nombre, que sale en verde si su prueba CAE. En local:
-`node tools/mutar.mjs --comprobar` (segundos) o `node tools/mutar.mjs [nombre…]`
-(en serie; restaura siempre, tambien con Ctrl-C). **Una mutacion cuyo build sale
-identico al limpio es un error, no un «no cae»**: no llego a lo que se mide, que
-es justo el escape P3 —se midio una vez con el build viejo—. Asi que una
-mutacion de un comentario, que el minificador borra, sale en rojo.
-
-**La CI va repartida** (`.github/workflows/ci.yml`): typecheck y tests, una
-maquina por pasada del humo mas `gestures` y `slash`, y un trabajo final, «CI
-completa», que solo sale verde si todo lo esta. **Si anades una pasada al humo,
-anadela a la matriz**, o no correra nunca en CI. Las puertas de `slash`, la
-accion compartida y lo que ensenaron el humo y sus fallos estan en
-`docs/pruebas.md`: **leelo antes de escribir o tocar una comprobacion.**
-
-**Y al cerrar cada tanda, la auditoria**: la skill `auditoria`
-(`.claude/skills/auditoria/`, se invoca con `/auditoria`). Tiene un proceso fijo
-por fases, diez lentes, un escaner automatico con autoprueba y un **registro de
-escapes**. Parte del commit que marca «Ultima auditoria» en `docs/pendiente.md`. **Lo
-que un cambio retire —un valor, una tecla, un nombre— entra en
-`.claude/skills/auditoria/references/retirados.md` en ese mismo cambio**, no en
-la auditoria: si no, nadie lo busca hasta entonces (escape 19).
-Cada fallo que aparezca despues y que una auditoria pudo ver se anade a ese
-registro, con el metodo que lo habria detectado, y ese metodo pasa al escaner o
-a una lente: asi la skill mejora con cada cosa que se le escapa. Vive en el repo
-a proposito: el contenedor muere con la sesion y la skill tiene que crecer.
+**Y al cerrar cada tanda, la auditoria** (`/auditoria`). **Lo que un cambio
+retire —un valor, una tecla, un nombre— entra en
+`.claude/skills/auditoria/references/retirados.md` en ese mismo cambio**
+(escape 19).
 
 ## Donde esta cada cosa: leer antes de tocar
 
 Este fichero se carga entero en cada turno, asi que lleva solo lo que vale para
 cualquier tarea. Lo de cada parte del juego vive en `docs/`, con el mismo texto
-que tuvo aqui hasta el 2026-10-02 (propuesta 3). **Antes de tocar una de estas
+que tuvo aqui hasta el 2026-10-02 (propuesta 3) y el 2026-10-10. **Antes de tocar una de estas
 partes, lee su documento**: casi todo lo que cuenta es una decision del autor
 con fecha, o la leccion de un fallo que ya paso.
 
 | Si vas a tocar… | Lee |
 |---|---|
-| El golpe, sembrar, colocar, la altura que estorba, el nacimiento (reglas 12, 21 y 22) | `docs/reglas.md` |
+| Una regla dura (el texto entero de todas), el golpe, sembrar, colocar, la altura que estorba, el nacimiento | `docs/reglas.md` |
 | Teclas, raton y pausa, la pantalla del movil, la barra de PC, el ojo y las vistas, la camara, los gestos, MIRA/TAP, el auto salto | `docs/controles.md` |
 | El inventario, herramientas, golpes, estaciones, ropa, el panel, el registro de objetos | `docs/recoleccion.md` |
 | Barrido, estocada, escombros, esquirlas, o una medida de «se ve» | `docs/efectos.md` |
@@ -337,8 +200,13 @@ con fecha, o la leccion de un fallo que ya paso.
 | Algo que viene del isometrico retirado (reglas 6, 7 y 16-20) | `docs/isometrico.md` |
 | Una ley del libro | `docs/leyes.md` y `docs/el-libro-del-mundo.md` |
 
-Y **`docs/pendiente.md` primero, siempre**: decisiones pendientes, deducciones
-que esperan el juicio del autor y la historia de cada tanda.
+Y **`docs/pendiente.md` primero, siempre**: la tanda en curso, las decisiones
+del autor que aun no son codigo y lo aparcado. Desde el 2026-10-10 lo demas va
+aparte, para que leerlo primero no cueste 35.000 tokens:
+**`docs/juicio.md`**, las deducciones que esperan el juicio del autor (se buscan
+las filas de la parte que se toca; las nuevas se anaden alli), y
+**`docs/historia.md`**, las tandas cerradas (se consulta, no se lee de corrido;
+al cerrar una tanda, su seccion «HECHA» se mueve alli).
 
 **Al cambiar algo, se actualiza el documento de su parte**, no `CLAUDE.md`,
 salvo que cambie una regla dura, el procedimiento o este indice. Y si una parte

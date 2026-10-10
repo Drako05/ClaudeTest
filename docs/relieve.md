@@ -65,7 +65,9 @@ exacta** y alcance dos andando, y el agua es muro tambien volando. **El salto
 solo empuja hacia arriba y en el aire se anda como en el suelo** (decision del
 autor, 2026-09-30): a la velocidad de andar o de correr, girando lo que se
 quiera, y sin mando no se avanza. Hasta entonces conservaba el impulso del
-despegue y admitia un 30 % de desviacion. Andar y volar solo se distinguen
+despegue y admitia un 30 % de desviacion. Desde el 2026-10-10, con la misma
+**inercia** que en el suelo: arrancar, frenar y girar llevan 0,1 s
+(`INERTIA_TIME`, regla 21), y **bajar es caer**, tambien medio bloque. Andar y volar solo se distinguen
 en el margen de subida (regla 21). Medido con la
 integracion exacta: apice 1.160 niveles contra 1.161 en papel, alcance 2.17
 casillas a paso completo, vuelo 0.400 s. `GRAVITY = 62` y `JUMP_SPEED = 12` son

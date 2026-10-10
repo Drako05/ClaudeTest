@@ -13,7 +13,7 @@ nada, recolecta con las manos, fabrica sus primeras herramientas, que le dan
 mejores recursos, y con ellos fabrica mejores herramientas e indumentaria. Fue
 en dos tandas, las dos hechas: la **tanda 1** (manos → herramientas de piedra →
 lo que sacan) y la **tanda 2** (mesa, horno, fundir, cobre, hierro y ropa). Las
-cifras y lo que decidio el autor en cada una estan en `docs/pendiente.md`.
+cifras y lo que decidio el autor en cada una estan en `docs/historia.md`.
 
 Decisiones del autor, que no se tocan sin preguntarle:
 

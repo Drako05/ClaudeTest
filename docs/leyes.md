@@ -18,6 +18,28 @@ Los tests de las leyes viven en [`tests/world-laws.test.ts`](../tests/world-laws
 
 ---
 
+## Las tres que condicionan el diseno
+
+Estaba en `CLAUDE.md` hasta el 2026-10-10 y se mudo aqui **literal**: `CLAUDE.md`
+se carga en cada llamada, asi que alli queda solo el enunciado.
+
+Tres leyes condicionan el diseno entero y conviene tenerlas presentes antes de
+tocar la simulacion:
+
+- **«El mundo existe independientemente de cualquier observador»** prohibe
+  simular solo lo que rodea al jugador. La vida avanza en pasos globales fijos
+  (`LIFE_STEP_TICKS`) sobre todos los chunks perturbados a la vez, de modo que
+  ponerse al dia de golpe y simular continuamente dan el mismo resultado. Si
+  anades un proceso que dependa del orden fino entre chunks, esa equivalencia se
+  rompe y el test de independencia del observador te avisara.
+- **«Las entidades vivas no surgen automaticamente»** prohibe generar vida de la
+  nada. El paso de vida vive en `sim/world.ts` (`lifeStep`) con sus constantes en
+  `shared/ecology.ts`, y ahi esta codificado en la aritmetica: con densidad cero
+  el crecimiento vale exactamente cero.
+- **«Segun su naturaleza, pueden ser finitos, consumibles y renovables»**: no
+  todo recurso vuelve. `lifeKindOf` devuelve `null` para lo inerte —roca y
+  minerales—, que asi queda fuera del paso de vida: ni crece ni se repone.
+
 ## Capitulo I: El mundo
 
 | Ley | Estado | Donde vive | Prueba |

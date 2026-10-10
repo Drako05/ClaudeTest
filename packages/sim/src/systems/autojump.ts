@@ -38,9 +38,9 @@ export function riseTime(rise: number): number {
 /**
  * Si toca saltar solo en este tick.
  *
- * Se recorre la linea de avance del CENTRO del cuerpo, que es lo que mira la
- * colision para la altura (`blocked` en `movement.ts`), y decide el primer
- * punto que estorbaria andando:
+ * Se recorre la linea de avance del cuerpo midiendo con su **huella entera**,
+ * que es lo que mira la colision (`blocked` en `movement.ts`), y decide el
+ * primer punto que estorbaria andando:
  *
  * - si es algo solido —agua, un tronco—, no se salta: no hay nada que subir;
  * - si es suelo que sube mas de `STEP_UP`, es el bloque. Se salta si cabe en el

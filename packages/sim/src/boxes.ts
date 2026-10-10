@@ -6,12 +6,15 @@
  * objeto y no a su casilla, y con alto: encima se esta de pie. Chocan el
  * tronco del arbol, la roca, los minerales y las estaciones; el arbusto, el
  * brote y los guijarros solo se golpean. Y **el cuerpo se apoya y choca con su
- * huella entera**, tambien contra las estaciones; el terreno sigue midiendose
- * en el centro (regla 21).
+ * huella entera**, tambien contra las estaciones y, desde el 2026-10-10,
+ * tambien contra el terreno: «todas las cajas chocan con el terreno en todo
+ * momento» (el autor; regla 21).
  *
  * De ahi sale todo con la regla de siempre —no se entra donde el suelo esta por
- * encima de los pies—, solo que «el suelo» es el terreno en el centro y,
- * encima, el techo de cada caja que toca la huella (`squareFloor`, `footing`).
+ * encima de los pies—, solo que «el suelo» es lo mas alto que toca la huella:
+ * cada columna de 0,5 del terreno y el techo de cada caja de objeto, salvo las
+ * que quedan por encima de la cabeza, que son techo (`squareFloor`,
+ * `footing`, `headroom`).
  *
  * Vive aparte de `systems/` a proposito: lo usan `jump.ts`, `movement.ts`,
  * `body.ts` y `gathering.ts`, y desde cualquiera de ellos abriria un ciclo de
@@ -36,7 +39,7 @@ import {
 } from '@verdant/shared';
 import type { Hitbox } from './aim.js';
 import { EntityKind, type EntityStore } from './entities.js';
-import { topOf, VOXELS_PER_TILE } from './relief.js';
+import { topOf, VOXEL, VOXELS_PER_TILE, voxelOf } from './relief.js';
 import { treeTrunkAt } from './trunk.js';
 import type { World } from './world.js';
 
@@ -44,9 +47,16 @@ import type { World } from './world.js';
 export const BODY_RADIUS = 0.34;
 
 /**
+ * Lo que mide de alto el cuerpo del jugador (el autor, 2026-10-06): una caja de
+ * objeto que asoma dentro de este alto le estorba de lado, y una que queda por
+ * encima es techo contra el que se da con la cabeza.
+ */
+export const PLAYER_HEIGHT = 1.8;
+
+/**
  * Medidas de las cajas que no son arboles: medio ancho y alto, en bloques.
  * Salen de lo que mide cada dibujo (1,17 el arbusto, 1,09 la roca, 0,88 el
- * brote) y son **deduccion mia**; estan en `docs/pendiente.md`.
+ * brote) y son **deduccion mia**; estan en `docs/juicio.md`.
  */
 const BUSH_BOX = { half: 0.45, height: 1.1 };
 const ROCK_BOX = { half: 0.45, height: 1.0 };
@@ -182,7 +192,7 @@ const footCache = new Map<number, ReturnType<typeof hitPartsOf>>();
 /**
  * Las partes con caja mas bajas de un animal, las que lo sostienen: las patas
  * del cuadrupedo, el caparazon del cangrejo, el tronco de la gaviota.
- * **Deduccion mia** (`docs/pendiente.md`).
+ * **Deduccion mia** (`docs/juicio.md`).
  */
 function footPartsOf(species: Species, stage: Stage): ReturnType<typeof hitPartsOf> {
   const key = species * 8 + stage;
@@ -302,22 +312,99 @@ export function solidBox(world: World, tx: number, ty: number): Hitbox | null {
 }
 
 /**
- * Lo que pisa una huella cuadrada de medio lado `half` centrada en (`x`, `y`):
- * el terreno en su centro y, encima, el techo de cada caja que choca y la
- * solapa. Con `half` 0, lo que hay justo en ese punto. Con `upTo`, solo las
- * cajas cuyo techo no pasa de ahi (ver `footing`).
+ * Las columnas de 0,5 que solapa el tramo `[c - half, c + half]` de un eje: la
+ * primera y la ultima. Tocar el borde de una columna no es solaparla. Con
+ * `half` 0, la del punto.
  */
-export function squareFloor(world: World, x: number, y: number, half: number, upTo = Infinity): number {
-  let floor = world.groundHeightAt(x, y);
+function columnSpan(c: number, half: number): [number, number] {
+  if (half <= 0) return [voxelOf(c), voxelOf(c)];
+  return [voxelOf(c - half), Math.ceil((c + half) / VOXEL) - 1];
+}
+
+/**
+ * Lo mas alto del terreno bajo una huella cuadrada de medio lado `half`
+ * centrada en (`x`, `y`): el techo de cada columna de 0,5 que solapa. Con
+ * `half` 0, el de la columna del punto. Con `upTo`, solo las columnas que no
+ * pasan de ahi, como las cajas (`footing`); `-Infinity` si no queda ninguna.
+ */
+export function terrainUnder(world: World, x: number, y: number, half: number, upTo = Infinity): number {
+  const [vx0, vx1] = columnSpan(x, half);
+  const [vy0, vy1] = columnSpan(y, half);
+  let top = -Infinity;
+  for (let vy = vy0; vy <= vy1; vy++) {
+    for (let vx = vx0; vx <= vx1; vx++) {
+      const column = columnTopIn(world, vx, vy);
+      if (column <= upTo) top = Math.max(top, column);
+    }
+  }
+  return top;
+}
+
+/**
+ * Lo que pisa una huella cuadrada de medio lado `half` centrada en (`x`, `y`):
+ * el terreno bajo la huella entera (`terrainUnder`) y, encima, el techo de cada
+ * caja que choca y la solapa. Con `half` 0, lo que hay justo en ese punto. Con
+ * `upTo`, solo el terreno y las cajas cuyo techo no pasa de ahi (ver
+ * `footing`); `-Infinity` si no queda nada debajo de eso. Con
+ * `head`, solo las que empiezan por debajo de ahi: las de mas arriba no se
+ * pisan, son techo (`headroom`).
+ */
+export function squareFloor(world: World, x: number, y: number, half: number, upTo = Infinity, head = Infinity): number {
+  let floor = terrainUnder(world, x, y, half, upTo);
   for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
     for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
       const b = solidBox(world, tx, ty);
-      if (b && b.z1 > floor && b.z1 <= upTo && b.x0 < x + half && b.x1 > x - half && b.y0 < y + half && b.y1 > y - half) {
+      if (
+        b &&
+        b.z1 > floor &&
+        b.z1 <= upTo &&
+        b.z0 < head &&
+        b.x0 < x + half &&
+        b.x1 > x - half &&
+        b.y0 < y + half &&
+        b.y1 > y - half
+      ) {
         floor = b.z1;
       }
     }
   }
   return floor;
+}
+
+/**
+ * El techo sobre una huella cuadrada: lo mas bajo de las cajas que chocan, la
+ * solapan y empiezan a la altura `from` o por encima. `Infinity` si no hay
+ * ninguna. Con `from` en la cabeza, es lo que corta un salto.
+ */
+export function ceilingOver(world: World, x: number, y: number, half: number, from: number): number {
+  let ceiling = Infinity;
+  for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
+    for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
+      const b = solidBox(world, tx, ty);
+      if (
+        b &&
+        b.z0 >= from - 1e-9 &&
+        b.z0 < ceiling &&
+        b.x0 < x + half &&
+        b.x1 > x - half &&
+        b.y0 < y + half &&
+        b.y1 > y - half
+      ) {
+        ceiling = b.z0;
+      }
+    }
+  }
+  return ceiling;
+}
+
+/**
+ * Hasta donde puede subir la cabeza de una entidad donde esta: el techo sobre el
+ * jugador. Los animales aun no lo miran (`Infinity`): sus partes chocan de lado
+ * con las cajas, y en el mundo de hoy no hay nada colgado.
+ */
+export function headroom(world: World, store: EntityStore, id: number): number {
+  if (store.kind[id] !== EntityKind.Player) return Infinity;
+  return ceilingOver(world, store.x[id], store.y[id], BODY_RADIUS, store.z[id] + PLAYER_HEIGHT);
 }
 
 /**
@@ -350,12 +437,18 @@ export function partsFloor(world: World, boxes: readonly OrientedBox[], x: numbe
  * sube andando): una caja que asoma por encima de eso no se pisa, se esta
  * metido en ella —un arbol que crecio encima, un animal que no cabe y anda
  * solo con los pies—, y no puede subir el cuerpo de golpe a su techo.
- * **Deduccion mia.**
+ * **Deduccion mia.** Desde el 2026-10-10, al jugador le pasa lo mismo con el
+ * terreno: una columna que asoma mas de `STEP_UP` no lo sube de golpe (solo se
+ * sube de golpe lo que se sube andando, el autor), y si toda su huella esta
+ * metida en el terreno, se queda donde esta.
  */
 export function footing(world: World, store: EntityStore, id: number, upTo = Infinity): number {
   const x = store.x[id];
   const y = store.y[id];
-  if (store.kind[id] === EntityKind.Player) return squareFloor(world, x, y, BODY_RADIUS, upTo);
+  if (store.kind[id] === EntityKind.Player) {
+    const floor = squareFloor(world, x, y, BODY_RADIUS, upTo, store.z[id] + PLAYER_HEIGHT);
+    return floor === -Infinity ? store.z[id] : floor;
+  }
   const animal = store.animal[id];
   if (!animal) return world.groundHeightAt(x, y);
   const feet = bodyBoxes(animal.species, animal.stage, x, y, store.z[id], store.facingX[id], store.facingY[id], true);
