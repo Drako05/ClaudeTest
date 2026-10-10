@@ -113,7 +113,9 @@ hasta 255**: sobre el cielo el azul ya va por 240, el trazo translucido lo
 subia 10, y la camara baja daba 0 con el barrido a la vista. La camara baja
 mide ademas el ancho entero, como la primera persona: mirando arriba la colision
 la deja a 0,84 de los ojos, y la caja central pillaba el trazo en una captura
-de ocho o en ninguna), todas a la vez; y un trabajo final, «CI completa», que solo sale
+de ocho o en ninguna. Y como la normal, se queda con **el mejor de cuatro
+rumbos**: lo que vigila, la cinta orientada hacia el ojo, la borraba en todos a
+la vez, y en un claro dio 0 en el rumbo de salida y 3.966 en otro), todas a la vez; y un trabajo final, «CI completa», que solo sale
 verde si todo lo esta. La preparacion —Node, dependencias y Chromium con su
 cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
 tandas. Cada pasada se lanza por el prefijo de su nombre

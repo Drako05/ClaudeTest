@@ -249,8 +249,13 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
   // 31 m el plano del sector pasa por ella, el arco se ve de canto, y metido en
   // un pinar da 12-16 pixeles en cinco rumbos de ocho y 173 en otro. Paso en la
   // CI (2026-10-06, en 13.9, 11.2), y el build de `main` daba lo mismo alli.
-  const turns = view === 'camara baja' ? 1 : 4;
-  const keepBest = view === 'normal';
+  //
+  // La camara baja, igual desde la tanda de fisicas (2026-10-10): lo que vigila
+  // es la cinta orientada hacia el ojo, y tumbada se veia de canto en todos los
+  // rumbos. Con uno solo dependia del sitio: el paseo ya no acaba siempre en el
+  // mismo, y en un claro de la CI dio 0 en el rumbo de salida y 3.966 en otro.
+  const turns = 4;
+  const keepBest = view === 'normal' || view === 'camara baja';
   // La camara baja, tambien: mirando arriba la colision la deja a un palmo de
   // los ojos (0,84 en un claro, tanda de fisicas), casi en primera persona, y
   // la caja central pillaba el trazo en una captura de ocho, o en ninguna.
@@ -287,13 +292,14 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
       await writeFile(new URL('../screenshots/slash.png', import.meta.url), hitting.best);
     }
 
-    // En la vista normal, un rumbo con la camara pegada a la cabeza no cuenta:
+    // En la vista normal, un rumbo con la camara pegada a la cabeza no cuenta
+    // (en la baja lo esta siempre: mirando arriba choca con el suelo):
     // desde ahi el barrido da 0 u 11.886 segun el instante, y era ese numero
     // grande el que daba el verde (ver `MIN_NORMAL`).
     const free = here.camDistance >= 0.9 * here.camWant;
-    const counts = !keepBest || free;
+    const counts = view !== 'normal' || free;
     if (counts && (worst === null || (keepBest ? hitting.max > worst : hitting.max < worst))) worst = hitting.max;
-    if (turns > 1) {
+    {
       console.log(`  ${view}, rumbo ${turn + 1}: ${hitting.max} pixeles aclarados (camara a ${here.camDistance.toFixed(1)} de ${here.camWant.toFixed(1)}${counts ? '' : ': pegada, no cuenta'})`);
     }
     sent += after.slashesDrawn - before.slashesDrawn;
@@ -335,8 +341,8 @@ for (const r of results) {
   );
 }
 console.log('');
-console.log('«pixeles aclarados» es el barrido llegando a pantalla; en la vista normal, el');
-console.log('MEJOR de cuatro rumbos, y en la giratoria y la primera persona, el PEOR. Con');
+console.log('«pixeles aclarados» es el barrido llegando a pantalla; en la vista normal y la');
+console.log('baja, el MEJOR de cuatro rumbos, y en la giratoria y la primera persona, el PEOR. Con');
 console.log('?efectos=barrido no se dibujan impactos, esquirlas ni escombros: todo lo');
 console.log('aclarado es del barrido, aunque «recogido» no sea cero.');
 console.log('');
