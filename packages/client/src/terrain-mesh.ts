@@ -49,8 +49,9 @@ const SIDES: ReadonlyArray<{ dx: number; dy: number; a: [number, number]; b: [nu
  * Fuera del chunk se pregunta al GENERADOR y no al mundo: `world.columnTop`
  * llamaria a `getChunk` y registraria el chunk vecino, con lo que dibujar
  * alteraria las cuentas de bioma. Es el mismo cuidado que tiene
- * `biome-edges.ts`. Tambien lo usan las sombras (`shadow-patches.ts`), para
- * caer sobre la superficie que se dibuja y no sobre otra cuenta parecida.
+ * `biome-edges.ts`. Tambien lo usan las sombras (`main.ts` se lo pasa a
+ * `buildShadows` como su `surface`), para caer sobre la superficie que se
+ * dibuja y no sobre otra cuenta parecida.
  */
 export function columnTopFor(world: World, chunk: Chunk, vx: number, vy: number): number {
   const lx = vx - chunk.cx * CHUNK_COLUMNS;

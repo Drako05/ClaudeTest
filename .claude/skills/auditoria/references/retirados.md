@@ -100,3 +100,10 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 
 - `pasada == 'slash'|prueba: 'slash'|casilla `slash`|\[[^\]]*\bslash\]` — `slash` como una sola casilla de la CI o una sola prueba de mutacion; desde el 2026-10-10 va en partes (`slash-<parte>`, `slash:<parte>`, `tools/slash-partes.mjs`). Permitido en: `docs/historia.md`.
 - `sleep 300|sin .gh. ni API` — esperar la CI con un temporizador fijo de 5 minutos porque no habia API; desde el 2026-10-10, `tools/esperar-ci.sh` con `gh api`. Permitido en: `docs/pruebas.md` (cuenta el cambio), `docs/historia.md`.
+
+## Auditoria del 2026-10-10: lo que retiraron las tandas de voxeles, fisicas y pruebas
+
+- `avanza(ba)? lo justo para que (sus|los) pies` — el animal que en el aire avanzaba lo justo para pasar el borde en lo alto del salto, mas deprisa que su paso si hacia falta (`601329f`); desde la fase B de fisicas (2026-10-10) avanza a su paso, como el jugador. Permitido en: `packages/sim/src/systems/movement.ts` (lo cuenta como historia), `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`, `docs/fauna.md`.
+- `tope de 15 minutos|15 minutos antes de dar` — lo que `mutar.mjs` esperaba antes de dar una prueba por colgada; desde el 2026-10-10 son 25 (`LIMITE_MS`). Permitido en: `docs/historia.md`.
+- `se alcanza \(PENDIENTE DEL AUTOR\)|CHOQUE DE DOS DECISIONES TUYAS` — el bloque a dos casillas a altura 2 que la huella entera alcanza; el autor lo acepto el 2026-10-10 («no hay problema en que se alcancen más casillas siempre que se respeten las leyes físicas»). Permitido en: `docs/pendiente.md`, `docs/historia.md`.
+- `feetOnly|footPartsOf` — las cajas mas bajas de un animal, con las que se apoyaba hasta la fase B de fisicas; desde entonces reposa con todas (`partsRest`), y la auditoria del 2026-10-10 retiro lo que quedaba. Permitido en: `docs/pendiente.md`, `docs/historia.md`.

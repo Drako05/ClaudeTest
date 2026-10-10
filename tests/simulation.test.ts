@@ -348,7 +348,7 @@ describe('Congelar la supervivencia', () => {
 describe('El hambre segun el esfuerzo', () => {
   /**
    * Hambre perdida en `n` ticks con esa Intent, empezando llena y en una zona
-   * llana y despejada: correr contra una pared o un talud no es avanzar, y la
+   * llana y despejada: correr contra una pared o un escalon no es avanzar, y la
    * cuenta mediria contra que se choca.
    */
   function lost(seed: number, n: number, i: Intent): number {
@@ -507,7 +507,7 @@ describe('Mirada y golpe', () => {
 
   /**
    * Un rellano llano de 3x3 alrededor de `(x, y)` en el mundo 2024, sin agua ni
-   * taludes, con todo lo que tuviera quitado y el jugador en su centro, de pie
+   * escalones, con todo lo que tuviera quitado y el jugador en su centro, de pie
    * y mirando al este con esa inclinacion.
    */
   function onFlat(lookZ: number) {

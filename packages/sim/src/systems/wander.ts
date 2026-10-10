@@ -54,7 +54,7 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
   store.z[id] = world.groundHeightAt(store.x[id], store.y[id]);
   // Mirando de su origen a su punto de paso: lo mismo lo mire alguien o no.
   faceToFit(world, store, id, animal, Math.atan2(target.y - animal.homeY, target.x - animal.homeX));
-  // Ya girado: sus pies, sobre lo que pisan sus partes mas bajas.
+  // Ya girado: sus pies, sobre lo que pisan todas sus cajas (`partsRest`).
   store.z[id] = footing(world, store, id, store.z[id] + STEP_UP);
   store.vz[id] = 0;
   store.grounded[id] = 1;

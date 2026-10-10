@@ -159,8 +159,7 @@ export interface OrientedBox {
 /**
  * Las cajas que golpean y chocan de un animal con los pies en (`x`, `y`, `z`)
  * y mirando a (`fx`, `fy`). El ancho del plano (`z` del marco del animal) va a
- * su izquierda: (-fy, fx). Con `feetOnly`, solo sus partes mas bajas: las que
- * lo sostienen.
+ * su izquierda: (-fy, fx).
  */
 export function bodyBoxes(
   species: Species,
@@ -170,12 +169,11 @@ export function bodyBoxes(
   z: number,
   fx: number,
   fy: number,
-  feetOnly = false,
 ): OrientedBox[] {
   const len = Math.hypot(fx, fy) || 1;
   const ux = fx / len;
   const uy = fy / len;
-  return (feetOnly ? footPartsOf(species, stage) : hitPartsOf(species, stage)).map((p) => ({
+  return hitPartsOf(species, stage).map((p) => ({
     cx: x + ux * p.at[0] - uy * p.at[2],
     cy: y + uy * p.at[0] + ux * p.at[2],
     cz: z + p.at[1],
@@ -185,26 +183,6 @@ export function bodyBoxes(
     hw: p.size[2] / 2,
     hh: p.size[1] / 2,
   }));
-}
-
-const footCache = new Map<number, ReturnType<typeof hitPartsOf>>();
-
-/**
- * Las partes con caja mas bajas de un animal, las que lo sostienen: las patas
- * del cuadrupedo, el caparazon del cangrejo, el tronco de la gaviota.
- * **Deduccion mia** (`docs/juicio.md`).
- */
-function footPartsOf(species: Species, stage: Stage): ReturnType<typeof hitPartsOf> {
-  const key = species * 8 + stage;
-  let parts = footCache.get(key);
-  if (!parts) {
-    const all = hitPartsOf(species, stage);
-    const base = (p: (typeof all)[number]) => p.at[1] - p.size[1] / 2;
-    const lowest = Math.min(...all.map(base));
-    parts = all.filter((p) => base(p) <= lowest + 1e-6);
-    footCache.set(key, parts);
-  }
-  return parts;
 }
 
 /**

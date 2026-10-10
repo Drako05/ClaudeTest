@@ -11,6 +11,110 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Pruebas mas rapidas — HECHA (2026-10-10)
+
+Pedido del autor, literal: «Cómo podemos hacer para que las pruebas las hagas
+más rápido […] con tal de ahorrarnos esas horas que llega a tomar el proceso de
+pruebas posterior a cada tanda de cambios». Aprobo el plan de tres fases.
+
+**Lo medido.**
+- La CI paso de ~5 minutos (4-5 oct) a ~15. El camino critico era una sola
+  casilla, `slash`, con 845-900 s; todas las demas, por debajo de 340 s. Sus
+  mutaciones tardaban ~1.000 s cada una.
+- El 10-oct hubo 4 rondas en `pruebas` en 3 h 20 min, y tres salieron en rojo,
+  varias por depender de la velocidad de la maquina.
+- Sin GPU, Chromium dibuja por software: ~5 FPS a 1280x720 en el contenedor y
+  1,4 s por captura. Ninguna opcion de arranque de Chromium lo mejora. Un tick
+  de la simulacion cuesta 1,7 ms.
+
+**Las fases.**
+1. **`slash` partido en cinco casillas**, una por parte (`docs/pruebas.md`).
+   **Hecha y en `main`** (`6bab86a`). En la CI de `pruebas`: CI 11 min,
+   mutaciones 7 min 42 s (antes ~15 y ~18). Por el camino se vio que el
+   recorte por frustum no lo caza la vista normal (`docs/juicio.md`).
+2. **`tools/esperar-ci.sh`**: espera a la CI con `gh api` y no con un
+   temporizador fijo. **Hecha y en `main`**.
+3. **Reloj de pruebas** (`?reloj=manual`, `clock.ts`, `window.__reloj`;
+   `docs/pruebas.md`, «El reloj manual»). **Hecho y en `main`** (`7e2d790`,
+   CI de `main` en verde):
+   - Migradas: `life`, `relief`, `fauna`, `devTools`, `stations`,
+     `resources`, `highRefresh` (`hz` 144) y `slash`, con capturas recortadas.
+     Todas dan lo mismo en dos corridas, salvo un contador de `fauna`.
+   - Las mutaciones de la ronda caen todas, en local y en la CI.
+   - **En la CI de `pruebas`** (`30ca220`): CI **6 min 45 s** y mutaciones
+     **2 min 01 s**, frente a ~15 y ~18 al empezar la tanda. Cada parte de
+     `slash` tarda 54-98 s, y las pasadas migradas 33-67 s. El camino critico
+     ya son las tres con el reloj de verdad: `gestures` 394 s, `desktop` 241 y
+     `mobile` 230.
+   - **Queda fuera**: `mobile`, por sus toques sostenidos con temporizadores
+     del navegador. `desktop` y `gestures` siguen con el reloj de verdad a
+     proposito.
+
+   **Decisiones por defecto, del agente y sin aprobar**: frames a 60 Hz con el
+   reloj manual, y una comprobacion que dé otro numero no se reajusta en
+   silencio, sino que se dice con los dos valores y va a `docs/juicio.md`.
+   Alli estan los numeros nuevos de `slash` y la vista «de cerca» que no se
+   acerca.
+
+## Fisicas: cajas que chocan siempre, gravedad, inercia, camara — HECHA (2026-10-10)
+
+Cerrada con la auditoria del 2026-10-10 (`docs/pendiente.md`). Lo que dijo
+el autor al probarla es la tanda siguiente, en `pendiente.md`. La de pruebas
+se metio delante por pedido suyo.
+
+**Empieza aqui.** Es tambien la fase 2 de los voxeles (abajo). El autor, literal
+(2026-10-10):
+
+1. «las entidades y el jugador solo bajan de escalón cuando al caer ninguna de
+   sus cajas choca con algo. lo mismo se aplica para subir. es decir, todas las
+   cajas chocan con el terreno en todo momento.»
+2. «las entidades deben saltar para subir un escalón de mas de 0.5. usando las
+   mismas físicas que el jugador (moverse para desplazarse en el aire y poder
+   subir porque el mero salto solo aplica impulso vertical). creo que aquí se
+   puede aplicar el sistema de salto automático pero para los animales.»
+3. «solo al subir escalones ≤ 0.5 se permite teletransportar a la entidad o el
+   jugador. lo que en la practica, será simplemente como seguir caminando.»
+4. «ahora para cualquier entidad y jugador, debe haber una desaceleración al
+   cambiar la dirección del movimiento, ya sea caminando, corriendo o en el
+   aire (cayendo o saltando). Esta desaceleración también aplica al dejar se
+   avanzar, no se parara el instante, sino que tendrá ese pequeño instante de
+   desplazamiento en la dirección que llevaba (debe ser pequeño, como 0.1s,
+   pero escucho tus sugerencias para este detalle).»
+5. «en todo momento, la cámara debe tener un suavizado/retraso de 0.1s al
+   perseguir al jugador en todas las vistas. (es un tiempo ajustable que
+   juzgare cuando lo pruebe).»
+
+Y sus respuestas a las preguntas:
+- Inercia: **arranque y frenada en 0,1 s**, a ritmo constante.
+- Camara, literal: «el retraso igual en todas las vistas y direcciones, el
+  centro de la pantalla sigue siendo el punto hacia donde mira y apunta el
+  personaje sin importar la ubicación del personaje.»
+- Saltar mientras se cae medio bloque: **sin margen**.
+- Animales en el aire: **como el jugador, a su paso**; saltan justo antes de
+  chocar si llegan arriba, y si no, rodean.
+
+**El plan, en tres fases, cada una a `main` con su CI:** A, el jugador (el
+terreno con la huella entera, sin `SNAP_DOWN`, techos, inercia); B, los animales
+(el reposo por cajas, auto salto a su paso, inercia); C, la camara (retraso
+exponencial ajustable en el panel, y mirando al punto de mira). **El modelo
+comun, deduccion mia: la altura de reposo** de un cuerpo es el maximo, sobre
+cada caja, de lo mas alto bajo su huella menos lo que esa caja esta por encima
+de los pies; andando se sube de golpe hasta `STEP_UP`, por debajo se cae con
+gravedad, y en el aire no se entra donde el reposo pasa de los pies.
+
+**Estado:** A y B hechas y **fueron juntas a `main`**: la CI de A cayo en tres
+pasadas del humo, y cuando estuvieron arregladas B ya estaba en el arbol. Lo
+que ensenaron: `stations` (la deriva al empujar arboles metia la huella en el
+pasillo de la mesa y el horno: orden de teclas), `fauna` (una presa parada
+puede estar atascada lejos de su punto de paso, y al recargar aparece en el:
+se exige `atWaypoint`), y `slash` (ver `docs/pruebas.md`: la vista normal
+cuenta solo rumbos con la camara libre). **C, hecha**: la camara persigue los
+ojos con retraso exponencial de 0,1 s en las tres vistas y mira al punto de
+mira (`docs/controles.md`), con un deslizador en el panel de desarrollo. Las
+tres fueron a `main` juntas, verificadas en la misma CI; por el camino `slash`
+pidio medir en un claro y la camara baja en cuatro rumbos (`docs/pruebas.md`). La
+`/auditoria` la cerro el mismo dia.
+
 ## Una caja por objeto, con alto, y las patas con caja — HECHO (2026-10-05)
 
 Al ver las cajas en el panel, el autor afino las reglas:
@@ -88,6 +192,38 @@ clavados».
   0-4 %, la marmota hasta 12 % en una semilla. Quedan los cuerpos grandes en
   sitios estrechos, tambien en «Esperando tu juicio».
 - El tick medio no cambia (0,26 ms).
+
+## Auditoria al cerrar la fauna y los equipables (2026-10-04)
+
+Desde `8396b7f` hasta `3415d31`: la primera tanda de fauna (que se cerro sin
+auditar), la guia de arte y los equipables con sus iconos.
+
+**Corregido:**
+- **El humo `desktop` media el registro de PC con un plazo fijo de 400 ms** y
+  cayo una vez en la CI de `main` (escape 23). Ahora espera hasta que la linea
+  se mueva, con tope dentro de su vida, y una mutacion la ve caer.
+- **`slash` fallo una vez con 16 pixeles en la vista normal** (suelo 20). La
+  sospecha es un animal paseando por delante del barrido; **la causa no esta
+  confirmada**. Ahora mide con `?fauna=0`, que quita solo el dibujo de los
+  animales (escape 24). Si vuelve a caer, la causa era otra.
+- **Dos cabeceras seguian contando a los animales como laminas**
+  (`sprite-depth.ts`, `body-ray.ts`), aunque son de bloques desde `a1168a7`
+  (escape 22). El escaner tiene una categoria nueva que lo habria visto.
+- Un comentario CSS huerfano de la regla `.slot .hint`, que se quito con los
+  iconos.
+- El README no contaba los equipables ni las armas, y `stations.test.ts` y el
+  humo seguian hablando de la ropa como antes.
+- El campo `wornWear` de la sonda `__verdant`, que no leia nadie.
+
+**Dejado a proposito:**
+- Los 18 avisos de terminos retirados, todos en secciones de historia.
+- `state.lastBroke`: el cliente no lo pinta (no hay avisos en pantalla), pero
+  lo leen los tests, como `lastBlocked`.
+
+**El alcance, dicho claro**: la fauna se audito con el escaner, buscando
+restos de los modelos sustituidos y releyendo las cabeceras de lo que esos
+modelos usaban. Sus comprobaciones ya se mutaron en sus rondas. Los
+equipables, ademas, linea a linea.
 
 ## Auditoria al cerrar la tanda 2 (2026-10-02)
 

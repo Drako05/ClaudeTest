@@ -391,7 +391,9 @@ su cabeza entrara en una pared, no gira.
     esta**, sin subirse a medias;
   - una cabeza que toca el borde de una pared a menos de medio bloque por
     encima de su base sube al animal entero, como cualquier escalon: es el
-    precio de que ninguna caja entre nunca en nada *(deduccion)*;
+    precio de que ninguna caja entre nunca en nada *(deduccion)*. *Luego*: el
+    autor lo vio el mismo dia y se ve mal; quiere que salten desde el punto
+    de impacto, y esta por hablar (`docs/pendiente.md`);
   - hasta el 2026-10-10 el terreno se media en el centro de los pies y cada
     parte miraba una heuristica de escalones hacia los pies.
 - **Inercia** (el autor, 2026-10-10): su avance arranca y frena en
@@ -435,7 +437,7 @@ Lo que eligio el autor, y como esta hecho (`movement.ts`, `walkAnimal`):
   entra en la pared. Como mucho **1 bloque** (`ANIMAL_BACKUP`, *deduccion*).
 - **Todos saltan un bloque** (`ANIMAL_JUMP_UP`), con la parabola del jugador.
   - Salta cuando el avance no progresa y, a lo largo de su rumbo, el suelo
-    sube mas de `STEP_UP` y no mas de un nivel, sin nada solido ni fuera de su
+    sube mas de `STEP_UP` y no mas de un bloque, sin nada solido ni fuera de su
     bioma antes del borde.
   - **En el aire avanza a su paso**, como el jugador (el autor, 2026-10-10:
     «usando las mismas físicas que el jugador»). Hasta entonces avanzaba lo
@@ -513,10 +515,10 @@ cinco casos de terreno: nada mal tapado ni mal visto.
   - el plano: su alto, los pies en el suelo, y que es `hit`;
   - la cabeza del bisonte se golpea y su cola no, y girado;
   - el choque en mundos hechos a mano: el pasillo, la pared al girar, el
-    escalon y la rampa, y la indulgencia al girar y al avanzar;
+    escalon y la escalera de medio bloque, y la indulgencia al girar y al avanzar;
   - que no se quedan clavados: de frente contra una pared retrocede y gira;
-    un escalon de un nivel lo saltan la liebre y el bisonte sin meter la
-    cabeza; un pilar, un charco y una pared de dos niveles se bordean.
+    un escalon de un bloque lo saltan la liebre y el bisonte sin meter la
+    cabeza; un pilar, un charco y una pared de dos bloques se bordean.
 - **`tests/body-ray.test.ts`**: el rayo contra la caja del cuerpo y contra el
   terreno, la verdad de la sonda.
 - **La pasada `fauna` del humo** afirma:

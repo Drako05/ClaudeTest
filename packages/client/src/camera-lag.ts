@@ -25,8 +25,8 @@
  * **Que sea exponencial es deduccion mia**: un retraso puro —la camara donde
  * estaban los ojos hace 0,1 s— daria el mismo salto del escalon, solo 0,1 s
  * despues. La exponencial lo convierte en una curva, y andando a ritmo
- * constante se queda exactamente 0,1 s por detras: la distancia es la
- * velocidad por el retraso.
+ * constante se queda ~0,1 s por detras: la distancia es la velocidad por el
+ * retraso (con fotogramas de 1/60 s, la cuenta discreta da 0,092 s).
  */
 export const CAMERA_LAG = 0.1;
 /** Lo que mueve el deslizador del panel de desarrollo. */

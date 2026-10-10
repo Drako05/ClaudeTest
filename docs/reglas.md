@@ -233,6 +233,11 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     1.16 de la derivacion, y ese decimo es justo el margen que el autor pidio
     para que subirse a un bloque no fuera al milimetro.
 
+    **Con la huella entera se alcanza mas**: el bloque a dos casillas a altura 2
+    ya se alcanza de un salto, de pie en su filo (`tests/jump.test.ts`). El
+    autor lo acepto (2026-10-10): «no hay problema en que se alcancen más
+    casillas siempre que se respeten las leyes físicas».
+
     **Los objetos entran en ese suelo por su caja** (decision del autor,
     2026-10-05, que extiende la de las estaciones del 2026-09-30: «fisicas como
     un bloque»). Cada objeto tiene **una** caja, la que se golpea (regla 12),
@@ -264,17 +269,18 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     el centro (`World.floorHeightAt`, retirado).
 
     **Los animales llevan la regla a sus partes** (2026-10-03, ver
-    `docs/fauna.md`). Sus pies, como el jugador: centro y `STEP_UP` contra el
+    `docs/fauna.md`). Sus pies, en el centro y con `STEP_UP` contra el
     terreno. Ademas, cada parte de su cuerpo que choca (`hit`), girada con su
-    rumbo, no puede solapar una casilla de agua, ni una columna de 0,5 que,
-    hacia sus pies, tenga un escalon de mas de `STEP_UP` cuya cima pase de la
-    base de la parte, ni la caja de un objeto cuyo techo pase de esa base
-    (`sim/body.ts`, *deduccion*). Un medio bloque no es escalon: se sube
-    andando. Se apoyan en las
-    cajas que tocan **sus partes mas bajas** —las patas; el caparazon del
-    cangrejo; el tronco de la gaviota— (*deduccion*). La decision del autor es
-    que choquen las cajas de sus partes; como se mide la altura contra ellas es
-    deduccion mia.
+    rumbo, no puede solapar una casilla de agua, y desde el 2026-10-10 **todas
+    sus cajas chocan siempre** (el autor): cada una mide su altura de reposo
+    (`partsRest`) —lo mas alto bajo ella, columnas de 0,5 y cajas de objetos,
+    menos lo que esa caja esta por encima de los pies—, el cuerpo reposa en el
+    maximo de todas, y una parte estorba si pide subir los pies mas de
+    `STEP_UP` andando o de nada en el aire (`sim/body.ts`). La decision del
+    autor es que choquen las cajas de sus partes; como se mide la altura
+    contra ellas es deduccion mia. Hasta la fase B de aquella tanda, cada parte
+    miraba una heuristica de escalones hacia los pies y se apoyaban solo en sus
+    partes mas bajas.
 
 22. **Donde se nace hay que ganarselo.** `findSpawn` miraba solo si el tile era
     solido, y eso basto mientras el relieve solo se veia. Con la altura

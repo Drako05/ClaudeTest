@@ -18,7 +18,7 @@ import { FP_EYE, OrbitCamera, PROJECTIONS } from '../packages/client/src/camera.
 const FRAME = 1 / 60;
 
 describe('La persecucion de los ojos', () => {
-  it('andando a ritmo constante va exactamente 0,1 s por detras', () => {
+  it('andando a ritmo constante va ~0,1 s por detras (0,092 a 60 Hz)', () => {
     const eyes = { x: 0, y: 0, z: 0 };
     const target = { x: 0, y: 0, z: 0 };
     const speed = 5.2;

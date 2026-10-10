@@ -29,11 +29,16 @@ que nadie toco es justo lo que ninguna tanda mira.
    zoom. Un nombre falso es documentacion falsa que ademas compila.
 5. Anade lo retirado a `retirados.md` para que el escaner lo vigile siempre.
 
-**Patrones conocidos**: el humo con alcance 2 cuando era 2,5 (`escapes.md` #1);
-el alcance 2,5 en cinco comentarios cuando ya era 3, porque nadie lo anadio a
-`retirados.md` al cambiarlo (#19); un test que comparaba con el grosor MEDIO de
-la picea negra, 0,22, cuando lo que afirma es «el tronco mas fino», 0,21 (#20):
-el numero se saca de donde vive, no se copia.
+**Patrones conocidos**:
+- **Numeros continuos contra ticks** (#27): un comentario que da la cuenta de
+  la formula (frenar de 5,2 a 0 en 0,1 s: 0,26 m) y un test que mide la del
+  juego, a 60 Hz (0,22). Se busca el mismo numero en el test y los documentos,
+  y vale el de los ticks.
+- el humo con alcance 2 cuando era 2,5 (`escapes.md` #1); el alcance 2,5 en
+  cinco comentarios cuando ya era 3, porque nadie lo anadio a `retirados.md`
+  al cambiarlo (#19); un test que comparaba con el grosor MEDIO de la picea
+  negra, 0,22, cuando lo que afirma es «el tronco mas fino», 0,21 (#20): el
+  numero se saca de donde vive, no se copia.
 
 ## B. Comprobaciones — ¿puede fallar?
 
@@ -123,6 +128,11 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
    con su motivo.
 
 **Patrones conocidos**: `#invPanel h2` pisaba a `.invPage h2` (#6).
+- **Un parametro que solo pasan los tests** (#26): al sustituir un modelo,
+  sus piezas auxiliares (`bodyBoxes(…, feetOnly)`, `footPartsOf`) siguen
+  exportadas porque un test las usa, y el escaner no las ve como muertas. Se
+  busca quien las llama **fuera de `tests/`**; si nadie, se van y el test
+  calcula lo suyo.
 
 ## E. Comentarios contra codigo — ¿dice verdad cada frase?
 
@@ -171,6 +181,13 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
 
 **Patrones conocidos**: `leyes.md` decia «el relieve no existe» semanas
 despues de existir.
+- **Al sustituir un modelo, su regla en `reglas.md`** (#26): la tanda pone
+  al dia el documento de su parte (`fauna.md`) y se olvida del texto de la
+  regla dura que lo enuncia. Se relee la regla en `reglas.md` y su enunciado
+  en `CLAUDE.md`.
+- **La tabla de leyes cita tests por su nombre** (#25): el escaner cruza la
+  columna «Prueba» con los `it`/`describe` (categoria 13); al renombrar un
+  test, se busca su nombre viejo en `docs/`.
 
 ## G. Logica de lo nuevo — ¿que pasa en los bordes?
 

@@ -312,6 +312,50 @@ Formato:
   quita solo su dibujo. Si vuelve a caer, la causa era otra.
 - **Donde vive ahora**: lente G, «algo nuevo que se mueve o tapa».
 
+### 25. La tabla de leyes citaba un test que no existia (2026-10-10)
+- **Que paso**: la fase 1 de los voxeles anoto en `docs/leyes.md` la prueba
+  «andando se sube como mucho medio bloque por tick», pero el test que lo
+  afirma se seguia llamando «no se cambia de nivel andando mas de lo que una
+  rampa permite», del tiempo de las rampas. Cuatro dias con la ley apuntando
+  a una prueba que nadie encontraba buscandola.
+- **Por que se escapo**: la categoria de nombres del escaner mira lo que va
+  entre comillas invertidas; los tests se citan entre comillas latinas.
+- **Que lo habria visto**: cruzar cada cita de la columna «Prueba» con los
+  nombres de `it`/`describe`.
+- **Donde vive ahora**: el escaner, categoria 13, con su fallo sembrado.
+
+### 26. Un modelo sustituido deja su parametro y su resumen (2026-10-10)
+- **Que paso**: la fase B de fisicas cambio el apoyo de los animales de «sus
+  partes mas bajas» (`partsFloor`) a «todas sus cajas» (`partsRest`), y
+  retiro `partsFloor`. Pero se quedaron vivos `bodyBoxes(…, feetOnly)` y
+  `footPartsOf`, que ya solo usaban dos tests; la fila de `docs/juicio.md`
+  que preguntaba por el modelo viejo; y el parrafo de los animales en la
+  regla 21 de `docs/reglas.md`, que seguia contando la heuristica de
+  escalones y el apoyo en las partes mas bajas. `docs/fauna.md`, el
+  documento de la parte, si estaba al dia.
+- **Por que se escapo**: el escaner da los exports sin uso, no los
+  parametros que solo pasan los tests; y la tanda actualizo el documento de
+  su parte, no el resumen de la regla en `reglas.md`.
+- **Que lo habria visto**: al sustituir un modelo, buscar los nombres de
+  **todo lo que lo servia** (su funcion auxiliar, su parametro), no solo el
+  suyo, y contar quien los llama fuera de `tests/`; y releer la regla dura
+  que lo enuncia, en `reglas.md` y en `CLAUDE.md`.
+- **Donde vive ahora**: lente D, «un parametro que solo pasan los tests»;
+  lente F, «al sustituir un modelo, su regla en `reglas.md`».
+
+### 27. Un numero continuo en un mundo de ticks (2026-10-10)
+- **Que paso**: `INERTIA_TIME` decia que al soltar se resbalan 0,26 m, y
+  `reglas.md` y su test, 0,22. Las dos cuentas eran buenas: 0,26 es la
+  frenada continua (v²/2a) y 0,22 la de seis ticks a 60 Hz, que es la que
+  hace el juego. Lo mismo con la camara, «exactamente 0,1 s por detras»,
+  que a 60 Hz son 0,092 (y el test ya lo toleraba).
+- **Por que se escapo**: el comentario se escribio con la formula y el test
+  con la simulacion, y nadie cruzo los dos numeros.
+- **Que lo habria visto**: lente A: para cada numero derivado de un comentario,
+  buscar el mismo en el test y en los documentos; si difieren, ver cual es el
+  de los ticks.
+- **Donde vive ahora**: lente A, «numeros continuos contra ticks».
+
 ---
 
 ## Del proceso del agente
