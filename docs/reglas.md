@@ -1,12 +1,108 @@
-# Las reglas largas, enteras
+# Las reglas duras, enteras
 
-El texto entero de las reglas 12, 21 y 22 de `CLAUDE.md`, con sus medidas, su
-historia y lo que decidio el autor. `CLAUDE.md` lleva un resumen de cada una
-con el mismo numero, que es el que cita el codigo.
+El texto entero de **todas** las reglas duras de `CLAUDE.md`, con sus medidas,
+su historia y lo que decidio el autor. `CLAUDE.md` lleva solo el enunciado de
+cada una, con el mismo numero, que es el que cita el codigo: **lo que cambie
+aqui se revisa alli, y al reves.**
 
-Estaba en `CLAUDE.md` hasta el 2026-10-02 y se mudo aqui **literal** (propuesta 3:
+Las 12, 21 y 22 estaban en `CLAUDE.md` hasta el 2026-10-02 y se mudaron aqui **literal** (propuesta 3:
 `CLAUDE.md` se carga entero en cada turno, asi que lleva solo lo operativo y
 un indice de estos documentos).
+
+## Las demas reglas duras, enteras
+
+Estaba en `CLAUDE.md` hasta el 2026-10-10 y se mudo aqui **literal**: `CLAUDE.md`
+se carga en cada llamada, asi que alli queda solo el enunciado.
+
+1. **`packages/sim` jamas toca el navegador.** Sin DOM, canvas, WebGL, three.js ni
+   `Math.random`. El mismo modulo debe correr en Node (servidor autoritativo,
+   tests) y en el navegador. `tests/purity.test.ts` lo verifica.
+2. **Toda aleatoriedad viene de una semilla explicita.** Usa `mulberry32` o
+   `hash2D` de `packages/sim/src/rng.ts`.
+3. **La generacion del mundo es pura.** `generateChunk(gen, cx, cy)` no puede
+   depender del orden en que se llame ni de estado previo. Un chunk se descarta y
+   se regenera constantemente.
+4. **Las mutaciones van al overlay** de `World.setFeature`, nunca escribiendo el
+   array del chunk directamente: el chunk es cache desechable. Lo que hay en un
+   tile es `override ?? potencial`, y esa es la **unica fuente de verdad**: la
+   usan por igual el dibujo, la colision y la recoleccion. Que el renderer leyera
+   el potencial crudo por su cuenta fue justo el bug de las plantas que no
+   desaparecian al recolectarlas.
+5. **El input produce `Intent`; nunca muta el estado.** Es lo que permitira
+   enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
+   fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
+   nucleo. La mirada tambien viaja ahi (`aimX`/`aimY`, y `aimZ` para su
+   inclinacion), y es **la de la camara**, decision del autor: cada tick sale de
+   `camera.forward()` y `camera.lookPitch`, que son **la misma en las tres
+   vistas**, y el nucleo la usa **tal cual, sin encajarla en ocho
+   direcciones**: inclina el sector del golpe (regla 12). Se acciona hacia donde se mira; y
+   como el movimiento tambien se rota con la camara antes de entrar en la
+   Intent, la Intent sigue siendo de mundo y puede viajar por red.
+
+   **`moveX`/`moveY` son DIRECCION, no velocidad.** Su magnitud no dice nada. Lo
+   cambio el autor al pedir la carrera: el joystick hacia de acelerador —cuanto
+   mas desplazado, mas rapido— y eso se sustituyo por dos velocidades discretas
+   que elige `run`. Un mando analogico apunta; no dosifica. La zona muerta se
+   queda, pero vive en el cliente: el nucleo solo ve direcciones.
+6. *(Retirada con el isometrico: la vista isometrica girable. Ver
+   `docs/isometrico.md`.)*
+7. *(Retirada con el isometrico: la capa ordenada por profundidad. Ver
+   `docs/isometrico.md`.)*
+8. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
+   interpolacion para el render es cosa del cliente.
+9. **Lo unico que detiene el paso es el agua.** La roca estuvo en
+   `isTerrainSolid` y eso convertia el bioma de montana entero en un muro contra
+   el que se chocaba; de paso explicaba que no tuviera nada dentro. Si algo tiene
+   que estorbar, que sea una feature, no el terreno.
+10. **El bioma es del tile, no del chunk.** La contabilidad de vida va por
+   `(chunk, bioma, tipo)` y `World.biomeAt` devuelve el bioma del suelo que se
+   pisa. Etiquetar el chunk entero con su terreno predominante hacia que el panel
+   anunciara «Bosque» estando en pradera y que dos especies distintas compartieran
+   referente. Un brote solo puede salir en un tile de su propio bioma.
+11. **Un paso de vida lee estado congelado y escribe en otro.** La colonizacion
+    mira si hay vida cerca en `ChunkRecord.live`, que es la foto del inicio del
+    paso, nunca los vecinos en curso. Leyendo el estado vivo, que un chunk
+    arrasado reviviera dependia del orden en que se generaron los chunks —es
+    decir, de por donde paseo el jugador—, y eso rompe la ley del observador sin
+    que ningun test evidente lo delate.
+13. **El relieve sale de la misma elevacion que el terreno, en voxeles de 0,5**
+    (decision del autor, 2026-10-06). Cada columna de 0,5 × 0,5 tiene su altura
+    en medios bloques (`heightFrom`, 0,03 de elevacion cada uno: el 0,06 del
+    autor partido en dos), interpolando el relieve entre las esquinas de su
+    casilla; lo que es agua lo decide la casilla, el mismo `e < 0.42` de
+    siempre, asi que `terrainAt` no cambia y los umbrales de bioma siguen
+    calibrados. El bioma, la vida y los objetos siguen por casilla de 1. Si
+    mueves el nivel del mar sin mover el umbral de agua,
+    `tests/relief.test.ts` te avisa.
+14. **La altura y los muros son dos mecanismos distintos.** Las **cordilleras**
+    amplifican el desnivel sobre el nivel del mar, y de ahi salen la altitud y
+    las laderas escalonadas; los **salientes** levantan +3 de golpe y de ahi
+    salen las mesetas. Con voxeles de 0,5, la ladera de una cordillera sale en
+    paredes de un bloque, que se saltan, y las paredes de dos o mas solo las dan
+    los salientes (medido, 2026-10-06). Los salientes se pagan en conectividad, y
+    su densidad esta calibrada, no elegida. Antes de tocar `OUTCROP_THRESHOLD`,
+    `RIDGE_GAIN` o sus escalas, vuelve a medir con
+    `npx vite-node tools/analyze-world.ts` y mira la **linea base solo-agua**: el
+    mundo plano tampoco es del todo conexo, y comparar contra el 100 % hace pasar
+    por sano un relieve que no lo es. El presupuesto acordado es un punto.
+15. *(Retirada con los voxeles, 2026-10-06: la rampa. El autor elimino las
+    rampas; el relieve sube a escalones de medio bloque, que se suben andando.
+    Ver `docs/relieve.md`.)*
+16-20. *(Retiradas con el isometrico: el orden por antidiagonales, el recorte
+    por bloques, la silueta del jugador, la fila de su casilla y el filo de los
+    escalones. Ver `docs/isometrico.md`.)*
+23. **Cualquier medida de conectividad tiene que obedecer la fisica.** El
+    recorrido de `debug.reachableArea` inundaba mirando solo los solidos, y
+    desde que una pared detiene el paso eso dejo de medir lo que el jugador
+    recorre. Sus cifras de antes y las de ahora **no son comparables**.
+    `tools/analyze-world.ts` ya lo hacia bien —mide con «se sube un bloque de un
+    salto»—, asi que la calibracion de la regla 14 estaba hecha para esta fisica
+    y aguanta. Desde los voxeles (2026-10-06) las tres medidas van **por
+    columnas de 0,5**: medio bloque andando, uno de un salto (`canClimbTo`). El
+    relieve cuesta 0,14-0,76 puntos sobre la linea base solo-agua, lo mismo que
+    antes, por debajo del punto acordado.
+
+## Las reglas 12, 21 y 22
 
 12. **El golpe es un SECTOR PLANO que sale de los ojos y cuenta solo si toca
     un hitbox** (`sim/aim.ts`), decision del autor del 2026-09-28: **3

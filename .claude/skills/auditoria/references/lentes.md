@@ -158,7 +158,7 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
    cuente: `CLAUDE.md` y el documento de su parte en `docs/` (el indice de
    `CLAUDE.md` dice cual), `README.md`, `docs/pendiente.md`, `docs/juicio.md`, `docs/leyes.md`,
    `docs/isometrico.md` y la ayuda del HTML. Deben decir lo mismo. Ojo con los
-   **resumenes**: las reglas 12, 21 y 22 estan resumidas en `CLAUDE.md` y
+   **resumenes**: las reglas duras estan enunciadas en `CLAUDE.md` y
    enteras en `docs/reglas.md`, asi que lo que cambie en una cambia en las dos.
 2. `docs/juicio.md`, «Esperando tu juicio»: cada fila **sigue existiendo en
    el juego**. Una deduccion sobre un boton que ya no existe no espera el
