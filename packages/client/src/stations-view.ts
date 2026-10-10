@@ -29,6 +29,7 @@ import {
   type Material,
   type Texture,
 } from 'three';
+import { now } from './clock.js';
 import { Feature, Station, stationOfFeature } from '@verdant/shared';
 import { GRAVITY, hash2DFloat, STATION_BOXES, type Placed, type World } from '@verdant/sim';
 import { STATION_FACES } from './palette.js';
@@ -241,7 +242,7 @@ export class StationSet {
   drop(placed: Placed, world: World): void {
     const ground = world.groundHeightAt(placed.x + 0.5, placed.y + 0.5);
     if (placed.z <= ground + 0.01) return;
-    this.falling.set(`${placed.x},${placed.y}`, { from: placed.z, ground, since: performance.now(), mesh: null });
+    this.falling.set(`${placed.x},${placed.y}`, { from: placed.z, ground, since: now(), mesh: null });
     this.drops++;
   }
 

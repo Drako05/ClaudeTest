@@ -94,8 +94,10 @@ import {
   stoneOreSpot,
 } from './probes.js';
 import { skyTint, tintCss } from './sky.js';
+import * as clock from './clock.js';
 import {
   faunaShownFromLocation,
+  manualClockFromLocation,
   onlySlashFromLocation,
   randomSeed,
   seedFromLocation,
@@ -679,7 +681,10 @@ function restart(): void {
 
 // --------------------------------------------------------------- bucle
 
-let last = performance.now();
+/** Con `?reloj=manual` el bucle no corre solo: lo avanza la prueba (`clock.ts`). */
+const manualClock = manualClockFromLocation();
+if (manualClock) clock.startManualClock();
+let last = clock.now();
 let accumulator = 0;
 let fpsFrames = 0;
 let fpsWindow = 0;
@@ -732,7 +737,13 @@ let gathered = 0;
 /** Animales muertos en esta partida. Para la prueba de humo. */
 let animalsKilled = 0;
 
-function frame(now: number): void {
+/**
+ * Un frame del bucle, en el instante `now` (ms). Lo llama el navegador por
+ * `requestAnimationFrame`, o la prueba con el reloj manual (`window.__reloj`),
+ * que avanza sin dibujar: `draw` decide si se manda la escena a la GPU, que sin
+ * ella es lo que cuesta.
+ */
+function runFrame(now: number, draw: boolean): void {
   const raw = (now - last) / 1000;
   last = now;
   // El peor frame se mide SIN recortar: recortarlo ocultaria justo el tiron.
@@ -1004,7 +1015,7 @@ function frame(now: number): void {
   syncChunks();
   // Despues de redibujar los chunks: la caja recien puesta nace en su suelo y
   // la caida la sube a donde va.
-  stations.animate(performance.now());
+  stations.animate(clock.now());
   overlays.updateReticle(state);
   overlays.syncDebug(
     state.world,
@@ -1055,7 +1066,7 @@ function frame(now: number): void {
     // colision deja la camara pegada al personaje, que llenaria la pantalla.
     player.visible = camera.projection !== 'primera' && camera.camDistance >= HIDE_PLAYER_BELOW;
   }
-  renderer.render(scene, camera.active);
+  if (draw) renderer.render(scene, camera.active);
 
   // Muerto, el cursor se suelta para poder pulsar «Reiniciar»; el aviso de
   // pausa no se pinta encima de esa pantalla.
@@ -1081,11 +1092,36 @@ function frame(now: number): void {
       state.world.biomeAt(Math.floor(px), Math.floor(py)),
     );
   }
+}
 
+function frame(now: number): void {
+  runFrame(now, true);
   requestAnimationFrame(frame);
 }
 
-requestAnimationFrame(frame);
+if (manualClock) {
+  // El bucle de las pruebas: solo corre cuando se le pide. Con `hz` 60 cada
+  // frame lleva un tick, como un jugador a 60 Hz; la pasada de 144 Hz pide 144.
+  Object.defineProperty(window, '__reloj', {
+    value: {
+      /** Avanza `ms` de juego en frames de `1/hz` s, sin dibujar. Devuelve el tick. */
+      avanzar(ms: number, { hz = 60 }: { hz?: number } = {}): number {
+        const frames = Math.round((ms * hz) / 1000);
+        for (let i = 0; i < frames; i++) {
+          clock.advanceManualClock(1000 / hz);
+          runFrame(clock.now(), false);
+        }
+        return state.tick;
+      },
+      /** Dibuja la escena tal como esta, para una captura. */
+      dibujar(): void {
+        renderer.render(scene, camera.active);
+      },
+    },
+  });
+} else {
+  requestAnimationFrame(frame);
+}
 
 /**
  * Estado legible desde fuera, para la prueba de humo y las medidas: permite a
