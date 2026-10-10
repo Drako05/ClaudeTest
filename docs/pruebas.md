@@ -137,8 +137,12 @@ sin medirlas; las puertas son las mismas, aplicadas a lo medido. Una parte que
 no existe sale en rojo, y una pedida que no llega a medirse, tambien («sin
 medida»). Lo que cambia: cada vista se mide antes en el tiempo del juego que
 de una pieza, y sin los golpes de las vistas de antes. Las mutaciones del
-barrido piden la parte que vigila lo que rompen (`slash:normal` el recorte por
-frustum, `slash:baja` el ancho de la cinta). La preparacion —Node, dependencias y Chromium con su
+barrido piden la parte que vigila lo que rompen, **medida, no supuesta**: el
+recorte por frustum lo cazan la camara baja, la primera persona y la estocada
+—con `slash` entero cayeron esas tres a 0 y la vista normal paso (CI,
+2026-10-10)—, asi que va con `slash:baja`, como el ancho de la cinta. Con
+`slash:normal` no cayo. Lo que dice el codigo de la vista normal («lo que vigila
+es el recorte por frustum») no casa con eso: esta en `docs/juicio.md`. La preparacion —Node, dependencias y Chromium con su
 cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
 tandas. Cada pasada se lanza por el prefijo de su nombre
 (`node tools/smoke.mjs life`). **Si anades una pasada al humo, anadela a la

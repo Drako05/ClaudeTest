@@ -18,6 +18,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
+| Pruebas: **la vista normal de `slash` no caza el recorte por frustum**, aunque su puerta propia (`MIN_NORMAL`, 5) se puso para eso. Con la mutacion puesta cayeron a 0 la camara baja, la primera persona y la estocada, y la normal paso (CI, 2026-10-10). Esa puerta queda sin nada medido que la justifique; no la toco sin que lo digas | `docs/pruebas.md`, `slash` partido; `tools/slash.mjs`, las puertas | una puerta |
 | **CHOQUE DE DOS DECISIONES TUYAS**: con el terreno pisado con la huella entera (2026-10-10), **el bloque a dos casillas a altura 2 ya se alcanza** de un salto: el borde delantero del cuerpo llega a su cara con los pies a +1,13 y se queda de pie en su filo. Tu enunciado del salto (2026-09-28) decia que no. O se acepta, o se recalibra el salto (`GRAVITY`, `JUMP_SPEED`, que son deduccion mia) | `docs/reglas.md`, regla 21; `tests/jump.test.ts` | dos numeros |
 | Fisicas, animales: **el reposo por cajas**: el cuerpo reposa en el maximo, sobre cada caja, de lo mas alto bajo ella menos su altura sobre los pies; consecuencia rara, **una cabeza que toca el borde de una pared a menos de medio bloque sobre su base sube al animal entero**, como un escalon | `docs/fauna.md`, el cuerpo y el terreno | la formula de `partsRest` |
 | Fisicas: si algo crece bajo un cuerpo y asoma mas de lo que se sube, **se queda donde esta**, sin subirse a medias apoyado en otra cosa | `docs/reglas.md`, regla 21 | una linea en `footing` |
