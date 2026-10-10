@@ -51,8 +51,15 @@ const BOX = { x0: 320, y0: 120, x1: 960, y1: 520 };
  */
 const FULL_WIDTH = { x0: 0, y0: 60, x1: 1280, y1: 540 };
 
-/** Cuanto tiene que subir un canal para contar como aclarado por el efecto. */
+/**
+ * Cuanto tiene que subir un canal para contar como aclarado por el efecto: 12,
+ * o la mitad de lo que le queda hasta 255 si le queda menos (y al menos 1).
+ * Sobre el cielo el azul ya va por 240 y no puede subir 12: con el trazo
+ * translucido subia 10, y la camara baja contaba 0 con el barrido a la vista
+ * (tanda de fisicas, 2026-10-10, mirando arriba en un claro).
+ */
 const LIFT = 12;
+const rose = (before, after) => after - before >= Math.max(1, Math.min(LIFT, (255 - before) / 2));
 
 const file = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
 const html = await readFile(file);
@@ -244,7 +251,10 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
   // CI (2026-10-06, en 13.9, 11.2), y el build de `main` daba lo mismo alli.
   const turns = view === 'camara baja' ? 1 : 4;
   const keepBest = view === 'normal';
-  const box = view === 'primera persona' ? FULL_WIDTH : BOX;
+  // La camara baja, tambien: mirando arriba la colision la deja a un palmo de
+  // los ojos (0,84 en un claro, tanda de fisicas), casi en primera persona, y
+  // la caja central pillaba el trazo en una captura de ocho, o en ninguna.
+  const box = view === 'primera persona' || view === 'camara baja' ? FULL_WIDTH : BOX;
   let worst = null;
   let noise = 0;
   let sent = 0;
@@ -456,11 +466,8 @@ function brightened(reference, shot, box = BOX) {
   for (let y = box.y0; y < box.y1; y++) {
     for (let x = box.x0; x < box.x1; x++) {
       const i = (y * width + x) * 4;
-      if (
-        shot.data[i] - reference.data[i] >= LIFT &&
-        shot.data[i + 1] - reference.data[i + 1] >= LIFT &&
-        shot.data[i + 2] - reference.data[i + 2] >= LIFT
-      ) n++;
+      if (rose(reference.data[i], shot.data[i]) && rose(reference.data[i + 1], shot.data[i + 1]) &&
+        rose(reference.data[i + 2], shot.data[i + 2])) n++;
     }
   }
   return n;

@@ -107,8 +107,13 @@ canto, 12 pixeles en cualquier rumbo libre. Los ~190 y 9.001 de antes salian de
 rumbos con la camara metida en la cabeza por la colision, que dan eso o 0 segun
 el instante; lo que vigila es el recorte por frustum, que da 0 en todos. Y se
 mide **en un claro**, con la camara libre en los cuatro rumbos: el paseo acaba
-donde lo deja la velocidad de la maquina, y entre arboles la camara baja dio 0),
-todas a la vez; y un trabajo final, «CI completa», que solo sale
+donde lo deja la velocidad de la maquina, y entre arboles la camara baja dio 0.
+Y un canal cuenta como aclarado si sube 12 **o la mitad de lo que le queda
+hasta 255**: sobre el cielo el azul ya va por 240, el trazo translucido lo
+subia 10, y la camara baja daba 0 con el barrido a la vista. La camara baja
+mide ademas el ancho entero, como la primera persona: mirando arriba la colision
+la deja a 0,84 de los ojos, y la caja central pillaba el trazo en una captura
+de ocho o en ninguna), todas a la vez; y un trabajo final, «CI completa», que solo sale
 verde si todo lo esta. La preparacion —Node, dependencias y Chromium con su
 cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
 tandas. Cada pasada se lanza por el prefijo de su nombre
