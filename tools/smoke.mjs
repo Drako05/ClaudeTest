@@ -68,11 +68,74 @@ function spots(page) {
   return page.evaluate(() => window.__verdant.spots());
 }
 
+// ------------------------------------------------------------------ el reloj
+//
+// Las pasadas migradas abren el juego con `?reloj=manual` (`clock.ts`): el
+// bucle no corre solo, y la prueba lo avanza frame a frame sin dibujar
+// (`window.__reloj`). Sin GPU el headless dibuja a ~5 FPS, y esperar en tiempo
+// real tardaba lo que tardaba y daba lo que daba la maquina: el paseo acababa
+// donde lo dejaba su velocidad. Con el reloj manual cada frame lleva un tick,
+// como un jugador a 60 Hz, y el resultado es el mismo en cualquier maquina.
+//
+// Los ayudantes de abajo valen para los dos relojes, asi que una pasada se
+// migra anadiendola a `MANUAL_PASSES` y cambiando sus esperas AL JUEGO
+// (`page.waitForTimeout`) por `elapse`. Las esperas a la interfaz con reloj de
+// verdad —destellos, gestos, la pausa— se quedan como estan.
+
+/** Las pasadas que van con el reloj manual. `desktop` se queda con el de verdad a proposito: alguna tiene que probar el bucle real. */
+const MANUAL_PASSES = new Set([
+  'lifePass', 'reliefPass', 'faunaPass', 'devToolsPass', 'stationsPass', 'resourcesPass', 'highRefreshPass',
+]);
+/** Si la pasada en curso va con el reloj manual; lo pone el bucle de pasadas. */
+let manualPass = false;
+
+/** Si esta pagina va con el reloj manual. */
+const manual = (page) => page.url().includes('reloj=manual');
+
+/**
+ * Deja correr el juego `ms` milisegundos: con el reloj manual lo avanza en
+ * frames de `1/hz` s (sin dibujar, que es lo que cuesta), y con el de verdad
+ * espera.
+ */
+async function elapse(page, ms, hz = 60) {
+  if (manual(page)) return page.evaluate(([m, h]) => window.__reloj.avanzar(m, { hz: h }), [ms, hz]);
+  await page.waitForTimeout(ms);
+}
+
+/**
+ * Espera a que `fn` (evaluada en la pagina) sea cierta, como `waitForFunction`.
+ * Con el reloj manual avanza el juego de 100 en 100 ms mientras tanto, hasta
+ * `timeout` ms DE JUEGO; si no llega, lanza como lo haria `waitForFunction`.
+ */
+async function until(page, fn, arg, { timeout = 30000 } = {}) {
+  if (!manual(page)) return page.waitForFunction(fn, arg, { timeout });
+  for (let t = 0; ; t += 100) {
+    if (await page.evaluate(fn, arg)) return;
+    if (t >= timeout) throw new Error(`until: no se cumplio en ${timeout} ms de juego: ${fn}`);
+    await elapse(page, 100);
+  }
+}
+
+/** Una captura a fichero. Con el reloj manual, dibuja antes: sin bucle no hay fotograma. */
+async function shot(page, name) {
+  if (manual(page)) await page.evaluate(() => window.__reloj.dibujar());
+  await page.screenshot({ path: join(SHOTS, name) });
+}
+
 /**
  * Espera a que el bucle haya corrido de verdad, no solo a que cargue: se mide el
  * AVANCE del reloj, que un mundo puede nacer ya entrado en la manana.
  */
 async function waitForLoop(page, ticks = 90) {
+  if (manual(page)) {
+    // Con dos frames de margen: un frame con el juego en pausa no corre tick.
+    const before = (await state(page)).tick;
+    const after = await elapse(page, ((ticks + 2) * 1000) / 60);
+    // Una comprobacion y no un error: un reloj manual que no avanza el juego
+    // tiene que salir como FALLO, que es lo que la ronda de mutaciones busca.
+    check(after - before > ticks, `el bucle no avanzo: ${before} -> ${after} en ${ticks + 2} frames (¿en pausa?)`);
+    return state(page);
+  }
   await page.evaluate(() => delete window.__smokeBaseTick);
   await page.waitForFunction(
     (n) => {
@@ -99,7 +162,8 @@ const VIEW = '&view=perspectiva';
 
 async function open(page, baseUrl, query) {
   const view = (query ?? '').includes('view=') ? '' : VIEW;
-  await page.goto(`${baseUrl}/?seed=${SEED}${query ?? ''}${view}`, { waitUntil: 'load' });
+  const clockMode = manualPass ? '&reloj=manual' : '';
+  await page.goto(`${baseUrl}/?seed=${SEED}${query ?? ''}${view}${clockMode}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
   await play(page);
   return waitForLoop(page);
@@ -162,7 +226,7 @@ async function useClick(page) {
 async function toHand(page, item) {
   const slot = (await state(page)).slots.findIndex((s) => s.item === item);
   if (slot >= 0 && slot < 4) await page.keyboard.press(`Digit${slot + 1}`);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   return slot;
 }
 
@@ -179,7 +243,7 @@ async function freeCursor(page) {
 
 async function unfree(page) {
   await page.keyboard.press('F3');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   await play(page);
 }
 
@@ -205,7 +269,7 @@ async function look(page, dx, dy) {
 
 async function hold(page, key, ms) {
   await page.keyboard.down(key);
-  await page.waitForTimeout(ms);
+  await elapse(page, ms);
   await page.keyboard.up(key);
 }
 
@@ -263,7 +327,7 @@ async function harvestUntil(page, done, rounds = 8) {
   for (let round = 0; round < rounds && !done(now); round++) {
     for (let i = 0; i < 3; i++) {
       await strike(page);
-      await page.waitForTimeout(260);
+      await elapse(page, 260);
     }
     now = await waitForLoop(page, 20);
     if (done(now)) break;
@@ -1134,7 +1198,7 @@ async function resourcesPass(browser, baseUrl) {
     // Comer es usar la baya en la mano: clic derecho (decision del autor).
     await toHand(page, 2);
     await useClick(page);
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
     const fed = await state(page);
     console.log(`  comer: bayas ${withBerries.inventory[2]} -> ${fed.inventory[2]}, hambre ${withBerries.hunger.toFixed(2)} -> ${fed.hunger.toFixed(2)}`);
     check(fed.sent.use > withBerries.sent.use, 'el clic derecho no llego a la Intent');
@@ -1156,16 +1220,16 @@ async function resourcesPass(browser, baseUrl) {
     // hacia abajo, justo lo que da la camara de arranque; se baja algo mas para
     // sembrar con margen. Bajar el raton baja la mirada.
     await look(page, 0, 120);
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
     // Sembrar es usar la semilla en la mano: clic derecho. F ya no hace nada.
     const beforeF = await state(page);
     await page.keyboard.press('KeyF');
-    await page.waitForTimeout(250);
+    await elapse(page, 250);
     check((await state(page)).sent.use === beforeF.sent.use, 'la tecla F sigue haciendo algo');
     await toHand(page, seeded.inventory[3] > 0 ? 3 : 4);
     for (let i = 0; i < 8; i++) {
       await useClick(page);
-      await page.waitForTimeout(250);
+      await elapse(page, 250);
       planted = await state(page);
       if (seeds === 0 || planted.inventory[3] + planted.inventory[4] < seeds) break;
       // A otra casilla: girar la camara cambia la apuntada.
@@ -1193,14 +1257,14 @@ async function resourcesPass(browser, baseUrl) {
     // A mano, un mineral no da nada, y sin aviso: el autor quito todos los
     // avisos en pantalla (2026-09-29).
     await strike(page);
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
     const byHand = await state(page);
     check(ores(byHand) === 0, 'un mineral se saco a mano');
     check((await page.locator('#toast').count()) === 0, 'sigue habiendo avisos en pantalla');
     // Fabricar el pico de piedra desde el panel.
     await page.click('[data-kit="piedra"]');
     await page.keyboard.press('KeyE');
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
     // Arrastrar mueve: la rama de la casilla 1 a la 6.
     const center = async (sel) => {
       const r = await page.locator(sel).boundingBox();
@@ -1211,7 +1275,7 @@ async function resourcesPass(browser, baseUrl) {
       await page.mouse.down();
       await page.mouse.move(to.x, to.y, { steps });
       await page.mouse.up();
-      await page.waitForTimeout(300);
+      await elapse(page, 300);
     };
     const kit = await state(page);
     await drag(await center('#invGrid .slot:nth-child(1)'), await center('#invGrid .slot:nth-child(6)'));
@@ -1228,14 +1292,14 @@ async function resourcesPass(browser, baseUrl) {
     const at = await center(pickRow);
     await page.mouse.move(at.x, at.y);
     await page.mouse.down();
-    await page.waitForTimeout(500);
+    await elapse(page, 500);
     await page.mouse.up();
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
     check((await state(page)).itemsSent.craft === beforeCraft.itemsSent.craft, 'soltar antes de 1,5 s fabrico');
     await page.mouse.down();
-    await page.waitForTimeout(1900);
+    await elapse(page, 1900);
     await page.mouse.up();
-    await page.waitForTimeout(400);
+    await elapse(page, 400);
     const made = await state(page);
     const pickSlot = made.slots.findIndex((s) => s.item === 11);
     console.log(`  pico fabricado en la casilla ${pickSlot + 1}; registro ${JSON.stringify(made.feed)}`);
@@ -1259,13 +1323,13 @@ async function resourcesPass(browser, baseUrl) {
     check(asked.discardAsk && (await page.isVisible('#discardAsk')), 'soltar fuera del panel no pidio confirmacion');
     check(asked.inventory[1] > 0 && asked.itemsSent.discard === made.itemsSent.discard, 'se tiro antes de confirmar');
     await page.click('#discardNo');
-    await page.waitForTimeout(250);
+    await elapse(page, 250);
     const kept = await state(page);
     check(!kept.discardAsk && kept.inventory[1] > 0 && kept.itemsSent.discard === made.itemsSent.discard, 'cancelar tiro la piedra');
     await drag(stoneFrom, { x: 30, y: 30 });
     console.log(`  confirmar al tirar: «${await page.textContent('#discardText')}»`);
     await page.click('#discardYes');
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
     const thrown = await state(page);
     check(thrown.itemsSent.discard > made.itemsSent.discard && thrown.inventory[1] === 0, 'confirmar no tiro la piedra');
     // Con el inventario abierto, de la rejilla a la barra de la mano: el pico,
@@ -1275,19 +1339,19 @@ async function resourcesPass(browser, baseUrl) {
       const toBar = await state(page);
       check(toBar.slots[3].item === 11, `arrastrar a la barra no movio el pico: ${JSON.stringify(toBar.slots.slice(0, 4))}`);
     }
-    await page.screenshot({ path: join(SHOTS, '3d-03b-inventario-fabricar.png') });
+    await shot(page, '3d-03b-inventario-fabricar.png');
     await page.keyboard.press('KeyE');
-    await page.waitForTimeout(200);
+    await elapse(page, 200);
     await toHand(page, 11);
     // Con el pico, golpe a golpe: el hierro pide uno mejor, lo demas sale.
     const iron = mineral.kind.includes('hierro');
     let mined = await state(page);
     for (let i = 0; i < 10 && ores(mined) === 0; i++) {
       await strike(page);
-      await page.waitForTimeout(260);
+      await elapse(page, 260);
       mined = await state(page);
     }
-    await page.screenshot({ path: join(SHOTS, '3d-03-montana.png') });
+    await shot(page, '3d-03-montana.png');
     const pickNow = mined.slots.findIndex((s) => s.item === 11);
     console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickNow]?.wear}, esquirlas ${mined.chipsDrawn}`);
     check(mined.chipsDrawn > 0, 'golpear sin romper no solto esquirlas');
@@ -1325,7 +1389,7 @@ async function stationsPass(browser, baseUrl) {
   // Y la carne cruda, para asarla en el horno (fauna, primera tanda).
   await page.click('[data-kit="cocina"]');
   await page.keyboard.press('F3');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   await play(page);
   const kit = await state(page);
   check(kit.inventory[0] >= 12 && kit.inventory[7] >= 10, `«Materiales de metal» no dio lo suyo: ${JSON.stringify(kit.inventory)}`);
@@ -1339,7 +1403,7 @@ async function stationsPass(browser, baseUrl) {
     await page.mouse.down();
     await page.mouse.move(to.x, to.y, { steps: 8 });
     await page.mouse.up();
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
   };
   const tabs = () => page.evaluate(() => Array.from(document.querySelectorAll('#recipeTabs .slot:not(.off)')).map((t) => t.textContent));
   const category = (name) =>
@@ -1349,9 +1413,9 @@ async function stationsPass(browser, baseUrl) {
     const at = await center(`#recipeList .recipe:nth-child(${n}) .result`);
     await page.mouse.move(at.x, at.y);
     await page.mouse.down();
-    await page.waitForTimeout(1900);
+    await elapse(page, 1900);
     await page.mouse.up();
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
   };
   /** A la cuarta casilla de la barra y a la mano, si no estaba en la barra. */
   const toBar = async (item) => {
@@ -1361,7 +1425,7 @@ async function stationsPass(browser, baseUrl) {
 
   // Con E, las recetas de mano: mesa y horno, sin fundir ni ropa.
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const handTabs = await tabs();
   // El panel de PC mide siempre lo mismo, haya las recetas que haya (pedido del
   // autor, 2026-10-02): se compara con E, con el horno y con la mesa.
@@ -1381,7 +1445,7 @@ async function stationsPass(browser, baseUrl) {
   check(built.inventory[18] === 1 && built.inventory[19] === 1, `no se fabricaron la mesa y el horno: ${JSON.stringify(built.inventory)}`);
   await toBar(18);
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   await play(page);
 
   // Mirando a lo largo de un eje, para que la mesa y el horno caigan en las
@@ -1395,19 +1459,19 @@ async function stationsPass(browser, baseUrl) {
   const a0 = await angle();
   const axis = Math.round(a0 / (Math.PI / 2)) * (Math.PI / 2);
   await look(page, wrap(axis - a0) / 0.0025, 0);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   // El signo del raton frente al angulo no importa: si giro al reves, se deshace.
   if (Math.abs(wrap((await angle()) - axis)) > 0.05) await look(page, (-2 * wrap(axis - a0)) / 0.0025, 0);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   check(Math.abs(wrap((await angle()) - axis)) < 0.05, 'no se pudo encarar la vista a un eje');
 
   // Colocar: la mesa en la mano, mirando al suelo de delante, clic derecho.
   await look(page, 0, 150);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   await toHand(page, 18);
   const before = await state(page);
   await useClick(page);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const placed = await state(page);
   console.log(`  colocar la mesa: mesas ${before.inventory[18]} -> ${placed.inventory[18]}, en ${JSON.stringify(placed.stationTiles)}, cajas dibujadas ${placed.stationsDrawn}`);
   check(placed.inventory[18] === 0 && placed.stationTiles.some((t) => t.feature === 24), 'USAR con la mesa en la mano no la coloco');
@@ -1425,17 +1489,17 @@ async function stationsPass(browser, baseUrl) {
 
   // El horno, detras: media vuelta (0,0025 rad por pixel), lejos de la mesa.
   await look(page, 1257, 0);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   await toHand(page, 19);
   await useClick(page);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const both = await state(page);
   check(both.inventory[19] === 0 && both.stationTiles.some((t) => t.feature === 25), 'USAR con el horno en la mano no lo coloco');
-  await page.screenshot({ path: join(SHOTS, '3d-10-horno.png') });
+  await shot(page, '3d-10-horno.png');
 
   // Abrir el horno mirandolo: su panel, con sus recetas. Fundir 5 de cobre.
   await useClick(page);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const furnace = await state(page);
   const furnaceTabs = await tabs();
   const furnaceBox = await panelBox();
@@ -1455,23 +1519,23 @@ async function stationsPass(browser, baseUrl) {
   check(roasted.inventory[22] === smelted.inventory[22] - 2 && roasted.inventory[23] === 2, 'el horno no aso la carne');
   await toBar(23);
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   await play(page);
 
   // Comerla: mirando de lado y al cielo, que mirando el horno —o la mesa, que
   // esta justo enfrente— USAR la abriria. Llena 35 de hambre, o hasta 100.
   await look(page, 628, -300);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   await toHand(page, 23);
   const hungry = await state(page);
   await useClick(page);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const fed = await state(page);
   console.log(`  comer carne asada: ${hungry.inventory[23]} -> ${fed.inventory[23]}, hambre ${hungry.hunger.toFixed(1)} -> ${fed.hunger.toFixed(1)}`);
   check(fed.inventory[23] === hungry.inventory[23] - 1, 'USAR con la carne asada en la mano no se la comio');
   check(fed.hunger > hungry.hunger + 0.5, 'comer carne asada no lleno el hambre');
   await look(page, -628, 300);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
 
   // Estorba: andar contra el horno no mete el cuerpo en su casilla.
   await hold(page, 'KeyW', 900);
@@ -1488,9 +1552,9 @@ async function stationsPass(browser, baseUrl) {
 
   // La mesa, a la espalda: pico de cobre y mochila.
   await look(page, -1257, 0);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   await useClick(page);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const bench = await state(page);
   const benchTabs = await tabs();
   console.log(`  usar la mesa: «${await page.textContent('#recipeTitle')}», ${benchTabs}`);
@@ -1525,7 +1589,7 @@ async function stationsPass(browser, baseUrl) {
   console.log(`  panel de PC con E ${handBox.w}x${handBox.h}, horno ${furnaceBox.w}x${furnaceBox.h}, mesa ${benchBox.w}x${benchBox.h}`);
   check([handBox, furnaceBox].every((b) => Math.abs(b.w - benchBox.w) <= 1 && Math.abs(b.h - benchBox.h) <= 1),
     `el panel de PC cambia de tamano segun las recetas: ${JSON.stringify({ handBox, furnaceBox, benchBox })}`);
-  await page.screenshot({ path: join(SHOTS, '3d-12-panel-pc.png') });
+  await shot(page, '3d-12-panel-pc.png');
   await craft(2);
   await category('Ropa');
   await craft(2);
@@ -1548,7 +1612,7 @@ async function stationsPass(browser, baseUrl) {
     check(!(await bagIcon()), 'el icono del Bolso sigue a la vista con la mochila puesta');
     check(shown === 22, `la rejilla no ensena las casillas de la mochila: ${shown}`);
     check(dressed.feed.every((t) => !t.includes('Mochila') || t.startsWith('+')), `equiparse la anoto como perdida: ${dressed.feed}`);
-    await page.screenshot({ path: join(SHOTS, '3d-11-panel-mesa.png') });
+    await shot(page, '3d-11-panel-mesa.png');
 
     // En PC tambien, la barra deslizable (pedido del autor, 2026-10-01): con
     // la mochila son seis filas y caben cuatro. Se ve al lado de la rejilla,
@@ -1570,7 +1634,7 @@ async function stationsPass(browser, baseUrl) {
     await page.mouse.down();
     await page.mouse.move(grabAt.x, grabAt.y + 120, { steps: 6 });
     await page.mouse.up();
-    await page.waitForTimeout(200);
+    await elapse(page, 200);
     const rp1 = await railPc();
     console.log(`  barra en PC: ${rp0.shown ? 'se ve' : 'no se ve'}, deslizado ${rp0.top} -> ${rp1.top.toFixed(0)}`);
     check(rp0.shown, 'en PC, con la mochila, no se ve la barra de la rejilla');
@@ -1594,7 +1658,7 @@ async function stationsPass(browser, baseUrl) {
     await page.keyboard.down(key);
     for (let i = 0; i < 6 && away.inventoryOpen; i++) {
       await page.keyboard.press('Space');
-      await page.waitForTimeout(400);
+      await elapse(page, 400);
       away = await state(page);
     }
     await page.keyboard.up(key);
@@ -2163,7 +2227,7 @@ async function devToolsPass(browser, baseUrl) {
   check(withBorders.gridChunks > 0, 'la rejilla de chunks no dibujo nada');
   check(withBorders.borderSegments > 0, 'el contorno de biomas no dibujo ni un segmento');
   check(withBorders.misplacedBorders === 0, `${withBorders.misplacedBorders} contornos fuera de su chunk`);
-  await page.screenshot({ path: join(SHOTS, '3d-06-bordes.png') });
+  await shot(page, '3d-06-bordes.png');
 
   // Las cajas de golpe y de choque (pedido del autor, 2026-10-05): con «Cajas»
   // se dibujan las de alrededor, y se quitan al apagarlas. Cada objeto tiene
@@ -2179,7 +2243,7 @@ async function devToolsPass(browser, baseUrl) {
   check(boxed.debugBoxes.hit === boxed.boxesNear.hitOnly && boxed.debugBoxes.both >= boxed.boxesNear.blocking &&
     boxed.boxesNear.blocking > 0 && boxed.debugBoxes.solid === 1,
     `las cajas no son las de alrededor: ${JSON.stringify(boxed.debugBoxes)} frente a ${JSON.stringify(boxed.boxesNear)}`);
-  await page.screenshot({ path: join(SHOTS, '3d-06b-cajas.png') });
+  await shot(page, '3d-06b-cajas.png');
   await page.click('[data-toggle="boxes"]');
   const unboxed = await waitForLoop(page, 10);
   check(unboxed.debugBoxes.hit + unboxed.debugBoxes.solid + unboxed.debugBoxes.both === 0,
@@ -2192,7 +2256,7 @@ async function devToolsPass(browser, baseUrl) {
     for (let burst = 0; burst < 3 && chunkOf(walked) === chunkOf(withBorders); burst++) {
       await page.keyboard.down(key);
       for (let i = 0; i < 4; i++) {
-        await page.waitForTimeout(650);
+        await elapse(page, 650);
         await page.keyboard.press('Space');
       }
       await page.keyboard.up(key);
@@ -2213,16 +2277,16 @@ async function devToolsPass(browser, baseUrl) {
 
   // Pausa: el reloj se para de verdad.
   await page.click('[data-toggle="pause"]');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   const paused = await state(page);
   check(paused.timeScale === 0, `pausar no dejo la escala a cero (${paused.timeScale})`);
-  await page.waitForTimeout(700);
+  await elapse(page, 700);
   const stillPaused = await state(page);
   check(stillPaused.tick === paused.tick, `el tiempo avanzo en pausa (${paused.tick} -> ${stillPaused.tick})`);
 
   // +1 h exacta, y el registro la anota tal cual.
   await page.click('[data-jump="1200"]');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   const afterJump = await state(page);
   console.log(`  +1 h: ${stillPaused.clock} -> ${afterJump.clock}`);
   check(afterJump.tick - stillPaused.tick === HOUR_TICKS, `el salto no adelanto una hora exacta (${afterJump.tick - stillPaused.tick})`);
@@ -2232,25 +2296,25 @@ async function devToolsPass(browser, baseUrl) {
   // Congelada por defecto: un dia entero no gasta hambre.
   check(afterJump.survivalFrozen === true, 'el panel no arranco con la supervivencia congelada');
   await page.click('[data-jump="28800"]');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const afterDay = await state(page);
   check(afterDay.hunger === afterJump.hunger, `saltar un dia gasto hambre estando congelada (${afterJump.hunger} -> ${afterDay.hunger})`);
 
   // Velocidad: a 16x el reloj corre mucho mas que a 1x.
   await page.click('[data-speed="16"]');
   const fast0 = await state(page);
-  await page.waitForTimeout(1000);
+  await elapse(page, 1000);
   const fast1 = await state(page);
   await page.click('[data-speed="1"]');
   const slow0 = await state(page);
-  await page.waitForTimeout(1000);
+  await elapse(page, 1000);
   const slow1 = await state(page);
   console.log(`  ticks por segundo: 16x ${fast1.tick - fast0.tick}, 1x ${slow1.tick - slow0.tick}`);
   check(fast1.tick - fast0.tick > 3 * (slow1.tick - slow0.tick), 'a 16x el reloj no corrio mas');
 
   // Descongelada, el hambre vuelve a bajar.
   await page.click('[data-toggle="survival"]');
-  await page.waitForTimeout(800);
+  await elapse(page, 800);
   const thawed = await state(page);
   check(thawed.survivalFrozen === false, 'el conmutador no se apago');
   check(thawed.hunger < afterDay.hunger, 'apagar la congelacion no devolvio el hambre');
@@ -2258,14 +2322,14 @@ async function devToolsPass(browser, baseUrl) {
 
   // Registro: recolectar deja constancia.
   await harvestUntil(page, (s) => sum(s.inventory) > 0);
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const log = await page.evaluate(() => document.getElementById('devLog').textContent);
   console.log(`  registro: ${JSON.stringify(log.split('\n')[0] ?? '')}`);
   check(log.split('\n').length > 1, 'recolectar no dejo ninguna linea en el registro');
 
   // F3 cierra y devuelve todo a su sitio.
   await page.keyboard.press('F3');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const closed = await state(page);
   check(closed.dev === false, 'F3 no cerro el panel');
   check(closed.timeScale === 1, `al cerrar el tiempo no volvio a 1x (${closed.timeScale})`);
@@ -2290,11 +2354,11 @@ async function lifePass(browser, baseUrl) {
     let now = await state(page);
     for (let i = 0; i < 6 && now.alive; i++) {
       await page.click('[data-jump="28800"]');
-      await page.waitForTimeout(300);
+      await elapse(page, 300);
       now = await state(page);
     }
     await page.keyboard.press('F3');
-    await page.waitForTimeout(300);
+    await elapse(page, 300);
     return state(page);
   }
 
@@ -2303,7 +2367,7 @@ async function lifePass(browser, baseUrl) {
   console.log(`  tras saltar dias sin comer: salud ${dead.health}, hambre ${dead.hunger}`);
   check(!dead.alive, 'saltar dias sin comer no mato al personaje');
   check(dead.deadShown && (await page.isVisible('#dead')), 'al morir no aparecio el aviso');
-  await page.screenshot({ path: join(SHOTS, '3d-07-muerte.png') });
+  await shot(page, '3d-07-muerte.png');
 
   // R empieza un mundo nuevo, con semilla nueva y reflejada en la URL.
   await page.keyboard.press('KeyR');
@@ -2330,7 +2394,7 @@ async function lifePass(browser, baseUrl) {
   check(night.clock.startsWith('00:'), `no arranco a medianoche (${night.clock})`);
   check(night.night > 0.4, `la noche no oscurece (${night.night})`);
   check(tint !== 'rgba(0, 0, 0, 0)' && tint !== 'transparent', `la vela de la noche no se pinta (${tint})`);
-  await page.screenshot({ path: join(SHOTS, '3d-08-noche.png') });
+  await shot(page, '3d-08-noche.png');
   const noon = await open(page, baseUrl, `&t=${DAY_TICKS / 2}`);
   check(noon.night === 0, `a mediodia sigue habiendo vela (${noon.night})`);
 
@@ -2356,7 +2420,7 @@ async function reliefPass(browser, baseUrl) {
     check(relief.tallWalls > 0, 'no hay paredes de dos bloques donde deberia haberlas');
     // Sin rampas (el autor, 2026-10-06): se sube andando por escalones de medio bloque.
     check(relief.halfSteps > 0, 'no hay ni un escalon de medio bloque por el que subir andando');
-    await page.screenshot({ path: join(SHOTS, '3d-09-relieve.png') });
+    await shot(page, '3d-09-relieve.png');
 
     const moved = await bestWalk(page, arrived);
     console.log(`  camino ${moved.toFixed(2)} casillas junto a la pared`);
@@ -2383,7 +2447,7 @@ async function reliefPass(browser, baseUrl) {
     await look(page, 0, -200);
     const marks = [];
     for (let i = 0; i < 8; i++) {
-      await page.waitForTimeout(150);
+      await elapse(page, 150);
       marks.push((await state(page)).reticle);
       await look(page, 314, 0);
     }
@@ -2393,7 +2457,7 @@ async function reliefPass(browser, baseUrl) {
     // El salto: despega, levanta mas de un bloque y vuelve al suelo.
     const antesDelSalto = await open(page, baseUrl, at);
     await page.keyboard.press('Space');
-    await page.waitForTimeout(1500);
+    await elapse(page, 1500);
     const trasCaer = await state(page);
     console.log(`  salto: ${trasCaer.jumps - antesDelSalto.jumps} despegue(s), hasta ${trasCaer.airPeak.toFixed(2)} niveles`);
     check(trasCaer.jumps > antesDelSalto.jumps, 'Espacio no despego al personaje');
@@ -2412,7 +2476,7 @@ async function reliefPass(browser, baseUrl) {
       await page.keyboard.down('KeyD');
       let best = 0;
       for (let i = 0; i < 6; i++) {
-        await page.waitForTimeout(120);
+        await elapse(page, 120);
         const s = await state(page);
         best = Math.max(best, s.speed);
         lagGap = Math.max(lagGap, s.camLagGap);
@@ -2423,11 +2487,11 @@ async function reliefPass(browser, baseUrl) {
     };
     const vAndando = await pushSpeed();
     await page.keyboard.press('ShiftLeft');
-    await page.waitForTimeout(150);
+    await elapse(page, 150);
     const trasShift = (await state(page)).running;
     const vCorriendo = await pushSpeed();
     await page.keyboard.press('ShiftLeft');
-    await page.waitForTimeout(150);
+    await elapse(page, 150);
     const trasSegundo = (await state(page)).running;
     console.log(`  correr: ${vAndando.toFixed(2)} -> ${vCorriendo.toFixed(2)} casillas/s`);
     check(trasShift === true && trasSegundo === false, 'Shift no se comporta como interruptor');
@@ -2435,7 +2499,7 @@ async function reliefPass(browser, baseUrl) {
     check(vCorriendo > vAndando * 1.15, `correr no acelero: ${vAndando} vs ${vCorriendo}`);
 
     // Parado, la camara alcanza al personaje.
-    await page.waitForTimeout(800);
+    await elapse(page, 800);
     const still = await state(page);
     console.log(`  camara: retraso ${still.camLag} s, hasta ${lagGap.toFixed(2)} por detras andando, ` +
       `${still.camLagGap.toFixed(3)} parado; punto de mira a ${aimOff.toFixed(4)} del centro`);
@@ -2455,8 +2519,8 @@ async function reliefPass(browser, baseUrl) {
     console.log(`  cima: nivel ${onTop.level}, ${onTop.terrain}`);
     check(onTop.level > 15, `la cima no era tan alta: nivel ${onTop.level}`);
     for (let i = 0; i < 4; i++) await page.keyboard.press('Minus');
-    await page.waitForTimeout(500);
-    await page.screenshot({ path: join(SHOTS, '3d-10-cima.png') });
+    await elapse(page, 500);
+    await shot(page, '3d-10-cima.png');
   }
 
   await page.close();
@@ -2501,23 +2565,36 @@ async function highRefreshPass(browser, baseUrl) {
   console.log('\n== pantalla de 144 Hz (pulsaciones que no se pierden) ==');
   const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
   watchProblems(page, 'refresco alto');
-  await page.addInitScript(() => {
-    const real = window.requestAnimationFrame.bind(window);
-    let t = null;
-    window.requestAnimationFrame = (cb) =>
-      real((now) => {
-        t = t === null ? now : t + 1000 / 144;
-        cb(t);
-      });
-  });
+  // Con el reloj manual, frames de 1/144 s (`elapse` con `hz`); con el de
+  // verdad, el de `requestAnimationFrame` fingido a 144 Hz.
+  if (!manualPass) {
+    await page.addInitScript(() => {
+      const real = window.requestAnimationFrame.bind(window);
+      let t = null;
+      window.requestAnimationFrame = (cb) =>
+        real((now) => {
+          t = t === null ? now : t + 1000 / 144;
+          cb(t);
+        });
+    });
+  }
   // Arriba al centro: en una ventana pequena la ayuda de teclado tapa el medio.
   const clickAt = { x: 320, y: 110 };
-  await page.goto(`${baseUrl}/?seed=${SEED}${VIEW}`, { waitUntil: 'load' });
+  await page.goto(`${baseUrl}/?seed=${SEED}${VIEW}${manualPass ? '&reloj=manual' : ''}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
   await page.mouse.click(clickAt.x, clickAt.y);
   await page.waitForFunction(() => window.__verdant && !window.__verdant.paused, null, { timeout: 5000 });
-  const afterTick = (t0, n) =>
-    page.waitForFunction(([base, k]) => window.__verdant.tick >= base + k, [t0, n], { timeout: 60000 });
+  const afterTick = async (t0, n) => {
+    if (!manual(page)) {
+      return page.waitForFunction(([base, k]) => window.__verdant.tick >= base + k, [t0, n], { timeout: 60000 });
+    }
+    // Frame a frame de 144 Hz hasta que corran los ticks: como la pantalla,
+    // que no espera a la simulacion.
+    for (let f = 0; f < 144 * 60; f++) {
+      if ((await elapse(page, 1000 / 144, 144)) >= t0 + n) return;
+    }
+    throw new Error(`a 144 Hz no corrieron ${n} ticks`);
+  };
 
   // Golpes: uno por tick, cada uno esperando a que pase un tick para que dos
   // no caigan en el mismo pestillo.
@@ -2596,15 +2673,26 @@ async function faunaPass(browser, baseUrl) {
   // con un buen rato quieta por delante. Parada no basta: un animal atascado
   // lejos de su punto tambien lo esta, y al recargar aparece en el punto (paso
   // en la CI de la tanda de fisicas).
-  const prey = later.fauna
+  //
+  // Y se busca a lo largo de un rato, no en un instante: con el reloj de verdad
+  // el instante caia donde lo dejaba la maquina y unas veces habia presa y
+  // otras no; con el manual cae siempre en el mismo tick, y en ese no hay
+  // ninguna (2026-10-10). Hasta 20 s de juego, de 2 en 2.
+  const pick = (s) => s.fauna
     .filter((a) => a.species !== 8 && !a.moving && a.atWaypoint && a.calm > 1000)
     .sort((p, q) => p.maxHealth - q.maxHealth)[0];
+  let prey = pick(later);
+  let seen = later;
+  for (let i = 0; i < 10 && !prey; i++) {
+    seen = await waitForLoop(page, 120);
+    prey = pick(seen);
+  }
   check(prey !== undefined, 'no hay ninguna presa quieta a la que ir');
   if (!prey) return page.close();
   // A 2,2 casillas de ella, del lado que no sea agua, en el mismo tick.
   let there = null;
   for (const [ox, oy] of [[0, 2.2], [0, -2.2], [2.2, 0], [-2.2, 0]]) {
-    there = await open(page, baseUrl, `&t=${later.tick}&x=${(prey.x + ox).toFixed(3)}&y=${(prey.y + oy).toFixed(3)}`);
+    there = await open(page, baseUrl, `&t=${seen.tick}&x=${(prey.x + ox).toFixed(3)}&y=${(prey.y + oy).toFixed(3)}`);
     if (!there.terrain.startsWith('Agua')) break;
   }
   const target = there.fauna.find((a) => a.key === prey.key);
@@ -2630,7 +2718,7 @@ async function faunaPass(browser, baseUrl) {
       const dPitch = s.pitch - pitch;
       if (Math.abs(dYaw) < 0.05 && Math.abs(dPitch) < 0.05) return s;
       await look(page, dYaw / 0.0025, dPitch / 0.0025);
-      await page.waitForTimeout(200);
+      await elapse(page, 200);
     }
     return state(page);
   };
@@ -2639,7 +2727,7 @@ async function faunaPass(browser, baseUrl) {
   // esquirlas y la comprobacion de las de la presa pasaba sin ellas (la
   // mutacion «caza sin esquirlas» no cayo en la CI).
   await page.keyboard.press('Tab');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   check((await state(page)).precise, 'TAB no puso el golpe en modo preciso');
   // Apuntar antes de cada golpe —sale enseguida si ya esta encarada— y
   // golpear: rapido, que su periodo de quieta se acaba.
@@ -2647,10 +2735,10 @@ async function faunaPass(browser, baseUrl) {
   for (let i = 0; i < 30 && now.animalsKilled === 0; i++) {
     await aimAt();
     await strike(page);
-    await page.waitForTimeout(260);
+    await elapse(page, 260);
     now = await state(page);
   }
-  await page.screenshot({ path: join(SHOTS, '3d-14-fauna.png') });
+  await shot(page, '3d-14-fauna.png');
   console.log(`  caza: especie ${prey.species}, etapa ${prey.stage}, ${prey.maxHealth} PV; muertos ${now.animalsKilled}, ` +
     `carne cruda ${now.inventory[22] ?? 0}, esquirlas ${now.chipsDrawn}, escombros ${now.debrisDrawn}`);
   check(now.animalsKilled === 1, 'golpear a la presa no la mato');
@@ -2703,7 +2791,11 @@ try {
   }
   for (const [name, pass] of Object.entries(passes)) {
     if (only && !name.startsWith(only)) continue;
+    // `SMOKE_RELOJ=real` corre todas con el de verdad, para comparar.
+    manualPass = MANUAL_PASSES.has(name) && process.env.SMOKE_RELOJ !== 'real';
+    const started = Date.now();
     await pass(browser, baseUrl);
+    console.log(`  (${name}: ${Math.round((Date.now() - started) / 1000)} s, reloj ${manualPass ? 'manual' : 'de verdad'})`);
   }
 } finally {
   await browser.close();

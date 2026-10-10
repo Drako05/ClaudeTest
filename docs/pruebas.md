@@ -151,6 +151,56 @@ humo sale en rojo si se le pide una pasada que no existe, para que una errata
 en la matriz no sea una casilla verde que no prueba nada. Una casilla que falle
 se relanza sola desde GitHub («Re-run failed jobs»).
 
+**El reloj manual** (`?reloj=manual`, desde el 2026-10-10). Sin GPU el headless
+dibuja por software: ~5 FPS a 1280x720 en el contenedor del agente y 1,4 s por
+captura. Un tick de la simulacion, en cambio, cuesta 1,7 ms. Con el reloj de
+verdad el humo esperaba en tiempo real: tardaba lo que tardaba y daba lo que
+diera la maquina, porque a 5 FPS cada frame corria una docena de ticks. Con
+`?reloj=manual` el bucle no corre solo: la prueba lo avanza con
+`window.__reloj.avanzar(ms, { hz })`, en frames de `1/hz` s **sin dibujar**, y
+`__reloj.dibujar()` hace un fotograma para una captura (`clock.ts`, `main.ts`).
+Con `hz` 60 cada frame lleva un tick, como un jugador a 60 Hz.
+
+- **En `smoke.mjs`** las pasadas de `MANUAL_PASSES` abren con el reloj manual.
+  Los ayudantes valen para los dos relojes: `elapse(page, ms)` avanza el juego
+  (con el de verdad, espera), `until` es el `waitForFunction` que avanza
+  mientras espera, `shot` dibuja antes de capturar, y `waitForLoop` y `hold`
+  van por `elapse`. Una espera AL JUEGO es `elapse`; una a la interfaz con
+  temporizadores del navegador (gestos, destellos) sigue con `waitForTimeout`.
+  `SMOKE_RELOJ=real node tools/smoke.mjs <pasada>` corre con el de verdad,
+  para comparar.
+- **Lo que lee el reloj manual**: lo que el cliente mide dentro del frame —la
+  caida de una estacion, la receta mantenida, el catalejo de la rueda—, por
+  `clock.now()`. Lo que va por eventos del navegador sigue con el de verdad, y
+  por eso no todo es exacto: en `fauna` los impactos dibujados dieron 114 y 112
+  en dos corridas. Las posiciones, los ticks y lo demas salieron identicos.
+- **Migradas**: `life`, `relief`, `fauna`, `devTools`, `stations`, `resources`
+  y `highRefresh`, que pasa a frames de 1/144 s con `hz` en vez del
+  `requestAnimationFrame` fingido (con el de verdad lo sigue usando).
+  **Con el reloj de verdad, a proposito**: `desktop`, que tiene que probar el
+  bucle real del navegador, y `gestures`, que mide dedos de verdad.
+  **Pendiente**: `mobile`, cuyos toques sostenidos dependen de temporizadores
+  del navegador.
+- **`slash`, tambien con el reloj manual**: cada captura dibuja antes
+  (`capture`) y se **recorta a la caja que mide**, porque la de pantalla
+  entera costaba 1,4-6 s sin GPU y la recortada ~0,2. El primer golpe se dibuja
+  mientras vive (`probe`): la esfera envolvente se planta al dibujarlo, y sin
+  ese dibujo el recorte por frustum no tendria nada que recortar. Entero tarda
+  2 min 21 s en local, frente a 845-900 s en la CI con el de verdad; dos
+  corridas dieron los mismos pixeles. Las puertas no cambian, pero los numeros
+  si (`docs/juicio.md`).
+- **Lo medido en local** (contenedor de 4 nucleos), con el de verdad y con el
+  manual: `life` 104 s y 16; `relief` 57, `fauna` 15, `devTools` 7,
+  `stations` 15, `resources` 21 y `highRefresh` 42, frente a 84-270 s por
+  casilla en la CI con el de verdad.
+- **Lo que cambio al migrar**: `fauna` busca su presa quieta durante hasta
+  20 s de juego, y no en un solo instante. Con el reloj manual el instante es
+  siempre el mismo tick, y en ese no habia ninguna; con el de verdad dependia
+  de la suerte. Y con el reloj manual, `waitForLoop` comprueba que el bucle
+  avanzo y lo dice como `FALLO`, en vez de agotar una espera: un reloj que no
+  avanza tiene que caer como comprobacion, que es lo que mira la ronda de
+  mutaciones.
+
 `npm run smoke` construye el cliente y lo juega en Chromium headless leyendo el
 estado real por `window.__verdant`. Los tests unitarios no detectan que el juego
 no arranque; esto si. Hace nueve pasadas —escritorio, recursos (comer, sembrar,
@@ -169,10 +219,11 @@ vio jugando —«ataco o salto y a veces no lo hace, a veces ni al segundo
 intento»— y un modelo del bucle lo midio en un 32 % de pulsaciones perdidas a
 90 Hz, 50 % a 120 y 58 % a 144 (a 60, del 0,5 al 2,5 %). Estuvo meses sin que
 el humo lo viera, porque el headless va a unos 13 FPS y ahi todo frame lleva
-tick. La pasada `highRefresh` finge el reloj de `requestAnimationFrame` a 144
-Hz y exige 30 de 30 golpes y 5 de 5 saltos; sin el arreglo da 10 y 0. **Lo que
-dependa del ritmo de fotogramas hay que medirlo con el reloj fingido**, no con
-el que tenga el headless.
+tick. La pasada `highRefresh` corre frames de 1/144 s con el reloj manual
+(`hz` 144; con el de verdad, finge el de `requestAnimationFrame`) y exige 30 de
+30 golpes y 5 de 5 saltos; sin el arreglo da 10 y 0 con el reloj fingido, y 0 y
+0 con el manual. **Lo que dependa del ritmo de fotogramas hay que medirlo con
+un reloj fingido o con el manual**, no con el que tenga el headless.
 
 Dos habitos del humo que conviene conservar. Lo que depende del paisaje se
 comprueba **desde el nacimiento**, que es un rellano llano (regla 22), o

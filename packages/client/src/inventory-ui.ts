@@ -45,6 +45,7 @@ import {
   toolStats,
 } from '@verdant/shared';
 import { makePlayerArt } from './art.js';
+import { now } from './clock.js';
 import { equipIcon } from './equip-icons.js';
 import { ScrollRail } from './scroll-rail-view.js';
 
@@ -468,7 +469,7 @@ export class InventoryUi {
       if (!stationNear(s.world, eye, this.mode, (tx, ty) => hitboxAt(s.world, tx, ty))) this.toggle();
     }
     if (this.hold) {
-      const t = Math.min(1, (performance.now() - this.hold.since) / CRAFT_HOLD_MS);
+      const t = Math.min(1, (now() - this.hold.since) / CRAFT_HOLD_MS);
       (this.hold.row.querySelector('.charge') as HTMLElement).style.width = `${t * 100}%`;
       if (t >= 1) {
         this.pending.craft = this.hold.recipe;
@@ -666,7 +667,7 @@ export class InventoryUi {
       if (r.inputs.some((input) => inv.count(input.item) < input.count)) return;
       if (!inv.fits([{ item: r.output, count: r.count }], r.inputs)) return;
       this.cancelHold();
-      this.hold = { recipe, since: performance.now(), row };
+      this.hold = { recipe, since: now(), row };
     });
     for (const type of ['pointerup', 'pointerleave', 'pointercancel']) {
       el.addEventListener(type, () => {

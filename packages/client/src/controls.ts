@@ -14,6 +14,7 @@
  * lo de la mano.
  */
 
+import { now } from './clock.js';
 import { Gestures, HOLD_MS, STICK_RADIUS } from './gestures.js';
 import type { MouseLook } from './pointer-lock.js';
 
@@ -131,12 +132,12 @@ export class Controls {
         case 'Equal':
         case 'NumpadAdd':
           this.keyZoom /= 1.25;
-          this.lastZoomKeyAt = performance.now();
+          this.lastZoomKeyAt = now();
           break;
         case 'Minus':
         case 'NumpadSubtract':
           this.keyZoom *= 1.25;
-          this.lastZoomKeyAt = performance.now();
+          this.lastZoomKeyAt = now();
           break;
         default:
           break;
@@ -639,7 +640,7 @@ export class Controls {
    * (deduccion del agente, no del autor).
    */
   get zoomHeld(): boolean {
-    return this.gestures.pinchHeld || performance.now() - this.lastZoomKeyAt < ZOOM_HOLD_MS;
+    return this.gestures.pinchHeld || now() - this.lastZoomKeyAt < ZOOM_HOLD_MS;
   }
 
   takeZoom(): number {
