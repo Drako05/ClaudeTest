@@ -122,8 +122,15 @@ page.on('pageerror', (e) => problems.push(String(e)));
 // blanco sin prueba de profundidad, como el barrido, y las esquirlas y los
 // escombros tambien aclaran. Con el barrido SIN ANCHO, en un pinar, la vista
 // normal contaba 25.506 pixeles de impactos: la medida pasaba sin barrido.
-await page.goto(`http://127.0.0.1:${port}/?seed=12345&view=perspectiva&fauna=0&efectos=barrido`, { waitUntil: 'load' });
-await page.waitForTimeout(3500);
+//
+// Y con el reloj manual (`?reloj=manual`, `docs/pruebas.md`): el juego avanza
+// cuando se le pide (`elapse`) y se dibuja cuando se captura (`capture`). Antes
+// el paseo acababa donde lo dejaba la velocidad de la maquina y cada vista
+// costaba ~40 s por rumbo en la CI. `SMOKE_RELOJ=real` usa el de verdad.
+const MANUAL = process.env.SMOKE_RELOJ !== 'real';
+await page.goto(`http://127.0.0.1:${port}/?seed=12345&view=perspectiva&fauna=0&efectos=barrido${MANUAL ? '&reloj=manual' : ''}`, { waitUntil: 'load' });
+await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+await elapse(3500);
 
 const spawn = await page.evaluate(() => window.__verdant);
 console.log(`nace en ${spawn.x.toFixed(1)}, ${spawn.y.toFixed(1)}`);
@@ -166,7 +173,7 @@ if (!planted) {
 }
 const origin = await page.evaluate(() => window.__verdant);
 console.log(`primer golpe dibujado en ${origin.x.toFixed(1)}, ${origin.y.toFixed(1)}`);
-await page.waitForTimeout(400);
+await elapse(400);
 
 // 2. Lejos de aqui. En ortografica el encuadre mide trece casillas de
 //    semialtura, asi que hay que salir de eso para que el recorte muerda.
@@ -195,7 +202,7 @@ for (let tries = 0; tries < 6 && walked < 18; tries++) {
   walked = Math.hypot(now.x - origin.x, now.y - origin.y);
 }
 await page.keyboard.up('Shift');
-await page.waitForTimeout(500);
+await elapse(500);
 
 const there = await page.evaluate(() => window.__verdant);
 console.log(`camina hacia ${best.key} y acaba a ${walked.toFixed(1)} casillas del primer golpe, en ${there.x.toFixed(1)}, ${there.y.toFixed(1)}`);
@@ -241,7 +248,7 @@ for (const [part, view] of Object.entries(VIEWS)) {
     // veces: perspectiva → isometrica → primera persona.
     await page.keyboard.press('KeyP');
     await page.keyboard.press('KeyP');
-    await page.waitForTimeout(600);
+    await elapse(600);
   }
   if (view === 'camara baja') {
     // Arrastrar hacia arriba sube la mirada y baja la camara por detras (desde
@@ -257,7 +264,7 @@ for (const [part, view] of Object.entries(VIEWS)) {
     // congelada: quieta y de frente, ese punto se queda dentro del frustum, que
     // en ortografica tiene 1300 unidades de fondo.
     for (let i = 0; i < 20; i++) await page.mouse.wheel(0, -120);
-    await page.waitForTimeout(600);
+    await elapse(600);
   }
 
   // En la vista giratoria se mide en cuatro rumbos y se guarda el PEOR: la
@@ -301,17 +308,17 @@ for (const [part, view] of Object.entries(VIEWS)) {
     // IDENTICOS. Asi que la referencia es una captura en reposo y lo que se mide
     // es lo que el efecto anade encima: el ruido de comparar dos capturas en
     // reposo dice cuanto vale cero.
-    const reference = decodePng(await page.screenshot());
+    const reference = decodePng(await capture(box));
     noise = Math.max(noise, (await sample(reference, 2, box)).max);
 
     const before = await page.evaluate(() => window.__verdant);
     await page.hover('#action');
     await page.mouse.down();
-    await page.waitForTimeout(300);
+    await elapse(300);
     const hitting = await sample(reference, 8, box);
     await page.mouse.up();
     const after = await page.evaluate(() => window.__verdant);
-    await page.waitForTimeout(500);
+    await elapse(500);
 
     // Una captura por tanda y no cuatro: la del fotograma con mas barrido a la
     // vista, que es la que decide si esto se ve o no.
@@ -348,13 +355,13 @@ const STAB_BOX = { x0: 700, y0: 400, x1: 1040, y1: 560 };
 let stabbing = null;
 if (measures('estocada')) {
   await page.keyboard.press('Tab');
-  await page.waitForTimeout(300);
-  const stabRef = decodePng(await page.screenshot());
+  await elapse(300);
+  const stabRef = decodePng(await capture(STAB_BOX));
   const stabNoise = (await sample(stabRef, 2, STAB_BOX)).max;
   const stabBefore = await page.evaluate(() => window.__verdant);
   await page.hover('#action');
   await page.mouse.down();
-  await page.waitForTimeout(300);
+  await elapse(300);
   stabbing = await sample(stabRef, 8, STAB_BOX);
   await page.mouse.up();
   await writeFile(new URL('../screenshots/estocada.png', import.meta.url), stabbing.best);
@@ -427,7 +434,23 @@ async function drag(dx, dy) {
   await page.mouse.down();
   await page.mouse.move(760 + dx, 300 + dy, { steps: 14 });
   await page.mouse.up();
-  await page.waitForTimeout(700);
+  await elapse(700);
+}
+
+/** Deja correr el juego: con el reloj manual lo avanza sin dibujar, con el de verdad espera. */
+async function elapse(ms) {
+  if (MANUAL) await page.evaluate((m) => window.__reloj.avanzar(m), ms);
+  else await page.waitForTimeout(ms);
+}
+
+/**
+ * Una captura de la caja, en PNG. Recortada, porque la de pantalla entera
+ * costaba 1,4-6 s sin GPU y la de la caja ~0,2 (2026-10-10); y con el reloj
+ * manual, dibujando antes: sin bucle no hay fotograma nuevo.
+ */
+async function capture(box) {
+  if (MANUAL) await page.evaluate(() => window.__reloj.dibujar());
+  return page.screenshot({ clip: { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 } });
 }
 
 /** Empuja en una direccion saltando, que aqui es la unica forma de avanzar. */
@@ -435,10 +458,10 @@ async function push(key, ms) {
   await page.keyboard.down(key);
   for (let t = 0; t < ms; t += 400) {
     await page.keyboard.press('Space');
-    await page.waitForTimeout(400);
+    await elapse(400);
   }
   await page.keyboard.up(key);
-  await page.waitForTimeout(250);
+  await elapse(250);
 }
 
 /** Si la camara esta donde quiere, sin que la colision la acerque. */
@@ -468,9 +491,16 @@ async function probe() {
   const before = await page.evaluate(() => window.__verdant.slashesDrawn);
   await page.hover('#action');
   await page.mouse.down();
-  await page.waitForTimeout(700);
+  // Con el reloj manual se dibuja mientras el barrido vive, como haria el
+  // juego: la esfera envolvente del primer golpe se planta al DIBUJARLO
+  // (paso 1, abajo), y sin dibujo el recorte por frustum no tendria nada que
+  // recortar.
+  for (let t = 0; t < 700; t += 50) {
+    await elapse(50);
+    if (MANUAL) await page.evaluate(() => window.__reloj.dibujar());
+  }
   await page.mouse.up();
-  await page.waitForTimeout(400);
+  await elapse(400);
   const after = await page.evaluate(() => window.__verdant.slashesDrawn);
   return after > before;
 }
@@ -480,11 +510,11 @@ async function sample(reference, times, box = BOX) {
   const counts = [];
   let best = null;
   for (let i = 0; i < times; i++) {
-    const png = await page.screenshot();
-    const lit = brightened(reference, decodePng(png), box);
+    const png = await capture(box);
+    const lit = brightened(reference, decodePng(png));
     if (best === null || lit > Math.max(...counts)) best = png;
     counts.push(lit);
-    await page.waitForTimeout(110);
+    await elapse(110);
   }
   return {
     max: Math.max(...counts),
@@ -502,16 +532,18 @@ async function sample(reference, times, box = BOX) {
  * valia: el trazo es translucido —`alpha = (1-t) * 0.85`— asi que mezclado con
  * hierba da un verde palido que no se acerca al blanco ni de lejos. Esa primera
  * version daba cero con el barrido perfectamente visible.
+ *
+ * Las dos capturas son ya de la caja que se mide (`capture`), asi que se
+ * cuenta entera.
  */
-function brightened(reference, shot, box = BOX) {
-  const { width } = shot;
+function brightened(reference, shot) {
+  if (reference.width !== shot.width || reference.height !== shot.height) {
+    throw new Error(`capturas de tamanos distintos: ${reference.width}x${reference.height} y ${shot.width}x${shot.height}`);
+  }
   let n = 0;
-  for (let y = box.y0; y < box.y1; y++) {
-    for (let x = box.x0; x < box.x1; x++) {
-      const i = (y * width + x) * 4;
-      if (rose(reference.data[i], shot.data[i]) && rose(reference.data[i + 1], shot.data[i + 1]) &&
-        rose(reference.data[i + 2], shot.data[i + 2])) n++;
-    }
+  for (let i = 0; i < shot.data.length; i += 4) {
+    if (rose(reference.data[i], shot.data[i]) && rose(reference.data[i + 1], shot.data[i + 1]) &&
+      rose(reference.data[i + 2], shot.data[i + 2])) n++;
   }
   return n;
 }

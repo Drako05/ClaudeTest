@@ -179,9 +179,16 @@ Con `hz` 60 cada frame lleva un tick, como un jugador a 60 Hz.
   `requestAnimationFrame` fingido (con el de verdad lo sigue usando).
   **Con el reloj de verdad, a proposito**: `desktop`, que tiene que probar el
   bucle real del navegador, y `gestures`, que mide dedos de verdad.
-  **Pendientes**: `mobile`, cuyos toques sostenidos dependen de
-  temporizadores del navegador, y `slash`, que necesita sus capturas con
-  `dibujar()`.
+  **Pendiente**: `mobile`, cuyos toques sostenidos dependen de temporizadores
+  del navegador.
+- **`slash`, tambien con el reloj manual**: cada captura dibuja antes
+  (`capture`) y se **recorta a la caja que mide**, porque la de pantalla
+  entera costaba 1,4-6 s sin GPU y la recortada ~0,2. El primer golpe se dibuja
+  mientras vive (`probe`): la esfera envolvente se planta al dibujarlo, y sin
+  ese dibujo el recorte por frustum no tendria nada que recortar. Entero tarda
+  2 min 21 s en local, frente a 845-900 s en la CI con el de verdad; dos
+  corridas dieron los mismos pixeles. Las puertas no cambian, pero los numeros
+  si (`docs/juicio.md`).
 - **Lo medido en local** (contenedor de 4 nucleos), con el de verdad y con el
   manual: `life` 104 s y 16; `relief` 57, `fauna` 15, `devTools` 7,
   `stations` 15, `resources` 21 y `highRefresh` 42, frente a 84-270 s por

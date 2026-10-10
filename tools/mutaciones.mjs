@@ -36,6 +36,24 @@ export default [
     a: '  const collect = true;',
     prueba: 'smoke:highRefresh',
   },
+  // `slash` con el reloj manual: se dibuja solo cuando se captura (y mientras
+  // vive el primer golpe), asi que hay que ver que sus dos fallos de siempre
+  // siguen cayendo. El recorte por frustum necesita que el primer golpe se
+  // haya DIBUJADO para plantar su esfera.
+  {
+    nombre: 'barrido recortado por el frustum',
+    fichero: 'packages/client/src/effects-view.ts',
+    de: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = false;',
+    a: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = true;',
+    prueba: 'slash:baja',
+  },
+  {
+    nombre: 'el barrido de tercera persona no tiene ancho',
+    fichero: 'packages/client/src/effects.ts',
+    de: 'export const SLASH_HALF_WIDTH = 0.06;',
+    a: 'export const SLASH_HALF_WIDTH = 0;',
+    prueba: 'slash:baja',
+  },
   // La camara rezagada, que con el headless lento daba 0,19 y ahora se mide a
   // 60 Hz exactos: sin retraso tiene que seguir cayendo.
   {

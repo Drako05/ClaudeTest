@@ -50,26 +50,27 @@ pruebas posterior a cada tanda de cambios». Aprobo el plan de tres fases.
 
 **Las fases.**
 1. **`slash` partido en cinco casillas**, una por parte (`docs/pruebas.md`).
-   **Hecha, falta verla en la CI.**
+   **Hecha y en `main`** (`6bab86a`). En la CI de `pruebas`: CI 11 min,
+   mutaciones 7 min 42 s (antes ~15 y ~18). Por el camino se vio que el
+   recorte por frustum no lo caza la vista normal (`docs/juicio.md`).
 2. **`tools/esperar-ci.sh`**: espera a la CI con `gh api` y no con un
-   temporizador fijo. **Hecha**: probada contra tandas pasadas, verdes y rojas.
-3. **Reloj de pruebas, pendiente.** Un modo `?reloj=manual` en el cliente con
-   `window.__reloj.avanzar(ms, { hz })`, que corre frames sin dibujar, y
-   `dibujar()`. Con eso el humo deja de esperar en tiempo real y da el mismo
-   resultado en cualquier maquina. El detalle:
-   - Un `clock.ts` con `now()` para lo que se mira dentro del frame: la caida
-     de las estaciones, la receta mantenida y el catalejo.
-   - `frame` partido en `step(dt, draw)`.
-   - En `smoke.mjs`, ayudantes conscientes del reloj (`jugar`, `waitForLoop`,
-     `hold`, `captura`).
-   - `highRefresh` con `hz: 144`.
-   - Migracion pasada a pasada: `life` de piloto. `desktop` y `gestures` se
-     quedan con el reloj real.
-   - `slash` con capturas recortadas a la caja que mide.
+   temporizador fijo. **Hecha y en `main`**.
+3. **Reloj de pruebas** (`?reloj=manual`, `clock.ts`, `window.__reloj`;
+   `docs/pruebas.md`, «El reloj manual»). **Hecho en el arbol**:
+   - Migradas: `life`, `relief`, `fauna`, `devTools`, `stations`,
+     `resources`, `highRefresh` (`hz` 144) y `slash`, con capturas recortadas.
+     Todas dan lo mismo en dos corridas, salvo un contador de `fauna`.
+   - Las mutaciones de la ronda caen todas en local (cinco).
+   - **Falta**: verlo en la CI de `pruebas` y llevarlo a `main`.
+   - **Queda fuera**: `mobile`, por sus toques sostenidos con temporizadores
+     del navegador. `desktop` y `gestures` siguen con el reloj de verdad a
+     proposito.
 
    **Decisiones por defecto, del agente y sin aprobar**: frames a 60 Hz con el
    reloj manual, y una comprobacion que dé otro numero no se reajusta en
    silencio, sino que se dice con los dos valores y va a `docs/juicio.md`.
+   Alli estan los numeros nuevos de `slash` y la vista «de cerca» que no se
+   acerca.
 
 ---
 
