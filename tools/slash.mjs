@@ -179,10 +179,14 @@ if (walked < 18) console.log('AVISO: no se ha alejado lo bastante; el recorte po
 //    equivocado. Con el sector de la regla 12 el barrido sale siempre, asi que
 //    esto casi nunca tiene que buscar; se queda como guarda, porque una medida
 //    que puede dar cero por otra causa es justo el error que ya costo caro.
-let reaches = await probe();
+//
+//    Y con la camara libre al menos en el rumbo de salida: la vista normal
+//    solo cuenta los rumbos en que la colision no la mete en la cabeza (ver
+//    `MIN_NORMAL`), y sin ninguno no habria medida.
+let reaches = (await probe()) && (await cameraFree());
 for (let tries = 0; tries < 8 && !reaches; tries++) {
   await push(['KeyD', 'KeyS', 'KeyA', 'KeyW'][tries % 4], 700);
-  reaches = await probe();
+  reaches = (await probe()) && (await cameraFree());
 }
 if (!reaches) {
   console.log('NO se ha encontrado sitio con alcance completo; la medida no valdria');
@@ -191,7 +195,7 @@ if (!reaches) {
   process.exit(1);
 }
 const spot = await page.evaluate(() => window.__verdant);
-console.log(`acciona con alcance completo en ${spot.x.toFixed(1)}, ${spot.y.toFixed(1)}, altura ${spot.z.toFixed(1)}`);
+console.log(`acciona con alcance completo en ${spot.x.toFixed(1)}, ${spot.y.toFixed(1)}, altura ${spot.z.toFixed(1)}, camara a ${spot.camDistance.toFixed(1)} de ${spot.camWant.toFixed(1)}`);
 
 const results = [];
 for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera persona']) {
@@ -270,8 +274,15 @@ for (const view of ['normal', 'camara baja', 'de cerca, girando', 'primera perso
       await writeFile(new URL('../screenshots/slash.png', import.meta.url), hitting.best);
     }
 
-    if (worst === null || (keepBest ? hitting.max > worst : hitting.max < worst)) worst = hitting.max;
-    if (turns > 1) console.log(`  ${view}, rumbo ${turn + 1}: ${hitting.max} pixeles aclarados`);
+    // En la vista normal, un rumbo con la camara pegada a la cabeza no cuenta:
+    // desde ahi el barrido da 0 u 11.886 segun el instante, y era ese numero
+    // grande el que daba el verde (ver `MIN_NORMAL`).
+    const free = here.camDistance >= 0.9 * here.camWant;
+    const counts = !keepBest || free;
+    if (counts && (worst === null || (keepBest ? hitting.max > worst : hitting.max < worst))) worst = hitting.max;
+    if (turns > 1) {
+      console.log(`  ${view}, rumbo ${turn + 1}: ${hitting.max} pixeles aclarados (camara a ${here.camDistance.toFixed(1)} de ${here.camWant.toFixed(1)}${counts ? '' : ': pegada, no cuenta'})`);
+    }
     sent += after.slashesDrawn - before.slashesDrawn;
     gathered += after.gathered - before.gathered;
   }
@@ -320,20 +331,29 @@ console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` :
 
 // Desde que corre en la CI (2026-10-02) tiene que poder fallar: una casilla que
 // mide y nunca sale en rojo es verde sin probar nada. Los suelos, entre lo
-// bueno y los fallos que tuvo (0, 2 y 13 pixeles): la vista normal da ~190 en
-// su mejor rumbo —en uno solo bajaba a 12-16 segun donde acabara el paseo— y
-// el fallo del frustum 0 en todos; la camara baja ~8.000 y los de orientacion 2 y 13;
+// bueno y los fallos que tuvo (0, 2 y 13 pixeles): la vista normal, 12 con la
+// camara libre y el fallo del frustum 0 en todos; la camara baja ~8.000 y los de orientacion 2 y 13;
 // la primera persona ~10.000 y la estocada ~8.900.
 //
 // La vista que gira cerca NO hace fallar: en la CI dio 46, 12 y ~190 sobre el
 // mismo codigo, segun el instante en que la captura pilla un trazo de 0,22 s, y
 // 12 cae justo donde caian los fallos. Como puerta fallaria a suertes; se mide
 // y se imprime para mirarla a mano.
+//
+// La vista normal tiene su propio suelo, y bajo (tanda de fisicas,
+// 2026-10-10). El sector sale de los ojos por la mirada, y en la vista normal
+// la mirada es la de la camara: el plano pasa por ella y el arco se ve de
+// canto, una raya de 12 pixeles en cualquier rumbo con la camara libre. Los
+// ~190, 9.001 u 11.886 de antes venian de rumbos con la camara metida en la
+// cabeza por la colision (a 0,3 de 31,4), que dan eso o 0 segun el instante.
+// Lo que vigila esta vista es el recorte por frustum, y ese da 0 en todos los
+// rumbos: cualquier cosa por encima del ruido lo descarta.
 const MIN_LIT = 20;
+const MIN_NORMAL = 5;
 const MIN_STAB = 500;
 const SIN_PUERTA = new Set(['de cerca, girando']);
 const fallos = results
-  .filter((r) => !SIN_PUERTA.has(r.view) && !(r.lit >= MIN_LIT))
+  .filter((r) => !SIN_PUERTA.has(r.view) && !(r.lit >= (r.view === 'normal' ? MIN_NORMAL : MIN_LIT)))
   .map((r) => `${r.view}: ${r.lit ?? 'sin medida'} pixeles`);
 if (!(stabbing.max >= MIN_STAB)) fallos.push(`estocada: ${stabbing.max} pixeles`);
 if (problems.length) fallos.push('errores de consola');
@@ -363,6 +383,12 @@ async function push(key, ms) {
   }
   await page.keyboard.up(key);
   await page.waitForTimeout(250);
+}
+
+/** Si la camara esta donde quiere, sin que la colision la acerque. */
+async function cameraFree() {
+  const s = await page.evaluate(() => window.__verdant);
+  return s.camDistance >= 0.9 * s.camWant;
 }
 
 /**

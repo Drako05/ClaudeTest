@@ -1583,11 +1583,14 @@ async function stationsPass(browser, baseUrl) {
   // mesa. De lado: detras
   // esta el horno.
   // El rellano del nacimiento es pequeno y lo rodean escalones: se prueba a
-  // cada lado, saltando, hasta pasar del alcance.
+  // cada lado, saltando, hasta pasar del alcance. Primero D: al otro lado (A)
+  // hay arboles, y empujandolos el cuerpo se desliza de lado, con un rumbo de
+  // camara que no es exacto, hasta que su huella toca la esquina del horno y
+  // ya no sale por D (2026-10-10, desde que el terreno se pisa con la huella).
   const near = await state(page);
   const bench0 = near.stationTiles.find((t) => t.feature === 24);
   let away = near;
-  for (const key of ['KeyA', 'KeyD', 'KeyS']) {
+  for (const key of ['KeyD', 'KeyS', 'KeyA', 'KeyD']) {
     await page.keyboard.down(key);
     for (let i = 0; i < 6 && away.inventoryOpen; i++) {
       await page.keyboard.press('Space');
@@ -2569,9 +2572,11 @@ async function faunaPass(browser, baseUrl) {
   check(turned >= 1, 'ningun animal giro mientras paseaba');
 
   // Cazar: la presa mas facil que suelte carne, parada en su punto de paso y
-  // con un buen rato quieta por delante.
+  // con un buen rato quieta por delante. Parada no basta: un animal atascado
+  // lejos de su punto tambien lo esta, y al recargar aparece en el punto (paso
+  // en la CI de la tanda de fisicas).
   const prey = later.fauna
-    .filter((a) => a.species !== 8 && !a.moving && a.calm > 1000)
+    .filter((a) => a.species !== 8 && !a.moving && a.atWaypoint && a.calm > 1000)
     .sort((p, q) => p.maxHealth - q.maxHealth)[0];
   check(prey !== undefined, 'no hay ninguna presa quieta a la que ir');
   if (!prey) return page.close();

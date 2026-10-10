@@ -100,7 +100,12 @@ bajan de 20 pixeles aclarados, o la estocada de 500; los fallos que tuvo daban
 la auditoria del 2026-10-04 mide **sin animales dibujados** (`?fauna=0`, que
 solo quita su dibujo): la vista normal dio una vez 16 en la CI con un codigo
 que habia pasado dos veces, y un animal de bloques paseando por delante del
-barrido es la sospecha), todas a la vez; y un trabajo final, «CI completa», que solo sale
+barrido es la sospecha. Y desde la tanda de fisicas, 2026-10-10, **la vista
+normal cuenta solo los rumbos con la camara libre y su suelo es 5**: el sector
+sale de los ojos por la mirada, que en esa vista es la de la camara, y se ve de
+canto, 12 pixeles en cualquier rumbo libre. Los ~190 y 9.001 de antes salian de
+rumbos con la camara metida en la cabeza por la colision, que dan eso o 0 segun
+el instante; lo que vigila es el recorte por frustum, que da 0 en todos), todas a la vez; y un trabajo final, «CI completa», que solo sale
 verde si todo lo esta. La preparacion —Node, dependencias y Chromium con su
 cache— es una accion compartida, `.github/actions/preparar`, que usan las dos
 tandas. Cada pasada se lanza por el prefijo de su nombre

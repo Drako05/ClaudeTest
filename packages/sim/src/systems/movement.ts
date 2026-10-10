@@ -266,12 +266,6 @@ export const ANIMAL_JUMP_UP = 1;
  */
 const JUMP_LOOK = 2.5;
 
-/**
- * En que parte del ascenso pasan los pies el borde, por orden de ensayo: en lo
- * alto, a tres cuartos y a la mitad. Lo mas justo primero; los otros, por si
- * la cabeza lo retiene contra el escalon los primeros ticks. **Deduccion mia.**
- */
-const LEAP_SHARES = [1, 0.75, 0.5];
 
 /**
  * Los rumbos de un rodeo, desde el de su destino: de mas cerca a mas lejos, y
@@ -309,10 +303,23 @@ function feetBlocked(
   return world.groundHeightAt(cx, cy) > feet + margin;
 }
 
-/** Cuantas veces se mete en el terreno el cuerpo del animal `id` puesto asi. */
-function clashesAt(world: World, store: EntityStore, id: number, x: number, y: number, z: number, fx: number, fy: number): number {
+/**
+ * Cuantas veces se mete en el terreno el cuerpo del animal `id` puesto asi, con
+ * el margen de subida de golpe: `STEP_UP` andando, 0 en el aire.
+ */
+function clashesAt(
+  world: World,
+  store: EntityStore,
+  id: number,
+  x: number,
+  y: number,
+  z: number,
+  fx: number,
+  fy: number,
+  margin = STEP_UP,
+): number {
   const animal = store.animal[id]!;
-  return bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, fx, fy), x, y);
+  return bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, fx, fy), z, margin);
 }
 
 /** Lleva al animal a (`x`, `y`) y deja puesta la velocidad que eso supone. */
@@ -372,9 +379,13 @@ function walkAnimalStep(
   keep?: (x: number, y: number) => boolean,
 ): void {
   const animal = store.animal[id];
+  // La inercia (el autor, 2026-10-10): el avance arranca desde lo que llevaba
+  // y llega a su paso en `INERTIA_TIME`.
+  const before = Math.hypot(store.vx[id], store.vy[id]);
   store.vx[id] = 0;
   store.vy[id] = 0;
   if (!animal || Math.hypot(dirX, dirY) <= 1e-6 || speed <= 0) return;
+  const accel = (speed / INERTIA_TIME) * dt;
   // Sin salida: espera a su siguiente punto de paso (`stepFauna` lo olvida).
   if (store.detourLeft[id] < 0) return;
   const feet = store.z[id];
@@ -420,11 +431,16 @@ function walkAnimalStep(
       return;
     }
   }
-  if (Math.abs(left) > ANIMAL_WALK_CONE) return;
+  // Girando sin avanzar: lo que llevaba se frena deslizandose por su rumbo.
+  if (Math.abs(left) > ANIMAL_WALK_CONE) {
+    glide(world, store, id, Math.max(0, before - accel), dt, keep);
+    return;
+  }
 
-  // El avance, a lo largo de su rumbo y eje a eje.
-  const stepX = fx * speed * dt;
-  const stepY = fy * speed * dt;
+  // El avance, a lo largo de su rumbo y eje a eje, a lo que da la inercia.
+  const pace = Math.min(speed, before + accel);
+  const stepX = fx * pace * dt;
+  const stepY = fy * pace * dt;
   if (!feetBlocked(world, x + stepX, y, feet, keep)) {
     const there = here > 0 ? here : clashes(x + stepX, y, fx, fy);
     if (here > 0 || there === 0) x += stepX;
@@ -433,7 +449,7 @@ function walkAnimalStep(
     if (here > 0 || clashes(x, y + stepY, fx, fy) === 0) y += stepY;
   }
   const moved = Math.hypot(x - store.x[id], y - store.y[id]);
-  if (moved < STALL * speed * dt) {
+  if (moved < STALL * pace * dt) {
     if (!tryJump(world, store, id, speed, dt, keep)) stuck(world, store, id, dirX, dirY, speed, dt, keep, detouring);
     return;
   }
@@ -442,6 +458,58 @@ function walkAnimalStep(
   store.leap[id] = speed;
   if (detouring) store.detourLeft[id] = Math.max(0, store.detourLeft[id] - moved);
   moveTo(store, id, x, y, dt);
+}
+
+/**
+ * Avanza `pace` por segundo a lo largo de su rumbo, eje a eje, sin meter el
+ * cuerpo en el terreno: lo que se desliza un animal que frena.
+ */
+function glide(
+  world: World,
+  store: EntityStore,
+  id: number,
+  pace: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  if (pace <= 0) return;
+  const feet = store.z[id];
+  const fx = store.facingX[id];
+  const fy = store.facingY[id];
+  let x = store.x[id];
+  let y = store.y[id];
+  const here = clashesAt(world, store, id, x, y, feet, fx, fy);
+  const stepX = fx * pace * dt;
+  const stepY = fy * pace * dt;
+  if (!feetBlocked(world, x + stepX, y, feet, keep) && (here > 0 || clashesAt(world, store, id, x + stepX, y, feet, fx, fy) === 0)) {
+    x += stepX;
+  }
+  if (!feetBlocked(world, x, y + stepY, feet, keep) && (here > 0 || clashesAt(world, store, id, x, y + stepY, feet, fx, fy) === 0)) {
+    y += stepY;
+  }
+  moveTo(store, id, x, y, dt);
+}
+
+/**
+ * Un animal que ha llegado a su punto de paso **no se para en seco**: frena
+ * deslizandose por su rumbo en `INERTIA_TIME` (el autor, 2026-10-10), al ritmo
+ * de su paso `speed`.
+ */
+export function brakeAnimal(
+  world: World,
+  store: EntityStore,
+  id: number,
+  speed: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  const before = Math.hypot(store.vx[id], store.vy[id]);
+  store.vx[id] = 0;
+  store.vy[id] = 0;
+  if (!store.animal[id]) return;
+  groundRound(world, store.x[id], store.y[id], () =>
+    glide(world, store, id, Math.max(0, before - (speed / INERTIA_TIME) * dt), dt, keep),
+  );
 }
 
 /**
@@ -517,7 +585,7 @@ function rehearseDetour(
   store.backedUp[id] = 0;
   rehearsing = true;
   rehearsalFailed = false;
-  const ticks = Math.ceil((Math.PI / ANIMAL_TURN_RATE + (ANIMAL_BACKUP + ANIMAL_DETOUR) / speed) / dt) + 1;
+  const ticks = Math.ceil((Math.PI / ANIMAL_TURN_RATE + (ANIMAL_BACKUP + ANIMAL_DETOUR) / speed + INERTIA_TIME) / dt) + 1;
   try {
     for (let t = 0; t < ticks && !rehearsalFailed && store.detourLeft[id] > 0; t++) {
       if (store.grounded[id]) walkAnimalStep(world, store, id, ax, ay, speed, dt, keep);
@@ -537,12 +605,12 @@ function rehearseDetour(
  * - **El borde**: el primer punto, a lo largo de su rumbo, en que el suelo sube
  *   mas de `STEP_UP` bajo sus pies. Si antes hay algo solido o fuera de su
  *   bioma, o sube mas de `ANIMAL_JUMP_UP`, no se salta.
- * - **En el aire avanza lo justo para que sus pies pasen el borde en lo alto
- *   del salto**, donde mas sobra, y nunca mas despacio que su paso
- *   (**deduccion mia**). La parabola es la del jugador; lo que cambia es el
- *   avance, porque un animal largo topa con la cabeza teniendo los pies lejos
- *   del borde: al bisonte adulto le quedan 1,7 bloques, y a la velocidad del
- *   jugador llegaria cayendo. Si asi no llega, prueba los otros `LEAP_SHARES`.
+ * - **En el aire avanza a su paso**, como el jugador (el autor, 2026-10-10:
+ *   «usando las mismas físicas que el jugador»): el salto solo empuja hacia
+ *   arriba. Hasta entonces avanzaba lo justo para que sus pies pasaran el borde
+ *   en lo alto del salto, mas deprisa que su paso si hacia falta; desde que
+ *   todas sus cajas chocan, sus patas delanteras se apoyan arriba antes que el
+ *   resto, y a su paso le basta. Si no llega, lo bordea.
  * - **Ensaya cada salto entero** con las mismas funciones que lo van a mover
  *   —`takeOff`, `airStep` y `applyVertical`, en el orden de `stepFauna`— y lo
  *   deshace: salta si aterriza arriba, mas alto de lo que se sube andando, y
@@ -577,13 +645,9 @@ function tryJump(
     }
   }
   if (edge < 0) return false;
-  for (const share of LEAP_SHARES) {
-    if (rehearseJump(world, store, id, Math.max(speed, edge / (share * (JUMP_SPEED / GRAVITY))), dt, keep)) {
-      takeOff(store, id);
-      return true;
-    }
-  }
-  return false;
+  if (!rehearseJump(world, store, id, speed, dt, keep)) return false;
+  takeOff(store, id);
+  return true;
 }
 
 /**
@@ -655,14 +719,14 @@ function airStep(
   const fy = store.facingY[id];
   let x = store.x[id];
   let y = store.y[id];
-  const here = clashesAt(world, store, id, x, y, z, fx, fy);
+  const here = clashesAt(world, store, id, x, y, z, fx, fy, 0);
   const stepX = fx * store.leap[id] * dt;
   const stepY = fy * store.leap[id] * dt;
   if (!feetBlocked(world, x + stepX, y, z, keep, 0)) {
-    if (here > 0 || clashesAt(world, store, id, x + stepX, y, z, fx, fy) === 0) x += stepX;
+    if (here > 0 || clashesAt(world, store, id, x + stepX, y, z, fx, fy, 0) === 0) x += stepX;
   }
   if (!feetBlocked(world, x, y + stepY, z, keep, 0)) {
-    if (here > 0 || clashesAt(world, store, id, x, y + stepY, z, fx, fy) === 0) y += stepY;
+    if (here > 0 || clashesAt(world, store, id, x, y + stepY, z, fx, fy, 0) === 0) y += stepY;
   }
   moveTo(store, id, x, y, dt);
 }
