@@ -29,8 +29,13 @@ import { aplicar, cayoDeVerdad, motivos, orden, pasadasDelHumo, validar } from '
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST = join(ROOT, 'packages/client/dist/index.html');
-/** Lo que puede tardar una prueba antes de darla por colgada. */
-const LIMITE_MS = 15 * 60 * 1000;
+/**
+ * Lo que puede tardar una prueba antes de darla por colgada. Eran 15 minutos
+ * hasta que `slash` paso a ~17,5 en la CI (tanda de fisicas, 2026-10-10: el
+ * claro y los cuatro rumbos de la camara baja), y la mutacion se cortaba sin
+ * llegar a su FALLO.
+ */
+const LIMITE_MS = 25 * 60 * 1000;
 
 const leer = (fichero) => {
   const ruta = join(ROOT, fichero);
