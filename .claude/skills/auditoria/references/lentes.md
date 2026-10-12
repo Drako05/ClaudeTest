@@ -76,7 +76,9 @@ que nadie toco es justo lo que ninguna tanda mira.
   rumbo y tumbo la casilla; la siguiente tanda dio 12, sobre el mismo
   codigo. El umbral va entre lo bueno medido en varias maquinas y lo malo
   conocido, no pegado a una medida; y una medida que en la CI salta de 12 a
-  190 no sirve de puerta: se imprime, pero no hace fallar.
+  190 no sirve de puerta: se imprime, pero no hace fallar. Y una que no
+  puede fallar no prueba nada (el autor, 2026-10-12): se vuelve determinista
+  (el reloj manual de `docs/pruebas.md`) y se le pone puerta, o se quita.
 - **Medir algo que ya no existe**: el rectangulo de un elemento retirado del
   DOM es todo ceros, y una comprobacion de «se movio» con un `||` que lo
   perdona pasa sin probar nada (la del registro de PC, 7.ª ronda, cazada al

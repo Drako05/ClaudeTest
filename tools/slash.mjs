@@ -396,10 +396,11 @@ console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` :
 // camara libre y el fallo del frustum 0 en todos; la camara baja ~8.000 y los de orientacion 2 y 13;
 // la primera persona ~10.000 y la estocada ~8.900.
 //
-// La vista que gira cerca NO hace fallar: en la CI dio 46, 12 y ~190 sobre el
-// mismo codigo, segun el instante en que la captura pilla un trazo de 0,22 s, y
-// 12 cae justo donde caian los fallos. Como puerta fallaria a suertes; se mide
-// y se imprime para mirarla a mano.
+// La vista que gira cerca hace fallar otra vez, con la de 20 (pedido del autor,
+// 2026-10-12: «si no puede fallar, no tiene sentido la prueba»). Estuvo sin
+// puerta porque en la CI daba 46, 12 o ~190 segun el instante en que la captura
+// pillaba un trazo de 0,22 s; con el reloj manual ya no depende del instante.
+// Y desde el mismo dia se acerca de verdad (con +, no con la rueda): da ~1.300.
 //
 // La vista normal tiene su propio suelo, y bajo (tanda de fisicas,
 // 2026-10-10). El sector sale de los ojos por la mirada, y en la vista normal
@@ -412,9 +413,8 @@ console.log(problems.length ? `PROBLEMAS: ${problems.slice(0, 5).join(' | ')}` :
 const MIN_LIT = 20;
 const MIN_NORMAL = 5;
 const MIN_STAB = 500;
-const SIN_PUERTA = new Set(['de cerca, girando']);
 const fallos = results
-  .filter((r) => !SIN_PUERTA.has(r.view) && !(r.lit >= (r.view === 'normal' ? MIN_NORMAL : MIN_LIT)))
+  .filter((r) => !(r.lit >= (r.view === 'normal' ? MIN_NORMAL : MIN_LIT)))
   .map((r) => `${r.view}: ${r.lit ?? 'sin medida'} pixeles`);
 if (stabbing && !(stabbing.max >= MIN_STAB)) fallos.push(`estocada: ${stabbing.max} pixeles`);
 // Lo pedido tiene que haberse medido: una parte que se salta sin querer saldria
