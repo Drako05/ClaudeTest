@@ -26,10 +26,12 @@
  * de un 5 %. Ajustable en el panel de desarrollo, de 0 (sin suavizar) a
  * `STEP_SMOOTH_MAX`.
  *
- * **Deduccion mia, no aprobada**: el «~0,1 s» de la propuesta, que eligio el
- * autor. La curva tambien es mia: un muelle criticamente amortiguado, que
- * arranca sin velocidad, llega sin codo y nunca se pasa. Con una exponencial
- * simple el primer fotograma ya subia el 40 % del escalon: un tiron.
+ * **Decision del autor** (2026-10-12), tras probarlo con el deslizador: «con
+ * 0,1 s se notan los escalones sin ser incomodos, ya pasados los 0,2 s casi se
+ * pierde el "jalon" del escalon». La curva la propuse yo y es la que probo: un
+ * muelle criticamente amortiguado, que arranca sin velocidad, llega sin codo y
+ * nunca se pasa. Con una exponencial simple el primer fotograma ya subia el
+ * 40 % del escalon: un tiron.
  */
 export const STEP_SMOOTH = 0.1;
 /** Lo que mueve el deslizador del panel de desarrollo. */

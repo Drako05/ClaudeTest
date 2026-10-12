@@ -84,8 +84,12 @@ autor literal y el modelo de la altura de reposo.
    jugador y la fauna se dibujan interpolados entre ticks, y la camara sube el
    escalon en 0,1 s con un muelle (`smooth.ts`, `docs/controles.md`). Las
    deducciones —la curva, lo que cuenta como escalon, el salto a 8—, en
-   `docs/juicio.md`. **Falta que el autor lo pruebe jugando**; el deslizador
-   del panel de desarrollo mueve la duracion. Por el camino, `relief` dio una
+   `docs/juicio.md`. **El autor lo probo y lo da por bueno** (2026-10-12):
+   «se siente mucho la mejoria de la camara al subir escalones. Con 0,1 s se
+   notan los escalones sin ser incomodos, ya pasados los 0,2 s casi se pierde
+   el "jalon" del escalon, asi que considero adecuado mantenerlo en 0,1 s».
+   Y la vista «de cerca» de `slash` vuelve a tener puerta, como pidio
+   (`docs/pruebas.md`). Por el camino, `relief` dio una
    vez 0,64 al correr en vez de 8,32 con el reloj manual, sin repetirse: el
    humo dice ahora si el juego se puso en pausa por medio.
 

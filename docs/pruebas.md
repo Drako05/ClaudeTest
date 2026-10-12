@@ -102,8 +102,13 @@ y tests, y una **matriz con una maquina por pasada del humo** —`desktop`,
 `highRefresh`, `fauna`— mas los gestos y el barrido en pixeles (`slash`, que desde que
 corre aqui **falla** si la vista normal, la camara baja o la primera persona
 bajan de 20 pixeles aclarados, o la estocada de 500; los fallos que tuvo daban
-0, 2 y 13. La vista que gira cerca se mide pero no hace fallar: en la CI dio
-46, 12 y ~190 sobre el mismo codigo, y como puerta fallaria a suertes. Desde
+0, 2 y 13. La vista que gira cerca estuvo sin puerta —en la CI dio 46, 12 y
+~190 sobre el mismo codigo, y como puerta habria fallado a suertes— hasta el
+2026-10-12: el autor pidio que fallara o se quitara («si no puede fallar, no
+tiene sentido la prueba»). Con el reloj manual ya no depende del instante, y
+desde ese dia se acerca de verdad (con +; con la rueda no se movia): da ~1.338
+y lleva la puerta de 20, y el recorte por frustum y la cinta sin ancho la
+dejan en 0 (las dos mutaciones caen con `slash:cerca`). Desde
 la auditoria del 2026-10-04 mide **sin animales dibujados** (`?fauna=0`, que
 solo quita su dibujo): la vista normal dio una vez 16 en la CI con un codigo
 que habia pasado dos veces, y un animal de bloques paseando por delante del
