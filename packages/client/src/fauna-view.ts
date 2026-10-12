@@ -69,9 +69,14 @@ export class FaunaView {
   /**
    * Pone al dia los modelos con la fauna materializada: crea los que faltan,
    * retira los que ya no estan (muertos o lejos) y coloca cada uno en sus pies,
-   * girado con su rumbo.
+   * girado con su rumbo. Los pies son los que diga `at` —interpolados entre
+   * ticks en el juego (`smooth.ts`)— o, sin el, los del ultimo tick.
    */
-  update(fauna: ReadonlyMap<string, number>, store: EntityStore): void {
+  update(
+    fauna: ReadonlyMap<string, number>,
+    store: EntityStore,
+    at: (id: number) => { x: number; y: number; z: number } = (id) => ({ x: store.x[id], y: store.y[id], z: store.z[id] }),
+  ): void {
     for (const [key, mesh] of this.meshes) {
       if (!fauna.has(key)) {
         this.scene.remove(mesh);
@@ -88,7 +93,8 @@ export class FaunaView {
         this.meshes.set(key, mesh);
         this.drawnTotal++;
       }
-      mesh.position.set(store.x[id], store.z[id], store.y[id]);
+      const feet = at(id);
+      mesh.position.set(feet.x, feet.z, feet.y);
       mesh.rotation.y = yawOf(store.facingX[id], store.facingY[id]);
     }
   }

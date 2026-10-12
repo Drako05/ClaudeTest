@@ -2409,7 +2409,7 @@ async function reliefPass(browser, baseUrl) {
   watchProblems(page, 'relieve');
 
   await open(page, baseUrl);
-  const { cliffSpot: spot, peakSpot: peak } = await spots(page);
+  const { cliffSpot: spot, peakSpot: peak, stepSpot: step } = await spots(page);
   check(spot !== null, 'no se encontro ninguna pared de dos bloques');
   if (spot) {
     console.log(`  pared de ${spot.drop} bloques en ${spot.stand.x},${spot.stand.y}`);
@@ -2467,11 +2467,10 @@ async function reliefPass(browser, baseUrl) {
     // Correr: la VELOCIDAD que da el nucleo, no la distancia, que la contesta
     // el paisaje.
     await open(page, baseUrl, at);
-    // De paso, la camara (tanda de fisicas, 2026-10-10): andando va rezagada
-    // —sus ojos, por detras de los del personaje— y aun asi el punto que mira
-    // el personaje esta en el centro de la pantalla.
-    let lagGap = 0;
-    let aimOff = 0;
+    // Si el juego se pone en pausa por medio (el headless soltando el cursor),
+    // se dice: una vez, con el reloj manual, corriendo dio 0,64 y no 8,32, y
+    // no se repitio (2026-10-12).
+    let pausedSeen = false;
     const pushSpeed = async () => {
       await page.keyboard.down('KeyD');
       let best = 0;
@@ -2479,8 +2478,7 @@ async function reliefPass(browser, baseUrl) {
         await elapse(page, 120);
         const s = await state(page);
         best = Math.max(best, s.speed);
-        lagGap = Math.max(lagGap, s.camLagGap);
-        aimOff = Math.max(aimOff, Math.abs(s.aimScreen[0]), Math.abs(s.aimScreen[1]));
+        pausedSeen ||= s.paused;
       }
       await page.keyboard.up('KeyD');
       return best;
@@ -2496,20 +2494,61 @@ async function reliefPass(browser, baseUrl) {
     console.log(`  correr: ${vAndando.toFixed(2)} -> ${vCorriendo.toFixed(2)} casillas/s`);
     check(trasShift === true && trasSegundo === false, 'Shift no se comporta como interruptor');
     check(vAndando > 0, 'andando la velocidad salio cero');
-    check(vCorriendo > vAndando * 1.15, `correr no acelero: ${vAndando} vs ${vCorriendo}`);
+    check(vCorriendo > vAndando * 1.15, `correr no acelero: ${vAndando} vs ${vCorriendo}${pausedSeen ? ' (con el juego en pausa por medio)' : ''}`);
 
-    // Parado, la camara alcanza al personaje.
+    // Parado, la camara esta en los ojos de verdad: sin el retraso de la fase
+    // C, que el autor descarto (2026-10-12), y con la interpolacion ya en el
+    // ultimo tick.
     await elapse(page, 800);
     const still = await state(page);
-    console.log(`  camara: retraso ${still.camLag} s, hasta ${lagGap.toFixed(2)} por detras andando, ` +
-      `${still.camLagGap.toFixed(3)} parado; punto de mira a ${aimOff.toFixed(4)} del centro`);
-    // Sin retraso da 0 exacto: la camara se recoloca en el mismo fotograma en
-    // que se mueve el personaje. Con el, ~0,5 a 60 fotogramas por segundo, y
-    // menos cuantos menos haya (0,19 en una maquina lenta).
-    check(lagGap > 0.08, `andando, la camara no va rezagada: ${lagGap}`);
-    check(lagGap < 2, `la camara se queda demasiado atras: ${lagGap}`);
-    check(still.camLagGap < 0.05, `parado, la camara no alcanza al personaje: ${still.camLagGap}`);
-    check(aimOff < 0.01, `el punto de mira no esta en el centro de la pantalla: ${aimOff}`);
+    const eyeOff = Math.hypot(still.camEyes[0] - still.x, still.camEyes[1] - still.y, still.camEyes[2] - still.z - 1.75);
+    console.log(`  camara parada: a ${eyeOff.toFixed(4)} de los ojos`);
+    check(eyeOff < 1e-6, `parado, la camara no esta en los ojos: a ${eyeOff}`);
+  }
+
+  // El escalon (2026-10-12): el cuerpo lo sube de golpe, como el nucleo, y la
+  // camara se queda abajo y lo sube en `STEP_SMOOTH` (0,1 s). Andando en linea
+  // recta hacia uno de medio bloque, fotograma a fotograma.
+  check(step !== null, 'no se encontro ningun escalon de medio bloque al que subir andando');
+  if (step) {
+    const before = await open(page, baseUrl, `&x=${step.stand.x}&y=${step.stand.y}`);
+    // Encarar el escalon: rumbo al eje `dir` (0,0025 rad por pixel; si giro al
+    // reves, se deshace), y mirar al frente para que W ande por el.
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    const want = Math.atan2(step.dir[1], step.dir[0]);
+    const angle = async () => {
+      const a = (await state(page)).aim;
+      return Math.atan2(a[1], a[0]);
+    };
+    const a0 = await angle();
+    await look(page, wrap(want - a0) / 0.0025, 0);
+    await elapse(page, 50);
+    if (Math.abs(wrap((await angle()) - want)) > 0.05) await look(page, (-2 * wrap(want - a0)) / 0.0025, 0);
+    await elapse(page, 50);
+    const faced = Math.abs(wrap((await angle()) - want));
+    await page.keyboard.down('KeyW');
+    let climb = null;
+    for (let f = 0; f < 120 && !climb; f++) {
+      const prev = await state(page);
+      await elapse(page, 1000 / 60);
+      const now = await state(page);
+      if (now.z - prev.z > 0.4 && now.grounded) climb = { prev, now };
+    }
+    // Lo que queda de desfase cuando se ha apagado, sin andar mas.
+    await page.keyboard.up('KeyW');
+    await elapse(page, 100);
+    const after = await state(page);
+    const rose = climb ? climb.now.z - climb.prev.z : 0;
+    const camRose = climb ? climb.now.camEyes[2] - climb.prev.camEyes[2] : 0;
+    console.log(`  escalon desde ${before.level}: encarado a ${faced.toFixed(3)} rad, el cuerpo sube ${rose.toFixed(2)} ` +
+      `y la camara ${camRose.toFixed(3)} ese fotograma; desfase ${after.camStep.toFixed(4)} a los 0,1 s ` +
+      `(el mayor, ${after.camStepPeak.toFixed(2)})`);
+    check(climb !== null, 'andando hacia el escalon, el cuerpo no lo subio');
+    check(!climb || camRose < rose / 2, `la camara subio el escalon de golpe con el cuerpo: ${camRose} de ${rose}`);
+    // Ni se hunde: interpolar la subida y ademas quedarse abajo la bajaria.
+    check(!climb || camRose > -1e-6, `al subir el escalon la camara bajo: ${camRose}`);
+    check(after.camStepPeak > 0.4, `subir el escalon no dejo la camara abajo: ${after.camStepPeak}`);
+    check(Math.abs(after.camStep) < 0.5 * 0.05, `a los 0,1 s la camara no ha subido el escalon: ${after.camStep}`);
   }
 
   // La cima.
@@ -2621,6 +2660,30 @@ async function highRefreshPass(browser, baseUrl) {
   console.log(`  golpes ${struck}/${STRIKES}, saltos ${jumped}/${JUMPS}`);
   check(struck === STRIKES, `a 144 Hz se perdieron ${STRIKES - struck} de ${STRIKES} golpes`);
   check(jumped === JUMPS, `a 144 Hz se perdieron ${JUMPS - jumped} de ${JUMPS} saltos`);
+
+  // Andando a 144 Hz, la camara se mueve en CADA fotograma (2026-10-12): el
+  // dibujo se interpola entre ticks (`smooth.ts`). Sin interpolar, los
+  // fotogramas sin tick —mas de la mitad a 144 Hz— la dejaban quieta, y eso
+  // es el tiron. Solo con el reloj manual, que es el que deja leer el estado
+  // fotograma a fotograma. Y en horizontal: andando se suben escalones, y el
+  // desfase del escalon mueve la camara en vertical en cada fotograma por su
+  // cuenta, con interpolacion o sin ella.
+  if (manual(page)) {
+    await page.keyboard.down('KeyW');
+    await elapse(page, 400, 144);
+    let still = 0;
+    const FRAMES = 72;
+    let prev = (await state(page)).camEyes;
+    for (let f = 0; f < FRAMES; f++) {
+      await elapse(page, 1000 / 144, 144);
+      const now = (await state(page)).camEyes;
+      if (Math.hypot(now[0] - prev[0], now[1] - prev[1]) < 1e-9) still++;
+      prev = now;
+    }
+    await page.keyboard.up('KeyW');
+    console.log(`  andando a 144 Hz, la camara quieta en ${still} de ${FRAMES} fotogramas`);
+    check(still === 0, `a 144 Hz la camara se queda quieta en ${still} de ${FRAMES} fotogramas: no se interpola`);
+  }
   await page.close();
 }
 

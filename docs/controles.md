@@ -269,30 +269,36 @@ perspectiva, de 0,5 a 0,1, porque la camara puede quedar a un palmo del suelo.
 Con la camara a menos de 1 bloque el sprite del jugador se oculta. Los rayos no
 salen de los chunks cargados: el mas largo mide 60 y se carga radio 3 de 32.
 
-**Y va con retraso** (pedido del autor, 2026-10-10; `camera-lag.ts`, puro). El
-autor, literal: «el retraso igual en todas las vistas y direcciones, el centro
-de la pantalla sigue siendo el punto hacia donde mira y apunta el personaje sin
-importar la ubicacion del personaje». En las tres vistas el pivote son **los
-ojos perseguidos** (`camera.eyes`), que van tras los de verdad con un retraso
-**exponencial** de constante `CAMERA_LAG = 0,1 s`: subir medio bloque, que en el
-nucleo es de golpe, la camara lo sube en una curva, y andando a ritmo constante
-va ~0,1 s por detras (la velocidad por el retraso: ~0,5 andando). Y las
-tres **miran al punto de mira** (`camera.aim`): el primer choque del rayo de la
-mirada desde los ojos DE VERDAD (`rayHit`, con el terreno y los hitboxes, como
-la colision), o su final a 64 si no choca nada. Asi el centro de la pantalla es
-siempre donde apunta, este donde este la camara; sin retraso es lo de antes,
-porque ese punto esta sobre la linea de la mirada. La colision sale del pivote
-perseguido. Mas lejos de 8, la camara no persigue: salta (nacer, reaparecer,
-`?x=&y=`). **La mirada que viaja en la `Intent` no lleva retraso** (regla 5):
-es la del raton o el dedo, `forward()` y `lookPitch`, tal cual. El retraso se
-ajusta en el panel de desarrollo, de 0 a 0,3 (`docs/devtools.md`). Que sea
-exponencial, el salto a 8, el tope de 64 y el minimo de 0,05 del punto de mira
-son deduccion mia (`docs/juicio.md`).
+**Sin tirones** (2026-10-12; `smooth.ts`, puro). Sustituye a la camara con
+retraso de la fase C (2026-10-10: perseguia los ojos con 0,1 s de retraso y
+miraba al punto de mira), que el autor probo y descarto: «no ayudo en nada,
+incluso en primera persona genera tirones raros, es injugable asi». De lo que
+se le propuso eligio esto, en dos piezas, las dos de dibujo:
 
-**El autor la probo el mismo dia y no sirve**: «no ayudo en nada, incluso en
-primera persona genera tirones raros, es injugable asi». Esta en el codigo
-hasta que se acuerde el sustituto; las sospechas y la recomendacion, en
-`docs/pendiente.md`.
+- **El dibujo se interpola entre ticks** (`TickInterpolation`; regla 8). La
+  simulacion va a 60 Hz y la pantalla a lo que de: a 144 Hz mas de la mitad
+  de los fotogramas no llevan tick, y sin interpolar la camara y todo lo que
+  se mueve se quedaban quietos en ellos (el humo lo midio: 42 de 72). Ahora
+  el jugador y la fauna se dibujan entre el tick anterior y el ultimo, en la
+  fraccion de tick que lleva el acumulador. Cuesta un tick de retraso en lo
+  que se ve de la posicion; la mirada no lo lleva. Mas lejos de 8 en un tick
+  no se interpola: se salta (nacer, reaparecer, `?x=&y=`).
+- **El escalon se sube en una curva** (`StepSmoother`). Subir medio bloque
+  andando es de golpe en el nucleo (regla 21), y el cuerpo se dibuja asi; la
+  camara se queda abajo y lo sube en `STEP_SMOOTH = 0,1 s`, con un muelle
+  criticamente amortiguado: arranca sin velocidad, deja menos de un 5 % a los
+  0,1 s y nunca se pasa. El primer fotograma sube el 19 % del escalon; con una
+  exponencial simple subia el 40 %, que era un tiron. Cuenta como escalon una
+  subida de golpe con los pies en el suelo antes y despues; saltar, caer o
+  aterrizar no. Una escalera seguida se suma. Se ajusta en el panel de
+  desarrollo, de 0 a 0,3 (`docs/devtools.md`).
+
+La camara **mira por la linea de la mirada**, en las tres vistas, como antes de
+la fase C: el centro de la pantalla es hacia donde se mira desde los ojos que
+se dibujan. **La mirada que viaja en la `Intent` no cambia** (regla 5): es la
+del raton o el dedo, `forward()` y `lookPitch`, tal cual, y el golpe sale de
+los ojos de verdad. La duracion, la curva, el salto a 8 y lo que cuenta como
+escalon son deduccion mia (`docs/juicio.md`).
 
 **Consecuencia a saber**: como la mirada pasa por los ojos del jugador, en
 tercera persona **el personaje tapa el centro de la pantalla**, que es justo

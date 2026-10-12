@@ -107,3 +107,9 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `tope de 15 minutos|15 minutos antes de dar` — lo que `mutar.mjs` esperaba antes de dar una prueba por colgada; desde el 2026-10-10 son 25 (`LIMITE_MS`). Permitido en: `docs/historia.md`.
 - `se alcanza \(PENDIENTE DEL AUTOR\)|CHOQUE DE DOS DECISIONES TUYAS` — el bloque a dos casillas a altura 2 que la huella entera alcanza; el autor lo acepto el 2026-10-10 («no hay problema en que se alcancen más casillas siempre que se respeten las leyes físicas»). Permitido en: `docs/pendiente.md`, `docs/historia.md`.
 - `feetOnly|footPartsOf` — las cajas mas bajas de un animal, con las que se apoyaba hasta la fase B de fisicas; desde entonces reposa con todas (`partsRest`), y la auditoria del 2026-10-10 retiro lo que quedaba. Permitido en: `docs/pendiente.md`, `docs/historia.md`.
+
+## La camara con retraso de la fase C (2026-10-12)
+
+- `camera-lag|CAMERA_LAG|cameraLag|camLagGap|aimScreen|aimPoint|AIM_FAR|AIM_NEAR|CAMERA_SNAP|\bchase\(|camera\.aim\b|camera\.lag\b|devLag` — la camara que perseguia los ojos con 0,1 s de retraso y miraba al punto de mira (fase C de fisicas, 2026-10-10); el autor la descarto, y desde el 2026-10-12 el dibujo se interpola entre ticks y solo el escalon se suaviza (`smooth.ts`). Permitido en: `docs/historia.md`, `docs/pendiente.md`.
+- `retraso de la camara|camara (va )?(con|rezagada) retraso|ojos perseguidos|camara rezagada|va rezagada` — la misma, en palabras. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `docs/controles.md` (cuenta que se sustituyo), `docs/devtools.md` (lo mismo), `docs/juicio.md` (lo mismo), `packages/client/src/smooth.ts` (lo mismo), `packages/client/src/camera.ts` (lo mismo), `tests/smooth.test.ts` (lo mismo).
+- `mouse\.wheel\(0, -120\)` — acercar la vista «de cerca» de `slash` con la rueda, que desde que la rueda recorre la barra de la mano no acercaba nada; desde el 2026-10-12, con `Equal`. Permitido en: `docs/historia.md`.
