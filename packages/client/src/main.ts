@@ -91,9 +91,11 @@ import {
   peakSpot,
   reliefAround,
   stationTilesAround,
+  stepSpot,
   stoneOreSpot,
 } from './probes.js';
 import { skyTint, tintCss } from './sky.js';
+import { StepSmoother, TickInterpolation } from './smooth.js';
 import * as clock from './clock.js';
 import {
   faunaShownFromLocation,
@@ -686,6 +688,15 @@ const manualClock = manualClockFromLocation();
 if (manualClock) clock.startManualClock();
 let last = clock.now();
 let accumulator = 0;
+/** Lo de antes del ultimo tick, para dibujar entre ese y el (`smooth.ts`). */
+const interp = new TickInterpolation();
+/** El desfase de la camara al subir un escalon (`smooth.ts`). */
+const stepCam = new StepSmoother();
+/** Lo que se dibuja y se interpola: el jugador y la fauna materializada. */
+function* drawnIds(): Iterable<number> {
+  yield state.playerId;
+  yield* state.fauna.values();
+}
 let fpsFrames = 0;
 let fpsWindow = 0;
 let fps = 0;
@@ -905,7 +916,15 @@ function runFrame(now: number, draw: boolean): void {
             (tx, ty) => hitboxAt(state.world, tx, ty),
           )
         : null;
+    // Lo de antes del tick, para dibujar entre este y el siguiente (`smooth.ts`).
+    const pid = state.playerId;
+    const zAntes = state.entities.z[pid];
+    interp.capture(drawnIds(), state.entities.x, state.entities.y, state.entities.z);
     step(state, intent);
+    // Un escalon subido de golpe: el cuerpo no se interpola, y la camara se
+    // queda abajo y lo sube en `STEP_SMOOTH` (pedido del autor, 2026-10-12).
+    const lifted = stepCam.tick(zAntes, state.entities.z[pid], !!pisabaAntes, !!state.entities.grounded[pid]);
+    if (lifted) interp.lift(pid, lifted);
     // La estacion recien puesta cae desde donde la toco la mirada (pedido del
     // autor: todo tiene gravedad). Solo se ve: el nucleo ya la tiene en su sitio.
     if (state.lastPlaced) stations.drop(state.lastPlaced, state.world);
@@ -1026,11 +1045,18 @@ function runFrame(now: number, draw: boolean): void {
   debugBoxes.update(state, dev.showBoxes);
   skyEl.style.background = tintCss(skyTint(state.tick));
 
-  const px = state.entities.x[state.playerId];
-  const py = state.entities.y[state.playerId];
-  // La altura que LLEVA, no la del suelo: con gravedad dejan de ser lo mismo, y
-  // leyendo el suelo el personaje seguiria pegado al terreno saltando.
-  const ph = state.entities.z[state.playerId];
+  // Donde se dibuja: entre el tick anterior y el ultimo, en la fraccion de tick
+  // que lleva el acumulador (`smooth.ts`; regla 8). La altura es la que LLEVA,
+  // no la del suelo: con gravedad dejan de ser lo mismo, y leyendo el suelo el
+  // personaje seguiria pegado al terreno saltando.
+  const alpha = accumulator / TICK_DT;
+  const drawnAt = (id: number) =>
+    interp.at(id, { x: state.entities.x[id], y: state.entities.y[id], z: state.entities.z[id] }, alpha);
+  const body = drawnAt(state.playerId);
+  const px = body.x;
+  const py = body.y;
+  const ph = body.z;
+  stepCam.advance(dt, dev.stepSmooth);
   water.position.set(px, WATER_Y, py);
 
   const w = window.innerWidth;
@@ -1040,26 +1066,16 @@ function runFrame(now: number, draw: boolean): void {
   scene.fog = camera.projection === 'orto' ? null : haze;
   // La camara no atraviesa bloques ni objetos (pedido del autor): choca con el
   // mismo terreno y los mismos hitboxes que el golpe. Los ejes de three.js
-  // (`y` arriba) pasan a los del nucleo (`z` arriba).
-  // Con retraso (`camera-lag.ts`): la colision, desde los ojos que persigue; el
-  // punto al que mira, con el rayo de la mirada desde los de verdad.
+  // (`y` arriba) pasan a los del nucleo (`z` arriba). Sus ojos van con el
+  // desfase del escalon (`stepCam`), y la colision sale de ellos.
   const ground = (x: number, y: number) => state.world.groundHeightAt(x, y);
   const boxAt = (tx: number, ty: number) => hitboxAt(state.world, tx, ty);
-  camera.lag = dev.cameraLag;
-  camera.follow(
-    px,
-    ph,
-    py,
-    w,
-    h,
-    (from, back, want) =>
-      cameraClearance({ x: from.x, y: from.z, z: from.y }, { x: back.x, y: back.z, z: back.y }, want, ground, boxAt),
-    (from, dir, far) =>
-      rayHit({ x: from.x, y: from.z, z: from.y }, { x: dir.x, y: dir.z, z: dir.y }, far, ground, boxAt),
-    dt,
+  camera.follow(px, ph + stepCam.offset, py, w, h, (from, back, want) =>
+    cameraClearance({ x: from.x, y: from.z, z: from.y }, { x: back.x, y: back.z, z: back.y }, want, ground, boxAt),
   );
-  // La fauna, cada modelo en sus pies y girado con su rumbo.
-  if (showFauna) faunaView.update(state.fauna, state.entities);
+  // La fauna, cada modelo en sus pies —interpolados, como el jugador— y
+  // girado con su rumbo.
+  if (showFauna) faunaView.update(state.fauna, state.entities, drawnAt);
   if (player) {
     billboards.moveTo(player, px, ph, py);
     // Desde dentro no se dibuja el cuerpo: en primera persona, y cuando la
@@ -1180,19 +1196,11 @@ Object.defineProperty(window, '__verdant', {
       camDistance: camera.camDistance,
       /** La que querria sin la colision. */
       camWant: camera.camWant,
-      /** El retraso de la camara, y lo que van sus ojos por detras de los de verdad. */
-      camLag: camera.lag,
-      camLagGap: camera.eyes.distanceTo(
-        new Vector3(e.x[state.playerId], e.z[state.playerId] + EYE_HEIGHT, e.y[state.playerId]),
-      ),
-      /** Alto de los ojos que persigue la camara, en coordenadas del nucleo. */
-      camEyesZ: camera.eyes.y,
-      /** El punto que mira el personaje, en la pantalla (-1 a 1): el centro es 0, 0. */
-      aimScreen: (() => {
-        camera.active.updateMatrixWorld();
-        const p = camera.aim.clone().project(camera.active);
-        return [p.x, p.y];
-      })(),
+      /** Los ojos con que se dibuja la camara, en coordenadas del nucleo (`z` arriba). */
+      camEyes: [camera.eyes.x, camera.eyes.z, camera.eyes.y],
+      /** Lo que la camara va por debajo de los ojos tras un escalon, y el mayor desde el arranque. */
+      camStep: stepCam.offset,
+      camStepPeak: stepCam.peak,
       /** Cuanto queda la camara por ENCIMA del suelo que tiene debajo. */
       camClearance:
         camera.active.position.y -
@@ -1356,6 +1364,7 @@ Object.defineProperty(window, '__verdant', {
       spots: () => ({
         relief: reliefAround(state),
         cliffSpot: cliffSpot(state),
+        stepSpot: stepSpot(state),
         peakSpot: peakSpot(state),
         mineralSpot: mineralSpot(state),
         stoneOreSpot: stoneOreSpot(state),

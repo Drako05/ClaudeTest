@@ -100,6 +100,57 @@ export function cliffSpot(state: GameState): { stand: { x: number; y: number }; 
 }
 
 /**
+ * Un escalon de medio bloque que se sube andando en linea recta, para ver
+ * subir la camara (`smooth.ts`, 2026-10-12).
+ *
+ * Por columnas de 0,5, como `cliffSpot`: el sitio es el centro de una columna
+ * con sus ocho vecinas a su altura, y en un eje (`dir`) la franja de tres
+ * columnas de ancho —la huella entera, 0,68, cae en ella— sigue llana una
+ * columna mas y luego sube medio bloque y se queda ahi tres columnas. Sin agua
+ * ni nada que estorbe en las casillas de ese camino.
+ */
+export function stepSpot(
+  state: GameState,
+): { stand: { x: number; y: number }; dir: [number, number] } | null {
+  const pvx = voxelOf(state.entities.x[state.playerId]);
+  const pvy = voxelOf(state.entities.y[state.playerId]);
+  const gen = state.world.gen;
+  const R = 120 * VOXELS_PER_TILE;
+  const clear = (vx: number, vy: number) => {
+    const tx = Math.floor(vx / VOXELS_PER_TILE);
+    const ty = Math.floor(vy / VOXELS_PER_TILE);
+    const terrain = gen.terrainAt(tx, ty);
+    return !isTerrainSolid(terrain) && !blocksBody(gen.featureAt(tx, ty, terrain));
+  };
+
+  let best: { stand: { x: number; y: number }; dir: [number, number]; d: number } | null = null;
+  for (let vy = pvy - R; vy <= pvy + R; vy++) {
+    for (let vx = pvx - R; vx <= pvx + R; vx++) {
+      const d = Math.max(Math.abs(vx - pvx), Math.abs(vy - pvy));
+      if (best && d >= best.d) continue;
+      const h = gen.columnTopAt(vx, vy);
+      if (h < 0) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        let ok = true;
+        // A lo largo: -1 a 1 llano (el sitio), 2 a 4 medio bloque arriba.
+        for (let along = -1; along <= 4 && ok; along++) {
+          const want = along <= 1 ? h : h + 1;
+          for (let across = -1; across <= 1 && ok; across++) {
+            const cx = vx + dx * along + dy * across;
+            const cy = vy + dy * along + dx * across;
+            ok = gen.columnTopAt(cx, cy) === want && clear(cx, cy);
+          }
+        }
+        if (!ok) continue;
+        best = { stand: { x: (vx + 0.5) / VOXELS_PER_TILE, y: (vy + 0.5) / VOXELS_PER_TILE }, dir: [dx, dy], d };
+        break;
+      }
+    }
+  }
+  return best ? { stand: best.stand, dir: best.dir } : null;
+}
+
+/**
  * Resumen del relieve alrededor del jugador, para la prueba de humo.
  *
  * Los numeros que interesan: que haya varias alturas —si no, el relieve no se

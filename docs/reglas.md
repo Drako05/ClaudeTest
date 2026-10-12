@@ -49,7 +49,10 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
 7. *(Retirada con el isometrico: la capa ordenada por profundidad. Ver
    `docs/isometrico.md`.)*
 8. **Paso de tiempo fijo.** La simulacion avanza en incrementos de `TICK_DT`. La
-   interpolacion para el render es cosa del cliente.
+   interpolacion para el render es cosa del cliente, y la hace desde el
+   2026-10-12 (`smooth.ts`): el jugador y la fauna se dibujan entre el tick
+   anterior y el ultimo. Sin ella, a 144 Hz mas de la mitad de los fotogramas
+   dejaban quieto lo que se movia (`docs/controles.md`).
 9. **Lo unico que detiene el paso es el agua.** La roca estuvo en
    `isTerrainSolid` y eso convertia el bioma de montana entero en un muro contra
    el que se chocaba; de paso explicaba que no tuviera nada dentro. Si algo tiene

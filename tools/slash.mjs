@@ -263,7 +263,11 @@ for (const [part, view] of Object.entries(VIEWS)) {
     // golpe. Las dos cosas juntas son lo que hace caer una esfera envolvente
     // congelada: quieta y de frente, ese punto se queda dentro del frustum, que
     // en ortografica tiene 1300 unidades de fondo.
-    for (let i = 0; i < 20; i++) await page.mouse.wheel(0, -120);
+    //
+    // Con + (`Equal`), no con la rueda: desde que la rueda recorre la barra de
+    // la mano, el zoom va con + y -, y con la rueda esta vista medio de 31,4,
+    // lo mismo que la normal (2026-10-12).
+    for (let i = 0; i < 20; i++) await page.keyboard.press('Equal');
     await elapse(600);
   }
 

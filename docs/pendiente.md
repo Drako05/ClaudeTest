@@ -79,6 +79,16 @@ autor literal y el modelo de la altura de reposo.
    entre ticks**. La inercia de camara no la recomendaria: anade latencia a la
    mirada, que es la que apunta el golpe.
 
+   **HECHO (2026-10-12)**: el autor eligio esa recomendacion, «escalon +
+   interpolar». Fuera el retraso y el punto de mira (camera-lag.ts); el
+   jugador y la fauna se dibujan interpolados entre ticks, y la camara sube el
+   escalon en 0,1 s con un muelle (`smooth.ts`, `docs/controles.md`). Las
+   deducciones —la curva, lo que cuenta como escalon, el salto a 8—, en
+   `docs/juicio.md`. **Falta que el autor lo pruebe jugando**; el deslizador
+   del panel de desarrollo mueve la duracion. Por el camino, `relief` dio una
+   vez 0,64 al correr en vez de 8,32 con el reloj manual, sin repetirse: el
+   humo dice ahora si el juego se puso en pausa por medio.
+
 Aparte, y pendiente del autor: **las paredes de 2+ voxeles**, que el
 relieve interpolado casi elimino (de 38-47 m de pared de 1 m o mas por 100 m² a
 1,6-3); se le propusieron cuatro opciones (A: interpolar solo los desniveles de
@@ -246,17 +256,32 @@ fases de fisicas y las pruebas mas rapidas (22 commits).
   en «que decides tu», abajo, porque toca la fisica del salto que se va a
   debatir con la cabeza que sube primero.
 - `mobile` sigue con el reloj de verdad: quedo fuera de la tanda de pruebas.
+- **El registro de PC de `desktop` cayo otra vez en la CI de `pruebas`**
+  (`54028eb`): la linea murio sin verse moverse (`alive: false`, y 623 -> 0),
+  con la pasada a 304 s en un runner lento. Relanzada una vez, paso. Es la
+  comprobacion del escape 23, con el reloj de verdad a proposito; si vuelve a
+  caer, la salida es medir la deriva en la pagina con el tiempo del juego y
+  no con temporizadores del navegador, y no subir el plazo.
 
 **Verificado**: typecheck y los 515 tests en local; el escaner con su
 autoprueba (13 categorias); `analyze-world` (0,14/0,76/0,61 pt, como en la
 fase 1) y `shots`, que funcionan; y la CI de `pruebas`.
+
+**El alcance, dicho claro**: linea a linea, lo nuevo de fisicas
+(`movement.ts`, `boxes.ts`, `body.ts`, y camera-lag.ts, retirado el
+2026-10-12), el reloj
+(`clock.ts` y el bucle de `main.ts`) y sus documentos; lo demas, con el
+escaner, busquedas por lente y las cabeceras. Las comprobaciones de la tanda
+ya se mutaron en sus rondas; aqui solo las tocadas.
+
+**Aprendido** (fase 6): escapes 25-27 en la skill, la categoria 13 del
+escaner y sus patrones en las lentes A, D y F.
 
 **Que decides tu:**
 1. **Inercia de los animales en el aire**: (a) que arranquen el salto con lo
    que llevaban y aceleren en el aire en 0,1 s, como el jugador; (b) dejarlo
    como esta, porque un salto ya es un arranque; (c) decidirlo con lo de la
    cabeza que sube primero.
-
 
 ## Guia de arte — en progreso (abierta el 2026-10-04)
 

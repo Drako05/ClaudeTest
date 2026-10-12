@@ -11,56 +11,59 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: pruebas mas rapidas, fase 3 (2026-10-10): el humo con el reloj manual
- * (`?reloj=manual`, `clock.ts`). Lo que hay que ver es que las comprobaciones
- * siguen mordiendo sin el reloj de verdad: un reloj que no avanza no puede
- * pasar, la pasada de 144 Hz sigue viendo el fallo que vigila con frames
- * fingidos de 1/144 s, y lo que dependia del ritmo de fotogramas (la camara
- * rezagada) se sigue midiendo.
+ * Ronda: la camara sin tirones (2026-10-12). Fuera el retraso de la fase C;
+ * el dibujo se interpola entre ticks y la camara sube el escalon en una curva
+ * (`smooth.ts`). Lo que hay que ver: que el humo note que no se interpola, que
+ * la camara sube el escalon de golpe o se hunde al subirlo, y que los tests
+ * del modulo puro muerden su curva.
  */
 export default [
-  // Un reloj manual que no avanza el juego: ningun tick, y el humo lo dice.
+  // Sin interpolar: a 144 Hz, en los fotogramas sin tick, la camara no se mueve.
   {
-    nombre: 'el reloj manual no avanza el juego',
+    nombre: 'el dibujo no se interpola entre ticks',
     fichero: 'packages/client/src/main.ts',
-    de: '          runFrame(clock.now(), false);',
-    a: '          runFrame(last, false);',
-    prueba: 'smoke:life',
-  },
-  // El fallo que vigila la pasada de 144 Hz: los pestillos recogidos en todos
-  // los frames, tambien en los que no corren tick, se pierden.
-  {
-    nombre: 'a 144 Hz se recogen los pestillos en frames sin tick',
-    fichero: 'packages/client/src/main.ts',
-    de: '  const collect = accumulator >= TICK_DT || scaled === 0;',
-    a: '  const collect = true;',
+    de: '  const alpha = accumulator / TICK_DT;',
+    a: '  const alpha = 1;',
     prueba: 'smoke:highRefresh',
   },
-  // `slash` con el reloj manual: se dibuja solo cuando se captura (y mientras
-  // vive el primer golpe), asi que hay que ver que sus dos fallos de siempre
-  // siguen cayendo. El recorte por frustum necesita que el primer golpe se
-  // haya DIBUJADO para plantar su esfera.
+  // Sin el desfase: la camara sube el escalon de golpe con el cuerpo.
   {
-    nombre: 'barrido recortado por el frustum',
-    fichero: 'packages/client/src/effects-view.ts',
-    de: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = false;',
-    a: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = true;',
-    prueba: 'slash:baja',
-  },
-  {
-    nombre: 'el barrido de tercera persona no tiene ancho',
-    fichero: 'packages/client/src/effects.ts',
-    de: 'export const SLASH_HALF_WIDTH = 0.06;',
-    a: 'export const SLASH_HALF_WIDTH = 0;',
-    prueba: 'slash:baja',
-  },
-  // La camara rezagada, que con el headless lento daba 0,19 y ahora se mide a
-  // 60 Hz exactos: sin retraso tiene que seguir cayendo.
-  {
-    nombre: 'en el juego la camara va sin retraso',
+    nombre: 'la camara sube el escalon de golpe',
     fichero: 'packages/client/src/main.ts',
-    de: '  camera.lag = dev.cameraLag;',
-    a: '  camera.lag = 0;',
+    de: '  camera.follow(px, ph + stepCam.offset, py, w, h,',
+    a: '  camera.follow(px, ph, py, w, h,',
     prueba: 'smoke:relief',
+  },
+  // Sin `lift`: se interpola la subida Y se queda abajo, y la camara se hunde.
+  {
+    nombre: 'la subida del escalon se interpola',
+    fichero: 'packages/client/src/main.ts',
+    de: '    if (lifted) interp.lift(pid, lifted);',
+    a: '    if (lifted) interp.lift(pid, 0);',
+    prueba: 'smoke:relief',
+  },
+  // El mismo `lift`, en el modulo puro y su test.
+  {
+    nombre: 'lift no sube lo de antes',
+    fichero: 'packages/client/src/smooth.ts',
+    de: '    if (p) p.z += dz;',
+    a: '    if (p) p.z += 0;',
+    prueba: 'test:tests/smooth.test.ts',
+  },
+  // Un muelle tres veces mas blando: a los 0,1 s no ha subido.
+  {
+    nombre: 'el escalon tarda en subir',
+    fichero: 'packages/client/src/smooth.ts',
+    de: 'const SETTLE = 4.744;',
+    a: 'const SETTLE = 1.5;',
+    prueba: 'smoke:relief',
+  },
+  // La exponencial simple de la primera version: un tiron en el primer fotograma.
+  {
+    nombre: 'el escalon arranca de golpe',
+    fichero: 'packages/client/src/smooth.ts',
+    de: '    this.offset = (this.offset + carry * t) * decay;',
+    a: '    this.offset = this.offset * Math.exp((-3 * t) / time);',
+    prueba: 'test:tests/smooth.test.ts',
   },
 ];
