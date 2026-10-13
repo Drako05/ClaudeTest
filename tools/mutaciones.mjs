@@ -11,25 +11,34 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: la vista «de cerca» de `slash` vuelve a tener puerta (2026-10-12,
- * pedido del autor: «si no puede fallar, no tiene sentido la prueba»). Se
- * queda solo si caza algo: los dos fallos del barrido de siempre.
+ * Ronda: `mobile` pasa al reloj manual (2026-10-13). Las comprobaciones de la
+ * pasada que dependen de que el juego corra entre toques —la accion mantenida,
+ * el catalejo que vuelve y el sostenido de TAP— tienen que seguir cayendo con
+ * el reloj manual; si no, esperan a un juego parado y no comprueban nada.
  */
 export default [
-  // Para lo que se hizo: una esfera envolvente congelada, que cae acercandose
-  // y girando.
+  // La accion mantenida repite cada 15 ticks: a 600 no repite en los 2,4 s.
   {
-    nombre: 'barrido recortado por el frustum, de cerca',
-    fichero: 'packages/client/src/effects-view.ts',
-    de: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = false;',
-    a: 'Ocho mallas no valen un recorte.\n      mesh.frustumCulled = true;',
-    prueba: 'slash:cerca',
+    nombre: 'mobile: la accion mantenida no repite',
+    fichero: 'packages/client/src/main.ts',
+    de: 'const ACTION_REPEAT_TICKS = 15;',
+    a: 'const ACTION_REPEAT_TICKS = 600;',
+    prueba: 'smoke:mobile',
   },
+  // El catalejo vuelve con el `dt` del frame: a 8 s no vuelve en 1,2.
   {
-    nombre: 'el barrido de tercera persona no tiene ancho, de cerca',
-    fichero: 'packages/client/src/effects.ts',
-    de: 'export const SLASH_HALF_WIDTH = 0.06;',
-    a: 'export const SLASH_HALF_WIDTH = 0;',
-    prueba: 'slash:cerca',
+    nombre: 'mobile: el catalejo no vuelve al soltar',
+    fichero: 'packages/client/src/camera.ts',
+    de: 'const SPYGLASS_RELAX = 0.08;',
+    a: 'const SPYGLASS_RELAX = 8;',
+    prueba: 'smoke:mobile',
+  },
+  // El sostenido de TAP no se reconoce nunca: el dedo nunca lleva `HOLD_MS`.
+  {
+    nombre: 'mobile: el sostenido de TAP no se reconoce',
+    fichero: 'packages/client/src/controls.ts',
+    de: 'if (this.gestures.promoteHold(id, performance.now())) {',
+    a: 'if (this.gestures.promoteHold(id, -1e9)) {',
+    prueba: 'smoke:mobile',
   },
 ];
