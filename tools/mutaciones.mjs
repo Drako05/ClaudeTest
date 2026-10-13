@@ -49,6 +49,14 @@ export default [
     a: 'return [vx, vy];',
     prueba: 'test:tests/jump.test.ts',
   },
+  // Sin saltar para girar, en las laderas no se ve ni un salto de giro.
+  {
+    nombre: 'fisica: sin salto de giro',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '      if (tryTurnJump(world, store, id, goal, dt, keep)) return;',
+    a: '      if (goal !== goal) return;',
+    prueba: 'test:tests/fauna.test.ts',
+  },
   // Si al caer aterriza con todo, y no solo con la base, sube a lo que tiene metido.
   {
     nombre: 'fisica: al caer aterriza con todo',

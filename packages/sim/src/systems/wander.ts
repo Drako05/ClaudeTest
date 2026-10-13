@@ -53,6 +53,8 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
   }
   store.repelling[id] = 0;
   store.impulse[id] = 0;
+  store.turnToX[id] = 0;
+  store.turnToY[id] = 0;
   store.z[id] = world.groundHeightAt(store.x[id], store.y[id]);
   // Mirando de su origen a su punto de paso: lo mismo lo mire alguien o no.
   faceToFit(world, store, id, animal, Math.atan2(target.y - animal.homeY, target.x - animal.homeX));

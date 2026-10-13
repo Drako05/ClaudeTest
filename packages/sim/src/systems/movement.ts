@@ -557,8 +557,10 @@ function walkAnimalMove(
   const before = Math.hypot(store.vx[id], store.vy[id]);
   store.vx[id] = 0;
   store.vy[id] = 0;
-  // En el suelo, el impulso del salto ya no cuenta.
+  // En el suelo, el impulso del salto y el giro en el aire ya no cuentan.
   store.impulse[id] = 0;
+  store.turnToX[id] = 0;
+  store.turnToY[id] = 0;
   if (!animal || Math.hypot(dirX, dirY) <= 1e-6 || speed <= 0) return;
   const accel = (speed / INERTIA_TIME) * dt;
   // Sin salida: espera a su siguiente punto de paso (`stepFauna` lo olvida).
@@ -602,6 +604,9 @@ function walkAnimalMove(
         moveTo(store, id, bx, by, dt);
         return;
       }
+      // Ni retrocediendo: salta en el sitio y gira en el aire (el autor,
+      // 2026-10-13, «salta para girar»).
+      if (tryTurnJump(world, store, id, goal, dt, keep)) return;
       stuck(world, store, id, dirX, dirY, speed, dt, keep, detouring);
       return;
     }
@@ -692,6 +697,8 @@ export function brakeAnimal(
   store.vx[id] = 0;
   store.vy[id] = 0;
   store.impulse[id] = 0;
+  store.turnToX[id] = 0;
+  store.turnToY[id] = 0;
   if (!store.animal[id]) return;
   groundRound(world, store.x[id], store.y[id], () => {
     glide(world, store, id, Math.max(0, before - (speed / INERTIA_TIME) * dt), dt, keep);
@@ -747,7 +754,7 @@ let rehearsalFailed = false;
 /** Lo que un ensayo cambia de un animal, para deshacerlo. */
 const SAVED = [
   'x', 'y', 'z', 'vx', 'vy', 'vz', 'grounded', 'facingX', 'facingY', 'detourX', 'detourY', 'detourLeft', 'backedUp', 'impulse',
-  'repelling', 'repelX', 'repelY',
+  'repelling', 'repelX', 'repelY', 'turnToX', 'turnToY',
 ] as const;
 const saved = new Float64Array(SAVED.length);
 
@@ -886,7 +893,60 @@ function rehearseJump(
 }
 
 /**
- * Un tick de un animal en el aire: no gira, y **anda**, como el jugador (el
+ * Lo menos que tiene que girar un salto de giro para que valga la pena: menos,
+ * y no se da. **Deduccion mia.**
+ */
+const TURN_JUMP_MIN = Math.PI / 12;
+
+/**
+ * **Salta para girar** (el autor, 2026-10-13): el giro hacia `goal` no cabe en
+ * el suelo ni retrocediendo —en una ladera de escalones, la cabeza de un animal
+ * de cabeza baja barre los de arriba al dar media vuelta—. Salta en el sitio,
+ * sin avanzar ni impulso, y gira en el aire a su ritmo (`airStep`), donde la
+ * cabeza ya pasa por encima. Un salto dura ~0,39 s, ~70° de giro: media vuelta
+ * son dos o tres saltos. Se ensaya entero y se da si aterriza cabiendo y al
+ * menos `TURN_JUMP_MIN` mas cerca de su rumbo (**deduccion mia**).
+ */
+function tryTurnJump(
+  world: World,
+  store: EntityStore,
+  id: number,
+  goal: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  if (!store.grounded[id]) return false;
+  const kept = SAVED.map((k) => store[k][id]);
+  const off = () => Math.abs(turnBetween(Math.atan2(store.facingY[id], store.facingX[id]), goal));
+  const before = off();
+  const launch = () => {
+    store.vx[id] = 0;
+    store.vy[id] = 0;
+    store.impulse[id] = 0;
+    store.turnToX[id] = Math.cos(goal);
+    store.turnToY[id] = Math.sin(goal);
+    takeOff(store, id);
+  };
+  launch();
+  applyVertical(world, store, id, dt);
+  for (let t = 0; t < 120 && !store.grounded[id]; t++) {
+    airStep(world, store, id, 0, dt, keep);
+    applyVertical(world, store, id, dt);
+  }
+  const turns =
+    store.grounded[id] === 1 &&
+    store.repelling[id] === 0 &&
+    off() < before - TURN_JUMP_MIN &&
+    clashesAt(world, store, id, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]) === 0;
+  SAVED.forEach((k, i) => (store[k][id] = kept[i]));
+  if (!turns) return false;
+  launch();
+  return true;
+}
+
+/**
+ * Un tick de un animal en el aire: no gira —salvo en un salto de giro
+ * (`tryTurnJump`)—, y **anda**, como el jugador (el
  * autor, 2026-10-10: «usando las mismas físicas que el jugador»): su paso
  * `speed` por su rumbo, con la inercia de `INERTIA_TIME` desde lo que llevaba
  * —`vx`, `vy` son lo que anda—, mas el impulso de su salto (`impulse`), que no
@@ -923,10 +983,25 @@ function airStep(
     return;
   }
   const z = store.z[id];
+  const rising = store.vz[id] > 0;
+  // Un salto de giro: gira hacia su rumbo, hasta lo que da un tick, si el
+  // cuerpo cabe girado (sin margen, como subiendo), y no anda.
+  const turning = store.turnToX[id] !== 0 || store.turnToY[id] !== 0;
+  if (turning) {
+    const have = Math.atan2(store.facingY[id], store.facingX[id]);
+    const left = turnBetween(have, Math.atan2(store.turnToY[id], store.turnToX[id]));
+    const turn = Math.max(-ANIMAL_TURN_RATE * dt, Math.min(ANIMAL_TURN_RATE * dt, left));
+    const nfx = Math.cos(have + turn);
+    const nfy = Math.sin(have + turn);
+    if (turn !== 0 && clashesAt(world, store, id, store.x[id], store.y[id], z, nfx, nfy, 0, 0) === 0) {
+      store.facingX[id] = nfx;
+      store.facingY[id] = nfy;
+    }
+  }
   const fx = store.facingX[id];
   const fy = store.facingY[id];
-  const rising = store.vz[id] > 0;
-  steer(store, id, fx * speed, fy * speed, speed / INERTIA_TIME, dt);
+  const pace = turning ? 0 : speed;
+  steer(store, id, fx * pace, fy * pace, Math.max(speed, 1e-9) / INERTIA_TIME, dt);
   const push = store.impulse[id];
   let x = store.x[id];
   let y = store.y[id];

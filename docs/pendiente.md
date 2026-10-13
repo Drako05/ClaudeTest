@@ -56,6 +56,18 @@ autor literal y el modelo de la altura de reposo.
    que no son las patas» (cabeza, cuello, tronco, cola); si el impulso minimo
    rompe «saltan a su paso» (decision suya del mismo dia) o es la excepcion; que
    animales llegan a 1 m; y si las patas siguen subiendo medio bloque de golpe.
+
+   **HECHO (2026-10-13)**, con lo que pidio el autor ese dia: el animal cuyas
+   patas no serian lo primero en tocar un escalon de 0,5 o 1 salta antes de
+   tocarlo, con el **impulso horizontal minimo** para que sus patas delanteras
+   lleguen arriba (constante todo el vuelo, sumado a lo que anda en el aire); y
+   **el choque va por fases**, para animales y jugador: subiendo y en
+   horizontal, todas las cajas; bajando, solo la base, y lo demas lo saca la
+   **repulsion** (4 m/s, en horizontal, gana al mando). Al medirlo aparecio que
+   en las laderas de escalones un animal de cabeza baja no podia dar media
+   vuelta; el autor eligio **saltar para girar** («luego me explicas bien y lo
+   ajustamos»: **pendiente de explicarselo**). Esta en `docs/reglas.md` (21) y
+   `docs/fauna.md`; las deducciones, en `docs/juicio.md`.
 3. **La camara con retraso no sirve: «no ayudo en nada, incluso en primera
    persona genera tirones raros, es injugable asi».** Pide un metodo de suavizado
    de verdad, y deja la recomendacion al agente (sugiere, sin cerrarlo, inercia

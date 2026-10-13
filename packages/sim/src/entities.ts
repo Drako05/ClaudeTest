@@ -84,6 +84,13 @@ export class EntityStore {
    */
   readonly impulse: Float32Array;
   /**
+   * El rumbo al que gira un animal en un salto de giro (`tryTurnJump`): salta
+   * en el sitio cuando en el suelo no le cabe el giro, y gira en el aire. (0, 0)
+   * si no salta para girar.
+   */
+  readonly turnToX: Float32Array;
+  readonly turnToY: Float32Array;
+  /**
    * La repulsion (`repel` en `movement.ts`): 1 mientras el cuerpo sale de algo
    * en que se metio cayendo, por el rumbo (`repelX`, `repelY`); 2 si no
    * encontro por donde salir, hasta que deje de estar metido; 0 si no.
@@ -121,6 +128,8 @@ export class EntityStore {
     this.detourLeft = new Float32Array(capacity);
     this.backedUp = new Float32Array(capacity);
     this.impulse = new Float32Array(capacity);
+    this.turnToX = new Float32Array(capacity);
+    this.turnToY = new Float32Array(capacity);
     this.repelling = new Uint8Array(capacity);
     this.repelX = new Float32Array(capacity);
     this.repelY = new Float32Array(capacity);
@@ -154,6 +163,8 @@ export class EntityStore {
     this.detourLeft[id] = 0;
     this.backedUp[id] = 0;
     this.impulse[id] = 0;
+    this.turnToX[id] = 0;
+    this.turnToY[id] = 0;
     this.repelling[id] = 0;
     return id;
   }
