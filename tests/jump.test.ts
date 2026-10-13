@@ -491,6 +491,47 @@ describe('El agua es muro tambien en el aire', () => {
   });
 });
 
+describe('Cayendo solo choca la base (el autor, 2026-10-13)', () => {
+  it('saltando contra una pared alta y empujando hacia ella, al caer entra un tick y la repulsion lo saca', () => {
+    // Una pared de 3 al norte (y < 0); el jugador, al pie, salta empujando
+    // hacia ella sin parar.
+    const world = heightField((_x, y) => (y < 0 ? 3 : 0));
+    const store = new EntityStore(4);
+    const id = store.spawn(EntityKind.Player, 0.5, 0.5);
+    let deepest = 0;
+    let wasInside = false;
+    let rose = false;
+    for (let t = 0; t < 120; t++) {
+      if (store.grounded[id]) {
+        moveEntity(world, store, id, 0, -1, TICK_DT);
+        if (t === 0) takeOff(store, id);
+      } else {
+        moveAirborne(world, store, id, 0, -1, TICK_DT);
+      }
+      applyVertical(world, store, id, TICK_DT);
+      // De pie, solo en el suelo: lo que tiene metido no lo sostiene.
+      if (store.grounded[id]) expect(store.z[id]).toBe(0);
+      const inside = BODY_RADIUS - store.y[id];
+      // Subiendo, la cara lo estampa: no entra.
+      if (store.vz[id] > 0) {
+        rose = true;
+        expect(inside).toBeLessThanOrEqual(1e-9);
+      }
+      deepest = Math.max(deepest, inside);
+      if (inside > 1e-9) wasInside = true;
+    }
+    expect(rose).toBe(true);
+    expect(wasInside).toBe(true);
+    // Lo de un tick andando, y nada mas: la repulsion gana al mando.
+    expect(deepest).toBeLessThanOrEqual(WALK_SPEED * TICK_DT + 1e-9);
+    // Acaba fuera de la pared, de pie al pie de ella, sin subirse.
+    expect(store.y[id]).toBeGreaterThanOrEqual(BODY_RADIUS - 1e-9);
+    expect(store.grounded[id]).toBe(1);
+    expect(store.z[id]).toBe(0);
+    expect(store.repelling[id]).toBe(0);
+  });
+});
+
 describe('Saltar el tiempo sigue equivaliendo a vivirlo quieto', () => {
   it('tambien en pleno vuelo', () => {
     // La equivalencia es una regla del proyecto: `skipTime` tiene que ser `step`

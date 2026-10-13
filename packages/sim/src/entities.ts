@@ -77,8 +77,20 @@ export class EntityStore {
   readonly detourLeft: Float32Array;
   /** Lo que lleva retrocedido un animal para que le quepa un giro. */
   readonly backedUp: Float32Array;
-  /** A que velocidad avanza un animal en el aire: la de su salto, o la de su paso si se cayo andando. */
-  readonly leap: Float32Array;
+  /**
+   * El impulso horizontal del salto de un animal, a lo largo de su rumbo, en
+   * bloques por segundo (`tryJump`): constante todo el vuelo y sumado a lo que
+   * anda en el aire (el autor, 2026-10-13). Se borra al tocar suelo.
+   */
+  readonly impulse: Float32Array;
+  /**
+   * La repulsion (`repel` en `movement.ts`): 1 mientras el cuerpo sale de algo
+   * en que se metio cayendo, por el rumbo (`repelX`, `repelY`); 2 si no
+   * encontro por donde salir, hasta que deje de estar metido; 0 si no.
+   */
+  readonly repelling: Uint8Array;
+  readonly repelX: Float32Array;
+  readonly repelY: Float32Array;
   /** Huecos de entidades retiradas, que `spawn` reutiliza antes de crecer. */
   private readonly free: number[] = [];
 
@@ -108,7 +120,10 @@ export class EntityStore {
     this.detourY = new Float32Array(capacity);
     this.detourLeft = new Float32Array(capacity);
     this.backedUp = new Float32Array(capacity);
-    this.leap = new Float32Array(capacity);
+    this.impulse = new Float32Array(capacity);
+    this.repelling = new Uint8Array(capacity);
+    this.repelX = new Float32Array(capacity);
+    this.repelY = new Float32Array(capacity);
   }
 
   spawn(kind: EntityKind, x: number, y: number): number {
@@ -138,7 +153,8 @@ export class EntityStore {
     this.wanderPeriod[id] = Number.NaN;
     this.detourLeft[id] = 0;
     this.backedUp[id] = 0;
-    this.leap[id] = 0;
+    this.impulse[id] = 0;
+    this.repelling[id] = 0;
     return id;
   }
 

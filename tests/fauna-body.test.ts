@@ -10,6 +10,8 @@ import {
   EntityStore,
   hitboxAt,
   rayOrientedBox,
+  REPEL_SPEED,
+  takeOff,
   walkAnimal,
   type Animal,
   type World,
@@ -70,7 +72,7 @@ function walk(
 ): void {
   for (let t = 0; t < seconds * 60; t++) {
     if (store.grounded[id]) walkAnimal(world, store, id, dx, dy, 1, 1 / 60, keep);
-    else airborneAnimal(world, store, id, 1 / 60, keep);
+    else airborneAnimal(world, store, id, 1, 1 / 60, keep);
     applyVertical(world, store, id, 1 / 60);
     each?.();
   }
@@ -169,7 +171,7 @@ describe('el cuerpo choca con el terreno', () => {
     expect(bison.store.facingX[bison.id]).toBeLessThan(0.99);
   });
 
-  it('no mete la cabeza en un escalon de un bloque: lo salta, y una liebre sube una escalera de medio bloque', () => {
+  it('no mete la cabeza en un escalon de un bloque: lo salta, y una liebre sube saltando una escalera de medio bloque', () => {
     const step = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
     for (const species of [Species.Bison, Species.Hare]) {
       const a = lone(species, 0, 0.5, 1, 0);
@@ -185,10 +187,20 @@ describe('el cuerpo choca con el terreno', () => {
       expect(a.store.z[a.id]).toBe(1);
       expect(a.store.x[a.id]).toBeGreaterThan(4);
     }
-    // Una escalera de medio bloque, de x = 2 a x = 3: se sube andando.
+    // Una escalera de medio bloque, de x = 2 a x = 3. Hasta el 2026-10-13 la
+    // liebre la subia andando, con el hocico subiendola de golpe; ahora el
+    // hocico llega antes que las patas, y salta cada escalon (el autor).
     const stairs = fakeWorld(() => false, (x) => (x < 2.5 ? 0 : x < 3 ? 0.5 : 1));
     const hare = lone(Species.Hare, 0, 0.5, 1, 0);
-    walk(stairs, hare.store, hare.id, 1, 0, 5, () => expect(hare.store.grounded[hare.id]).toBe(1));
+    let flights = 0;
+    let wasGrounded = true;
+    walk(stairs, hare.store, hare.id, 1, 0, 5, () => {
+      const s = hare.store;
+      if (wasGrounded && !s.grounded[hare.id]) flights++;
+      wasGrounded = s.grounded[hare.id] === 1;
+      if (s.grounded[hare.id] || s.vz[hare.id] > 0) expect(clashesOf(stairs, s, hare.id)).toBe(0);
+    });
+    expect(flights).toBe(2);
     expect(hare.store.x[hare.id]).toBeGreaterThan(3.5);
     expect(hare.store.z[hare.id]).toBe(1);
   });
@@ -294,18 +306,26 @@ describe('el cuerpo choca con el terreno', () => {
  * —a su paso— y arrancan y frenan con inercia.
  */
 describe('todas sus cajas chocan siempre, saltan a su paso y tienen inercia', () => {
-  it('bajando un escalon no cae hasta que caben todas sus cajas: las patas traseras no se meten en el', () => {
+  it('bajando un escalon no cae mientras lo pisa una pata; cayendo, lo que se mete lo saca la repulsion', () => {
     // Arriba a 1 hasta x = 3; abajo, a 0.
     const ledge = fakeWorld(() => false, (x) => (x < 3 ? 1 : 0));
     const bison = lone(Species.Bison, 1, 0.5, 1, 0);
     bison.store.z[bison.id] = 1;
     let fell = false;
+    let repelled = false;
     walk(ledge, bison.store, bison.id, 1, 0, 6, () => {
-      // Ninguna caja dentro del escalon, ni cayendo ni de pie.
-      expect(clashesOf(ledge, bison.store, bison.id)).toBe(0);
-      if (!bison.store.grounded[bison.id]) fell = true;
+      const s = bison.store;
+      // De pie, ninguna caja dentro del escalon. Cayendo solo choca la base
+      // (el autor, 2026-10-13): el tronco que asoma sobre el borde entra y la
+      // repulsion lo saca, en horizontal y sin desviarse del borde.
+      if (s.grounded[bison.id] && s.repelling[bison.id] === 0) expect(clashesOf(ledge, s, bison.id)).toBe(0);
+      if (!s.grounded[bison.id]) fell = true;
+      if (s.repelling[bison.id] === 1) repelled = true;
+      expect(s.y[bison.id]).toBeCloseTo(0.5, 9);
     });
     expect(fell).toBe(true);
+    expect(repelled).toBe(true);
+    expect(clashesOf(ledge, bison.store, bison.id)).toBe(0);
     expect(bison.store.z[bison.id]).toBe(0);
     expect(bison.store.x[bison.id]).toBeGreaterThan(4);
   });
@@ -360,5 +380,119 @@ describe('todas sus cajas chocan siempre, saltan a su paso y tienen inercia', ()
     }
     expect(hare.store.x[hare.id]).toBeGreaterThan(x0);
     expect(ticks).toBeLessThanOrEqual(6);
+  });
+});
+
+/**
+ * Lo que pidio el autor el 2026-10-13: si lo primero que tocaria un escalon no
+ * son sus patas, salta antes de tocarlo, con el impulso horizontal minimo para
+ * que sus patas delanteras lleguen arriba —constante todo el vuelo y sumado a
+ * lo que anda en el aire—. Y el choque por fases: subiendo y en horizontal
+ * chocan todas las cajas; bajando, solo la base, y lo demas que se meta lo
+ * saca la repulsion, en horizontal y a `REPEL_SPEED`.
+ */
+describe('salta antes de tocar, con el impulso minimo, y al caer solo choca la base', () => {
+  const halfStep = fakeWorld(() => false, (x) => (x >= 3 ? 0.5 : 0));
+  const fullStep = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
+
+  interface TakeOff {
+    x: number;
+    y: number;
+    z: number;
+    vx: number;
+    vy: number;
+    impulse: number;
+  }
+
+  /**
+   * Anda hacia +x desde `x0` y dice si salto, desde donde y con que impulso.
+   * De pie y subiendo, ninguna caja entra en nada: no espera a chocar.
+   */
+  function approach(world: World, species: Species, x0 = 0, seconds = 8) {
+    const a = lone(species, x0, 0.5, 1, 0);
+    let takeoff: TakeOff | null = null;
+    let groundZ = a.store.z[a.id];
+    walk(world, a.store, a.id, 1, 0, seconds, () => {
+      const s = a.store;
+      if (!takeoff && !s.grounded[a.id]) {
+        takeoff = { x: s.x[a.id], y: s.y[a.id], z: groundZ, vx: s.vx[a.id], vy: s.vy[a.id], impulse: s.impulse[a.id] };
+      }
+      if (s.grounded[a.id]) groundZ = s.z[a.id];
+      if (s.grounded[a.id] || s.vz[a.id] > 0) expect(clashesOf(world, s, a.id), Species[species]).toBe(0);
+    });
+    return { a, takeoff: takeoff as TakeOff | null };
+  }
+
+  /** Repite un salto desde `from` con otro impulso y otro paso en el aire; devuelve la altura a la que acaba. */
+  function replay(world: World, species: Species, from: TakeOff, impulse: number, speed: number): number {
+    const { store, id } = lone(species, from.x, from.y, 1, 0);
+    store.z[id] = from.z;
+    store.vx[id] = from.vx;
+    store.vy[id] = from.vy;
+    store.impulse[id] = impulse;
+    takeOff(store, id);
+    applyVertical(world, store, id, 1 / 60);
+    for (let t = 0; t < 180 && !store.grounded[id]; t++) {
+      airborneAnimal(world, store, id, speed, 1 / 60);
+      applyVertical(world, store, id, 1 / 60);
+    }
+    return store.z[id];
+  }
+
+  it('una liebre, que llega con el hocico, salta el escalon de medio bloque sin tocarlo', () => {
+    const { a, takeoff } = approach(halfStep, Species.Hare);
+    expect(takeoff).not.toBeNull();
+    expect(a.store.z[a.id]).toBe(0.5);
+    expect(a.store.x[a.id]).toBeGreaterThan(4);
+  });
+
+  it('un bisonte adulto, que llega con las patas, sube andando el de medio bloque; el de uno lo salta con impulso', () => {
+    const half = approach(halfStep, Species.Bison);
+    expect(half.takeoff).toBeNull();
+    expect(half.a.store.z[half.a.id]).toBe(0.5);
+    const full = approach(fullStep, Species.Bison);
+    expect(full.takeoff).not.toBeNull();
+    expect(full.takeoff!.impulse).toBeGreaterThan(0);
+    expect(full.a.store.z[full.a.id]).toBe(1);
+  });
+
+  it('el impulso es el minimo, y solo no basta: hace falta andar en el aire', () => {
+    const { takeoff } = approach(fullStep, Species.Bison);
+    const from = takeoff!;
+    // El paso del ayudante `walk` es 1.
+    expect(replay(fullStep, Species.Bison, from, from.impulse, 1)).toBe(1);
+    expect(replay(fullStep, Species.Bison, from, from.impulse - 0.1, 1)).toBeLessThan(1);
+    expect(replay(fullStep, Species.Bison, { ...from, vx: 0, vy: 0 }, from.impulse, 0)).toBeLessThan(1);
+  });
+
+  it('lo recibe aunque estuviera parado al pie del escalon', () => {
+    const probe = lone(Species.Hare, 0, 0.5, 1, 0);
+    const x0 = 3 - frontOf(probe.store, probe.id) - 1e-3;
+    const a = lone(Species.Hare, x0, 0.5, 1, 0);
+    expect(a.store.vx[a.id]).toBe(0);
+    walk(halfStep, a.store, a.id, 1, 0, 1 / 60);
+    expect(a.store.grounded[a.id]).toBe(0);
+    walk(halfStep, a.store, a.id, 1, 0, 3);
+    expect(a.store.z[a.id]).toBe(0.5);
+  });
+
+  it('cayendo, lo que se mete se repele en horizontal a REPEL_SPEED, sin subir ni bajar por ello', () => {
+    // El bisonte que baja del rellano: su tronco asoma sobre el borde al caer.
+    const ledge = fakeWorld(() => false, (x) => (x < 3 ? 1 : 0));
+    const bison = lone(Species.Bison, 1, 0.5, 1, 0);
+    const s = bison.store;
+    s.z[bison.id] = 1;
+    let pushed = 0;
+    let last = { x: s.x[bison.id], y: s.y[bison.id] };
+    walk(ledge, s, bison.id, 1, 0, 6, () => {
+      const moved = Math.hypot(s.x[bison.id] - last.x, s.y[bison.id] - last.y);
+      last = { x: s.x[bison.id], y: s.y[bison.id] };
+      if (s.repelling[bison.id] !== 1) return;
+      // Lo que anda (1) mas la repulsion, y nada mas.
+      expect(moved).toBeLessThanOrEqual((1 + REPEL_SPEED) / 60 + 1e-9);
+      if (moved > 1 / 60 + 1e-6) pushed++;
+    });
+    expect(pushed).toBeGreaterThan(0);
+    expect(clashesOf(ledge, s, bison.id)).toBe(0);
   });
 });

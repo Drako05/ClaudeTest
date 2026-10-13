@@ -51,6 +51,8 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
     store.x[id] = x;
     store.y[id] = y;
   }
+  store.repelling[id] = 0;
+  store.impulse[id] = 0;
   store.z[id] = world.groundHeightAt(store.x[id], store.y[id]);
   // Mirando de su origen a su punto de paso: lo mismo lo mire alguien o no.
   faceToFit(world, store, id, animal, Math.atan2(target.y - animal.homeY, target.x - animal.homeX));
@@ -100,7 +102,7 @@ function faceToFit(world: World, store: EntityStore, id: number, animal: Animal,
     let angle = start;
     for (let k = 0; k < 8; k++) {
       const a = start + (k * Math.PI) / 4;
-      const clashes = bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, Math.cos(a), Math.sin(a)), z, STEP_UP);
+      const clashes = bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, Math.cos(a), Math.sin(a)), z, 0, STEP_UP);
       if (clashes < fewest) {
         fewest = clashes;
         angle = a;
@@ -185,7 +187,7 @@ export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, t
     // casillas.
     groundRound(world, store.x[id], store.y[id], () => {
       if (!store.grounded[id]) {
-        airborneAnimal(world, store, id, TICK_DT, keep);
+        airborneAnimal(world, store, id, info.speed, TICK_DT, keep);
       } else if (Math.hypot(dx, dy) > ARRIVE_DISTANCE) {
         walkAnimal(world, store, id, dx, dy, info.speed, TICK_DT, keep);
       } else {
