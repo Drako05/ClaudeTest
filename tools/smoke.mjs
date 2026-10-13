@@ -84,7 +84,7 @@ function spots(page) {
 
 /** Las pasadas que van con el reloj manual. `desktop` se queda con el de verdad a proposito: alguna tiene que probar el bucle real. */
 const MANUAL_PASSES = new Set([
-  'lifePass', 'reliefPass', 'faunaPass', 'devToolsPass', 'stationsPass', 'resourcesPass', 'highRefreshPass',
+  'lifePass', 'reliefPass', 'faunaPass', 'devToolsPass', 'stationsPass', 'resourcesPass', 'highRefreshPass', 'mobilePass',
 ]);
 /** Si la pasada en curso va con el reloj manual; lo pone el bucle de pasadas. */
 let manualPass = false;
@@ -1703,7 +1703,7 @@ async function mobilePass(browser, baseUrl) {
   // La barra de la mano, arriba en el movil: tocar una casilla la elige.
   const beforeTap = await state(page);
   await page.tap('#hotbar .slot:nth-child(2)');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const tapped = await state(page);
   check(tapped.itemsSent.select > beforeTap.itemsSent.select && tapped.selectedSlot === 1,
     `tocar la casilla 2 de la barra no la eligio (${tapped.selectedSlot})`);
@@ -1805,7 +1805,7 @@ async function mobilePass(browser, baseUrl) {
   }
   console.log(`  desarrollo en el movil: ${JSON.stringify(devPanelR)}, pisa ${pisados.join(',') || 'nada'}`);
   check(pisados.length === 0, `el panel de desarrollo pisa mandos: ${pisados}`);
-  await page.screenshot({ path: join(SHOTS, '3d-04b-movil-desarrollo.png') });
+  await shot(page, '3d-04b-movil-desarrollo.png');
   await page.tap('#devToggle');
   await page.waitForTimeout(200);
   check(!(await page.isVisible('#devPanel')) && !(await state(page)).dev, 'tocar otra vez no cerro el panel de desarrollo');
@@ -1814,7 +1814,7 @@ async function mobilePass(browser, baseUrl) {
   await page.waitForTimeout(200);
   check(await page.isVisible('#invPanel'), 'tocar el boton no abrio el inventario en el movil');
   check(!(await state(page)).paused, 'abrir el inventario en el movil pauso');
-  await page.screenshot({ path: join(SHOTS, '3d-04-movil.png') });
+  await shot(page, '3d-04-movil.png');
   check((await page.locator('.pageNav').count()) === 0, 'siguen las flechas del inventario');
   const tabsOf = () => page.evaluate(() =>
     Array.from(document.querySelectorAll('#invTabs button')).map((b) => {
@@ -1933,7 +1933,8 @@ async function mobilePass(browser, baseUrl) {
       { type: 'pointerup', id: 3, x: 195 - to, y: 300 },
       { type: 'pointerup', id: 4, x: 195 + to, y: 300 },
     ]);
-    await page.waitForTimeout(200);
+    // La pinza se aplica a la camara en el frame (`takeZoom`).
+    await elapse(page, 200);
     return (await state(page)).distance;
   };
   const d0 = (await state(page)).distance;
@@ -1949,7 +1950,7 @@ async function mobilePass(browser, baseUrl) {
   await page.tap('#others');
   await page.tap('#proj');
   await page.tap('#proj');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   check((await state(page)).projection === 'primera', 'tocar el ojo dos veces no llevo a la primera persona');
   const fov0 = (await state(page)).fov;
   await pointers(page, [
@@ -1962,13 +1963,14 @@ async function mobilePass(browser, baseUrl) {
       { type: 'pointermove', id: 6, x: 225 + i * 8, y: 300 },
     ]);
   }
-  await page.waitForTimeout(400);
+  // El catalejo se estrecha y vuelve en el frame, con su `dt`.
+  await elapse(page, 400);
   const fovHeld = (await state(page)).fov;
   await pointers(page, [
     { type: 'pointerup', id: 5, x: 85, y: 300 },
     { type: 'pointerup', id: 6, x: 305, y: 300 },
   ]);
-  await page.waitForTimeout(1200);
+  await elapse(page, 1200);
   const fovAfter = (await state(page)).fov;
   console.log(`  catalejo: ${fov0} -> ${fovHeld.toFixed(1)} (apoyado) -> ${fovAfter.toFixed(1)} (soltado)`);
   check(fovHeld < fov0, 'en primera persona la pinza no estrecho el campo de vision');
@@ -1996,7 +1998,7 @@ async function mobilePass(browser, baseUrl) {
   for (const p of outside) {
     await pointers(page, [{ type: 'pointerdown', id: 1, ...p }]);
     await pointers(page, [{ type: 'pointermove', id: 1, x: p.x + 26, y: p.y - 26 }]);
-    await page.waitForTimeout(200);
+    await elapse(page, 200);
     const shown = await page.isVisible('#stick.on');
     await pointers(page, [{ type: 'pointerup', id: 1, x: p.x + 26, y: p.y - 26 }]);
     check(!shown, `el joystick salio fuera de su zona, en ${p.x.toFixed(0)},${p.y.toFixed(0)}`);
@@ -2007,7 +2009,7 @@ async function mobilePass(browser, baseUrl) {
   const beforeStick = await state(page);
   await pointers(page, [{ type: 'pointerdown', id: 1, ...stick }]);
   await pointers(page, [{ type: 'pointermove', id: 1, x: stick.x + 26, y: stick.y - 26 }]);
-  await page.waitForTimeout(800);
+  await elapse(page, 800);
   check(await page.isVisible('#stick.on'), 'el joystick no aparecio al apoyar el pulgar');
   await pointers(page, [{ type: 'pointerup', id: 1, x: stick.x + 26, y: stick.y - 26 }]);
   const afterStick = await waitForLoop(page, 20);
@@ -2020,18 +2022,18 @@ async function mobilePass(browser, baseUrl) {
   const still = await state(page);
   await pointers(page, [{ type: 'pointerdown', id: 1, ...stick }]);
   await pointers(page, [{ type: 'pointermove', id: 1, x: stick.x + 5, y: stick.y }]);
-  await page.waitForTimeout(500);
+  await elapse(page, 500);
   await pointers(page, [{ type: 'pointerup', id: 1, x: stick.x + 5, y: stick.y }]);
   const drifted = await waitForLoop(page, 10);
   check(Math.hypot(drifted.x - still.x, drifted.y - still.y) < 1e-6, 'la zona muerta no aguanta');
 
   // Correr: interruptor con luz.
   await tap(page, '#run');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const on = await state(page);
   const lit = await page.isVisible('#run.on');
   await tap(page, '#run');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const off = await state(page);
   console.log(`  correr: ${spawn.running} -> ${on.running} -> ${off.running} (luz: ${lit})`);
   check(spawn.running === false, 'se empieza corriendo');
@@ -2056,7 +2058,7 @@ async function mobilePass(browser, baseUrl) {
   check(geo.auto.top >= geo.run.bottom || geo.auto.right <= geo.run.left, 'el auto salto pisa CORRER');
   check(spawn.autoJump === false, 'el auto salto arranca encendido');
   await tap(page, '#autoJump');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const autoOn = await state(page);
   const autoLit = await page.isVisible('#autoJump.on');
   check(autoOn.autoJump === true && autoLit, 'el boton de auto salto no lo encendio o no lo muestra');
@@ -2069,7 +2071,7 @@ async function mobilePass(browser, baseUrl) {
   check(reopened.autoJump === true && (await again.isVisible('#autoJump.on')), 'el auto salto no se recordo');
   await again.close();
   await tap(page, '#autoJump');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const autoOff = await state(page);
   console.log(`  auto salto: ${spawn.autoJump} -> ${autoOn.autoJump} (luz: ${autoLit}, recordado: ${reopened.autoJump}) -> ${autoOff.autoJump}`);
   check(autoOff.autoJump === false && !(await page.isVisible('#autoJump.on')), 'el auto salto no se apago al segundo toque');
@@ -2079,9 +2081,9 @@ async function mobilePass(browser, baseUrl) {
   // Saltar y usar: el toque llega a la Intent.
   const b = await state(page);
   await tap(page, '#jump');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   await tap(page, '#use');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   const a = await state(page);
   console.log(`  intents: ${JSON.stringify(b.sent)} -> ${JSON.stringify(a.sent)}`);
   check(a.sent.jump > b.sent.jump, 'el boton de saltar no llego a la Intent');
@@ -2092,12 +2094,12 @@ async function mobilePass(browser, baseUrl) {
   // de donde dejo el joystick al jugador.
   const h0 = await open(page, baseUrl);
   await tapButton(page, '#action', 'touchstart');
-  await page.waitForTimeout(1600);
+  await elapse(page, 1600);
   // Y sin soltar, ese mismo dedo se arrastra: gira la camara y la accion sigue
   // repitiendo (pedido del autor).
   const holding = await state(page);
   for (let i = 1; i <= 16; i++) await tapButton(page, '#action', 'touchmove', -i * 10, -i * 2);
-  await page.waitForTimeout(800);
+  await elapse(page, 800);
   const draggedHold = await state(page);
   await tapButton(page, '#action', 'touchend', -160, -32);
   const h1 = await waitForLoop(page, 10);
@@ -2115,7 +2117,7 @@ async function mobilePass(browser, baseUrl) {
   if (!(await page.isVisible('#statsToggle'))) await page.tap('#others');
   await page.tap('#statsToggle');
   check(await page.isVisible('#statsPanel'), 'el panel no se abrio al tocarlo en movil');
-  await page.screenshot({ path: join(SHOTS, '3d-05-movil-panel.png') });
+  await shot(page, '3d-05-movil-panel.png');
   await page.tap('#statsToggle');
 
   // ENTRADA (decision del autor, 2026-10-01): MIRA, como siempre, o TAP, que
@@ -2136,7 +2138,7 @@ async function mobilePass(browser, baseUrl) {
   const inMira = await tapWorld(worldAt);
   check(inMira.sent.tapUse === t0.sent.tapUse && inMira.sent.tapHarvest === t0.sent.tapHarvest, 'en MIRA tocar el mundo actuo');
   await tap(page, '#inputMode');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const t1 = await state(page);
   check(t1.tapInput === true && (await inputIcon()) === 'tap', 'ENTRADA no paso a TAP o su icono no lo dice');
   const againTap = await context.newPage();
@@ -2160,7 +2162,7 @@ async function mobilePass(browser, baseUrl) {
   const flatness = async (p) => {
     const before = (await state(page)).sent.tapHarvest;
     await tapWorld(p);
-    await page.waitForFunction((n) => window.__verdant.sent.tapHarvest > n, before, { timeout: 5000 }).catch(() => {});
+    await until(page, (n) => window.__verdant.sent.tapHarvest > n, before, { timeout: 5000 }).catch(() => {});
     const pts = (await state(page)).lastSweep?.points;
     if (!pts) return Infinity;
     const xs = pts.map((q) => q.x);
@@ -2186,22 +2188,27 @@ async function mobilePass(browser, baseUrl) {
   check(Math.abs(dragTo.yaw - dragFrom.yaw) > 0.05, 'en TAP arrastrar no giro la camara');
   // Mantener: ataca en cuanto se reconoce el sostenido y luego cuatro veces
   // por segundo.
-  // Se espera a que lleguen tres golpes, no un tiempo fijo (escape 13).
+  // Se espera a que lleguen tres golpes, no un tiempo fijo (escape 13). El
+  // sostenido lo reconoce un temporizador del navegador (`HOLD_MS`, 300 ms, en
+  // `controls.ts`), que va con el reloj de verdad aunque el juego no: primero
+  // se le deja dispararse, y luego `until` avanza los ticks en que se cuentan
+  // los golpes.
   const h0t = await state(page);
   await pointers(page, [{ type: 'pointerdown', id: 3, ...worldAt }]);
-  await page.waitForFunction((n) => window.__verdant.sent.tapHarvest >= n, h0t.sent.tapHarvest + 3, { timeout: 8000 }).catch(() => {});
+  if (manual(page)) await page.waitForTimeout(450);
+  await until(page, (n) => window.__verdant.sent.tapHarvest >= n, h0t.sent.tapHarvest + 3, { timeout: 8000 }).catch(() => {});
   const h1t = await state(page);
   await pointers(page, [{ type: 'pointerup', id: 3, ...worldAt }]);
   const holdHits = h1t.sent.tapHarvest - h0t.sent.tapHarvest;
   console.log(`  TAP: mantener -> ${holdHits} ataques, usar ${h1t.sent.tapUse - h0t.sent.tapUse}`);
   check(holdHits >= 3 && h1t.sent.tapUse === h0t.sent.tapUse, `en TAP mantener no ataco sostenido o uso: ${holdHits}`);
   await tap(page, '#inputMode');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   check((await state(page)).tapInput === false, 'ENTRADA no volvio a MIRA');
 
   // Soltado todo, el jugador se queda quieto.
   const rest0 = await waitForLoop(page, 10);
-  await page.waitForTimeout(500);
+  await elapse(page, 500);
   const rest1 = await waitForLoop(page, 10);
   check(Math.hypot(rest1.x - rest0.x, rest1.y - rest0.y) < 1e-6, 'el jugador sigue moviendose sin mando');
 

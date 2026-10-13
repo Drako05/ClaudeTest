@@ -179,13 +179,24 @@ Con `hz` 60 cada frame lleva un tick, como un jugador a 60 Hz.
   `clock.now()`. Lo que va por eventos del navegador sigue con el de verdad, y
   por eso no todo es exacto: en `fauna` los impactos dibujados dieron 114 y 112
   en dos corridas. Las posiciones, los ticks y lo demas salieron identicos.
-- **Migradas**: `life`, `relief`, `fauna`, `devTools`, `stations`, `resources`
-  y `highRefresh`, que pasa a frames de 1/144 s con `hz` en vez del
-  `requestAnimationFrame` fingido (con el de verdad lo sigue usando).
+- **Migradas**: `life`, `relief`, `fauna`, `devTools`, `stations`, `resources`,
+  `highRefresh`, que pasa a frames de 1/144 s con `hz` en vez del
+  `requestAnimationFrame` fingido (con el de verdad lo sigue usando), y
+  `mobile` (2026-10-13).
   **Con el reloj de verdad, a proposito**: `desktop`, que tiene que probar el
   bucle real del navegador, y `gestures`, que mide dedos de verdad.
-  **Pendiente**: `mobile`, cuyos toques sostenidos dependen de temporizadores
-  del navegador.
+- **`mobile` y su toque sostenido**: lo unico de la pasada que va con un
+  temporizador del navegador es reconocer el sostenido de TAP (`HOLD_MS`,
+  300 ms, un `setTimeout` de `controls.ts`), que es interfaz y se queda con el
+  reloj de verdad. Los golpes que salen de el se cuentan en ticks. Asi que la
+  pasada espera primero en tiempo real a que el temporizador se dispare y
+  luego avanza el juego con `until` hasta los tres golpes. Lo demas que
+  esperaba con `waitForTimeout` esperaba al juego —la accion mantenida, el
+  joystick, la pinza y el catalejo, que se aplican en el frame— y va con
+  `elapse`; abrir paneles, pestanas y OTROS sigue con `waitForTimeout`.
+  En local, 11 s frente a 159 con el de verdad, y dos corridas con los mismos
+  numeros. Ahora salen los de un jugador a 60 Hz: 10 acciones en 2,4 s
+  manteniendo, que son las cuatro por segundo (con el de verdad, 23).
 - **`slash`, tambien con el reloj manual**: cada captura dibuja antes
   (`capture`) y se **recorta a la caja que mide**, porque la de pantalla
   entera costaba 1,4-6 s sin GPU y la recortada ~0,2. El primer golpe se dibuja

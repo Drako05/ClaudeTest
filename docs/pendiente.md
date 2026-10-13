@@ -259,7 +259,8 @@ fases de fisicas y las pruebas mas rapidas (22 commits).
   tick. El autor pidio arranque y frenada de 0,1 s tambien en el aire; esta
   en «que decides tu», abajo, porque toca la fisica del salto que se va a
   debatir con la cabeza que sube primero.
-- `mobile` sigue con el reloj de verdad: quedo fuera de la tanda de pruebas.
+- `mobile` seguia con el reloj de verdad: quedo fuera de la tanda de pruebas.
+  **Hecho el 2026-10-13**: va con el reloj manual (`docs/pruebas.md`).
 - **El registro de PC de `desktop` cayo otra vez en la CI de `pruebas`**
   (`54028eb`): la linea murio sin verse moverse (`alive: false`, y 623 -> 0),
   con la pasada a 304 s en un runner lento. Relanzada una vez, paso. Es la
