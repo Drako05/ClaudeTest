@@ -296,15 +296,24 @@ describe('Fauna: lo que estorba no los deja clavados', () => {
     // 5: antes 33 % y 25 % las pequeñas; despues 7 % y 0,04 %. Con la caja
     // ajustada al tronco y las patas con caja (2026-10-05), 3,6 % y 0,02 %:
     // entre troncos finos ya se pasa.
+    //
+    // Desde la fisica por fases (el autor, 2026-10-13), andando solo las patas
+    // suben medio bloque, y en una ladera de escalones un animal de cabeza baja
+    // no puede dar media vuelta en el suelo: la cabeza barre los de arriba.
+    // **Salta para girar** (eleccion del autor), y aqui se ve que lo hace.
     const state = createGame(5);
     const window = 3 * 60;
     const small = new Set([Species.Hare, Species.ArcticFox, Species.Marmot, Species.Crab, Species.Gull]);
     const trail = new Map<string, number[][]>();
-    const count = { all: 0, stuck: 0, small: 0, smallStuck: 0 };
+    const count = { all: 0, stuck: 0, small: 0, smallStuck: 0, turnJumps: 0 };
+    const wasGrounded = new Map<number, number>();
     for (let t = 0; t < 60 * 60; t++) {
       step(state, emptyIntent());
       const e = state.entities;
       for (const [key, id] of state.fauna) {
+        const took = wasGrounded.get(id) === 1 && e.grounded[id] === 0 && e.vz[id] > 0;
+        if (took && (e.turnToX[id] !== 0 || e.turnToY[id] !== 0)) count.turnJumps++;
+        wasGrounded.set(id, e.grounded[id]);
         const far = Math.hypot(e.wanderX[id] - e.x[id], e.wanderY[id] - e.y[id]);
         const h = trail.get(key) ?? [];
         h.push([e.x[id], e.y[id], far]);
@@ -322,6 +331,7 @@ describe('Fauna: lo que estorba no los deja clavados', () => {
     expect(count.small).toBeGreaterThan(1000);
     expect(count.stuck / count.all).toBeLessThan(0.2);
     expect(count.smallStuck / count.small).toBeLessThan(0.05);
+    expect(count.turnJumps).toBeGreaterThan(0);
   });
 });
 

@@ -212,6 +212,31 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     —puesto a mano con `?x=&y=`—, se queda al pie en vez de subir a lo alto, y
     al aparecer los pies van a lo que pisa la huella, no el centro.
 
+    **El choque va por fases** (el autor, 2026-10-13), para los animales y para
+    el jugador:
+    1. **Subiendo** (impulso vertical hacia arriba): chocan todas sus cajas, por
+       todas sus caras.
+    2. **Bajando** (hacia abajo, tambien la caida tras el salto): solo choca
+       **la base** —«la base de las patas, o la base de la extremidad que use
+       para moverse en el suelo»—, que es donde se aterriza (`landingFloor`).
+       Si otra caja choca con algo, no lo detiene: el cuerpo entero se
+       **repele** por el rumbo que antes saque todas sus cajas, hasta que esten
+       fuera, «rapida pero no instantanea» (`repel`, `REPEL_SPEED` = 4 m/s,
+       eleccion suya). Solo en el plano horizontal, nunca arriba ni abajo; y
+       mientras se repele, lo que empuja hacia dentro se pierde: gana la
+       repulsion. Sigue ya de pie, si hace falta, hasta salir.
+    3. **Solo en horizontal**: chocan todas las cajas, por todas sus caras. De
+       ahi que **solo la base sube medio bloque andando**: la cabeza de un
+       animal ya no lo sube (lo vio el autor el 2026-10-10: «subir primero la
+       cabeza y luego las patas se ve mal»). Si lo primero que tocaria un
+       escalon no son sus patas, **salta antes de tocarlo** (`docs/fauna.md`).
+
+    El jugador es una caja sola, y su base es su huella: cayendo ya no se
+    estampa contra una cara, entra como mucho lo de un tick y la repulsion lo
+    saca. Lo deducido —los 32 rumbos de la repulsion, la base del cangrejo y la
+    gaviota, que estar de pie siga apoyandose en cualquier caja— esta en
+    `docs/juicio.md`.
+
     **Inercia** (el autor, 2026-10-10): arrancar y frenar duran `INERTIA_TIME`,
     0,1 s, a ritmo constante, en el suelo y en el aire (`steer`,
     `systems/movement.ts`). Andando se resbalan ~0,22 m al soltar a 60 Hz, y

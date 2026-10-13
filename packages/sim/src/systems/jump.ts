@@ -19,7 +19,7 @@
  * **alcance dos**. `tests/jump.test.ts` lo tiene como tabla.
  */
 
-import { footing, headroom, PLAYER_HEIGHT } from '../boxes.js';
+import { footing, headroom, landingFloor, PLAYER_HEIGHT } from '../boxes.js';
 import { EntityKind, type EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 
@@ -88,8 +88,11 @@ export function applyVertical(world: World, store: EntityStore, id: number, dt: 
   // Lo que se pisa, con la huella entera: el terreno y las cajas que la tocan;
   // encima de una roca o de una mesa se esta de pie, y al bajarse o si se
   // desmonta, se cae. Una caja que asoma mas de lo que se sube andando no se
-  // pisa (`footing`).
-  const ground = footing(world, store, id, store.z[id] + STEP_UP);
+  // pisa (`footing`). En el aire, solo choca la base, y con lo que no pasa de
+  // los pies: es donde se aterriza (el autor, 2026-10-13; `landingFloor`).
+  const ground = store.grounded[id]
+    ? footing(world, store, id, store.z[id] + STEP_UP)
+    : landingFloor(world, store, id);
 
   if (store.grounded[id]) {
     if (store.z[id] <= ground + 1e-9) {

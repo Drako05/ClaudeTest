@@ -17,11 +17,11 @@
  * el relieve solo se veia.
  */
 
-import type { EntityStore } from '../entities.js';
+import { EntityKind, type EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
-import { BODY_RADIUS, PLAYER_HEIGHT, squareFloor } from '../boxes.js';
-import { applyVertical, GRAVITY, JUMP_SPEED, STEP_UP, takeOff } from './jump.js';
+import { BODY_RADIUS, partsRest, PLAYER_HEIGHT, squareFloor } from '../boxes.js';
+import { applyVertical, STEP_UP, takeOff } from './jump.js';
 
 /** Medio ancho del cuerpo del jugador, en tiles: su huella. Vive en `boxes.ts`. */
 export { BODY_RADIUS };
@@ -157,9 +157,13 @@ export function moveEntity(
  * inercia que en el suelo (`INERTIA_TIME`). Hasta entonces se conservaba el
  * impulso del despegue y solo se admitia un 30 % de desviacion.
  *
- * Lo unico que cambia es que va **sin margen de subida**, que es lo que
- * convierte la cara de un bloque en una pared contra la que estamparse: por
- * debajo de su altura no se entra, y por encima si.
+ * Lo que cambia es el choque, segun vaya (el autor, 2026-10-13):
+ * - **subiendo**, choca por todas sus caras, **sin margen de subida**: la cara
+ *   de un bloque es una pared contra la que estamparse; por debajo de su
+ *   altura no se entra, y por encima si;
+ * - **bajando**, solo choca la base, que es donde aterriza (`landingFloor`):
+ *   las caras no lo detienen, y si se mete en algo, lo saca la repulsion
+ *   (`repel`).
  */
 export function moveAirborne(
   world: World,
@@ -170,7 +174,7 @@ export function moveAirborne(
   dt: number,
   running = false,
 ): void {
-  walk(world, store, id, moveX, moveY, dt, running, 0);
+  walk(world, store, id, moveX, moveY, dt, running, store.vz[id] > 0 ? 0 : Infinity);
 }
 
 function walk(
@@ -199,8 +203,154 @@ function walk(
   }
 
   steer(store, id, targetX, targetY, speed / INERTIA_TIME, dt);
-  if (store.vx[id] === 0 && store.vy[id] === 0) return;
-  slide(world, store, id, store.vx[id] * dt, store.vy[id] * dt, margin);
+  // Mientras se repele, lo que empuja hacia dentro se pierde, como contra una
+  // pared: gana la repulsion (el autor, 2026-10-13).
+  if (store.repelling[id] === 1) {
+    const [vx, vy] = outward(store, id, store.vx[id], store.vy[id]);
+    store.vx[id] = vx;
+    store.vy[id] = vy;
+  }
+  if (store.vx[id] !== 0 || store.vy[id] !== 0) slide(world, store, id, store.vx[id] * dt, store.vy[id] * dt, margin);
+  repel(world, store, id, dt, margin === Infinity);
+}
+
+/**
+ * La velocidad de la repulsion, en bloques por segundo (el autor, 2026-10-13:
+ * «rapida pero no instantanea, se debe lograr ver el efecto»; eligio 4 m/s):
+ * medio bloque en 0,125 s.
+ */
+export const REPEL_SPEED = 4;
+
+/**
+ * Los rumbos que se prueban para salir: el autor quiere **cualquiera del plano
+ * horizontal**, y nunca arriba ni abajo (2026-10-13). 32, uno cada 11,25°, es
+ * **deduccion mia**.
+ */
+const REPEL_DIRS = 32;
+
+/** Hasta donde se busca la salida, y de cuanto en cuanto. **Deduccion mia.** */
+const REPEL_REACH = 1;
+const REPEL_PROBE = 0.02;
+
+/** (`vx`, `vy`) sin lo que va contra el rumbo de la repulsion en curso. */
+function outward(store: EntityStore, id: number, vx: number, vy: number): [number, number] {
+  const rx = store.repelX[id];
+  const ry = store.repelY[id];
+  const into = vx * rx + vy * ry;
+  return into < 0 ? [vx - into * rx, vy - into * ry] : [vx, vy];
+}
+
+/** Si el cuerpo, puesto en (`x`, `y`) a su altura, esta metido en algo por alguna caja. */
+function insideAt(world: World, store: EntityStore, id: number, x: number, y: number): boolean {
+  const z = store.z[id];
+  if (store.kind[id] === EntityKind.Player) return squareFloor(world, x, y, BODY_RADIUS, z + PLAYER_HEIGHT) > z + 1e-6;
+  return clashesAt(world, store, id, x, y, z, store.facingX[id], store.facingY[id], 0, 0) > 0;
+}
+
+/** Si el cuerpo puede estar en (`x`, `y`): no en el agua, y un animal, en su bioma. */
+function standable(
+  world: World,
+  store: EntityStore,
+  id: number,
+  x: number,
+  y: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  if (keep && !keep(x, y)) return false;
+  return store.kind[id] === EntityKind.Player ? !collides(world, x, y) : !world.isTerrainSolidAt(Math.floor(x), Math.floor(y));
+}
+
+/**
+ * **La repulsion** (el autor, 2026-10-13): cayendo solo choca la base, y si
+ * otra caja se mete en algo no lo detiene, pero el cuerpo entero se repele
+ * —en el plano horizontal, por el rumbo que antes lo saca— hasta que todas sus
+ * cajas esten fuera, a `REPEL_SPEED`.
+ *
+ * Empieza cayendo (`falling`) y sigue, ya de pie, hasta salir. El rumbo se
+ * elige al empezar y no cambia: de los `REPEL_DIRS`, el que saca el cuerpo con
+ * menos recorrido, probando desde el contrario a su avance y alternando a un
+ * lado y a otro (**deduccion mia**: determinista). No vale uno que lo deje en
+ * el agua o, a un animal, fuera de su bioma. Si no hay salida a `REPEL_REACH`,
+ * no se repele hasta que deje de estar metido.
+ */
+export function repel(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dt: number,
+  falling: boolean,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  const state = store.repelling[id];
+  if (state === 0 && !falling) return;
+  const x = store.x[id];
+  const y = store.y[id];
+  if (!insideAt(world, store, id, x, y)) {
+    store.repelling[id] = 0;
+    return;
+  }
+  if (state === 2) return;
+  if (state === 0) {
+    const moving = Math.hypot(store.vx[id], store.vy[id]) > 1e-9;
+    const start = moving
+      ? Math.atan2(-store.vy[id], -store.vx[id])
+      : Math.atan2(-store.facingY[id], -store.facingX[id]);
+    let found = false;
+    for (let d = REPEL_PROBE; d <= REPEL_REACH + 1e-9 && !found; d += REPEL_PROBE) {
+      // En el primer anillo en que sale por algun rumbo, el de menos recorrido
+      // exacto: la rejilla del anillo no distingue uno recto de uno torcido.
+      let best = Infinity;
+      for (let k = 0; k < REPEL_DIRS; k++) {
+        // 0, +1, -1, +2, -2...: a un lado y a otro del contrario al avance.
+        const turn = (k % 2 === 1 ? 1 : -1) * Math.ceil(k / 2);
+        const a = start + (turn * 2 * Math.PI) / REPEL_DIRS;
+        const ax = Math.cos(a);
+        const ay = Math.sin(a);
+        if (!standable(world, store, id, x + ax * d, y + ay * d, keep) || insideAt(world, store, id, x + ax * d, y + ay * d)) continue;
+        let lo = d - REPEL_PROBE;
+        let hi = d;
+        for (let i = 0; i < 10; i++) {
+          const mid = (lo + hi) / 2;
+          if (insideAt(world, store, id, x + ax * mid, y + ay * mid)) lo = mid;
+          else hi = mid;
+        }
+        if (hi < best - 1e-6) {
+          best = hi;
+          store.repelX[id] = ax;
+          store.repelY[id] = ay;
+          found = true;
+        }
+      }
+    }
+    if (!found) {
+      store.repelling[id] = 2;
+      return;
+    }
+    store.repelling[id] = 1;
+  }
+  const rx = store.repelX[id];
+  const ry = store.repelY[id];
+  const step = REPEL_SPEED * dt;
+  if (!standable(world, store, id, x + rx * step, y + ry * step, keep)) {
+    store.repelling[id] = 2;
+    return;
+  }
+  if (insideAt(world, store, id, x + rx * step, y + ry * step)) {
+    store.x[id] = x + rx * step;
+    store.y[id] = y + ry * step;
+    return;
+  }
+  // Sale en este tick: justo hasta donde deja de estar metido, no mas.
+  let lo = 0;
+  let hi = step;
+  for (let i = 0; i < 12; i++) {
+    const mid = (lo + hi) / 2;
+    if (insideAt(world, store, id, x + rx * mid, y + ry * mid)) lo = mid;
+    else hi = mid;
+  }
+  store.x[id] = x + rx * hi;
+  store.y[id] = y + ry * hi;
+  store.repelling[id] = 0;
 }
 
 /**
@@ -262,11 +412,13 @@ export const ANIMAL_DETOUR = 1;
 export const ANIMAL_JUMP_UP = 1;
 
 /**
- * Cuanto mira hacia delante un animal buscando el borde de lo que va a saltar:
- * mas que el hocico del bisonte adulto, que es lo que mas sobresale de sus pies.
+ * Hasta donde se busca el impulso minimo de un salto, a que saltos y con que
+ * precision, en bloques por segundo. **Deduccion mia**: el bisonte adulto, el
+ * de hocico mas largo, necesita unos 3 ante un escalon de 1 m.
  */
-const JUMP_LOOK = 2.5;
-
+export const IMPULSE_MAX = 6;
+const IMPULSE_PROBE = 0.5;
+const IMPULSE_STEP = 0.05;
 
 /**
  * Los rumbos de un rodeo, desde el de su destino: de mas cerca a mas lejos, y
@@ -305,8 +457,10 @@ function feetBlocked(
 }
 
 /**
- * Cuantas veces se mete en el terreno el cuerpo del animal `id` puesto asi, con
- * el margen de subida de golpe: `STEP_UP` andando, 0 en el aire.
+ * Cuantas veces se mete en el terreno el cuerpo del animal `id` puesto asi. Por
+ * defecto, como anda (el autor, 2026-10-13): la base sube `STEP_UP` de golpe y
+ * las demas cajas chocan por todas sus caras, sin margen. Subiendo en el aire,
+ * todas sin margen (0, 0).
  */
 function clashesAt(
   world: World,
@@ -317,10 +471,11 @@ function clashesAt(
   z: number,
   fx: number,
   fy: number,
-  margin = STEP_UP,
+  margin = 0,
+  baseMargin = STEP_UP,
 ): number {
   const animal = store.animal[id]!;
-  return bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, fx, fy), z, margin);
+  return bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, fx, fy), z, margin, baseMargin);
 }
 
 /** Lleva al animal a (`x`, `y`) y deja puesta la velocidad que eso supone. */
@@ -350,8 +505,10 @@ function moveTo(store: EntityStore, id: number, x: number, y: number, dt: number
  * Y para que lo que estorba no lo deje clavado (el autor, 2026-10-05):
  * - si el giro no cabe, **retrocede** a lo largo de su rumbo hasta que quepa,
  *   `ANIMAL_BACKUP` como mucho;
- * - si el avance no progresa y delante hay un escalon de hasta
- *   `ANIMAL_JUMP_UP`, **salta** (si el salto llega y el cuerpo cabe arriba);
+ * - si el paso siguiente meteria una caja en un escalon de hasta
+ *   `ANIMAL_JUMP_UP` que no se sube andando, **salta antes de tocarlo**, con
+ *   el impulso minimo para que sus patas delanteras lleguen arriba (el autor,
+ *   2026-10-13; `tryJump`);
  * - si no, **lo bordea**: `ANIMAL_DETOUR` por el rumbo libre mas cercano al de
  *   su destino, y vuelta a apuntarle. Un rodeo que no se puede ni empezar es un
  *   callejon sin salida: espera quieto al siguiente punto de paso.
@@ -369,7 +526,22 @@ export function walkAnimal(
   groundRound(world, store.x[id], store.y[id], () => walkAnimalStep(world, store, id, dirX, dirY, speed, dt, keep));
 }
 
+/** Un tick de andar y, si estaba saliendo de algo, la repulsion. */
 function walkAnimalStep(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dirX: number,
+  dirY: number,
+  speed: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  walkAnimalMove(world, store, id, dirX, dirY, speed, dt, keep);
+  if (store.animal[id]) repel(world, store, id, dt, false, keep);
+}
+
+function walkAnimalMove(
   world: World,
   store: EntityStore,
   id: number,
@@ -385,6 +557,10 @@ function walkAnimalStep(
   const before = Math.hypot(store.vx[id], store.vy[id]);
   store.vx[id] = 0;
   store.vy[id] = 0;
+  // En el suelo, el impulso del salto y el giro en el aire ya no cuentan.
+  store.impulse[id] = 0;
+  store.turnToX[id] = 0;
+  store.turnToY[id] = 0;
   if (!animal || Math.hypot(dirX, dirY) <= 1e-6 || speed <= 0) return;
   const accel = (speed / INERTIA_TIME) * dt;
   // Sin salida: espera a su siguiente punto de paso (`stepFauna` lo olvida).
@@ -428,6 +604,9 @@ function walkAnimalStep(
         moveTo(store, id, bx, by, dt);
         return;
       }
+      // Ni retrocediendo: salta en el sitio y gira en el aire (el autor,
+      // 2026-10-13, «salta para girar»).
+      if (tryTurnJump(world, store, id, goal, dt, keep)) return;
       stuck(world, store, id, dirX, dirY, speed, dt, keep, detouring);
       return;
     }
@@ -438,10 +617,10 @@ function walkAnimalStep(
     return;
   }
 
-  // El avance, a lo largo de su rumbo y eje a eje, a lo que da la inercia.
+  // El avance, a lo largo de su rumbo y eje a eje, a lo que da la inercia; si
+  // esta saliendo de algo, sin lo que empuja hacia dentro.
   const pace = Math.min(speed, before + accel);
-  const stepX = fx * pace * dt;
-  const stepY = fy * pace * dt;
+  const [stepX, stepY] = store.repelling[id] === 1 ? outward(store, id, fx * pace * dt, fy * pace * dt) : [fx * pace * dt, fy * pace * dt];
   if (!feetBlocked(world, x + stepX, y, feet, keep)) {
     const there = here > 0 ? here : clashes(x + stepX, y, fx, fy);
     if (here > 0 || there === 0) x += stepX;
@@ -451,13 +630,24 @@ function walkAnimalStep(
   }
   const moved = Math.hypot(x - store.x[id], y - store.y[id]);
   if (moved < STALL * pace * dt) {
-    if (!tryJump(world, store, id, speed, dt, keep)) stuck(world, store, id, dirX, dirY, speed, dt, keep, detouring);
+    // El paso lo meteria en algo que no se sube andando, y no se da: si es un
+    // escalon que se salta, salta ya, sin haber tocado (el autor, 2026-10-13).
+    // Sale con lo que llevaba andando, y en el aire sigue andando. Si puede
+    // deslizarse a lo largo de lo que estorba, se desliza: no salta.
+    if (here === 0) {
+      store.vx[id] = fx * before;
+      store.vy[id] = fy * before;
+      if (tryJump(world, store, id, store.x[id] + stepX, store.y[id] + stepY, speed, dt, keep)) return;
+      store.vx[id] = 0;
+      store.vy[id] = 0;
+    }
+    stuck(world, store, id, dirX, dirY, speed, dt, keep, detouring);
     return;
   }
   store.backedUp[id] = 0;
-  // Si con este paso se cae por un borde, cae avanzando a su paso.
-  store.leap[id] = speed;
   if (detouring) store.detourLeft[id] = Math.max(0, store.detourLeft[id] - moved);
+  // Si con este paso se cae por un borde, en el aire sigue andando con lo que
+  // llevaba (`airStep`).
   moveTo(store, id, x, y, dt);
 }
 
@@ -480,8 +670,7 @@ function glide(
   let x = store.x[id];
   let y = store.y[id];
   const here = clashesAt(world, store, id, x, y, feet, fx, fy);
-  const stepX = fx * pace * dt;
-  const stepY = fy * pace * dt;
+  const [stepX, stepY] = store.repelling[id] === 1 ? outward(store, id, fx * pace * dt, fy * pace * dt) : [fx * pace * dt, fy * pace * dt];
   if (!feetBlocked(world, x + stepX, y, feet, keep) && (here > 0 || clashesAt(world, store, id, x + stepX, y, feet, fx, fy) === 0)) {
     x += stepX;
   }
@@ -507,10 +696,14 @@ export function brakeAnimal(
   const before = Math.hypot(store.vx[id], store.vy[id]);
   store.vx[id] = 0;
   store.vy[id] = 0;
+  store.impulse[id] = 0;
+  store.turnToX[id] = 0;
+  store.turnToY[id] = 0;
   if (!store.animal[id]) return;
-  groundRound(world, store.x[id], store.y[id], () =>
-    glide(world, store, id, Math.max(0, before - (speed / INERTIA_TIME) * dt), dt, keep),
-  );
+  groundRound(world, store.x[id], store.y[id], () => {
+    glide(world, store, id, Math.max(0, before - (speed / INERTIA_TIME) * dt), dt, keep);
+    repel(world, store, id, dt, false, keep);
+  });
 }
 
 /**
@@ -559,7 +752,10 @@ let rehearsing = false;
 let rehearsalFailed = false;
 
 /** Lo que un ensayo cambia de un animal, para deshacerlo. */
-const SAVED = ['x', 'y', 'z', 'vx', 'vy', 'vz', 'grounded', 'facingX', 'facingY', 'detourX', 'detourY', 'detourLeft', 'backedUp', 'leap'] as const;
+const SAVED = [
+  'x', 'y', 'z', 'vx', 'vy', 'vz', 'grounded', 'facingX', 'facingY', 'detourX', 'detourY', 'detourLeft', 'backedUp', 'impulse',
+  'repelling', 'repelX', 'repelY', 'turnToX', 'turnToY',
+] as const;
 const saved = new Float64Array(SAVED.length);
 
 /**
@@ -590,7 +786,7 @@ function rehearseDetour(
   try {
     for (let t = 0; t < ticks && !rehearsalFailed && store.detourLeft[id] > 0; t++) {
       if (store.grounded[id]) walkAnimalStep(world, store, id, ax, ay, speed, dt, keep);
-      else airStep(world, store, id, dt, keep);
+      else airStep(world, store, id, speed, dt, keep);
       applyVertical(world, store, id, dt);
     }
     return !rehearsalFailed && store.detourLeft[id] === 0;
@@ -601,133 +797,240 @@ function rehearseDetour(
 }
 
 /**
- * Si delante hay un escalon que se salta, salta.
+ * **Salta antes de tocar** (el autor, 2026-10-13): el paso a (`nx`, `ny`)
+ * meteria una caja en algo que no se sube andando —la cabeza, el hocico o el
+ * cuello en cualquier escalon; las patas en uno de mas de medio bloque—. Si eso
+ * es un escalon de hasta `ANIMAL_JUMP_UP`, salta ya.
  *
- * - **El borde**: el primer punto, a lo largo de su rumbo, en que el suelo sube
- *   mas de `STEP_UP` bajo sus pies. Si antes hay algo solido o fuera de su
- *   bioma, o sube mas de `ANIMAL_JUMP_UP`, no se salta.
- * - **En el aire avanza a su paso**, como el jugador (el autor, 2026-10-10:
- *   «usando las mismas físicas que el jugador»): el salto solo empuja hacia
- *   arriba. Hasta entonces avanzaba lo justo para que sus pies pasaran el borde
- *   en lo alto del salto, mas deprisa que su paso si hacia falta; desde que
- *   todas sus cajas chocan, sus patas delanteras se apoyan arriba antes que el
- *   resto, y a su paso le basta. Si no llega, lo bordea.
+ * - **El escalon** es lo mas alto bajo las cajas que chocarian, desde sus pies.
+ * - **El impulso**: el salto solo empuja hacia arriba, y en el aire anda a su
+ *   paso; como eso no basta para que lleguen las patas cuando lo que sobresale
+ *   es la cabeza, lleva ademas un impulso horizontal por su rumbo, **el minimo**
+ *   para que sus patas delanteras lleguen arriba. Constante todo el vuelo,
+ *   sumado a lo que anda, y aunque estuviera parado: solo, no basta.
  * - **Ensaya cada salto entero** con las mismas funciones que lo van a mover
  *   —`takeOff`, `airStep` y `applyVertical`, en el orden de `stepFauna`— y lo
- *   deshace: salta si aterriza arriba, mas alto de lo que se sube andando, y
- *   con el cuerpo cabiendo. Como todo es determinista, el salto de verdad es el
- *   ensayado.
+ *   deshace. El minimo se busca biseccionando entre 0 e `IMPULSE_MAX`, a
+ *   `IMPULSE_STEP` (**deduccion mia**). Si ni con el maximo llega, no salta, y
+ *   lo bordea. Como todo es determinista, el salto de verdad es el ensayado.
  */
 function tryJump(
+  world: World,
+  store: EntityStore,
+  id: number,
+  nx: number,
+  ny: number,
+  speed: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  if (!store.grounded[id]) return false;
+  const animal = store.animal[id]!;
+  const z = store.z[id];
+  // Lo que pisarian las cajas que chocan, en lo alto de lo que tocan.
+  let rise = -Infinity;
+  for (const b of bodyBoxes(animal.species, animal.stage, nx, ny, z, store.facingX[id], store.facingY[id])) {
+    const rest = partsRest(world, [b], z);
+    if (rest <= z + (b.base ? STEP_UP : 0) + 1e-6) continue;
+    rise = Math.max(rise, rest + (b.cz - b.hh - z) - z);
+  }
+  if (!(rise > 1e-6) || rise > ANIMAL_JUMP_UP + 1e-6) return false;
+  // De menos a mas, a saltos de `IMPULSE_PROBE`, hasta el primero que llega; y
+  // de ahi, afinado. No vale empezar por el maximo y biseccionar: llegar no
+  // crece con el impulso. En una escalera, el que se pasa aterriza con la
+  // cabeza en el escalon siguiente, y no cabe.
+  let found = -1;
+  for (let probe = 0; probe <= IMPULSE_MAX + 1e-9; probe += IMPULSE_PROBE) {
+    if (rehearseJump(world, store, id, speed, probe, rise, dt, keep)) {
+      found = probe;
+      break;
+    }
+  }
+  if (found < 0) return false;
+  let lo = found - IMPULSE_PROBE;
+  let hi = found;
+  while (found > 0 && hi - lo > IMPULSE_STEP) {
+    const mid = (lo + hi) / 2;
+    if (rehearseJump(world, store, id, speed, mid, rise, dt, keep)) hi = mid;
+    else lo = mid;
+  }
+  store.impulse[id] = hi;
+  takeOff(store, id);
+  return true;
+}
+
+/**
+ * Ensaya un salto con ese `impulse` y lo deshace: sale si aterriza a `rise`
+ * por encima, o mas, de pie y con el cuerpo cabiendo.
+ */
+function rehearseJump(
+  world: World,
+  store: EntityStore,
+  id: number,
+  speed: number,
+  impulse: number,
+  rise: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  // Lo suyo, aparte: un ensayo de salto puede ir dentro del de un rodeo.
+  const kept = SAVED.map((k) => store[k][id]);
+  const z = store.z[id];
+  store.impulse[id] = impulse;
+  takeOff(store, id);
+  applyVertical(world, store, id, dt);
+  for (let t = 0; t < 120 && !store.grounded[id]; t++) {
+    airStep(world, store, id, speed, dt, keep);
+    applyVertical(world, store, id, dt);
+  }
+  const lands =
+    store.grounded[id] === 1 &&
+    store.repelling[id] === 0 &&
+    store.z[id] - z >= rise - 1e-6 &&
+    clashesAt(world, store, id, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]) === 0;
+  SAVED.forEach((k, i) => (store[k][id] = kept[i]));
+  return lands;
+}
+
+/**
+ * Lo menos que tiene que girar un salto de giro para que valga la pena: menos,
+ * y no se da. **Deduccion mia.**
+ */
+const TURN_JUMP_MIN = Math.PI / 12;
+
+/**
+ * **Salta para girar** (el autor, 2026-10-13): el giro hacia `goal` no cabe en
+ * el suelo ni retrocediendo —en una ladera de escalones, la cabeza de un animal
+ * de cabeza baja barre los de arriba al dar media vuelta—. Salta en el sitio,
+ * sin avanzar ni impulso, y gira en el aire a su ritmo (`airStep`), donde la
+ * cabeza ya pasa por encima. Un salto dura ~0,39 s, ~70° de giro: media vuelta
+ * son dos o tres saltos. Se ensaya entero y se da si aterriza cabiendo y al
+ * menos `TURN_JUMP_MIN` mas cerca de su rumbo (**deduccion mia**).
+ */
+function tryTurnJump(
+  world: World,
+  store: EntityStore,
+  id: number,
+  goal: number,
+  dt: number,
+  keep?: (x: number, y: number) => boolean,
+): boolean {
+  if (!store.grounded[id]) return false;
+  const kept = SAVED.map((k) => store[k][id]);
+  const off = () => Math.abs(turnBetween(Math.atan2(store.facingY[id], store.facingX[id]), goal));
+  const before = off();
+  const launch = () => {
+    store.vx[id] = 0;
+    store.vy[id] = 0;
+    store.impulse[id] = 0;
+    store.turnToX[id] = Math.cos(goal);
+    store.turnToY[id] = Math.sin(goal);
+    takeOff(store, id);
+  };
+  launch();
+  applyVertical(world, store, id, dt);
+  for (let t = 0; t < 120 && !store.grounded[id]; t++) {
+    airStep(world, store, id, 0, dt, keep);
+    applyVertical(world, store, id, dt);
+  }
+  const turns =
+    store.grounded[id] === 1 &&
+    store.repelling[id] === 0 &&
+    off() < before - TURN_JUMP_MIN &&
+    clashesAt(world, store, id, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]) === 0;
+  SAVED.forEach((k, i) => (store[k][id] = kept[i]));
+  if (!turns) return false;
+  launch();
+  return true;
+}
+
+/**
+ * Un tick de un animal en el aire: no gira —salvo en un salto de giro
+ * (`tryTurnJump`)—, y **anda**, como el jugador (el
+ * autor, 2026-10-10: «usando las mismas físicas que el jugador»): su paso
+ * `speed` por su rumbo, con la inercia de `INERTIA_TIME` desde lo que llevaba
+ * —`vx`, `vy` son lo que anda—, mas el impulso de su salto (`impulse`), que no
+ * cambia en todo el vuelo (el autor, 2026-10-13). La altura la pone despues
+ * `applyVertical`. El choque, como el del jugador (el autor, 2026-10-13):
+ * - **subiendo**, todas sus cajas por todas sus caras y sin margen: se estampa
+ *   contra la cara de lo que no alcanzo;
+ * - **bajando**, solo su base, que es donde aterriza (`landingFloor`); si otra
+ *   caja —o una pata de lado— se mete en algo, no lo detiene: lo saca la
+ *   repulsion (`repel`).
+ */
+export function airborneAnimal(
   world: World,
   store: EntityStore,
   id: number,
   speed: number,
   dt: number,
   keep?: (x: number, y: number) => boolean,
-): boolean {
-  if (!store.grounded[id]) return false;
-  const x = store.x[id];
-  const y = store.y[id];
-  const z = store.z[id];
-  const fx = store.facingX[id];
-  const fy = store.facingY[id];
-  let edge = -1;
-  for (let d = 0.05; d <= JUMP_LOOK; d += 0.05) {
-    const px = x + fx * d;
-    const py = y + fy * d;
-    if (world.isTerrainSolidAt(Math.floor(px), Math.floor(py)) || (keep && !keep(px, py))) return false;
-    // El suelo en ese punto, con la caja que haya: una roca se salta.
-    const rise = squareFloor(world, px, py, 0) - z;
-    if (rise > ANIMAL_JUMP_UP + 1e-6) return false;
-    if (rise > STEP_UP) {
-      edge = d;
-      break;
-    }
-  }
-  if (edge < 0) return false;
-  if (!rehearseJump(world, store, id, speed, dt, keep)) return false;
-  takeOff(store, id);
-  return true;
-}
-
-/**
- * Ensaya un salto avanzando a `leap` y lo deshace. Si aterriza arriba, deja
- * puesto ese `leap` para el salto de verdad.
- */
-function rehearseJump(
-  world: World,
-  store: EntityStore,
-  id: number,
-  leap: number,
-  dt: number,
-  keep?: (x: number, y: number) => boolean,
-): boolean {
-  const x = store.x[id];
-  const y = store.y[id];
-  const z = store.z[id];
-  const before = store.leap[id];
-  store.leap[id] = leap;
-  takeOff(store, id);
-  applyVertical(world, store, id, dt);
-  for (let t = 0; t < 120 && !store.grounded[id]; t++) {
-    airStep(world, store, id, dt, keep);
-    applyVertical(world, store, id, dt);
-  }
-  const lands =
-    store.grounded[id] === 1 &&
-    store.z[id] - z > STEP_UP &&
-    clashesAt(world, store, id, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]) === 0;
-  store.x[id] = x;
-  store.y[id] = y;
-  store.z[id] = z;
-  store.vz[id] = 0;
-  store.grounded[id] = 1;
-  store.vx[id] = 0;
-  store.vy[id] = 0;
-  store.leap[id] = lands ? leap : before;
-  return lands;
-}
-
-/**
- * Un tick de un animal en el aire: no gira, y avanza a lo largo de su rumbo a
- * `leap`, la de su salto o la de su paso si se cayo andando. Sin margen de
- * subida, como el jugador en el aire: se estampa contra la cara de lo que no
- * alcanzo, y cae. La altura la pone despues `applyVertical`.
- */
-export function airborneAnimal(
-  world: World,
-  store: EntityStore,
-  id: number,
-  dt: number,
-  keep?: (x: number, y: number) => boolean,
 ): void {
-  groundRound(world, store.x[id], store.y[id], () => airStep(world, store, id, dt, keep));
+  groundRound(world, store.x[id], store.y[id], () => airStep(world, store, id, speed, dt, keep));
 }
 
 function airStep(
   world: World,
   store: EntityStore,
   id: number,
+  speed: number,
   dt: number,
   keep?: (x: number, y: number) => boolean,
 ): void {
-  store.vx[id] = 0;
-  store.vy[id] = 0;
-  if (!store.animal[id]) return;
+  if (!store.animal[id]) {
+    store.vx[id] = 0;
+    store.vy[id] = 0;
+    return;
+  }
   const z = store.z[id];
+  const rising = store.vz[id] > 0;
+  // Un salto de giro: gira hacia su rumbo, hasta lo que da un tick, si el
+  // cuerpo cabe girado (sin margen, como subiendo), y no anda.
+  const turning = store.turnToX[id] !== 0 || store.turnToY[id] !== 0;
+  if (turning) {
+    const have = Math.atan2(store.facingY[id], store.facingX[id]);
+    const left = turnBetween(have, Math.atan2(store.turnToY[id], store.turnToX[id]));
+    const turn = Math.max(-ANIMAL_TURN_RATE * dt, Math.min(ANIMAL_TURN_RATE * dt, left));
+    const nfx = Math.cos(have + turn);
+    const nfy = Math.sin(have + turn);
+    if (turn !== 0 && clashesAt(world, store, id, store.x[id], store.y[id], z, nfx, nfy, 0, 0) === 0) {
+      store.facingX[id] = nfx;
+      store.facingY[id] = nfy;
+    }
+  }
   const fx = store.facingX[id];
   const fy = store.facingY[id];
+  const pace = turning ? 0 : speed;
+  steer(store, id, fx * pace, fy * pace, Math.max(speed, 1e-9) / INERTIA_TIME, dt);
+  const push = store.impulse[id];
   let x = store.x[id];
   let y = store.y[id];
-  const here = clashesAt(world, store, id, x, y, z, fx, fy, 0);
-  const stepX = fx * store.leap[id] * dt;
-  const stepY = fy * store.leap[id] * dt;
-  if (!feetBlocked(world, x + stepX, y, z, keep, 0)) {
-    if (here > 0 || clashesAt(world, store, id, x + stepX, y, z, fx, fy, 0) === 0) x += stepX;
+  const [stepX, stepY] = store.repelling[id] === 1
+    ? outward(store, id, (store.vx[id] + fx * push) * dt, (store.vy[id] + fy * push) * dt)
+    : [(store.vx[id] + fx * push) * dt, (store.vy[id] + fy * push) * dt];
+  // Un eje que no avanza pierde lo que anda, como el jugador contra una pared;
+  // el impulso no, que es de todo el vuelo (**deduccion mia**: si no, la
+  // cabeza pegada a la cara al despegar se lo comeria).
+  let movedX: boolean;
+  let movedY: boolean;
+  if (rising) {
+    const here = clashesAt(world, store, id, x, y, z, fx, fy, 0, 0);
+    movedX = !feetBlocked(world, x + stepX, y, z, keep, 0) &&
+      (here > 0 || clashesAt(world, store, id, x + stepX, y, z, fx, fy, 0, 0) === 0);
+    if (movedX) x += stepX;
+    movedY = !feetBlocked(world, x, y + stepY, z, keep, 0) &&
+      (here > 0 || clashesAt(world, store, id, x, y + stepY, z, fx, fy, 0, 0) === 0);
+    if (movedY) y += stepY;
+  } else {
+    // Bajando, las caras no detienen: solo el agua y el borde de su bioma.
+    movedX = !feetBlocked(world, x + stepX, y, z, keep, Infinity);
+    if (movedX) x += stepX;
+    movedY = !feetBlocked(world, x, y + stepY, z, keep, Infinity);
+    if (movedY) y += stepY;
   }
-  if (!feetBlocked(world, x, y + stepY, z, keep, 0)) {
-    if (here > 0 || clashesAt(world, store, id, x, y + stepY, z, fx, fy, 0) === 0) y += stepY;
-  }
-  moveTo(store, id, x, y, dt);
+  if (!movedX) store.vx[id] = 0;
+  if (!movedY) store.vy[id] = 0;
+  store.x[id] = x;
+  store.y[id] = y;
+  repel(world, store, id, dt, !rising, keep);
 }

@@ -11,34 +11,58 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: `mobile` pasa al reloj manual (2026-10-13). Las comprobaciones de la
- * pasada que dependen de que el juego corra entre toques —la accion mantenida,
- * el catalejo que vuelve y el sostenido de TAP— tienen que seguir cayendo con
- * el reloj manual; si no, esperan a un juego parado y no comprueban nada.
+ * Ronda: la fisica por fases del autor (2026-10-13). Andando, solo la base
+ * sube medio bloque; el animal salta antes de tocar, con el impulso minimo;
+ * cayendo, solo choca la base, y lo demas lo saca la repulsion, que gana al
+ * mando.
  */
 export default [
-  // La accion mantenida repite cada 15 ticks: a 600 no repite en los 2,4 s.
+  // El fallo de partida: la cabeza con el margen de las patas sube al animal.
   {
-    nombre: 'mobile: la accion mantenida no repite',
-    fichero: 'packages/client/src/main.ts',
-    de: 'const ACTION_REPEAT_TICKS = 15;',
-    a: 'const ACTION_REPEAT_TICKS = 600;',
-    prueba: 'smoke:mobile',
+    nombre: 'fisica: la cabeza sube medio bloque andando',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '  margin = 0,\n  baseMargin = STEP_UP,',
+    a: '  margin = STEP_UP,\n  baseMargin = STEP_UP,',
+    prueba: 'test:tests/fauna-body.test.ts',
   },
-  // El catalejo vuelve con el `dt` del frame: a 8 s no vuelve en 1,2.
+  // Sin impulso, las patas del bisonte no llegan a lo alto de un escalon de 1.
   {
-    nombre: 'mobile: el catalejo no vuelve al soltar',
-    fichero: 'packages/client/src/camera.ts',
-    de: 'const SPYGLASS_RELAX = 0.08;',
-    a: 'const SPYGLASS_RELAX = 8;',
-    prueba: 'smoke:mobile',
+    nombre: 'fisica: el salto sin impulso',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '  store.impulse[id] = hi;',
+    a: '  store.impulse[id] = 0;',
+    prueba: 'test:tests/fauna-body.test.ts',
   },
-  // El sostenido de TAP no se reconoce nunca: el dedo nunca lleva `HOLD_MS`.
+  // Sin repulsion, lo que se mete cayendo se queda dentro.
   {
-    nombre: 'mobile: el sostenido de TAP no se reconoce',
-    fichero: 'packages/client/src/controls.ts',
-    de: 'if (this.gestures.promoteHold(id, performance.now())) {',
-    a: 'if (this.gestures.promoteHold(id, -1e9)) {',
-    prueba: 'smoke:mobile',
+    nombre: 'fisica: sin repulsion',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'export const REPEL_SPEED = 4;',
+    a: 'export const REPEL_SPEED = 0;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  // Si el mando gana a la repulsion, el jugador se hunde en la pared al caer.
+  {
+    nombre: 'fisica: el mando gana a la repulsion',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'return into < 0 ? [vx - into * rx, vy - into * ry] : [vx, vy];',
+    a: 'return [vx, vy];',
+    prueba: 'test:tests/jump.test.ts',
+  },
+  // Sin saltar para girar, en las laderas no se ve ni un salto de giro.
+  {
+    nombre: 'fisica: sin salto de giro',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '      if (tryTurnJump(world, store, id, goal, dt, keep)) return;',
+    a: '      if (goal !== goal) return;',
+    prueba: 'test:tests/fauna.test.ts',
+  },
+  // Si al caer aterriza con todo, y no solo con la base, sube a lo que tiene metido.
+  {
+    nombre: 'fisica: al caer aterriza con todo',
+    fichero: 'packages/sim/src/systems/jump.ts',
+    de: '    : landingFloor(world, store, id);',
+    a: '    : footing(world, store, id, store.z[id] + STEP_UP);',
+    prueba: 'test:tests/jump.test.ts',
   },
 ];

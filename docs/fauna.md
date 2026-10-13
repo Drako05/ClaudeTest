@@ -380,20 +380,23 @@ su cabeza entrara en una pared, no gira.
   cada columna de 0,5 y de cada caja de objeto que solapa— menos lo que esa
   parte esta por encima de los pies. El cuerpo reposa en el maximo de todas:
   - **apoyo**: se esta de pie mientras alguna caja toque; **un animal con las
-    patas traseras sobre un escalon no cae hasta que todas sus cajas caben
-    abajo** (lo que el autor vio el 2026-10-05, ya resuelto);
-  - **choque**: una parte estorba si pide subir los pies mas de `STEP_UP`
-    andando, o mas de nada en el aire; la cabeza de un bisonte pasa por encima
-    de una pared que sus patas no;
+    patas traseras sobre un escalon no cae hasta que caben abajo** (lo que el
+    autor vio el 2026-10-05, ya resuelto). Una caja que no es pata sostiene el
+    cuerpo a su altura, pero no lo sube;
+  - **el choque va por fases** (el autor, 2026-10-13; regla 21): andando y
+    subiendo, todas sus cajas por todas sus caras, y **solo la base sube
+    medio bloque andando** —sus patas (`baseMaskOf`); el cangrejo y la
+    gaviota, cuyas patas no tienen caja, sus cajas mas bajas *(deduccion)*—.
+    Bajando, solo la base: aterriza con ella (`landingFloor`), y lo demas que
+    se meta en algo lo saca la repulsion (`repel`), en horizontal a 4 m/s. La
+    cabeza de un bisonte pasa por encima de una pared que sus patas no;
   - **solo subir medio bloque es de golpe**, y bajar es caer con la gravedad,
     como el jugador (regla 21);
   - si algo le crece debajo y asoma mas de lo que se sube, **se queda donde
     esta**, sin subirse a medias;
-  - una cabeza que toca el borde de una pared a menos de medio bloque por
-    encima de su base sube al animal entero, como cualquier escalon: es el
-    precio de que ninguna caja entre nunca en nada *(deduccion)*. *Luego*: el
-    autor lo vio el mismo dia y se ve mal; quiere que salten desde el punto
-    de impacto, y esta por hablar (`docs/pendiente.md`);
+  - hasta el 2026-10-13 una cabeza que tocaba el borde de una pared a menos
+    de medio bloque por encima de su base subia al animal entero; el autor lo
+    vio y se veia mal, y ahora salta antes de tocar (abajo, «Todos saltan»);
   - hasta el 2026-10-10 el terreno se media en el centro de los pies y cada
     parte miraba una heuristica de escalones hacia los pies.
 - **Inercia** (el autor, 2026-10-10): su avance arranca y frena en
@@ -435,19 +438,45 @@ Lo que eligio el autor, y como esta hecho (`movement.ts`, `walkAnimal`):
 - **Retrocede y gira.** Si el giro no cabe, da un paso atras a lo largo de su
   rumbo y vuelve a probar; gira sobre el centro de su tronco, y el cuerpo nunca
   entra en la pared. Como mucho **1 bloque** (`ANIMAL_BACKUP`, *deduccion*).
+- **Y si ni asi, salta para girar** (el autor, 2026-10-13; `tryTurnJump`). En
+  una ladera de escalones de medio bloque, un animal de cabeza baja que mira
+  cuesta abajo no puede dar media vuelta en el suelo: la cabeza barre los
+  escalones de arriba, y desde la fisica por fases eso choca. Salta en el
+  sitio, sin avanzar, y gira en el aire a su ritmo, donde la cabeza ya pasa por
+  encima. Un salto son ~0,39 s, ~70°: media vuelta son dos o tres saltitos. Se
+  ensaya entero y se da si aterriza cabiendo y al menos 15° mas cerca de su
+  rumbo *(deduccion)*. Medido en cinco semillas, 2 min cada una: sin el, los
+  clavados pasaban del 0-7 % al 1,5-12 %; con el, 0,9-8 %.
 - **Todos saltan un bloque** (`ANIMAL_JUMP_UP`), con la parabola del jugador.
-  - Salta cuando el avance no progresa y, a lo largo de su rumbo, el suelo
-    sube mas de `STEP_UP` y no mas de un bloque, sin nada solido ni fuera de su
-    bioma antes del borde.
-  - **En el aire avanza a su paso**, como el jugador (el autor, 2026-10-10:
-    «usando las mismas físicas que el jugador»). Hasta entonces avanzaba lo
-    justo para que sus pies pasaran el borde en lo alto del salto, mas deprisa
-    que su paso si hacia falta, porque un bisonte topaba con la cabeza con los
-    pies lejos del borde; desde que todas sus cajas chocan, sus patas
-    delanteras se apoyan arriba antes que el resto, y a su paso le basta.
-    Cada salto se ensaya entero antes de darlo; si no llega, lo bordea.
-  - En el aire no gira, y se estampa como el jugador contra lo que no alcanza.
-  - Si se cae andando por un borde, cae avanzando a su paso.
+  - **Saltan antes de tocar** (el autor, 2026-10-13): cuando el paso
+    siguiente meteria una caja en algo que no se sube andando —la cabeza, el
+    hocico o el cuello en cualquier escalon; las patas en uno de mas de medio
+    bloque— y no puede deslizarse a lo largo, salta ya, sin esperar a chocar.
+    Lo que llega antes a un escalon de medio bloque, mirando de frente: en
+    todas las crias y en liebre, jabali, zorro, ibice, marmota, cangrejo y
+    gaviota adultos, el hocico, la cabeza, el cuello o el tronco, y saltan;
+    los adultos de bisonte, ciervo y reno llegan con las patas y lo suben
+    andando. A uno de un bloque, todos con la cabeza o el cuello.
+  - **El escalon** es lo mas alto bajo las cajas que chocarian, y no puede
+    pasar de un bloque.
+  - **En el aire anda a su paso**, como el jugador (el autor, 2026-10-10:
+    «usando las mismas físicas que el jugador»), con su inercia de 0,1 s. Como
+    eso no basta cuando lo que sobresale es la cabeza (el hocico del bisonte
+    adulto asoma 0,85 m por delante de sus patas), **el salto lleva un impulso
+    horizontal, el minimo** para que sus patas delanteras lleguen arriba
+    (`impulse`; el autor, 2026-10-13): constante todo el vuelo, sumado a lo que
+    anda, aunque estuviera parado, y que solo no basta. Contra una cara se
+    pierde lo que anda en ese eje, como el jugador, pero no el impulso
+    *(deduccion)*.
+  - **El minimo se busca ensayando**: el salto entero, de 0 a 6 m/s a saltos
+    de 0,5 hasta el primero que llega, y afinado a 0,05 *(deduccion)*. No vale
+    biseccionar desde el maximo: en una escalera, el que se pasa aterriza con
+    la cabeza en el escalon siguiente. Si ninguno llega, lo bordea.
+  - En el aire no gira (salvo el salto de giro), y subiendo se estampa como el
+    jugador contra lo que no alcanza; bajando, lo que se mete lo saca la
+    repulsion.
+  - Si se cae andando por un borde, en el aire sigue andando con lo que
+    llevaba.
 - **Lo que no se salta lo bordea**: pared alta, agua, arbol, el borde de su
   bioma.
   - Rumbos, desde el de su punto de paso: ±45°, ±90°, ±135° y 180°, el

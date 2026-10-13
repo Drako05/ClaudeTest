@@ -93,6 +93,9 @@ entero —el porque, las medidas y el fallo que motivo cada una— esta en
     terreno y los objetos que chocan se pisan con la huella entera
     (`squareFloor`); **solo subir es de golpe: bajar es caer** con la gravedad.
     Se anda con inercia (`INERTIA_TIME`, 0,1 s) y la cabeza choca (1,8).
+    **El choque va por fases**: subiendo y en horizontal chocan todas las
+    cajas, y solo la base sube medio bloque andando; bajando solo choca la
+    base, y lo demas que se meta lo saca la repulsion, en horizontal (`repel`).
 22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano, del
     que se pueda salir, en terreno que sostenga vida.
 23. **Cualquier medida de conectividad tiene que obedecer la fisica**: por

@@ -31,11 +31,21 @@ export { bodyBoxes, groundRound, type OrientedBox } from './boxes.js';
  * (`partsRest`), y uno por cada (parte, casilla de agua) que solape. Cero es
  * que cabe. Dentro de una ronda (`groundRound`), cada casilla y cada columna se
  * leen una vez.
+ *
+ * Las cajas de la base llevan su propio margen, `baseMargin`: andando, solo
+ * ellas suben medio bloque de golpe, y las demas chocan por todas sus caras
+ * (el autor, 2026-10-13). Sin el, el mismo `margin` para todas.
  */
-export function bodyClashes(world: World, boxes: readonly OrientedBox[], feet: number, margin: number): number {
+export function bodyClashes(
+  world: World,
+  boxes: readonly OrientedBox[],
+  feet: number,
+  margin: number,
+  baseMargin = margin,
+): number {
   let clashes = 0;
   for (const b of boxes) {
-    if (partsRest(world, [b], feet) > feet + margin + 1e-6) clashes++;
+    if (partsRest(world, [b], feet) > feet + (b.base ? baseMargin : margin) + 1e-6) clashes++;
     const rx = b.hl * Math.abs(b.ux) + b.hw * Math.abs(b.uy);
     const ry = b.hl * Math.abs(b.uy) + b.hw * Math.abs(b.ux);
     for (let ty = Math.floor(b.cy - ry); ty <= Math.floor(b.cy + ry); ty++) {
