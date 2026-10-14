@@ -356,6 +356,45 @@ Formato:
   de los ticks.
 - **Donde vive ahora**: lente A, «numeros continuos contra ticks».
 
+### 28. Una comprobacion cuyo caso nuevo no ocurre donde mira (2026-10-14)
+- **Que paso**: con la caja cuadrada, el panel de «Cajas» paso a pintar en
+  cian la caja de cada animal y en rojo sus partes. La pasada `devTools` del
+  humo comprobaba «en cian solo el jugador» y «el rojo es lo que solo se
+  golpea», y siguio en verde: en el nacimiento de la semilla de la prueba no
+  hay ningun animal a 12 casillas. Con uno cerca habria fallado estando el
+  juego bien, y quitar la caja de los animales del panel no la hacia caer.
+- **Por que se escapo**: la mutacion de la tanda («sin la caja de los
+  animales») se probo contra el test puro, no contra el humo; y nadie miro
+  que el escenario del humo tuviera el caso nuevo.
+- **Que lo habria visto**: lente B: cuando la tanda mete una clase nueva de
+  cosa que la comprobacion cuenta, imprimir cuantas hay en su escenario. Si
+  son cero, la comprobacion no la ve: se lleva la prueba a donde la haya
+  (`&x=&y=` junto a un animal) y se muta contra esa pasada.
+- **Donde vive ahora**: lente B, «el caso nuevo, cero veces en el
+  escenario»; la pasada `devTools` va ahora junto a un animal.
+
+### 29. Una funcion metida entre una doc y lo que documenta (2026-10-14)
+- **Que paso**: `keepIn` se escribio justo encima de `stepFauna`, debajo de
+  la doc de esta, que quedo documentando otra cosa (y `stepFauna` sin doc).
+- **Por que se escapo**: es el escape 18 otra vez; el escaner lo ve, pero en
+  la tanda solo se paso por los terminos retirados, no entero.
+- **Que lo habria visto**: el escaner entero en cada ronda, no solo al
+  auditar.
+- **Donde vive ahora**: `tools/a-pruebas.sh` pasa el escaner entero antes de
+  empujar y ensena sus avisos vivos (no frena: se juzgan), y
+  `docs/pruebas.md`, paso 3, lo cuenta.
+
+### 30. Un numero de un modelo cambiado, en un comentario de otro fichero (2026-10-14)
+- **Que paso**: la fase 4 cambio la caja del bisonte de 1,25 a 1,24 y se
+  actualizaron `fauna.md` y `juicio.md`, pero la cabecera de `push.ts`, de la
+  fase anterior, seguia diciendo 1,25. Y tres secciones de historia que
+  contaban modelos ya sustituidos no llevaban su «*Luego*».
+- **Por que se escapo**: las medidas viejas no estaban en `retirados.md`
+  hasta la auditoria; en cuanto entraron, el escaner las encontro.
+- **Que lo habria visto**: anadir a `retirados.md` **los valores**, no solo
+  los nombres, en el mismo cambio que los retira (escape 19, otra vez).
+- **Donde vive ahora**: `retirados.md`, «La fisica de Minecraft».
+
 ---
 
 ## Del proceso del agente

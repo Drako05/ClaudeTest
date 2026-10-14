@@ -31,7 +31,10 @@ CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
    atribucion de la sesion. Lleva el arbol de trabajo tal cual, cambios sin
    commit incluidos, a la rama `pruebas`: commit con un indice temporal encima
    de su punta, avance rapido, sin tocar `main` ni el indice. Antes comprueba
-   que la lista de mutaciones aplica.
+   que la lista de mutaciones aplica, y pasa el escaner de la auditoria entero
+   y ensena sus avisos vivos: no frena, pero cada uno se juzga antes de
+   esperar a la CI (desde el 2026-10-14: una doc suelta y un numero viejo que
+   solo vio la auditoria).
 4. **Esperar las dos tandas en verde**: «CI completa» (`ci.yml`) y «Mutaciones
    completas» (`mutaciones.yml`). **`tools/esperar-ci.sh <sha>` en segundo
    plano** (`run_in_background`), con el SHA que imprimio el guion: pregunta a

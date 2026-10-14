@@ -93,6 +93,11 @@ que nadie toco es justo lo que ninguna tanda mira.
   `waitForTimeout` y luego «se movio». En una maquina cargada no da tiempo a
   un fotograma. Se espera hasta que se mueva, con un tope dentro de la vida
   de lo que se mide, y se muta lo que lo mueve para verla caer.
+- **El caso nuevo, cero veces en el escenario** (#28): si la tanda mete una
+  clase nueva de cosa que una comprobacion cuenta (la caja de cada animal en
+  el panel), se imprime cuantas hay donde mira la prueba. Si son cero, la
+  comprobacion no la ve y su mutacion no cae: se lleva la prueba a donde la
+  haya (`&x=&y=`) y se muta contra esa misma pasada, no contra el test puro.
 - **Un contador que suma de mas** (#21): si lo que se cuenta tambien lo sube
   otra cosa en la misma escena —las esquirlas del arbusto de al lado de la
   presa—, la comprobacion pasa sin lo que afirma. Se aisla la causa (golpe

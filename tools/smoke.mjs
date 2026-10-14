@@ -2239,17 +2239,21 @@ async function devToolsPass(browser, baseUrl) {
   // Las cajas de golpe y de choque (pedido del autor, 2026-10-05): con «Cajas»
   // se dibujan las de alrededor, y se quitan al apagarlas. Cada objeto tiene
   // una caja (el autor, 2026-10-05): los troncos y las rocas del nacimiento van
-  // en amarillo, golpe y choque a la vez, y en cian solo queda el jugador; con
-  // el choque de casilla entera de antes, el cian contaba cada arbol.
+  // en amarillo, golpe y choque a la vez; con el choque de casilla entera de
+  // antes, el cian contaba cada arbol. En cian, la caja de cada cuerpo: el
+  // jugador y, desde el 2026-10-14, cada animal cercano, cuyas partes van en
+  // rojo, porque solo se golpean.
   await page.click('[data-toggle="boxes"]');
   const boxed = await waitForLoop(page, 10);
   console.log(`  cajas: ${JSON.stringify(boxed.debugBoxes)}`);
   // Lo que hay, contado aparte (`boxesNear`): el rojo es exactamente lo que solo
-  // se golpea, y el amarillo, al menos lo que choca (mas los animales).
+  // se golpea —objetos y partes de animales—, el amarillo, al menos lo que
+  // choca, y el cian, un cuerpo por caja.
   console.log(`  alrededor: ${JSON.stringify(boxed.boxesNear)}`);
-  check(boxed.debugBoxes.hit === boxed.boxesNear.hitOnly && boxed.debugBoxes.both >= boxed.boxesNear.blocking &&
-    boxed.boxesNear.blocking > 0 && boxed.debugBoxes.solid === 1,
-    `las cajas no son las de alrededor: ${JSON.stringify(boxed.debugBoxes)} frente a ${JSON.stringify(boxed.boxesNear)}`);
+  const near = boxed.boxesNear;
+  check(boxed.debugBoxes.hit === near.hitOnly + near.animalParts && boxed.debugBoxes.both >= near.blocking &&
+    near.blocking > 0 && boxed.debugBoxes.solid === near.bodies,
+    `las cajas no son las de alrededor: ${JSON.stringify(boxed.debugBoxes)} frente a ${JSON.stringify(near)}`);
   await shot(page, '3d-06b-cajas.png');
   await page.click('[data-toggle="boxes"]');
   const unboxed = await waitForLoop(page, 10);
@@ -2342,6 +2346,23 @@ async function devToolsPass(browser, baseUrl) {
   check(closed.timeScale === 1, `al cerrar el tiempo no volvio a 1x (${closed.timeScale})`);
   check(closed.survivalFrozen === false, 'al cerrar el personaje siguio siendo inmortal');
   check(!(await page.isVisible('#devPanel')), 'el panel sigue visible tras cerrarlo');
+
+  // Las cajas junto a un animal: la suya en cian y sus partes en rojo (el
+  // autor, 2026-10-14). En el nacimiento de la semilla de la prueba no hay
+  // ninguno a 12 casillas, asi que la comprobacion de arriba no veia esta
+  // parte (auditoria del 2026-10-14): se va a uno.
+  const beast = start.fauna[0];
+  check(beast !== undefined, 'no hay fauna a la que ir a mirar sus cajas');
+  if (beast) {
+    await open(page, baseUrl, `&dev=1&x=${beast.x.toFixed(3)}&y=${beast.y.toFixed(3)}`);
+    await page.click('[data-toggle="boxes"]');
+    const herd = await waitForLoop(page, 10);
+    const around = herd.boxesNear;
+    console.log(`  junto a un animal: ${JSON.stringify(herd.debugBoxes)} frente a ${JSON.stringify(around)}`);
+    check(around.bodies >= 2 && around.animalParts > 0, `no hay ningun animal cerca: ${JSON.stringify(around)}`);
+    check(herd.debugBoxes.solid === around.bodies && herd.debugBoxes.hit === around.hitOnly + around.animalParts,
+      `las cajas de los animales no son las suyas: ${JSON.stringify(herd.debugBoxes)} frente a ${JSON.stringify(around)}`);
+  }
 
   await page.close();
 }

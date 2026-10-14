@@ -20,6 +20,12 @@ motivo="${1:-pruebas}"
 node tools/mutar.mjs --comprobar
 for f in tools/*.mjs; do node --check "$f"; done
 
+# Y el escaner de la auditoria, entero (escape 29): no frena, porque sus
+# avisos se juzgan, pero se ven antes de gastar una tanda de CI. Solo lo vivo:
+# las categorias con avisos y sus lineas, sin lo que esta en historia.
+node .claude/skills/auditoria/scripts/escaner.mjs 2>/dev/null \
+  | grep -v '\[historia\]' | grep -E '^## .*: [1-9]|^  [^ ]' || true
+
 git fetch -q origin pruebas 2>/dev/null || true
 if git rev-parse -q --verify origin/pruebas >/dev/null; then
   padre=$(git rev-parse origin/pruebas)

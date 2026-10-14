@@ -427,7 +427,8 @@ de bloques», y `docs/guia-de-arte.md`, directriz 4).
   solo cambia la forma de llegar, como un rodeo.
 - **Lo que cuesta**: cada ronda (`groundRound`) lee cada casilla y cada
   columna de 0,5 una vez (`columnTopIn`). Con la caja cuadrada el tick medio
-  bajo de ~1,2 ms a 0,52 ms.
+  bajo de ~1,2 ms a 0,52 ms; los empujes le suman 0,15 ms con 113 animales
+  (`push.ts`, ordenados a lo largo de x).
 
 Del 2026-10-03 al 2026-10-14 chocaban las cajas de sus partes, giradas con su
 rumbo, con su altura de reposo y, desde el 2026-10-13, por fases

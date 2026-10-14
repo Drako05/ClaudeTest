@@ -69,7 +69,10 @@ roca, que era lo que chocaba entonces; al verlo, el autor cambio la regla.
 
 Se rehacen enteras en cada fotograma: son unas 600 casillas, cuesta poco, y no
 hay cache que se quede vieja al talar algo o al pasar un animal. El humo las
-cuenta (`__verdant.debugBoxes`) y `tests/debug-boxes.test.ts` mide la parte pura.
+cuenta (`__verdant.debugBoxes`) contra un recuento aparte (`boxesNear`), en el
+nacimiento y junto a un animal, porque en el nacimiento de la semilla de la
+prueba no hay ninguno a mano (auditoria del 2026-10-14); y
+`tests/debug-boxes.test.ts` mide la parte pura.
 
 Del 2026-10-12 al 2026-10-14 un deslizador del grupo Vista ajustaba lo que
 tardaba la camara en subir un escalon; se retiro con el

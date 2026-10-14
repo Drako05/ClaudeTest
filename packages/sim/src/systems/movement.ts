@@ -16,6 +16,8 @@
  * todas sus caras siempre (el autor, 2026-10-14): el jugador, la suya; un
  * animal, la de su especie, de base cuadrada y alta hasta el lomo
  * (`bodyOf`). Asi un animal gira en cualquier sitio, y siempre tiene apoyo.
+ * Choca con el terreno, el agua y los objetos; **con otros cuerpos no**: se
+ * pueden meter uno en otro, y los aparta `pushBodies` (`push.ts`).
  *
  * Antes de esto el jugador cambiaba de nivel sin mas, teletransportandose de un
  * tile bajo a uno alto y al reves, porque la colision solo miraba `isSolidAt` y

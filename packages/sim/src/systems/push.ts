@@ -11,7 +11,7 @@
  *
  * **Deduccion mia, no numeros del autor** (`docs/juicio.md`):
  * - la **masa** de cada cuerpo es el volumen de su caja (`bodyOf`): el jugador,
- *   0,68 × 0,68 × 1,8; un bisonte adulto, 1,25 × 1,25 × 1,58;
+ *   0,68 × 0,68 × 1,8; un bisonte adulto, 1,24 × 1,24 × 1,58;
  * - dos cajas que se solapan en planta y en alto se apartan **por la linea
  *   entre sus centros**, a `PUSH_SPEED` (2 m/s) como mucho, en proporcion a lo
  *   que se solapan;
@@ -77,7 +77,7 @@ export function pushBodies(
     const { half: h, height } = bodyOf(store, ids[i]!);
     half[i] = h;
     tall[i] = height;
-    mass[i] = 4 * h * h * height;
+    mass[i] = massOf(store, ids[i]!);
     widest = Math.max(widest, h);
   }
   moveX.length = n;
