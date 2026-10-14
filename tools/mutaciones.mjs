@@ -11,79 +11,49 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: la fisica de los animales al estilo Minecraft (el autor,
- * 2026-10-14): la caja cuadrada que choca siempre, el escalon tick a tick, el
- * salto con la fuerza justa.
+ * Ronda: los empujes entre cuerpos (el autor, 2026-10-14, fase 3 de la fisica
+ * al estilo Minecraft): segun el tamaño, poco a poco, sin meter a nadie en una
+ * pared.
  */
 export default [
-  // El escalon de golpe, como hasta el 2026-10-14.
+  // El tick sin empujes.
   {
-    nombre: 'fisica: el escalon de golpe',
-    fichero: 'packages/sim/src/systems/jump.ts',
-    de: 'store.z[id] = Math.min(ground, store.z[id] + CLIMB_SPEED * dt);',
-    a: 'store.z[id] = ground;',
-    prueba: 'test:tests/jump.test.ts',
-  },
-  {
-    nombre: 'fisica: el escalon de golpe, en el humo',
-    fichero: 'packages/sim/src/systems/jump.ts',
-    de: 'store.z[id] = Math.min(ground, store.z[id] + CLIMB_SPEED * dt);',
-    a: 'store.z[id] = ground;',
-    prueba: 'smoke:relief',
-  },
-  {
-    nombre: 'fisica: el escalon de golpe, en las leyes',
-    fichero: 'packages/sim/src/systems/jump.ts',
-    de: 'store.z[id] = Math.min(ground, store.z[id] + CLIMB_SPEED * dt);',
-    a: 'store.z[id] = ground;',
-    prueba: 'test:tests/world-laws.test.ts',
-  },
-  // El salto de altura fija, el del jugador: el apice a 1,16.
-  {
-    nombre: 'fisica: el salto de un animal, de altura fija',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: 'const speed = jumpSpeedFor(rise + ANIMAL_JUMP_MARGIN);',
-    a: 'const speed = jumpSpeedFor(1.16);',
-    prueba: 'test:tests/fauna-body.test.ts',
-  },
-  // La caja del ancho justo, no 1,2 veces.
-  {
-    nombre: 'fisica: la caja del ancho justo',
-    fichero: 'packages/shared/src/fauna-body.ts',
-    de: 'export const COLLISION_WIDTH_FACTOR = 1.2;',
-    a: 'export const COLLISION_WIDTH_FACTOR = 1;',
-    prueba: 'test:tests/fauna-body.test.ts',
-  },
-  // En el aire, sin chocar de lado: lo que habia cayendo hasta el 2026-10-14.
-  {
-    nombre: 'fisica: el jugador en el aire sin chocar de lado',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: '  walk(world, store, id, moveX, moveY, dt, running, 0);',
-    a: '  walk(world, store, id, moveX, moveY, dt, running, Infinity);',
-    prueba: 'test:tests/jump.test.ts',
-  },
-  // Metido en algo, sin poder salir.
-  {
-    nombre: 'fisica: metido en algo, clavado',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: 'const half = blocked(world, store, id, x, y, feet, STEP_UP, keep) ? 0 : undefined;',
-    a: 'const half = undefined;',
-    prueba: 'test:tests/fauna-body.test.ts',
-  },
-  // El auto salto midiendo desde los pies a mitad de subida: salta en la escalera.
-  {
-    nombre: 'fisica: el auto salto desde los pies a medio subir',
-    fichero: 'packages/sim/src/systems/autojump.ts',
-    de: 'const feet = Math.max(store.z[id], footing(world, store, id, store.z[id] + STEP_UP));',
-    a: 'const feet = store.z[id];',
-    prueba: 'test:tests/jump.test.ts',
-  },
-  // Sin la caja de los animales en el panel.
-  {
-    nombre: 'devtools: sin la caja de los animales',
-    fichero: 'packages/client/src/debug-boxes.ts',
-    de: '    bodyEdges(out, state, id);',
+    nombre: 'empujes: el tick no empuja',
+    fichero: 'packages/sim/src/tick.ts',
+    de: '  pushBodies(world, entities, state.fauna, playerId);',
     a: '',
-    prueba: 'test:tests/debug-boxes.test.ts',
+    prueba: 'test:tests/push.test.ts',
+  },
+  // Sin masa: cada uno se lleva la mitad, sea cual sea su tamaño.
+  {
+    nombre: 'empujes: sin masa',
+    fichero: 'packages/sim/src/systems/push.ts',
+    de: '      const shareA = mass[j]! / (mass[i]! + mass[j]!);',
+    a: '      const shareA = 0.5;',
+    prueba: 'test:tests/push.test.ts',
+  },
+  // De golpe: se separan en un tick.
+  {
+    nombre: 'empujes: de golpe',
+    fichero: 'packages/sim/src/systems/push.ts',
+    de: '      const speed = PUSH_SPEED * overlap;',
+    a: '      const speed = (overlap * reach) / dt;',
+    prueba: 'test:tests/push.test.ts',
+  },
+  // Un empuje que no mira el choque: mete en el agua y saca del bioma.
+  {
+    nombre: 'empujes: atraviesan paredes',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '  if (dx !== 0 && !blocked(world, store, id, store.x[id] + dx, store.y[id], feet, margin, keep)) store.x[id] += dx;',
+    a: '  if (dx !== 0) store.x[id] += dx;',
+    prueba: 'test:tests/push.test.ts',
+  },
+  // El barrido corta antes de tiempo: solo mira su propia caja, no la mas ancha.
+  {
+    nombre: 'empujes: el barrido corta antes de tiempo',
+    fichero: 'packages/sim/src/systems/push.ts',
+    de: '      if (dx >= half[i]! + widest) break;',
+    a: '      if (dx >= half[i]! + half[i]!) break;',
+    prueba: 'test:tests/push.test.ts',
   },
 ];

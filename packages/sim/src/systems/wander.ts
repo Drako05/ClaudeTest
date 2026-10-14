@@ -142,6 +142,15 @@ export function syncFauna(
  * llegar; lo que estorba lo salta o lo bordea (`walkAnimal`), y en el aire
  * sigue su salto (`airborneAnimal`). La gravedad, como al jugador.
  */
+/**
+ * Donde puede estar el animal `id`: solo en su bioma. Lo miran su andar, su
+ * salto y los empujes (`push.ts`); nada lo saca de el.
+ */
+export function keepIn(world: World, store: EntityStore, id: number): (x: number, y: number) => boolean {
+  const biome = SPECIES[store.animal[id]!.species].biome;
+  return (x, y) => biomeOfTerrain(world.terrainAt(Math.floor(x), Math.floor(y))) === biome;
+}
+
 export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, tick: number): void {
   for (const id of index.values()) {
     const animal = store.animal[id];
@@ -157,7 +166,7 @@ export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, t
     const dx = store.wanderX[id] - store.x[id];
     const dy = store.wanderY[id] - store.y[id];
     const info = SPECIES[animal.species];
-    const keep = (x: number, y: number) => biomeOfTerrain(world.terrainAt(Math.floor(x), Math.floor(y))) === info.biome;
+    const keep = keepIn(world, store, id);
     // Una ronda de consultas para el andar y la vertical: leen casi las mismas
     // casillas.
     groundRound(world, store.x[id], store.y[id], () => {

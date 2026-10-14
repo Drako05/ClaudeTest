@@ -130,10 +130,18 @@ del 0,9-8 % al 0,0-0,2 %**, y el tick medio de ~1,2 ms a 0,52 ms. Contado en
 `docs/reglas.md` (21), `docs/fauna.md`, `docs/controles.md` y
 `docs/relieve.md`.
 
-**Lo que queda**: (3) los empujes entre cuerpos; (4) los modelos, con las
-patas dentro del cuadrado. Hasta la 4, en los animales de cabeza larga la
-cabeza queda fuera de la caja y puede verse metida en una pared, como acepto
-el autor.
+**Fase 3 — HECHA (2026-10-14).** Los cuerpos —animales y jugador— no se
+chocan entre si: se empujan (`pushBodies`, `systems/push.ts`), poco a poco,
+hasta 2 m/s en proporcion al solape, repartido por la masa (el volumen de la
+caja), y por el choque de andar, sin meter a nadie en una pared ni sacar a un
+animal de su bioma. Las deducciones, en `docs/juicio.md`. Medido en cinco
+semillas, 2 min: clavados 0,0-0,5 % (sin empujes, 0,0-0,2 %); el empuje
+cuesta 0,15 ms por tick con 113 animales, tras ordenarlos a lo largo de x (a
+lo bruto, todos los pares, 0,65 ms).
+
+**Lo que queda**: (4) los modelos, con las patas dentro del cuadrado. Hasta
+entonces, en los animales de cabeza larga la cabeza queda fuera de la caja y
+puede verse metida en una pared, como acepto el autor.
 
 ## Pendiente del autor: las paredes de 2+ voxeles
 

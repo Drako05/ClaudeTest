@@ -231,7 +231,20 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
       (regla 12).
 
     Andando, la caja admite delante lo que no pase de los pies mas `STEP_UP`;
-    en el aire, nada (`slide`, con su margen). Hasta el 2026-10-14 el choque
+    en el aire, nada (`slide`, con su margen).
+
+    **Los cuerpos no se chocan entre si: se empujan** (el autor, 2026-10-14:
+    «colisiones similares a las de minecraft, que no se sienten rigidas»,
+    «segun el tamaño», y el jugador cuenta como un cuerpo mas). Al andar se
+    pueden meter uno en otro, y en cada tick, tras el paso de la fauna,
+    `pushBodies` (`systems/push.ts`) los aparta poco a poco por la linea entre
+    sus centros, hasta 2 m/s (`PUSH_SPEED`) en proporcion a lo que se
+    solapan; cada uno se lleva la parte que le toca por la masa del otro, que
+    es el volumen de su caja. El empuje pasa por el mismo choque que andar
+    (`nudge`), asi que no mete a nadie en una pared ni en el agua, ni saca a un
+    animal de su bioma, y no toca la velocidad de quien empuja: lo que el
+    jugador cede no le cuesta hambre. Los numeros son *deduccion*
+    (`docs/juicio.md`). Hasta el 2026-10-14 el choque
     iba por fases —subiendo todas las cajas, bajando solo la base, la
     repulsion sacando lo demas— y un animal chocaba con las cajas de sus
     partes giradas con su rumbo; se retiro todo (`docs/historia.md`).

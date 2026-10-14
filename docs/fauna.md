@@ -411,8 +411,12 @@ la tanda los rediseña, con el autor (`docs/pendiente.md`).
   en su origen si su caja no cabe alli, mirando de su origen a su punto de
   paso, y con los pies en lo que pisa su caja. Sale lo mismo lo mire alguien o
   no: la ley del observador.
-- **No choca con otros animales ni con el jugador**, de momento: los empujes
-  segun el tamaño son la fase 3 de la tanda (`docs/pendiente.md`).
+- **Con otros animales y con el jugador no choca: se empujan** (el autor,
+  2026-10-14; regla 21, `systems/push.ts`). Al andar se pueden meter uno en
+  otro, y cada tick se apartan poco a poco, el grande menos que el pequeño:
+  un bisonte aparta a una liebre casi sin moverse, y al jugador lo aparta mas
+  de lo que el jugador lo aparta a el. Su punto de paso no cambia: un empuje
+  solo cambia la forma de llegar, como un rodeo.
 - **Lo que cuesta**: cada ronda (`groundRound`) lee cada casilla y cada
   columna de 0,5 una vez (`columnTopIn`). Con la caja cuadrada el tick medio
   bajo de ~1,2 ms a 0,52 ms.
