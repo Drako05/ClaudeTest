@@ -283,25 +283,18 @@ se le propuso eligio esto, en dos piezas, las dos de dibujo:
   fraccion de tick que lleva el acumulador. Cuesta un tick de retraso en lo
   que se ve de la posicion; la mirada no lo lleva. Mas lejos de 8 en un tick
   no se interpola: se salta (nacer, reaparecer, `?x=&y=`).
-- **El escalon se sube en una curva** (`StepSmoother`). Subir medio bloque
-  andando es de golpe en el nucleo (regla 21), y el cuerpo se dibuja asi; la
-  camara se queda abajo y lo sube en `STEP_SMOOTH = 0,1 s` —**decision del
-  autor**, 2026-10-12, tras probarlo: «con 0,1 s se notan los escalones sin
-  ser incomodos, ya pasados los 0,2 s casi se pierde el "jalon" del
-  escalon»—, con un muelle
-  criticamente amortiguado: arranca sin velocidad, deja menos de un 5 % a los
-  0,1 s y nunca se pasa. El primer fotograma sube el 19 % del escalon; con una
-  exponencial simple subia el 40 %, que era un tiron. Cuenta como escalon una
-  subida de golpe con los pies en el suelo antes y despues; saltar, caer o
-  aterrizar no. Una escalera seguida se suma. Se ajusta en el panel de
-  desarrollo, de 0 a 0,3 (`docs/devtools.md`).
+- **El escalon ya no se suaviza en la camara** (el autor, 2026-10-14: la
+  camara suavizada «soluciono el problema equivocado»). Del 2026-10-12 al
+  2026-10-14 el nucleo subia el medio bloque de golpe y la camara lo seguia
+  en una curva de 0,1 s, con su deslizador en el panel. Ahora es el cuerpo el que sube tick a tick, medio bloque en 0,1 s
+  (`CLIMB_SPEED`, regla 21), y la camara lo sigue tal cual, con la
+  interpolacion entre ticks.
 
 La camara **mira por la linea de la mirada**, en las tres vistas, como antes de
 la fase C: el centro de la pantalla es hacia donde se mira desde los ojos que
 se dibujan. **La mirada que viaja en la `Intent` no cambia** (regla 5): es la
 del raton o el dedo, `forward()` y `lookPitch`, tal cual, y el golpe sale de
-los ojos de verdad. La curva, el salto a 8 y lo que cuenta como escalon son
-deduccion mia (`docs/juicio.md`); la duracion, del autor.
+los ojos de verdad. El salto a 8 es deduccion mia (`docs/juicio.md`).
 
 **Consecuencia a saber**: como la mirada pasa por los ojos del jugador, en
 tercera persona **el personaje tapa el centro de la pantalla**, que es justo

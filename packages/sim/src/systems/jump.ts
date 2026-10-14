@@ -19,8 +19,8 @@
  * **alcance dos**. `tests/jump.test.ts` lo tiene como tabla.
  */
 
-import { footing, headroom, landingFloor, PLAYER_HEIGHT } from '../boxes.js';
-import { EntityKind, type EntityStore } from '../entities.js';
+import { bodyOf, footing, headroom } from '../boxes.js';
+import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 
 /**
@@ -48,26 +48,50 @@ export const JUMP_SPEED = 12;
  * sube andando —el voxel del terreno, una caja baja—, y es una caracteristica
  * de la fisica, no de cada cosa. La pared mas baja que pide saltar mide 1.
  *
- * Y **solo subir es de golpe** (el autor, 2026-10-10): «solo al subir escalones
- * ≤ 0.5 se permite teletransportar». Bajar, por poco que sea, es caer con la
- * gravedad: un escalon de medio bloque tarda 0,13 s, y mientras se cae no se
- * salta (sin margen, decision suya del mismo dia).
+ * Y **nada se sube de golpe** (el autor, 2026-10-14: «nunca debimos dejar que
+ * el jugador o los animales se teletransportaran al subir un escalon»): los
+ * pies suben hacia el escalon a `CLIMB_SPEED`, tick a tick, sin dejar de
+ * andar. Bajar, por poco que sea, es caer con la gravedad: un escalon de medio
+ * bloque tarda 0,13 s, y mientras se cae no se salta (sin margen, decision suya
+ * del 2026-10-10).
  */
 export const STEP_UP = 0.5;
+
+/**
+ * A que velocidad suben los pies un escalon andando, en bloques por segundo:
+ * medio bloque en **0,1 s** (el autor, 2026-10-14: «tan rapidas que parecieran
+ * seguir caminando, pero en realidad el cuerpo si sube tick a tick»; el 0,1 s es
+ * el que dio por bueno para la camara el 2026-10-12). Los 5 m/s son
+ * **deduccion mia** de esos dos numeros.
+ */
+export const CLIMB_SPEED = STEP_UP / 0.1;
+
+/**
+ * Lo que sube por encima del escalon el salto de un animal (el autor,
+ * 2026-10-14: la fuerza «con respecto a la altura que desean alcanzar»; eligio
+ * el escalon mas 0,1 m, como el jugador, cuyo apice queda a 1,16 sobre 1).
+ */
+export const ANIMAL_JUMP_MARGIN = 0.1;
+
+/** El impulso vertical que pone el apice `rise` por encima de los pies, con esta gravedad. */
+export function jumpSpeedFor(rise: number): number {
+  return Math.sqrt(2 * GRAVITY * rise);
+}
 
 /**
  * Despegue. **Solo empuja hacia arriba** (decision del autor, 2026-09-30): lo
  * horizontal lo sigue poniendo el mando, en el aire como en el suelo
  * (`moveAirborne`). Hasta entonces conservaba el impulso del suelo y en el aire
- * solo admitia un 30 % de desviacion.
+ * solo admitia un 30 % de desviacion. El jugador salta siempre con
+ * `JUMP_SPEED`; un animal, con lo justo para su escalon (`jumpSpeedFor`).
  *
  * Devuelve si ha despegado de verdad: en el aire no se salta, y un salto que no
  * ocurre no cuesta hambre.
  */
-export function takeOff(store: EntityStore, id: number): boolean {
+export function takeOff(store: EntityStore, id: number, speed = JUMP_SPEED): boolean {
   if (!store.grounded[id]) return false;
   store.grounded[id] = 0;
-  store.vz[id] = JUMP_SPEED;
+  store.vz[id] = speed;
   return true;
 }
 
@@ -82,23 +106,22 @@ export function takeOff(store: EntityStore, id: number): boolean {
  * alcanzan el suelo, y en el suelo se cae cuando el suelo se aleja de los pies.
  * **Caer es caer**: salir de un borde no es un estado distinto de saltar, es la
  * misma parabola con `vz = 0`. Y desde el 2026-10-10 bajar un escalon, por
- * pequeno que sea, tambien: solo se sube de golpe (`STEP_UP`).
+ * pequeno que sea, tambien. Subirlo andando, desde el 2026-10-14, es ir
+ * subiendo los pies tick a tick (`CLIMB_SPEED`), de pie.
  */
 export function applyVertical(world: World, store: EntityStore, id: number, dt: number): void {
-  // Lo que se pisa, con la huella entera: el terreno y las cajas que la tocan;
+  // Lo que se pisa, con la caja entera: el terreno y las cajas que la tocan;
   // encima de una roca o de una mesa se esta de pie, y al bajarse o si se
   // desmonta, se cae. Una caja que asoma mas de lo que se sube andando no se
-  // pisa (`footing`). En el aire, solo choca la base, y con lo que no pasa de
-  // los pies: es donde se aterriza (el autor, 2026-10-13; `landingFloor`).
-  const ground = store.grounded[id]
-    ? footing(world, store, id, store.z[id] + STEP_UP)
-    : landingFloor(world, store, id);
+  // pisa (`footing`).
+  const ground = footing(world, store, id, store.z[id] + STEP_UP);
 
   if (store.grounded[id]) {
     if (store.z[id] <= ground + 1e-9) {
       // El suelo sigue a la misma altura, o sube lo que se sube andando: los
-      // pies lo siguen de golpe.
-      store.z[id] = ground;
+      // pies lo suben tick a tick, sin dejar de estar de pie (el autor,
+      // 2026-10-14: nada se sube de golpe).
+      store.z[id] = Math.min(ground, store.z[id] + CLIMB_SPEED * dt);
       return;
     }
     // Se ha salido por un borde: se cae sin impulso vertical, y lo horizontal
@@ -119,8 +142,9 @@ export function applyVertical(world: World, store: EntityStore, id: number, dt: 
   store.vz[id] = vz0 - GRAVITY * dt;
   store.z[id] += ((vz0 + store.vz[id]) / 2) * dt;
 
-  // La cabeza contra un techo corta la subida: se queda debajo y empieza a caer.
-  const top = store.z[id] + (store.kind[id] === EntityKind.Player ? PLAYER_HEIGHT : 0);
+  // Lo alto de la caja contra un techo corta la subida: se queda debajo y
+  // empieza a caer.
+  const top = store.z[id] + bodyOf(store, id).height;
   if (top > ceiling) {
     store.z[id] -= top - ceiling;
     store.vz[id] = Math.min(0, store.vz[id]);

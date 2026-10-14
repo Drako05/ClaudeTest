@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLIMB_SPEED,
   createGame,
   DayPhase,
   dayFraction,
@@ -32,6 +33,7 @@ import {
   RESOURCE_NAMES,
   Resource,
   Station,
+  TICK_DT,
   toolStats,
   withinEquilibrium,
 } from '@verdant/shared';
@@ -410,11 +412,12 @@ describe('Capitulo I — «Existen el pasar del tiempo y las leyes fisicas funda
     }
   });
 
-  it('andando se sube como mucho medio bloque por tick', () => {
+  it('andando se sube como mucho medio bloque, y tick a tick', () => {
     // El teletransporte de un tile bajo a uno alto era exactamente esto: andar
     // y aparecer arriba. Hasta los voxeles una rampa subia UN nivel y para eso
     // existia; hoy lo hace un escalon de medio bloque, y mas sin saltar seria
-    // atravesar un muro.
+    // atravesar un muro. Y desde el 2026-10-14 (el autor) ni ese medio bloque
+    // se sube de golpe: de pie, los pies suben a `CLIMB_SPEED`, tick a tick.
     for (const seed of [1, 2024, 31337]) {
       for (const [mx, my] of [
         [0, -1],
@@ -430,14 +433,23 @@ describe('Capitulo I — «Existen el pasar del tiempo y las leyes fisicas funda
         // Sin rampas, el suelo sube a escalones de medio bloque: andando, como
         // mucho uno por tick.
         let previo = world.groundHeightAt(e.x[p], e.y[p]);
+        let pies = e.z[p];
         for (let t = 0; t < 240; t++) {
+          const dePie = e.grounded[p] === 1;
           step(state, intent);
           const ahora = world.groundHeightAt(e.x[p], e.y[p]);
           expect(
             ahora - previo,
             `semilla ${seed} hacia ${mx},${my}: subio ${ahora - previo} de golpe`,
           ).toBeLessThanOrEqual(0.5 + 1e-9);
+          if (dePie && e.grounded[p] === 1) {
+            expect(
+              e.z[p] - pies,
+              `semilla ${seed} hacia ${mx},${my}: los pies subieron ${e.z[p] - pies} en un tick`,
+            ).toBeLessThanOrEqual(CLIMB_SPEED * TICK_DT + 1e-9);
+          }
           previo = ahora;
+          pies = e.z[p];
         }
       }
     }

@@ -200,42 +200,41 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     sube a escalones de medio bloque, que es justo lo que ese margen deja
     pasar.
 
-    **Solo subir es de golpe; bajar es caer** (el autor, 2026-10-10: «solo al
-    subir escalones ≤ 0.5 se permite teletransportar»; «solo bajan de escalón
-    cuando al caer ninguna de sus cajas choca con algo»). Hasta entonces
-    `SNAP_DOWN`, el gemelo de bajada de `STEP_UP`, pegaba los pies al suelo
-    medio bloque para no ir dando saltitos escalera abajo; se retiro. Ahora un
-    escalon de medio bloque tarda 0,13 s en caerse, y **cayendo no se salta**:
-    el autor eligio no dar margen (2026-10-10). Y nada sube mas de golpe: una
-    columna que asoma mas de `STEP_UP` sobre los pies no se pisa, igual que una
-    caja (*deduccion*); si un cuerpo aparece con la huella metida en una pared
-    —puesto a mano con `?x=&y=`—, se queda al pie en vez de subir a lo alto, y
-    al aparecer los pies van a lo que pisa la huella, no el centro.
+    **Subir es tick a tick; bajar es caer.** Bajar: el autor, 2026-10-10
+    («solo bajan de escalón cuando al caer ninguna de sus cajas choca con
+    algo»). Hasta entonces `SNAP_DOWN`, el gemelo de bajada de `STEP_UP`, pegaba
+    los pies al suelo medio bloque para no ir dando saltitos escalera abajo; se
+    retiro. Un escalon de medio bloque tarda 0,13 s en caerse, y **cayendo no se
+    salta**: el autor eligio no dar margen (2026-10-10). Subir: desde el
+    2026-10-14 **nada sube de golpe** (el autor: «nunca debimos dejar que el
+    jugador o los animales se teletransportaran al subir un escalon»; el
+    suavizado de camara del escalon «soluciono el problema equivocado» y se
+    retiro). De pie, si el suelo bajo la caja sube hasta `STEP_UP`, los pies
+    suben hacia el a `CLIMB_SPEED`, **medio bloque en 0,1 s**, sin dejar de
+    andar (`applyVertical`); mientras tanto la caja puede asomar un instante
+    dentro del borde que esta subiendo (*deduccion*, en `docs/juicio.md`). Una
+    columna que asoma mas de `STEP_UP` sobre los pies no se pisa, igual que
+    una caja (*deduccion*); si un cuerpo aparece con la huella metida en una
+    pared —puesto a mano con `?x=&y=`—, se queda al pie en vez de subir a lo
+    alto, y al aparecer los pies van a lo que pisa la huella, no el centro.
 
-    **El choque va por fases** (el autor, 2026-10-13), para los animales y para
-    el jugador:
-    1. **Subiendo** (impulso vertical hacia arriba): chocan todas sus cajas, por
-       todas sus caras.
-    2. **Bajando** (hacia abajo, tambien la caida tras el salto): solo choca
-       **la base** —«la base de las patas, o la base de la extremidad que use
-       para moverse en el suelo»—, que es donde se aterriza (`landingFloor`).
-       Si otra caja choca con algo, no lo detiene: el cuerpo entero se
-       **repele** por el rumbo que antes saque todas sus cajas, hasta que esten
-       fuera, «rapida pero no instantanea» (`repel`, `REPEL_SPEED` = 4 m/s,
-       eleccion suya). Solo en el plano horizontal, nunca arriba ni abajo; y
-       mientras se repele, lo que empuja hacia dentro se pierde: gana la
-       repulsion. Sigue ya de pie, si hace falta, hasta salir.
-    3. **Solo en horizontal**: chocan todas las cajas, por todas sus caras. De
-       ahi que **solo la base sube medio bloque andando**: la cabeza de un
-       animal ya no lo sube (lo vio el autor el 2026-10-10: «subir primero la
-       cabeza y luego las patas se ve mal»). Si lo primero que tocaria un
-       escalon no son sus patas, **salta antes de tocarlo** (`docs/fauna.md`).
+    **Cada cuerpo es una caja de base cuadrada que choca por todas sus caras,
+    siempre** (el autor, 2026-10-14, como en Minecraft: «con la caja como un
+    simple cubo rectangular, chocan por todas sus caras siempre, asi de
+    simple»). Alineada con los ejes, **no gira** con el cuerpo, y es la misma
+    fisica para el jugador y para los animales (`bodyOf`, `sim/boxes.ts`):
+    - el jugador, `BODY_RADIUS` (0,34) de medio lado y `PLAYER_HEIGHT` (1,8);
+    - un animal, **1,2 veces el ancho de su cuerpo** de lado y **alta hasta
+      el lomo** (`collisionBoxOf`, `shared/fauna-body.ts`, de sus partes `hit`
+      y en cache). La cabeza puede quedar fuera, y **se acepta que se vea
+      metida en una pared**. Las cajas que se golpean siguen siendo sus partes
+      (regla 12).
 
-    El jugador es una caja sola, y su base es su huella: cayendo ya no se
-    estampa contra una cara, entra como mucho lo de un tick y la repulsion lo
-    saca. Lo deducido —los 32 rumbos de la repulsion, la base del cangrejo y la
-    gaviota, que estar de pie siga apoyandose en cualquier caja— esta en
-    `docs/juicio.md`.
+    Andando, la caja admite delante lo que no pase de los pies mas `STEP_UP`;
+    en el aire, nada (`slide`, con su margen). Hasta el 2026-10-14 el choque
+    iba por fases —subiendo todas las cajas, bajando solo la base, la
+    repulsion sacando lo demas— y un animal chocaba con las cajas de sus
+    partes giradas con su rumbo; se retiro todo (`docs/historia.md`).
 
     **Inercia** (el autor, 2026-10-10): arrancar y frenar duran `INERTIA_TIME`,
     0,1 s, a ritmo constante, en el suelo y en el aire (`steer`,
@@ -296,19 +295,12 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     roca chocaban por la casilla entera y sin alto, y la estacion se media en
     el centro (`World.floorHeightAt`, retirado).
 
-    **Los animales llevan la regla a sus partes** (2026-10-03, ver
-    `docs/fauna.md`). Sus pies, en el centro y con `STEP_UP` contra el
-    terreno. Ademas, cada parte de su cuerpo que choca (`hit`), girada con su
-    rumbo, no puede solapar una casilla de agua, y desde el 2026-10-10 **todas
-    sus cajas chocan siempre** (el autor): cada una mide su altura de reposo
-    (`partsRest`) —lo mas alto bajo ella, columnas de 0,5 y cajas de objetos,
-    menos lo que esa caja esta por encima de los pies—, el cuerpo reposa en el
-    maximo de todas, y una parte estorba si pide subir los pies mas de
-    `STEP_UP` andando o de nada en el aire (`sim/body.ts`). La decision del
-    autor es que choquen las cajas de sus partes; como se mide la altura
-    contra ellas es deduccion mia. Hasta la fase B de aquella tanda, cada parte
-    miraba una heuristica de escalones hacia los pies y se apoyaban solo en sus
-    partes mas bajas.
+    **Los animales llevan la regla en su caja** (2026-10-14, ver
+    `docs/fauna.md`): la misma que el jugador, con su medio lado y su alto, y
+    ademas su caja no puede solapar agua ni salir de su bioma. Saltan con la
+    fuerza justa para su escalon (`jumpSpeedFor`). Del 2026-10-03 al
+    2026-10-14 chocaban las cajas de sus partes, giradas con su rumbo, cada una
+    con su altura de reposo (retirado: `docs/historia.md`).
 
 22. **Donde se nace hay que ganarselo.** `findSpawn` miraba solo si el tile era
     solido, y eso basto mientras el relieve solo se veia. Con la altura

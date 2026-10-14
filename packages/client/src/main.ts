@@ -95,7 +95,7 @@ import {
   stoneOreSpot,
 } from './probes.js';
 import { skyTint, tintCss } from './sky.js';
-import { StepSmoother, TickInterpolation } from './smooth.js';
+import { TickInterpolation } from './smooth.js';
 import * as clock from './clock.js';
 import {
   faunaShownFromLocation,
@@ -690,8 +690,6 @@ let last = clock.now();
 let accumulator = 0;
 /** Lo de antes del ultimo tick, para dibujar entre ese y el (`smooth.ts`). */
 const interp = new TickInterpolation();
-/** El desfase de la camara al subir un escalon (`smooth.ts`). */
-const stepCam = new StepSmoother();
 /** Lo que se dibuja y se interpola: el jugador y la fauna materializada. */
 function* drawnIds(): Iterable<number> {
   yield state.playerId;
@@ -917,14 +915,8 @@ function runFrame(now: number, draw: boolean): void {
           )
         : null;
     // Lo de antes del tick, para dibujar entre este y el siguiente (`smooth.ts`).
-    const pid = state.playerId;
-    const zAntes = state.entities.z[pid];
     interp.capture(drawnIds(), state.entities.x, state.entities.y, state.entities.z);
     step(state, intent);
-    // Un escalon subido de golpe: el cuerpo no se interpola, y la camara se
-    // queda abajo y lo sube en `STEP_SMOOTH` (pedido del autor, 2026-10-12).
-    const lifted = stepCam.tick(zAntes, state.entities.z[pid], !!pisabaAntes, !!state.entities.grounded[pid]);
-    if (lifted) interp.lift(pid, lifted);
     // La estacion recien puesta cae desde donde la toco la mirada (pedido del
     // autor: todo tiene gravedad). Solo se ve: el nucleo ya la tiene en su sitio.
     if (state.lastPlaced) stations.drop(state.lastPlaced, state.world);
@@ -1056,7 +1048,6 @@ function runFrame(now: number, draw: boolean): void {
   const px = body.x;
   const py = body.y;
   const ph = body.z;
-  stepCam.advance(dt, dev.stepSmooth);
   water.position.set(px, WATER_Y, py);
 
   const w = window.innerWidth;
@@ -1066,11 +1057,11 @@ function runFrame(now: number, draw: boolean): void {
   scene.fog = camera.projection === 'orto' ? null : haze;
   // La camara no atraviesa bloques ni objetos (pedido del autor): choca con el
   // mismo terreno y los mismos hitboxes que el golpe. Los ejes de three.js
-  // (`y` arriba) pasan a los del nucleo (`z` arriba). Sus ojos van con el
-  // desfase del escalon (`stepCam`), y la colision sale de ellos.
+  // (`y` arriba) pasan a los del nucleo (`z` arriba). La colision sale de los
+  // ojos, que suben un escalon con el cuerpo, tick a tick.
   const ground = (x: number, y: number) => state.world.groundHeightAt(x, y);
   const boxAt = (tx: number, ty: number) => hitboxAt(state.world, tx, ty);
-  camera.follow(px, ph + stepCam.offset, py, w, h, (from, back, want) =>
+  camera.follow(px, ph, py, w, h, (from, back, want) =>
     cameraClearance({ x: from.x, y: from.z, z: from.y }, { x: back.x, y: back.z, z: back.y }, want, ground, boxAt),
   );
   // La fauna, cada modelo en sus pies —interpolados, como el jugador— y
@@ -1198,9 +1189,6 @@ Object.defineProperty(window, '__verdant', {
       camWant: camera.camWant,
       /** Los ojos con que se dibuja la camara, en coordenadas del nucleo (`z` arriba). */
       camEyes: [camera.eyes.x, camera.eyes.z, camera.eyes.y],
-      /** Lo que la camara va por debajo de los ojos tras un escalon, y el mayor desde el arranque. */
-      camStep: stepCam.offset,
-      camStepPeak: stepCam.peak,
       /** Cuanto queda la camara por ENCIMA del suelo que tiene debajo. */
       camClearance:
         camera.active.position.y -

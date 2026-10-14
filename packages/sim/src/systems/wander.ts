@@ -13,6 +13,7 @@
 import {
   animalHitPoints,
   biomeOfTerrain,
+  collisionBoxOf,
   SPECIES,
   TICK_DT,
 } from '@verdant/shared';
@@ -25,9 +26,8 @@ import {
   type Animal,
 } from '../fauna.js';
 import { toChunkCoord, type World } from '../world.js';
-import { BODY_RADIUS, footing } from '../boxes.js';
-import { applyVertical, STEP_UP } from './jump.js';
-import { bodyBoxes, bodyClashes, groundRound } from '../body.js';
+import { footing, groundRound } from '../boxes.js';
+import { applyVertical } from './jump.js';
 import { airborneAnimal, brakeAnimal, collides, walkAnimal } from './movement.js';
 
 /** Los animales materializados, por su clave: la entidad que es cada uno. */
@@ -45,21 +45,21 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
   const target = waypointOf(world.gen, animal, period);
   // Si el punto de paso quedo tapado —un arbol que crecio, una estacion—, el
   // origen; y si tampoco, se queda donde este.
+  const { half } = collisionBoxOf(animal.species, animal.stage);
   let { x, y } = target;
-  if (covered(world, x, y)) ({ x, y } = { x: animal.homeX, y: animal.homeY });
-  if (!covered(world, x, y)) {
+  if (covered(world, x, y, half)) ({ x, y } = { x: animal.homeX, y: animal.homeY });
+  if (!covered(world, x, y, half)) {
     store.x[id] = x;
     store.y[id] = y;
   }
-  store.repelling[id] = 0;
-  store.impulse[id] = 0;
-  store.turnToX[id] = 0;
-  store.turnToY[id] = 0;
+  // Mirando de su origen a su punto de paso: lo mismo lo mire alguien o no. Su
+  // caja no gira, asi que cabe mire a donde mire.
+  const facing = Math.atan2(target.y - animal.homeY, target.x - animal.homeX);
+  store.facingX[id] = Math.cos(facing);
+  store.facingY[id] = Math.sin(facing);
+  // Sus pies, sobre lo que pisa su caja.
   store.z[id] = world.groundHeightAt(store.x[id], store.y[id]);
-  // Mirando de su origen a su punto de paso: lo mismo lo mire alguien o no.
-  faceToFit(world, store, id, animal, Math.atan2(target.y - animal.homeY, target.x - animal.homeX));
-  // Ya girado: sus pies, sobre lo que pisan todas sus cajas (`partsRest`).
-  store.z[id] = footing(world, store, id, store.z[id] + STEP_UP);
+  store.z[id] = footing(world, store, id);
   store.vz[id] = 0;
   store.grounded[id] = 1;
   store.vx[id] = 0;
@@ -71,13 +71,14 @@ function placeAt(world: World, store: EntityStore, id: number, animal: Animal, t
 }
 
 /**
- * Si el punto queda tapado: agua, o una casilla con un objeto que choca bajo
- * una huella como la del jugador (la medida por casilla, `World.isSolidAt`).
+ * Si el punto queda tapado para una caja de medio lado `half`: agua, o una
+ * casilla con un objeto que choca bajo ella (la medida por casilla,
+ * `World.isSolidAt`).
  */
-function covered(world: World, x: number, y: number): boolean {
-  if (collides(world, x, y)) return true;
-  for (let ty = Math.floor(y - BODY_RADIUS); ty <= Math.floor(y + BODY_RADIUS); ty++) {
-    for (let tx = Math.floor(x - BODY_RADIUS); tx <= Math.floor(x + BODY_RADIUS); tx++) {
+function covered(world: World, x: number, y: number, half: number): boolean {
+  if (collides(world, x, y, half)) return true;
+  for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
+    for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
       if (world.isSolidAt(tx, ty)) return true;
     }
   }
@@ -87,34 +88,6 @@ function covered(world: World, x: number, y: number): boolean {
 /** Lo que estorbaba camino del punto de paso de antes ya no cuenta. */
 function forgetObstacles(store: EntityStore, id: number): void {
   store.detourLeft[id] = 0;
-  store.backedUp[id] = 0;
-}
-
-/**
- * El rumbo con que se pone a un animal: de 8, el primero en que su cuerpo cabe
- * en el terreno, empezando por `start`; si no cabe en ninguno, el que
- * menos se mete, y desde ahi `walkAnimal` le deja salir. **Deduccion mia.**
- */
-function faceToFit(world: World, store: EntityStore, id: number, animal: Animal, start: number): void {
-  const x = store.x[id];
-  const y = store.y[id];
-  const z = store.z[id];
-  const best = groundRound(world, x, y, () => {
-    let fewest = Infinity;
-    let angle = start;
-    for (let k = 0; k < 8; k++) {
-      const a = start + (k * Math.PI) / 4;
-      const clashes = bodyClashes(world, bodyBoxes(animal.species, animal.stage, x, y, z, Math.cos(a), Math.sin(a)), z, 0, STEP_UP);
-      if (clashes < fewest) {
-        fewest = clashes;
-        angle = a;
-        if (clashes === 0) break;
-      }
-    }
-    return angle;
-  });
-  store.facingX[id] = Math.cos(best);
-  store.facingY[id] = Math.sin(best);
 }
 
 /**

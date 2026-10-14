@@ -1,26 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { animalHeight, Feature, partsOf, SPECIES_COUNT, Species, Stage, STAGE_COUNT } from '@verdant/shared';
+import {
+  animalHeight,
+  collisionBoxOf,
+  Feature,
+  hitPartsOf,
+  partsOf,
+  SPECIES_COUNT,
+  Species,
+  Stage,
+  STAGE_COUNT,
+} from '@verdant/shared';
 import {
   airborneAnimal,
+  ANIMAL_JUMP_MARGIN,
   applyVertical,
   bodyBoxes,
-  bodyClashes,
+  bodyOf,
   brakeAnimal,
+  CLIMB_SPEED,
   EntityKind,
   EntityStore,
   hitboxAt,
   rayOrientedBox,
-  REPEL_SPEED,
-  takeOff,
+  squareFloor,
+  STEP_UP,
   walkAnimal,
   type Animal,
   type World,
 } from '@verdant/sim';
 
 /**
- * Un mundo hecho a mano: lo unico que miran el choque de las partes y el andar
- * de un animal es que casillas son solidas (agua), a que altura esta el suelo y
- * que objeto hay en cada casilla (`objects`, ninguno si no se dice).
+ * Un mundo hecho a mano: lo unico que miran el choque de un animal y su andar
+ * es que casillas son solidas (agua), a que altura esta el suelo y que objeto
+ * hay en cada casilla (`objects`, ninguno si no se dice).
  */
 function fakeWorld(
   solid: (tx: number, ty: number) => boolean,
@@ -48,17 +60,20 @@ function lone(species: Species, x: number, y: number, fx: number, fy: number) {
   return { store, id };
 }
 
-/** Cuantas cajas del animal estan metidas en algo, sin margen: cero es que cabe. */
-function clashesOf(world: World, store: EntityStore, id: number): number {
-  const a = store.animal[id]!;
-  const z = store.z[id];
-  return bodyClashes(world, bodyBoxes(a.species, a.stage, store.x[id], store.y[id], z, store.facingX[id], store.facingY[id]), z, 0);
+/**
+ * Cuanto esta metida su caja en algo: lo que asoma lo que pisa por encima de
+ * los pies. Cero (o menos) es que cabe; subiendo un escalon andando, tick a
+ * tick, puede asomar hasta medio bloque.
+ */
+function inside(world: World, store: EntityStore, id: number): number {
+  const body = bodyOf(store, id);
+  return squareFloor(world, store.x[id], store.y[id], body.half, store.z[id] + body.height) - store.z[id];
 }
 
 /**
  * Anda `seconds` hacia (`dx`, `dy`) como en `stepFauna`: en el suelo
- * `walkAnimal`, en el aire `airborneAnimal`, y la gravedad. `keep` es lo que
- * admiten sus pies, como su bioma.
+ * `walkAnimal`, en el aire `airborneAnimal`, y la gravedad. El paso es 1.
+ * `keep` es lo que admiten sus pies, como su bioma.
  */
 function walk(
   world: World,
@@ -84,19 +99,6 @@ function lowestOf<T extends { cz: number; hh: number }>(boxes: T[]): T[] {
   return boxes.filter((b) => b.cz - b.hh <= base + 1e-6);
 }
 
-/** Hasta donde llega en x el cuerpo que choca, girado con su rumbo. */
-function frontOf(store: EntityStore, id: number): number {
-  const a = store.animal[id]!;
-  const boxes = bodyBoxes(a.species, a.stage, store.x[id], store.y[id], store.z[id], store.facingX[id], store.facingY[id]);
-  return Math.max(...boxes.map((b) => b.cx + b.hl * Math.abs(b.ux) + b.hw * Math.abs(b.uy)));
-}
-
-/** Donde acaba por delante el hocico de un bisonte adulto, desde sus pies. */
-const SNOUT_REACH = (() => {
-  const snout = partsOf(Species.Bison, Stage.Adult).find((p) => p.name === 'hocico')!;
-  return snout.at[0] + snout.size[0] / 2;
-})();
-
 describe('el plano del cuerpo', () => {
   it('cada especie y etapa mide de alto su animalHeight, con los pies en el suelo', () => {
     for (let s = 0; s < SPECIES_COUNT; s++) {
@@ -111,7 +113,7 @@ describe('el plano del cuerpo', () => {
     }
   });
 
-  it('golpean y chocan la cabeza, el cuello, las extremidades y el tronco; lo pequeno o fino no', () => {
+  it('se golpean la cabeza, el cuello, las extremidades y el tronco; lo pequeno o fino no', () => {
     // El autor, 2026-10-05: las patas y las pinzas si; las patas de la gaviota
     // y del cangrejo, finas como un cuerno, no.
     const thinLegs = new Set([Species.Gull, Species.Crab]);
@@ -135,144 +137,14 @@ describe('el plano del cuerpo', () => {
     const tail = partsOf(Species.Bison, Stage.Adult).find((p) => p.name === 'cola')!;
     const down = { x: 0, y: 0, z: -1 };
     const hits = (x: number) => boxes.some((b) => rayOrientedBox({ x, y: 0, z: 5 }, down, b, 10) !== null);
-    // La caja cuadrada de antes llegaba a 0,9 del centro; la cabeza esta mas alla.
-    expect(head.at[0] - head.size[0] / 2).toBeGreaterThan(0.9);
+    // La caja de colision llega a ~0,62 del centro; la cabeza esta mas alla.
+    expect(head.at[0] - head.size[0] / 2).toBeGreaterThan(collisionBoxOf(Species.Bison, Stage.Adult).half);
     expect(hits(head.at[0])).toBe(true);
     expect(hits(tail.at[0])).toBe(false);
     // Girado, lo que estaba delante esta a su izquierda.
     const turned = bodyBoxes(Species.Bison, Stage.Adult, 0, 0, 0, 0, 1);
     expect(turned.some((b) => rayOrientedBox({ x: 0, y: head.at[0], z: 5 }, down, b, 10) !== null)).toBe(true);
     expect(turned.some((b) => rayOrientedBox({ x: head.at[0], y: 0, z: 5 }, down, b, 10) !== null)).toBe(false);
-  });
-});
-
-describe('el cuerpo choca con el terreno', () => {
-  // Un pasillo de una casilla de ancho a lo largo de x, en y de 0 a 1.
-  const corridor = fakeWorld((_tx, ty) => ty !== 0);
-
-  it('un bisonte no cabe por un pasillo de un bloque; una liebre si, y lo recorre', () => {
-    const bison = lone(Species.Bison, 0.5, 0.5, 1, 0);
-    expect(clashesOf(corridor, bison.store, bison.id)).toBeGreaterThan(0);
-    const hare = lone(Species.Hare, 0.5, 0.5, 1, 0);
-    expect(clashesOf(corridor, hare.store, hare.id)).toBe(0);
-    walk(corridor, hare.store, hare.id, 1, 0, 3);
-    expect(hare.store.x[hare.id]).toBeGreaterThan(3);
-    expect(clashesOf(corridor, hare.store, hare.id)).toBe(0);
-  });
-
-  it('no gira si al girar la cabeza entrara en una pared, ni avanza contra ella', () => {
-    // Una pared en x >= 2.
-    const wall = fakeWorld((tx) => tx >= 2);
-    const bison = lone(Species.Bison, 0.5, 0.5, 0, 1);
-    expect(clashesOf(wall, bison.store, bison.id)).toBe(0);
-    walk(wall, bison.store, bison.id, 1, 0, 3, () => expect(clashesOf(wall, bison.store, bison.id)).toBe(0));
-    // Mirando a +x su hocico llegaria mas alla de x = 2: no termino de girar.
-    // (Con la inercia, 2026-10-10, frena deslizandose y se queda a ~0,951.)
-    expect(bison.store.facingX[bison.id]).toBeLessThan(0.99);
-  });
-
-  it('no mete la cabeza en un escalon de un bloque: lo salta, y una liebre sube saltando una escalera de medio bloque', () => {
-    const step = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
-    for (const species of [Species.Bison, Species.Hare]) {
-      const a = lone(species, 0, 0.5, 1, 0);
-      let jumped = false;
-      walk(step, a.store, a.id, 1, 0, 5, () => {
-        expect(clashesOf(step, a.store, a.id)).toBe(0);
-        if (!a.store.grounded[a.id]) jumped = true;
-        // Andando por abajo, ninguna parte entra en el escalon.
-        if (a.store.grounded[a.id] && a.store.z[a.id] === 0) expect(frontOf(a.store, a.id)).toBeLessThanOrEqual(3 + 1e-6);
-      });
-      // Lo salto y siguio arriba (el autor, 2026-10-05: todos saltan un bloque).
-      expect(jumped).toBe(true);
-      expect(a.store.z[a.id]).toBe(1);
-      expect(a.store.x[a.id]).toBeGreaterThan(4);
-    }
-    // Una escalera de medio bloque, de x = 2 a x = 3. Hasta el 2026-10-13 la
-    // liebre la subia andando, con el hocico subiendola de golpe; ahora el
-    // hocico llega antes que las patas, y salta cada escalon (el autor).
-    const stairs = fakeWorld(() => false, (x) => (x < 2.5 ? 0 : x < 3 ? 0.5 : 1));
-    const hare = lone(Species.Hare, 0, 0.5, 1, 0);
-    let flights = 0;
-    let wasGrounded = true;
-    walk(stairs, hare.store, hare.id, 1, 0, 5, () => {
-      const s = hare.store;
-      if (wasGrounded && !s.grounded[hare.id]) flights++;
-      wasGrounded = s.grounded[hare.id] === 1;
-      if (s.grounded[hare.id] || s.vz[hare.id] > 0) expect(clashesOf(stairs, s, hare.id)).toBe(0);
-    });
-    expect(flights).toBe(2);
-    expect(hare.store.x[hare.id]).toBeGreaterThan(3.5);
-    expect(hare.store.z[hare.id]).toBe(1);
-  });
-
-  it('de frente contra una pared y con el destino detras, retrocede, gira y se va', () => {
-    // Una pared en x >= 3, y el hocico pegado a ella: cualquier paso de giro
-    // la meteria. Antes se quedaba asi para siempre.
-    const wall = fakeWorld((tx) => tx >= 3);
-    const x0 = 3 - SNOUT_REACH - 1e-3;
-    const bison = lone(Species.Bison, x0, 0.5, 1, 0);
-    expect(clashesOf(wall, bison.store, bison.id)).toBe(0);
-    walk(wall, bison.store, bison.id, -1, 0, 4, () => expect(clashesOf(wall, bison.store, bison.id)).toBe(0));
-    expect(bison.store.facingX[bison.id]).toBeLessThan(-0.9);
-    expect(bison.store.x[bison.id]).toBeLessThan(x0 - 1);
-  });
-
-  it('lo que no se salta se bordea: un pilar, un charco y una pared de dos bloques', () => {
-    // Un pilar solido en (3, 0), justo en el camino.
-    const pillar = fakeWorld((tx, ty) => tx === 3 && ty === 0);
-    const a = lone(Species.Hare, 0.5, 0.5, 1, 0);
-    walk(pillar, a.store, a.id, 1, 0, 8, () => expect(clashesOf(pillar, a.store, a.id)).toBe(0));
-    expect(a.store.x[a.id]).toBeGreaterThan(5);
-    // Un charco de tres casillas en x = 3: el agua no es de su bioma.
-    const open = fakeWorld(() => false);
-    const dry = (x: number, y: number) => !(Math.floor(x) === 3 && Math.abs(Math.floor(y)) <= 1);
-    const b = lone(Species.Hare, 0.5, 0.5, 1, 0);
-    walk(open, b.store, b.id, 1, 0, 10, () => expect(dry(b.store.x[b.id], b.store.y[b.id])).toBe(true), dry);
-    expect(b.store.x[b.id]).toBeGreaterThan(5);
-    // Una pared de dos bloques a lo largo de y: no se salta, se recorre.
-    const cliff = fakeWorld(() => false, (x) => (x >= 3 ? 2 : 0));
-    const c = lone(Species.Hare, 0.5, 0.5, 1, 0);
-    // Ocho segundos: cada rodeo arranca y frena con la inercia (2026-10-10).
-    walk(cliff, c.store, c.id, 1, 0, 8, () => expect(c.store.z[c.id]).toBeLessThan(1));
-    expect(c.store.x[c.id]).toBeLessThan(3);
-    expect(Math.abs(c.store.y[c.id] - 0.5)).toBeGreaterThan(2);
-  });
-
-  it('un animal que nacio sin caber sale andando y no se queda clavado', () => {
-    // La cabeza dentro de una pared en x >= 2: se aleja hacia -x.
-    const wall = fakeWorld((tx) => tx >= 2);
-    const bison = lone(Species.Bison, 0.8, 0.5, 1, 0);
-    const before = clashesOf(wall, bison.store, bison.id);
-    expect(before).toBeGreaterThan(0);
-    walk(wall, bison.store, bison.id, -1, 0, 6);
-    expect(clashesOf(wall, bison.store, bison.id)).toBe(0);
-    expect(bison.store.x[bison.id]).toBeLessThan(0.5);
-    // Metido de grupa y mirando hacia fuera: sale avanzando, sin girar.
-    const rump = lone(Species.Bison, 1.2, 0.5, -1, 0);
-    expect(clashesOf(wall, rump.store, rump.id)).toBeGreaterThan(0);
-    walk(wall, rump.store, rump.id, -1, 0, 3);
-    expect(clashesOf(wall, rump.store, rump.id)).toBe(0);
-    expect(rump.store.x[rump.id]).toBeLessThan(0.8);
-  });
-
-  it('choca con una roca por las patas, la salta y sigue por encima (el autor, 2026-10-05)', () => {
-    // Una roca de 1,0 en la casilla 3 de la fila 0; el ciervo anda al este.
-    const world = fakeWorld(() => false, () => 0, (tx, ty) => (tx === 3 && ty === 0 ? Feature.RockNode : Feature.None));
-    const rock = hitboxAt(world, 3, 0)!;
-    // Las patas solas ya chocan: puesto con la pata delantera dentro de la roca.
-    const legs = lowestOf(bodyBoxes(Species.RedDeer, Stage.Adult, rock.x0 - 0.3, 0.5, 0, 1, 0));
-    expect(legs.length).toBe(4);
-    expect(bodyClashes(world, legs, 0, 0.5)).toBeGreaterThan(0);
-    // Andando, salta encima, se apoya en ella y sigue.
-    const deer = lone(Species.RedDeer, 0, 0.5, 1, 0);
-    let stood = 0;
-    walk(world, deer.store, deer.id, 1, 0, 8, () => {
-      expect(clashesOf(world, deer.store, deer.id)).toBe(0);
-      if (deer.store.grounded[deer.id]) stood = Math.max(stood, deer.store.z[deer.id]);
-    });
-    expect(stood).toBe(rock.z1);
-    expect(deer.store.x[deer.id]).toBeGreaterThan(rock.x1 + 1);
-    expect(deer.store.z[deer.id]).toBe(0);
   });
 
   it('un golpe que solo toca la pata de un ciervo le da; el de su cuerno, no', () => {
@@ -301,68 +173,184 @@ describe('el cuerpo choca con el terreno', () => {
 });
 
 /**
- * La fisica del 2026-10-10 (el autor): todas las cajas chocan con el terreno
- * en todo momento, solo subir medio bloque es de golpe, saltan como el jugador
- * —a su paso— y arrancan y frenan con inercia.
+ * La caja de colision (el autor, 2026-10-14, como en Minecraft): de base
+ * cuadrada, alineada con los ejes, 1,2 × el ancho del cuerpo y alta hasta el
+ * lomo; choca por todas sus caras siempre. Las cajas que se golpean siguen
+ * siendo las partes.
  */
-describe('todas sus cajas chocan siempre, saltan a su paso y tienen inercia', () => {
-  it('bajando un escalon no cae mientras lo pisa una pata; cayendo, lo que se mete lo saca la repulsion', () => {
-    // Arriba a 1 hasta x = 3; abajo, a 0.
-    const ledge = fakeWorld(() => false, (x) => (x < 3 ? 1 : 0));
-    const bison = lone(Species.Bison, 1, 0.5, 1, 0);
-    bison.store.z[bison.id] = 1;
-    let fell = false;
-    let repelled = false;
-    walk(ledge, bison.store, bison.id, 1, 0, 6, () => {
-      const s = bison.store;
-      // De pie, ninguna caja dentro del escalon. Cayendo solo choca la base
-      // (el autor, 2026-10-13): el tronco que asoma sobre el borde entra y la
-      // repulsion lo saca, en horizontal y sin desviarse del borde.
-      if (s.grounded[bison.id] && s.repelling[bison.id] === 0) expect(clashesOf(ledge, s, bison.id)).toBe(0);
-      if (!s.grounded[bison.id]) fell = true;
-      if (s.repelling[bison.id] === 1) repelled = true;
-      expect(s.y[bison.id]).toBeCloseTo(0.5, 9);
+describe('la caja de colision', () => {
+  it('es cuadrada, de 1,2 veces el ancho del cuerpo, y alta hasta el lomo', () => {
+    for (let s = 0; s < SPECIES_COUNT; s++) {
+      for (let st = 0; st < STAGE_COUNT; st++) {
+        const parts = hitPartsOf(s as Species, st as Stage);
+        const width = 2 * Math.max(...parts.map((p) => Math.abs(p.at[2]) + p.size[2] / 2));
+        const trunk = parts.find((p) => p.name === 'tronco' || p.name === 'caparazon')!;
+        const box = collisionBoxOf(s as Species, st as Stage);
+        expect(2 * box.half, `${Species[s]} ${st}`).toBeCloseTo(1.2 * width, 9);
+        expect(box.height, `${Species[s]} ${st}`).toBeCloseTo(trunk.at[1] + trunk.size[1] / 2, 9);
+      }
+    }
+  });
+
+  it('un bisonte no cabe por un pasillo de un bloque; una liebre si, y lo recorre', () => {
+    // Un pasillo de una casilla de ancho a lo largo de x, en y de 0 a 1.
+    const corridor = fakeWorld((_tx, ty) => ty !== 0);
+    expect(2 * collisionBoxOf(Species.Bison, Stage.Adult).half).toBeGreaterThan(1);
+    const hare = lone(Species.Hare, 0.5, 0.5, 1, 0);
+    walk(corridor, hare.store, hare.id, 1, 0, 3);
+    expect(hare.store.x[hare.id]).toBeGreaterThan(2.5);
+  });
+
+  it('gira en el sitio hacia cualquier lado, aunque la cabeza se meta en la pared (se acepta)', () => {
+    // De frente contra una pared en x >= 3, con la caja pegada a ella y el
+    // destino detras. Hasta el 2026-10-14 el giro no cabia: retrocedia y
+    // empujaba (el vaiven que vio el autor). Ahora gira sin moverse.
+    const wall = fakeWorld((tx) => tx >= 3);
+    const half = collisionBoxOf(Species.Bison, Stage.Adult).half;
+    const x0 = 3 - half - 1e-3;
+    const bison = lone(Species.Bison, x0, 0.5, 1, 0);
+    let movedWhileTurning = 0;
+    walk(wall, bison.store, bison.id, -1, 0, 1, () => {
+      if (bison.store.facingX[bison.id] > -0.7) movedWhileTurning = Math.max(movedWhileTurning, Math.abs(bison.store.x[bison.id] - x0));
     });
-    expect(fell).toBe(true);
-    expect(repelled).toBe(true);
-    expect(clashesOf(ledge, bison.store, bison.id)).toBe(0);
+    expect(bison.store.facingX[bison.id]).toBeLessThan(-0.99);
+    // Frena lo poco que llevaba; ni retrocede ni empuja.
+    expect(movedWhileTurning).toBeLessThan(1e-9);
+    walk(wall, bison.store, bison.id, -1, 0, 2);
+    expect(bison.store.x[bison.id]).toBeLessThan(x0 - 1);
+  });
+
+  it('nunca se mete en el terreno: andando, saltando ni cayendo (subiendo un escalon, como mucho medio bloque)', () => {
+    // Sube medio bloque, luego uno, y baja de golpe dos.
+    const terrain = fakeWorld(() => false, (x) => (x < 2 ? 0 : x < 4 ? 0.5 : x < 6 ? 1.5 : -0.5));
+    for (const species of [Species.Bison, Species.Hare, Species.Crab]) {
+      const a = lone(species, 0.5, 0.5, 1, 0);
+      walk(terrain, a.store, a.id, 1, 0, 14, () => {
+        const deep = inside(terrain, a.store, a.id);
+        if (a.store.grounded[a.id]) expect(deep, Species[species]).toBeLessThanOrEqual(STEP_UP + 1e-9);
+        else expect(deep, Species[species]).toBeLessThanOrEqual(1e-9);
+      });
+      expect(a.store.x[a.id], Species[species]).toBeGreaterThan(6.5);
+      expect(a.store.z[a.id], Species[species]).toBe(-0.5);
+    }
+  });
+
+  it('un animal que se encuentra metido en algo sale andando y no se queda clavado', () => {
+    // Una pared de dos bloques en x >= 2, y la caja del bisonte dentro.
+    const wall = fakeWorld(() => false, (x) => (x >= 2 ? 2 : 0));
+    const bison = lone(Species.Bison, 1.8, 0.5, -1, 0);
+    expect(inside(wall, bison.store, bison.id)).toBeGreaterThan(STEP_UP);
+    walk(wall, bison.store, bison.id, -1, 0, 3);
+    expect(inside(wall, bison.store, bison.id)).toBeLessThanOrEqual(0);
     expect(bison.store.z[bison.id]).toBe(0);
-    expect(bison.store.x[bison.id]).toBeGreaterThan(4);
   });
 
-  it('cada caja choca a su altura: la cabeza pasa por encima de lo que no le llega, y no por dentro', () => {
-    const bison = lone(Species.Bison, 0, 0.5, 1, 0);
-    const boxes = bodyBoxes(Species.Bison, Stage.Adult, 0, 0.5, 0, 1, 0);
-    // La cabeza es la caja mas adelantada; debajo no hay otra (la joroba si
-    // tiene el tronco debajo).
-    const head = boxes.reduce((a, b) => (b.cx > a.cx ? b : a));
-    const base = head.cz - head.hh;
-    const below = Math.floor(base * 2) / 2;
-    expect(below).toBeGreaterThan(0);
-    // Una columna sola, bajo el centro de la cabeza: a la altura de medio
-    // bloque por debajo de su base no estorba; medio bloque mas alta, si.
-    const vx = Math.floor(head.cx * 2);
-    const vy = Math.floor(head.cy * 2);
-    const pillar = (h: number) =>
-      fakeWorld(() => false, (x, y) => (Math.floor(x * 2) === vx && Math.floor(y * 2) === vy ? h : 0));
-    expect(clashesOf(pillar(below), bison.store, bison.id)).toBe(0);
-    expect(clashesOf(pillar(below + 0.5), bison.store, bison.id)).toBeGreaterThan(0);
+  it('lo que no se salta se bordea: un pilar, un charco y una pared de dos bloques', () => {
+    // Un pilar solido en (3, 0), justo en el camino.
+    const pillar = fakeWorld((tx, ty) => tx === 3 && ty === 0);
+    const a = lone(Species.Hare, 0.5, 0.5, 1, 0);
+    walk(pillar, a.store, a.id, 1, 0, 8);
+    expect(a.store.x[a.id]).toBeGreaterThan(5);
+    // Un charco de tres casillas en x = 3: el agua no es de su bioma.
+    const open = fakeWorld(() => false);
+    const dry = (x: number, y: number) => !(Math.floor(x) === 3 && Math.abs(Math.floor(y)) <= 1);
+    const b = lone(Species.Hare, 0.5, 0.5, 1, 0);
+    walk(open, b.store, b.id, 1, 0, 10, () => expect(dry(b.store.x[b.id], b.store.y[b.id])).toBe(true), dry);
+    expect(b.store.x[b.id]).toBeGreaterThan(5);
+    // Una pared de dos bloques a lo largo de y: no se salta, se recorre.
+    const cliff = fakeWorld(() => false, (x) => (x >= 3 ? 2 : 0));
+    const c = lone(Species.Hare, 0.5, 0.5, 1, 0);
+    walk(cliff, c.store, c.id, 1, 0, 8, () => expect(c.store.z[c.id]).toBeLessThan(1));
+    expect(c.store.x[c.id]).toBeLessThan(3);
+    expect(Math.abs(c.store.y[c.id] - 0.5)).toBeGreaterThan(2);
+  });
+});
+
+/**
+ * Subir y saltar (el autor, 2026-10-14): lo que no pasa de medio bloque se sube
+ * andando, tick a tick; lo de mas, hasta un bloque, se salta con la fuerza
+ * justa —el escalon mas 0,1—, y antes de rozarlo.
+ */
+describe('subir andando y saltar con la fuerza justa', () => {
+  const halfStep = fakeWorld(() => false, (x) => (x >= 3 ? 0.5 : 0));
+  const fullStep = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
+
+  it('el medio bloque se sube andando, tick a tick, sin saltar y sin dejar de andar', () => {
+    for (const species of [Species.Bison, Species.Hare, Species.Boar]) {
+      const a = lone(species, 0.5, 0.5, 1, 0);
+      let most = 0;
+      let rising = 0;
+      walk(halfStep, a.store, a.id, 1, 0, 6, () => {
+        expect(a.store.grounded[a.id], Species[species]).toBe(1);
+      });
+      // Otra vez, midiendo cada tick.
+      const b = lone(species, 0.5, 0.5, 1, 0);
+      for (let t = 0; t < 360; t++) {
+        const z = b.store.z[b.id];
+        const x = b.store.x[b.id];
+        walkAnimal(halfStep, b.store, b.id, 1, 0, 1, 1 / 60);
+        applyVertical(halfStep, b.store, b.id, 1 / 60);
+        if (b.store.z[b.id] > z + 1e-12) {
+          most = Math.max(most, b.store.z[b.id] - z);
+          rising++;
+          expect(b.store.x[b.id], Species[species]).toBeGreaterThan(x);
+        }
+      }
+      expect(a.store.z[a.id], Species[species]).toBe(0.5);
+      expect(most, Species[species]).toBeLessThanOrEqual(CLIMB_SPEED / 60 + 1e-9);
+      expect(rising, Species[species]).toBe(6);
+    }
   });
 
-  it('salta un escalon de un bloque a su paso: en el aire no va mas deprisa que andando', () => {
-    const step = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
-    for (const species of [Species.Bison, Species.Hare, Species.RedDeer]) {
-      const a = lone(species, 0, 0.5, 1, 0);
+  it('el de un bloque lo salta con la fuerza justa: el apice, 0,1 por encima, y aterriza arriba', () => {
+    for (const species of [Species.Bison, Species.Hare, Species.RedDeer, Species.Crab]) {
+      const a = lone(species, 0.5, 0.5, 1, 0);
+      let peak = 0;
       let flew = false;
-      walk(step, a.store, a.id, 1, 0, 6, () => {
+      walk(fullStep, a.store, a.id, 1, 0, 8, () => {
         if (a.store.grounded[a.id]) return;
         flew = true;
-        // El paso del ayudante `walk` es 1.
+        peak = Math.max(peak, a.store.z[a.id]);
+        // En el aire no va mas deprisa que andando (el paso del ayudante es 1).
         expect(Math.hypot(a.store.vx[a.id], a.store.vy[a.id])).toBeLessThanOrEqual(1 + 1e-9);
       });
       expect(flew, Species[species]).toBe(true);
+      // Hasta el 2026-10-14, con el salto del jugador: a 1,16.
+      expect(peak, Species[species]).toBeLessThanOrEqual(1 + ANIMAL_JUMP_MARGIN + 1e-9);
+      expect(peak, Species[species]).toBeGreaterThan(1 + ANIMAL_JUMP_MARGIN - 0.03);
       expect(a.store.z[a.id], Species[species]).toBe(1);
     }
+  });
+
+  it('salta antes de rozar, aunque llegue en diagonal: no se arrastra a lo largo de la pared', () => {
+    // Hacia el escalon de un bloque, a 30° de su cara. Lo que vio el autor:
+    // arrastraban la cabeza contra la pared unos metros antes de saltar.
+    const a = lone(Species.Hare, 0.5, 0.5, Math.cos(Math.PI / 6), Math.sin(Math.PI / 6));
+    const half = bodyOf(a.store, a.id).half;
+    let touching = 0;
+    let jumped = false;
+    walk(fullStep, a.store, a.id, Math.cos(Math.PI / 6), Math.sin(Math.PI / 6), 8, () => {
+      if (!a.store.grounded[a.id]) jumped = true;
+      if (!jumped && a.store.grounded[a.id] && a.store.x[a.id] + half > 3 - 0.01) touching++;
+    });
+    expect(jumped).toBe(true);
+    expect(touching).toBeLessThanOrEqual(1);
+    expect(a.store.z[a.id]).toBe(1);
+  });
+
+  it('choca con una roca y la salta, y sigue por encima (el autor, 2026-10-05)', () => {
+    // Una roca de 1,0 en la casilla 3 de la fila 0; el ciervo anda al este.
+    const world = fakeWorld(() => false, () => 0, (tx, ty) => (tx === 3 && ty === 0 ? Feature.RockNode : Feature.None));
+    const rock = hitboxAt(world, 3, 0)!;
+    const deer = lone(Species.RedDeer, 0, 0.5, 1, 0);
+    let stood = 0;
+    walk(world, deer.store, deer.id, 1, 0, 8, () => {
+      expect(inside(world, deer.store, deer.id)).toBeLessThanOrEqual(STEP_UP + 1e-9);
+      if (deer.store.grounded[deer.id]) stood = Math.max(stood, deer.store.z[deer.id]);
+    });
+    expect(stood).toBe(rock.z1);
+    expect(deer.store.x[deer.id]).toBeGreaterThan(rock.x1 + 1);
+    expect(deer.store.z[deer.id]).toBe(0);
   });
 
   it('arranca en 0,1 s, y al llegar no se para en seco: frena deslizandose 0,1 s', () => {
@@ -380,119 +368,5 @@ describe('todas sus cajas chocan siempre, saltan a su paso y tienen inercia', ()
     }
     expect(hare.store.x[hare.id]).toBeGreaterThan(x0);
     expect(ticks).toBeLessThanOrEqual(6);
-  });
-});
-
-/**
- * Lo que pidio el autor el 2026-10-13: si lo primero que tocaria un escalon no
- * son sus patas, salta antes de tocarlo, con el impulso horizontal minimo para
- * que sus patas delanteras lleguen arriba —constante todo el vuelo y sumado a
- * lo que anda en el aire—. Y el choque por fases: subiendo y en horizontal
- * chocan todas las cajas; bajando, solo la base, y lo demas que se meta lo
- * saca la repulsion, en horizontal y a `REPEL_SPEED`.
- */
-describe('salta antes de tocar, con el impulso minimo, y al caer solo choca la base', () => {
-  const halfStep = fakeWorld(() => false, (x) => (x >= 3 ? 0.5 : 0));
-  const fullStep = fakeWorld(() => false, (x) => (x >= 3 ? 1 : 0));
-
-  interface TakeOff {
-    x: number;
-    y: number;
-    z: number;
-    vx: number;
-    vy: number;
-    impulse: number;
-  }
-
-  /**
-   * Anda hacia +x desde `x0` y dice si salto, desde donde y con que impulso.
-   * De pie y subiendo, ninguna caja entra en nada: no espera a chocar.
-   */
-  function approach(world: World, species: Species, x0 = 0, seconds = 8) {
-    const a = lone(species, x0, 0.5, 1, 0);
-    let takeoff: TakeOff | null = null;
-    let groundZ = a.store.z[a.id];
-    walk(world, a.store, a.id, 1, 0, seconds, () => {
-      const s = a.store;
-      if (!takeoff && !s.grounded[a.id]) {
-        takeoff = { x: s.x[a.id], y: s.y[a.id], z: groundZ, vx: s.vx[a.id], vy: s.vy[a.id], impulse: s.impulse[a.id] };
-      }
-      if (s.grounded[a.id]) groundZ = s.z[a.id];
-      if (s.grounded[a.id] || s.vz[a.id] > 0) expect(clashesOf(world, s, a.id), Species[species]).toBe(0);
-    });
-    return { a, takeoff: takeoff as TakeOff | null };
-  }
-
-  /** Repite un salto desde `from` con otro impulso y otro paso en el aire; devuelve la altura a la que acaba. */
-  function replay(world: World, species: Species, from: TakeOff, impulse: number, speed: number): number {
-    const { store, id } = lone(species, from.x, from.y, 1, 0);
-    store.z[id] = from.z;
-    store.vx[id] = from.vx;
-    store.vy[id] = from.vy;
-    store.impulse[id] = impulse;
-    takeOff(store, id);
-    applyVertical(world, store, id, 1 / 60);
-    for (let t = 0; t < 180 && !store.grounded[id]; t++) {
-      airborneAnimal(world, store, id, speed, 1 / 60);
-      applyVertical(world, store, id, 1 / 60);
-    }
-    return store.z[id];
-  }
-
-  it('una liebre, que llega con el hocico, salta el escalon de medio bloque sin tocarlo', () => {
-    const { a, takeoff } = approach(halfStep, Species.Hare);
-    expect(takeoff).not.toBeNull();
-    expect(a.store.z[a.id]).toBe(0.5);
-    expect(a.store.x[a.id]).toBeGreaterThan(4);
-  });
-
-  it('un bisonte adulto, que llega con las patas, sube andando el de medio bloque; el de uno lo salta con impulso', () => {
-    const half = approach(halfStep, Species.Bison);
-    expect(half.takeoff).toBeNull();
-    expect(half.a.store.z[half.a.id]).toBe(0.5);
-    const full = approach(fullStep, Species.Bison);
-    expect(full.takeoff).not.toBeNull();
-    expect(full.takeoff!.impulse).toBeGreaterThan(0);
-    expect(full.a.store.z[full.a.id]).toBe(1);
-  });
-
-  it('el impulso es el minimo, y solo no basta: hace falta andar en el aire', () => {
-    const { takeoff } = approach(fullStep, Species.Bison);
-    const from = takeoff!;
-    // El paso del ayudante `walk` es 1.
-    expect(replay(fullStep, Species.Bison, from, from.impulse, 1)).toBe(1);
-    expect(replay(fullStep, Species.Bison, from, from.impulse - 0.1, 1)).toBeLessThan(1);
-    expect(replay(fullStep, Species.Bison, { ...from, vx: 0, vy: 0 }, from.impulse, 0)).toBeLessThan(1);
-  });
-
-  it('lo recibe aunque estuviera parado al pie del escalon', () => {
-    const probe = lone(Species.Hare, 0, 0.5, 1, 0);
-    const x0 = 3 - frontOf(probe.store, probe.id) - 1e-3;
-    const a = lone(Species.Hare, x0, 0.5, 1, 0);
-    expect(a.store.vx[a.id]).toBe(0);
-    walk(halfStep, a.store, a.id, 1, 0, 1 / 60);
-    expect(a.store.grounded[a.id]).toBe(0);
-    walk(halfStep, a.store, a.id, 1, 0, 3);
-    expect(a.store.z[a.id]).toBe(0.5);
-  });
-
-  it('cayendo, lo que se mete se repele en horizontal a REPEL_SPEED, sin subir ni bajar por ello', () => {
-    // El bisonte que baja del rellano: su tronco asoma sobre el borde al caer.
-    const ledge = fakeWorld(() => false, (x) => (x < 3 ? 1 : 0));
-    const bison = lone(Species.Bison, 1, 0.5, 1, 0);
-    const s = bison.store;
-    s.z[bison.id] = 1;
-    let pushed = 0;
-    let last = { x: s.x[bison.id], y: s.y[bison.id] };
-    walk(ledge, s, bison.id, 1, 0, 6, () => {
-      const moved = Math.hypot(s.x[bison.id] - last.x, s.y[bison.id] - last.y);
-      last = { x: s.x[bison.id], y: s.y[bison.id] };
-      if (s.repelling[bison.id] !== 1) return;
-      // Lo que anda (1) mas la repulsion, y nada mas.
-      expect(moved).toBeLessThanOrEqual((1 + REPEL_SPEED) / 60 + 1e-9);
-      if (moved > 1 / 60 + 1e-6) pushed++;
-    });
-    expect(pushed).toBeGreaterThan(0);
-    expect(clashesOf(ledge, s, bison.id)).toBe(0);
   });
 });

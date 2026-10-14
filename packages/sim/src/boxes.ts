@@ -16,8 +16,8 @@
  * que quedan por encima de la cabeza, que son techo (`squareFloor`,
  * `footing`, `headroom`).
  *
- * Vive aparte de `systems/` a proposito: lo usan `jump.ts`, `movement.ts`,
- * `body.ts` y `gathering.ts`, y desde cualquiera de ellos abriria un ciclo de
+ * Vive aparte de `systems/` a proposito: lo usan `jump.ts`, `movement.ts` y
+ * `gathering.ts`, y desde cualquiera de ellos abriria un ciclo de
  * importacion (ver «Ciclos de importacion» en `CLAUDE.md`).
  *
  * Coordenadas del nucleo: `x`, `y` en el suelo y `z` hacia arriba.
@@ -25,6 +25,7 @@
 
 import {
   blocksBody,
+  collisionBoxOf,
   Feature,
   harvestOf,
   hitPartsOf,
@@ -34,6 +35,7 @@ import {
   Station,
   stationHeight,
   stationOfFeature,
+  type CollisionBox,
   type Species,
   type Stage,
 } from '@verdant/shared';
@@ -154,45 +156,13 @@ export interface OrientedBox {
   hl: number;
   hw: number;
   hh: number;
-  /**
-   * Si es de la **base**: la extremidad con que anda, que es lo unico que sube
-   * medio bloque de golpe y lo unico que detiene una caida (`baseMaskOf`).
-   */
-  base?: boolean;
-}
-
-const baseCache = new Map<number, readonly boolean[]>();
-
-/**
- * Que partes `hit` de una especie son su **base**, en el orden de
- * `hitPartsOf`: con lo que anda, que es lo que sube un escalon andando y lo
- * unico que choca al caer (el autor, 2026-10-13: «se choca solo con la base de
- * las patas, o la base de la extremidad que use para moverse en el suelo»).
- * Son sus patas; el cangrejo y la gaviota, cuyas patas no tienen caja, se
- * apoyan en sus cajas mas bajas, el caparazon y el tronco (**deduccion mia**).
- */
-export function baseMaskOf(species: Species, stage: Stage): readonly boolean[] {
-  const key = species * 8 + stage;
-  let mask = baseCache.get(key);
-  if (!mask) {
-    const parts = hitPartsOf(species, stage);
-    const legs = parts.map((p) => p.name.startsWith('pata'));
-    if (legs.some(Boolean)) {
-      mask = legs;
-    } else {
-      const bottom = (p: (typeof parts)[number]) => p.at[1] - p.size[1] / 2;
-      const lowest = Math.min(...parts.map(bottom));
-      mask = parts.map((p) => bottom(p) <= lowest + 1e-6);
-    }
-    baseCache.set(key, mask);
-  }
-  return mask;
 }
 
 /**
- * Las cajas que golpean y chocan de un animal con los pies en (`x`, `y`, `z`)
- * y mirando a (`fx`, `fy`). El ancho del plano (`z` del marco del animal) va a
- * su izquierda: (-fy, fx).
+ * Las cajas que se golpean de un animal con los pies en (`x`, `y`, `z`) y
+ * mirando a (`fx`, `fy`): sus partes `hit`, giradas con su rumbo (regla 12).
+ * No chocan: el animal choca con su caja de colision (`bodyOf`). El ancho del
+ * plano (`z` del marco del animal) va a su izquierda: (-fy, fx).
  */
 export function bodyBoxes(
   species: Species,
@@ -206,8 +176,7 @@ export function bodyBoxes(
   const len = Math.hypot(fx, fy) || 1;
   const ux = fx / len;
   const uy = fy / len;
-  const base = baseMaskOf(species, stage);
-  return hitPartsOf(species, stage).map((p, i) => ({
+  return hitPartsOf(species, stage).map((p) => ({
     cx: x + ux * p.at[0] - uy * p.at[2],
     cy: y + uy * p.at[0] + ux * p.at[2],
     cz: z + p.at[1],
@@ -216,36 +185,30 @@ export function bodyBoxes(
     hl: p.size[0] / 2,
     hw: p.size[2] / 2,
     hh: p.size[1] / 2,
-    base: base[i],
   }));
 }
 
 /**
- * Si la huella de una caja girada solapa el cuadrado de centro (`cx`, `cy`) y
- * medio lado `half`: ejes separadores en 2D. Tocarse por el borde no cuenta.
+ * **La caja de colision** de una entidad: su medio lado en planta y su alto.
+ * Una caja alineada con los ejes del mundo, que no gira, para el jugador
+ * (`BODY_RADIUS`, `PLAYER_HEIGHT`) y para los animales (`collisionBoxOf`: el
+ * autor, 2026-10-14, «base cuadrada», como en Minecraft). Choca por todas sus
+ * caras siempre (regla 21).
  */
-export function overlapsSquare(b: OrientedBox, cx: number, cy: number, half: number): boolean {
-  const dx = cx - b.cx;
-  const dy = cy - b.cy;
-  const ax = Math.abs(b.ux);
-  const ay = Math.abs(b.uy);
-  // Ejes del cuadrado: x e y. La caja proyecta hl·|u| + hw·|v| en cada uno.
-  if (Math.abs(dx) >= half + b.hl * ax + b.hw * ay) return false;
-  if (Math.abs(dy) >= half + b.hl * ay + b.hw * ax) return false;
-  // Ejes de la caja: u y v. El cuadrado proyecta half·(|ux| + |uy|) en los dos.
-  const reach = half * (ax + ay);
-  if (Math.abs(dx * b.ux + dy * b.uy) >= b.hl + reach) return false;
-  if (Math.abs(-dx * b.uy + dy * b.ux) >= b.hw + reach) return false;
-  return true;
+export function bodyOf(store: EntityStore, id: number): CollisionBox {
+  const animal = store.animal[id];
+  if (store.kind[id] === EntityKind.Player || !animal) return PLAYER_BOX;
+  return collisionBoxOf(animal.species, animal.stage);
 }
 
+const PLAYER_BOX: CollisionBox = { half: BODY_RADIUS, height: PLAYER_HEIGHT };
+
 /**
- * Lo que se lee de cada casilla en una ronda de consultas: si su terreno corta
- * el paso, su suelo mas bajo y mas alto, y la caja de lo que choca. Un animal
- * mira su postura hasta cuatro veces por tick —donde esta, girado y avanzado en
- * cada eje—, y ensaya saltos y rodeos, sobre casi las mismas casillas; asi que
- * cada ronda (`groundRound`) las lee una vez. Es lo que deja el choque por
- * partes en el presupuesto de un tick (`tests/performance.test.ts`).
+ * Lo que se lee de cada casilla en una ronda de consultas: el techo de cada
+ * columna y la caja de lo que choca. Un animal mira
+ * su caja varias veces por tick —avanzada en cada eje, lo que hay delante para
+ * saltar— y ensaya saltos y rodeos, sobre casi las mismas casillas; asi que
+ * cada ronda (`groundRound`) las lee una vez (`tests/performance.test.ts`).
  */
 const MEMO_R = 4;
 const MEMO_SIDE = 2 * MEMO_R + 1;
@@ -257,7 +220,6 @@ const memo = {
   ox: 0,
   oy: 0,
   stamp: new Int32Array(MEMO_SIDE * MEMO_SIDE),
-  water: new Uint8Array(MEMO_SIDE * MEMO_SIDE),
   box: new Array<Hitbox | null>(MEMO_SIDE * MEMO_SIDE).fill(null),
   colStamp: new Int32Array(MEMO_COLS * MEMO_COLS),
   colTop: new Float64Array(MEMO_COLS * MEMO_COLS),
@@ -291,16 +253,9 @@ function tile(world: World, tx: number, ty: number): number {
   const i = ly * MEMO_SIDE + lx;
   if (memo.stamp[i] !== memo.gen) {
     memo.stamp[i] = memo.gen;
-    memo.water[i] = world.isTerrainSolidAt(tx, ty) ? 1 : 0;
     memo.box[i] = solidBoxAt(world, tx, ty);
   }
   return i;
-}
-
-/** Si el terreno de la casilla corta el paso (el agua), dentro de una ronda o no. */
-export function terrainSolid(world: World, tx: number, ty: number): boolean {
-  const i = tile(world, tx, ty);
-  return i >= 0 ? memo.water[i] === 1 : world.isTerrainSolidAt(tx, ty);
 }
 
 /** El techo de la columna de 0,5 (`vx`, `vy`), en el mundo, dentro de una ronda o no. */
@@ -337,17 +292,15 @@ function columnSpan(c: number, half: number): [number, number] {
 /**
  * Lo mas alto del terreno bajo una huella cuadrada de medio lado `half`
  * centrada en (`x`, `y`): el techo de cada columna de 0,5 que solapa. Con
- * `half` 0, el de la columna del punto. Con `cap`, solo las columnas que no
- * pasan de ahi: las de mas arriba no se pisan, el cuerpo esta metido en ellas.
+ * `half` 0, el de la columna del punto.
  */
-export function terrainUnder(world: World, x: number, y: number, half: number, cap = Infinity): number {
+export function terrainUnder(world: World, x: number, y: number, half: number): number {
   const [vx0, vx1] = columnSpan(x, half);
   const [vy0, vy1] = columnSpan(y, half);
   let top = -Infinity;
   for (let vy = vy0; vy <= vy1; vy++) {
     for (let vx = vx0; vx <= vx1; vx++) {
-      const t = columnTopIn(world, vx, vy);
-      if (t > top && t <= cap) top = t;
+      top = Math.max(top, columnTopIn(world, vx, vy));
     }
   }
   return top;
@@ -358,18 +311,16 @@ export function terrainUnder(world: World, x: number, y: number, half: number, c
  * el terreno bajo la huella entera (`terrainUnder`) y, encima, el techo de cada
  * caja que choca y la solapa. Con `half` 0, lo que hay justo en ese punto. Con
  * `head`, solo las cajas que empiezan por debajo de ahi: las de mas arriba no
- * se pisan, son techo (`headroom`). Con `cap`, solo lo que no pasa de ahi: es
- * donde aterriza un cuerpo que cae, que solo choca por la base (regla 21).
+ * se pisan, son techo (`headroom`).
  */
-export function squareFloor(world: World, x: number, y: number, half: number, head = Infinity, cap = Infinity): number {
-  let floor = terrainUnder(world, x, y, half, cap);
+export function squareFloor(world: World, x: number, y: number, half: number, head = Infinity): number {
+  let floor = terrainUnder(world, x, y, half);
   for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
     for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
       const b = solidBox(world, tx, ty);
       if (
         b &&
         b.z1 > floor &&
-        b.z1 <= cap &&
         b.z0 < head &&
         b.x0 < x + half &&
         b.x1 > x - half &&
@@ -410,116 +361,30 @@ export function ceilingOver(world: World, x: number, y: number, half: number, fr
 }
 
 /**
- * Hasta donde puede subir la cabeza de una entidad donde esta: el techo sobre el
- * jugador. Los animales aun no lo miran (`Infinity`): sus partes chocan de lado
- * con las cajas, y en el mundo de hoy no hay nada colgado.
+ * Hasta donde puede subir lo alto de la caja de una entidad donde esta: el
+ * techo sobre ella. Desde el 2026-10-14 tambien el de los animales, que chocan
+ * con su caja (`bodyOf`).
  */
 export function headroom(world: World, store: EntityStore, id: number): number {
-  if (store.kind[id] !== EntityKind.Player) return Infinity;
-  return ceilingOver(world, store.x[id], store.y[id], BODY_RADIUS, store.z[id] + PLAYER_HEIGHT);
+  const body = bodyOf(store, id);
+  return ceilingOver(world, store.x[id], store.y[id], body.half, store.z[id] + body.height);
 }
 
 /**
- * **La altura de reposo** de un cuerpo de cajas giradas con los pies a `z`: lo
- * mas bajo a que pueden estar los pies sin que **ninguna** caja quede dentro del
- * terreno o de la caja de un objeto (el autor, 2026-10-10: «todas las cajas
- * chocan con el terreno en todo momento»). Es, sobre cada caja, lo mas alto que
- * hay bajo ella —el techo de cada columna de 0,5 y de cada caja de objeto que
- * solapa— menos lo que esa caja esta por encima de los pies. **Deduccion mia.**
+ * Lo que pisa una entidad donde esta: el suelo bajo su caja entera
+ * (`squareFloor`), contando solo las cajas de objeto que empiezan por debajo de
+ * lo alto de su caja. El jugador y los animales igual, cada uno con su caja
+ * (`bodyOf`; hasta el 2026-10-14 un animal se apoyaba en las cajas de sus
+ * partes). Es la vara de los pies —caer, aterrizar, estar de pie— en
+ * `applyVertical`.
  *
- * Asi la cabeza de un bisonte pasa por encima de una pared que sus patas no, y
- * un animal con las patas traseras sobre un escalon no cae hasta que todas sus
- * cajas caben abajo. Las cajas de objeto que empiezan por encima de una parte
- * no cuentan para ella. Con `cap`, solo lo que deja los pies a esa altura o
- * por debajo: lo de mas arriba no es apoyo, es algo en que la caja esta metida.
- */
-export function partsRest(world: World, boxes: readonly OrientedBox[], z: number, cap = Infinity): number {
-  let rest = -Infinity;
-  for (const p of boxes) {
-    const lift = p.cz - p.hh - z;
-    const top = p.cz + p.hh;
-    const rx = p.hl * Math.abs(p.ux) + p.hw * Math.abs(p.uy);
-    const ry = p.hl * Math.abs(p.uy) + p.hw * Math.abs(p.ux);
-    for (let vy = voxelOf(p.cy - ry); vy <= voxelOf(p.cy + ry); vy++) {
-      for (let vx = voxelOf(p.cx - rx); vx <= voxelOf(p.cx + rx); vx++) {
-        if (!overlapsSquare(p, (vx + 0.5) * VOXEL, (vy + 0.5) * VOXEL, VOXEL / 2)) continue;
-        const feet = columnTopIn(world, vx, vy) - lift;
-        if (feet > rest && feet <= cap) rest = feet;
-      }
-    }
-    for (let ty = Math.floor(p.cy - ry); ty <= Math.floor(p.cy + ry); ty++) {
-      for (let tx = Math.floor(p.cx - rx); tx <= Math.floor(p.cx + rx); tx++) {
-        const b = solidBox(world, tx, ty);
-        if (!b || b.z0 >= top) continue;
-        const feet = b.z1 - lift;
-        if (feet <= rest || feet > cap) continue;
-        if (overlapsSquare(p, (b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2)) rest = feet;
-      }
-    }
-  }
-  return rest;
-}
-
-/**
- * Lo que pisa una entidad donde esta: el jugador con su huella
- * (`BODY_RADIUS`), un animal con todas sus cajas (`partsRest`; hasta el
- * 2026-10-10, solo con las mas bajas y el terreno en el centro). Es la vara de
- * los pies —caer, aterrizar, estar de pie— en `applyVertical`.
- *
- * Si lo que pisa —la huella del jugador, todas las cajas del animal— pide
- * subir mas de `upTo` (los pies mas lo que se sube andando), se esta metido en
- * algo —un arbol que crecio encima, un animal que nacio sin caber— y el cuerpo
- * **se queda donde esta**: ni se sube de golpe a lo alto (solo se sube de golpe
- * lo que se sube andando, el autor, 2026-10-10) ni a medias apoyado en otra
- * cosa. **Deduccion mia.** Hasta la fase B de la tanda de fisicas se filtraba
- * caja a caja (las que asomaban no se pisaban), y eso si subia a medias.
+ * Si lo que pisa pide subir mas de `upTo` (los pies mas lo que se sube
+ * andando), se esta metido en algo —un arbol que crecio encima— y el cuerpo
+ * **se queda donde esta**, sin subirse a lo alto. **Deduccion mia.**
  */
 export function footing(world: World, store: EntityStore, id: number, upTo = Infinity): number {
-  const x = store.x[id];
-  const y = store.y[id];
   const z = store.z[id];
-  // Mientras se repele algo de lo que esta metido (`repel` en `movement.ts`),
-  // no se sube a ello de golpe: primero sale (el autor, 2026-10-13, la
-  // repulsion solo va en horizontal).
-  if (store.repelling[id] === 1) upTo = Math.min(upTo, z);
-  let rest: number;
-  if (store.kind[id] === EntityKind.Player) {
-    rest = squareFloor(world, x, y, BODY_RADIUS, z + PLAYER_HEIGHT);
-  } else {
-    const animal = store.animal[id];
-    if (!animal) return world.groundHeightAt(x, y);
-    const boxes = bodyBoxes(animal.species, animal.stage, x, y, z, store.facingX[id], store.facingY[id]);
-    // Solo la base sube de golpe (el autor, 2026-10-13: solo las patas suben
-    // un escalon andando). Las demas cajas sostienen el cuerpo a su altura,
-    // pero no lo suben: una cabeza no levanta al animal.
-    rest = partsRest(world, boxes.filter((b) => b.base), z);
-    if (rest <= upTo) rest = Math.max(rest, partsRest(world, boxes.filter((b) => !b.base), z, z + 1e-9));
-  }
-  // Metido en algo mas de lo que se sube de golpe: se queda donde esta, sin
-  // subirse a medias apoyado en otra cosa. Andando no pasa nunca —no se entra
-  // donde el suelo pasa de los pies—; pasa al aparecer o si algo crece debajo.
+  const body = bodyOf(store, id);
+  const rest = squareFloor(world, store.x[id], store.y[id], body.half, z + body.height);
   return rest > upTo || rest === -Infinity ? z : rest;
-}
-
-/**
- * Donde aterriza una entidad que cae: lo mas alto bajo su **base** que no pasa
- * de sus pies (el autor, 2026-10-13: «cuando se baja, se choca solo con la base
- * de las patas»). Lo que asoma por encima de los pies no detiene la caida: la
- * caja esta metida en ello, y la saca la repulsion, en horizontal. El jugador
- * es una caja sola, y su base es su huella. Si no queda nada debajo, los pies.
- */
-export function landingFloor(world: World, store: EntityStore, id: number): number {
-  const x = store.x[id];
-  const y = store.y[id];
-  const z = store.z[id];
-  let rest: number;
-  if (store.kind[id] === EntityKind.Player) {
-    rest = squareFloor(world, x, y, BODY_RADIUS, z + PLAYER_HEIGHT, z + 1e-9);
-  } else {
-    const animal = store.animal[id];
-    if (!animal) return world.groundHeightAt(x, y);
-    const boxes = bodyBoxes(animal.species, animal.stage, x, y, z, store.facingX[id], store.facingY[id]);
-    rest = partsRest(world, boxes.filter((b) => b.base), z, z + 1e-9);
-  }
-  return rest === -Infinity ? z : rest;
 }

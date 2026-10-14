@@ -22,6 +22,7 @@ import {
   applyVertical,
   BODY_RADIUS,
   autoJumpDue,
+  CLIMB_SPEED,
   createGame,
   EntityKind,
   EntityStore,
@@ -491,44 +492,53 @@ describe('El agua es muro tambien en el aire', () => {
   });
 });
 
-describe('Cayendo solo choca la base (el autor, 2026-10-13)', () => {
-  it('saltando contra una pared alta y empujando hacia ella, al caer entra un tick y la repulsion lo saca', () => {
+describe('La caja choca por todas sus caras siempre (el autor, 2026-10-14)', () => {
+  it('saltando contra una pared alta, ni subiendo ni cayendo entra en ella', () => {
     // Una pared de 3 al norte (y < 0); el jugador, al pie, salta empujando
-    // hacia ella sin parar.
+    // hacia ella sin parar. Del 2026-10-13 al 14, cayendo solo chocaba la base
+    // y entraba un tick; desde entonces, nada.
     const world = heightField((_x, y) => (y < 0 ? 3 : 0));
     const store = new EntityStore(4);
     const id = store.spawn(EntityKind.Player, 0.5, 0.5);
-    let deepest = 0;
-    let wasInside = false;
-    let rose = false;
+    let flew = false;
     for (let t = 0; t < 120; t++) {
       if (store.grounded[id]) {
         moveEntity(world, store, id, 0, -1, TICK_DT);
         if (t === 0) takeOff(store, id);
       } else {
+        flew = true;
         moveAirborne(world, store, id, 0, -1, TICK_DT);
       }
       applyVertical(world, store, id, TICK_DT);
-      // De pie, solo en el suelo: lo que tiene metido no lo sostiene.
-      if (store.grounded[id]) expect(store.z[id]).toBe(0);
-      const inside = BODY_RADIUS - store.y[id];
-      // Subiendo, la cara lo estampa: no entra.
-      if (store.vz[id] > 0) {
-        rose = true;
-        expect(inside).toBeLessThanOrEqual(1e-9);
-      }
-      deepest = Math.max(deepest, inside);
-      if (inside > 1e-9) wasInside = true;
+      expect(store.y[id]).toBeGreaterThanOrEqual(BODY_RADIUS - 1e-9);
     }
-    expect(rose).toBe(true);
-    expect(wasInside).toBe(true);
-    // Lo de un tick andando, y nada mas: la repulsion gana al mando.
-    expect(deepest).toBeLessThanOrEqual(WALK_SPEED * TICK_DT + 1e-9);
-    // Acaba fuera de la pared, de pie al pie de ella, sin subirse.
-    expect(store.y[id]).toBeGreaterThanOrEqual(BODY_RADIUS - 1e-9);
+    expect(flew).toBe(true);
     expect(store.grounded[id]).toBe(1);
     expect(store.z[id]).toBe(0);
-    expect(store.repelling[id]).toBe(0);
+  });
+
+  it('un escalon de medio bloque se sube tick a tick, sin dejar de andar: medio bloque en 0,1 s', () => {
+    // Llano a 0 hasta x = 2; de ahi, medio bloque.
+    const world = heightField((x) => (x >= 2 ? 0.5 : 0));
+    const store = new EntityStore(4);
+    const id = store.spawn(EntityKind.Player, 0.5, 0.5);
+    const rises: number[] = [];
+    let walkedWhileRising = 0;
+    for (let t = 0; t < 60; t++) {
+      const before = { x: store.x[id], z: store.z[id] };
+      moveEntity(world, store, id, 1, 0, TICK_DT);
+      applyVertical(world, store, id, TICK_DT);
+      expect(store.grounded[id]).toBe(1);
+      if (store.z[id] > before.z + 1e-12) {
+        rises.push(store.z[id] - before.z);
+        if (store.x[id] > before.x) walkedWhileRising++;
+      }
+    }
+    expect(store.z[id]).toBe(0.5);
+    // Ni de golpe ni a saltos: 6 ticks de 1/12 de bloque, a 60 Hz.
+    expect(rises.length).toBe(6);
+    for (const r of rises) expect(r).toBeLessThanOrEqual(CLIMB_SPEED * TICK_DT + 1e-9);
+    expect(walkedWhileRising).toBe(6);
   });
 });
 

@@ -31,7 +31,7 @@ export interface Offset {
 }
 
 /** Un punto o una direccion, con `z` la altura. */
-import type { OrientedBox } from './body.js';
+import type { OrientedBox } from './boxes.js';
 
 export interface Vec3 {
   readonly x: number;
@@ -189,7 +189,7 @@ export function rayBox(origin: Vec3, dir: Vec3, box: Hitbox, maxT: number): numb
 }
 
 /**
- * Donde entra el rayo en una caja girada en el suelo (`body.ts`): el metodo
+ * Donde entra el rayo en una caja girada en el suelo (`boxes.ts`): el metodo
  * de las placas en los ejes de la caja, o `null` si no la cruza entre `0` y
  * `maxT`. Es como se golpea a las partes de un animal.
  */

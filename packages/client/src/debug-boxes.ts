@@ -9,11 +9,12 @@
  * simulacion. Desde el 2026-10-05 (el autor) cada objeto tiene **una** caja,
  * que se golpea y, si su tipo choca, tambien choca (`boxes.ts`):
  * - **Las dos**: los objetos que chocan (`blocksBody`: el tronco del arbol, la
- *   roca, los minerales y las estaciones) y cada parte de los animales
- *   (`animalBoxes`), patas incluidas.
- * - **Golpe**: lo que solo se golpea (el arbusto, el brote, los guijarros).
- * - **Choque**: el jugador, su huella de `BODY_RADIUS` de los pies a los ojos
- *   (`EYE_HEIGHT`, **propuesta mia**: su choque no tiene alto).
+ *   roca, los minerales y las estaciones).
+ * - **Golpe**: lo que solo se golpea (el arbusto, el brote, los guijarros) y,
+ *   desde el 2026-10-14, cada parte de los animales (`animalBoxes`).
+ * - **Choque**: la caja de cada cuerpo (`bodyOf`): el jugador y, desde el
+ *   2026-10-14, cada animal, de base cuadrada y hasta el lomo (el autor, como
+ *   la vaca de Minecraft).
  *
  * La cuenta es pura (`collectBoxes`, `boxEdges`) y se mide en Node; dibujarla
  * es `DebugBoxes`.
@@ -23,8 +24,7 @@ import { BufferAttribute, BufferGeometry, LineBasicMaterial, LineSegments, type 
 import { blocksBody } from '@verdant/shared';
 import {
   animalBoxes,
-  BODY_RADIUS,
-  EYE_HEIGHT,
+  bodyOf,
   hitboxAt,
   type GameState,
   type Hitbox,
@@ -62,7 +62,7 @@ export function boxEdges(out: number[], box: Hitbox | OrientedBox): void {
       for (const y of [box.y0, box.y1]) for (const x of [box.x0, box.x1]) corners.push([x, z, y]);
     }
   } else {
-    // El eje de ancho es (-uy, ux), como en `sim/body.ts`.
+    // El eje de ancho es (-uy, ux), como en `bodyBoxes` (`sim/boxes.ts`).
     for (const sz of [-1, 1]) {
       for (const sw of [-1, 1]) {
         for (const sl of [-1, 1]) {
@@ -95,23 +95,31 @@ export function collectBoxes(state: GameState, radius = BOX_RADIUS): BoxEdges {
       }
     }
   }
-  // El jugador: su huella de choque, de los pies a los ojos.
+  // El jugador: su caja de choque.
   const x = entities.x[playerId];
   const y = entities.y[playerId];
-  const z = entities.z[playerId];
-  boxEdges(out.solid, {
-    x0: x - BODY_RADIUS, x1: x + BODY_RADIUS, y0: y - BODY_RADIUS, y1: y + BODY_RADIUS, z0: z, z1: z + EYE_HEIGHT,
-  });
-  out.counts.solid++;
-  // Los animales, cada parte que golpea y choca.
+  bodyEdges(out, state, playerId);
+  // Los animales: su caja de choque, y cada parte que se golpea.
   for (const id of state.fauna.values()) {
     if (Math.abs(entities.x[id] - x) > radius || Math.abs(entities.y[id] - y) > radius) continue;
+    bodyEdges(out, state, id);
     for (const part of animalBoxes(entities, id)) {
-      boxEdges(out.both, part);
-      out.counts.both++;
+      boxEdges(out.hit, part);
+      out.counts.hit++;
     }
   }
   return out;
+}
+
+/** La caja de choque de un cuerpo (`bodyOf`), de los pies a lo alto. */
+function bodyEdges(out: BoxEdges, state: GameState, id: number): void {
+  const { entities } = state;
+  const { half, height } = bodyOf(entities, id);
+  const x = entities.x[id];
+  const y = entities.y[id];
+  const z = entities.z[id];
+  boxEdges(out.solid, { x0: x - half, x1: x + half, y0: y - half, y1: y + half, z0: z, z1: z + height });
+  out.counts.solid++;
 }
 
 function lines(color: number): LineSegments {

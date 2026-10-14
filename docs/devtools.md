@@ -56,11 +56,13 @@ corte el paso (decision del autor). Ninguna caja es del cliente: todas salen
 del nucleo. Desde el mismo dia cada objeto tiene **una** caja, que se golpea y,
 si su tipo choca, tambien choca (`sim/boxes.ts`, ver `docs/reglas.md`, 21):
 - **Las dos**: los objetos que chocan (`blocksBody`: el tronco del arbol, la
-  roca, los minerales y las estaciones) y cada parte de los animales
-  (`animalBoxes`), patas incluidas.
-- **Golpe**: lo que solo se golpea: el arbusto, el brote y los guijarros.
-- **Choque**: el jugador, su huella de `BODY_RADIUS` de los pies a los ojos
-  (propuesta mia: su choque no tiene alto).
+  roca, los minerales y las estaciones).
+- **Golpe**: lo que solo se golpea: el arbusto, el brote, los guijarros y,
+  desde el 2026-10-14, cada parte de los animales (`animalBoxes`), patas
+  incluidas.
+- **Choque**: la caja de cada cuerpo (`bodyOf`, regla 21): el jugador, su
+  huella de `BODY_RADIUS` y `PLAYER_HEIGHT` de alto; cada animal, su caja
+  cuadrada hasta el lomo, que no gira.
 
 El primer dibujo (unas horas) pintaba en cian la casilla entera de cada arbol y
 roca, que era lo que chocaba entonces; al verlo, el autor cambio la regla.
@@ -69,14 +71,9 @@ Se rehacen enteras en cada fotograma: son unas 600 casillas, cuesta poco, y no
 hay cache que se quede vieja al talar algo o al pasar un animal. El humo las
 cuenta (`__verdant.debugBoxes`) y `tests/debug-boxes.test.ts` mide la parte pura.
 
-**La camara al subir un escalon** (2026-10-12; hasta entonces, el retraso de
-la camara de la fase C, que el autor descarto): un deslizador del grupo Vista
-mueve de 0 a 0,3 s (`STEP_SMOOTH_MAX`) lo que tarda la camara en subir un
-escalon, para que el autor lo ajuste jugando. El de partida es 0,1
-(`STEP_SMOOTH`, `docs/controles.md`), y con 0 sube de golpe con el cuerpo.
-**A diferencia de lo demas, no vuelve a su valor al cerrar el panel**
-(propuesta mia): es un ajuste, no un estado que deje el juego raro sin el
-panel a la vista. Se olvida al recargar.
+Del 2026-10-12 al 2026-10-14 un deslizador del grupo Vista ajustaba lo que
+tardaba la camara en subir un escalon; se retiro con el
+suavizado, cuando el cuerpo paso a subir tick a tick (`docs/controles.md`).
 
 **En el movil, que no tiene F3**, el panel se abre con el cuarto boton de la
 columna de OTROS, una llave inglesa bajo el bioma (`#devToggle`, pedido del

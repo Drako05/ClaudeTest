@@ -13,7 +13,7 @@
  */
 
 import { TICK_DT } from '@verdant/shared';
-import { BODY_RADIUS, squareFloor } from '../boxes.js';
+import { BODY_RADIUS, footing, squareFloor } from '../boxes.js';
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 import { GRAVITY, JUMP_SPEED, STEP_UP } from './jump.js';
@@ -66,7 +66,9 @@ export function autoJumpDue(
   const dirX = moveX / len;
   const dirY = moveY / len;
   const speed = speedOf(running);
-  const feet = store.z[id];
+  // Desde el suelo al que van los pies: subiendo un escalon andando, tick a
+  // tick (2026-10-14), van por debajo de el, y se mide desde donde llegan.
+  const feet = Math.max(store.z[id], footing(world, store, id, store.z[id] + STEP_UP));
   // Mas alla de esto ni el bloque mas alto que se sube pide saltar ya.
   const reach = speed * (riseTime(JUMP_HEIGHT) + TICK_DT);
 

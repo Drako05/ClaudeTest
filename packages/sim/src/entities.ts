@@ -75,29 +75,6 @@ export class EntityStore {
   readonly detourX: Float32Array;
   readonly detourY: Float32Array;
   readonly detourLeft: Float32Array;
-  /** Lo que lleva retrocedido un animal para que le quepa un giro. */
-  readonly backedUp: Float32Array;
-  /**
-   * El impulso horizontal del salto de un animal, a lo largo de su rumbo, en
-   * bloques por segundo (`tryJump`): constante todo el vuelo y sumado a lo que
-   * anda en el aire (el autor, 2026-10-13). Se borra al tocar suelo.
-   */
-  readonly impulse: Float32Array;
-  /**
-   * El rumbo al que gira un animal en un salto de giro (`tryTurnJump`): salta
-   * en el sitio cuando en el suelo no le cabe el giro, y gira en el aire. (0, 0)
-   * si no salta para girar.
-   */
-  readonly turnToX: Float32Array;
-  readonly turnToY: Float32Array;
-  /**
-   * La repulsion (`repel` en `movement.ts`): 1 mientras el cuerpo sale de algo
-   * en que se metio cayendo, por el rumbo (`repelX`, `repelY`); 2 si no
-   * encontro por donde salir, hasta que deje de estar metido; 0 si no.
-   */
-  readonly repelling: Uint8Array;
-  readonly repelX: Float32Array;
-  readonly repelY: Float32Array;
   /** Huecos de entidades retiradas, que `spawn` reutiliza antes de crecer. */
   private readonly free: number[] = [];
 
@@ -126,13 +103,6 @@ export class EntityStore {
     this.detourX = new Float32Array(capacity);
     this.detourY = new Float32Array(capacity);
     this.detourLeft = new Float32Array(capacity);
-    this.backedUp = new Float32Array(capacity);
-    this.impulse = new Float32Array(capacity);
-    this.turnToX = new Float32Array(capacity);
-    this.turnToY = new Float32Array(capacity);
-    this.repelling = new Uint8Array(capacity);
-    this.repelX = new Float32Array(capacity);
-    this.repelY = new Float32Array(capacity);
   }
 
   spawn(kind: EntityKind, x: number, y: number): number {
@@ -161,11 +131,6 @@ export class EntityStore {
     this.maxHealth[id] = 100;
     this.wanderPeriod[id] = Number.NaN;
     this.detourLeft[id] = 0;
-    this.backedUp[id] = 0;
-    this.impulse[id] = 0;
-    this.turnToX[id] = 0;
-    this.turnToY[id] = 0;
-    this.repelling[id] = 0;
     return id;
   }
 
