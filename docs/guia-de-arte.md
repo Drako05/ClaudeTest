@@ -122,7 +122,8 @@ que venga. Son **las directrices del autor** para el diseño.
 - **La caja** (`docs/reglas.md`, regla 21): de base cuadrada, de lado 1,2
   veces el ancho del cuerpo, alta hasta el lomo y sin girar con el animal. Su
   referente es la vaca de Minecraft.
-- **Lectura del agente, *por confirmar***:
+- **Como se aplico** (propuesta del agente; **el autor dio por buenos los
+  modelos** con las capturas, 2026-10-14: «aprobados esos diseños»):
   - mirando el animal a lo largo de un eje, el borde de fuera de cada pata
     queda **dentro del cuadrado**, y se ponen justo en su borde; en diagonal
     asoman las esquinas, como en Minecraft;
@@ -136,4 +137,5 @@ que venga. Son **las directrices del autor** para el diseño.
   rejilla con su caja en cian; `tests/fauna-body.test.ts` afirma que ninguna
   pata se sale.
 - **Aplicada**: las ocho especies de cuatro patas, en sus tres etapas
-  (2026-10-14), **pendiente del visto bueno del autor** con las capturas.
+  (2026-10-14), aprobadas por el autor con las capturas. Un modelo nuevo
+  sigue la misma regla.

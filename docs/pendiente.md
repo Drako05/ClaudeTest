@@ -139,16 +139,17 @@ semillas, 2 min: clavados 0,0-0,5 % (sin empujes, 0,0-0,2 %); el empuje
 cuesta 0,15 ms por tick con 113 animales, tras ordenarlos a lo largo de x (a
 lo bruto, todos los pares, 0,65 ms).
 
-**Fase 4 — HECHA en el codigo, ESPERANDO EL VISTO BUENO DEL AUTOR
-(2026-10-14).** Las ocho especies de cuatro patas tienen las patas en el
-cuadrado de su caja: troncos mas cortos (1,5 veces el ancho), patas en el
-borde del cuadrado, y la liebre, el zorro, el ciervo y el ibice algo mas
-anchos. La directriz 4 esta en `docs/guia-de-arte.md` con lo que entendi
-*por confirmar*, y las deducciones en `docs/juicio.md`. Se le enviaron dos
-capturas de la galeria con las cajas (`faunaGallery(true, 100)`), antes y
-despues. **Si pide retoques, van aqui**; cuando las de por buenas, se cierra
-la tanda con la auditoria. Los clavados no cambian: 0,0-0,5 % en cinco
+**Fase 4 — HECHA y APROBADA (2026-10-14).** Las ocho especies de cuatro
+patas tienen las patas en el cuadrado de su caja: troncos mas cortos (1,5
+veces el ancho), patas en el borde del cuadrado, y la liebre, el zorro, el
+ciervo y el ibice algo mas anchos. Se le enviaron dos capturas de la galeria
+con las cajas (`faunaGallery(true, 100)`), antes y despues, y el autor las
+dio por buenas: «aprobados esos diseños». La directriz 4 y como se aplico
+estan en `docs/guia-de-arte.md`. Los clavados no cambian: 0,0-0,5 % en cinco
 semillas.
+
+**Lo que queda de la tanda**: la auditoria de cierre (`/auditoria`), y con
+ella esta seccion pasa a `docs/historia.md`.
 
 ## Pendiente del autor: las paredes de 2+ voxeles
 
