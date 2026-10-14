@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyIntent, Feature, Species, Stage, Terrain, TICK_DT } from '@verdant/shared';
+import { collisionBoxOf, emptyIntent, Feature, Species, Stage, Terrain, TICK_DT } from '@verdant/shared';
 import {
   bodyOf,
   collides,
@@ -151,13 +151,14 @@ describe('Los cuerpos se empujan, y el grande aparta al pequeño', () => {
   });
 
   it('un empuje nunca mete a nadie en el agua ni saca a un animal de su bioma', () => {
-    // Agua desde x = 11; una liebre a 2 cm de ella (su caja mide 0,16 de lado),
-    // y un bisonte (con su caja aun fuera del agua) bien metido en ella, que la
-    // empuja hacia alli.
+    // Agua desde x = 11; una liebre con su caja a 2 cm de ella, y un bisonte
+    // (con su caja aun fuera del agua) bien metido en ella, que la empuja hacia
+    // alli.
+    const hareX = 11 - collisionBoxOf(Species.Hare, Stage.Adult).half - 0.02;
     const sea = fakeWorld((tx) => tx >= 11);
     const wet = pen([
       { species: Species.Bison, x: 10.35, y: 10.5 },
-      { species: Species.Hare, x: 10.9, y: 10.5 },
+      { species: Species.Hare, x: hareX, y: 10.5 },
     ]);
     for (let t = 0; t < 120; t++) pushBodies(sea, wet.store, wet.fauna, -1);
     const hare = wet.ids[1]!;
@@ -169,7 +170,7 @@ describe('Los cuerpos se empujan, y el grande aparta al pequeño', () => {
     const shore = fakeWorld(undefined, (tx) => (tx >= 11 ? Terrain.Sand : Terrain.Grass));
     const dry = pen([
       { species: Species.Bison, x: 10.35, y: 10.5 },
-      { species: Species.Hare, x: 10.9, y: 10.5 },
+      { species: Species.Hare, x: hareX, y: 10.5 },
     ]);
     for (let t = 0; t < 120; t++) pushBodies(shore, dry.store, dry.fauna, -1);
     expect(dry.store.x[dry.ids[1]!]).toBeLessThan(11);

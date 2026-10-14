@@ -139,9 +139,16 @@ semillas, 2 min: clavados 0,0-0,5 % (sin empujes, 0,0-0,2 %); el empuje
 cuesta 0,15 ms por tick con 113 animales, tras ordenarlos a lo largo de x (a
 lo bruto, todos los pares, 0,65 ms).
 
-**Lo que queda**: (4) los modelos, con las patas dentro del cuadrado. Hasta
-entonces, en los animales de cabeza larga la cabeza queda fuera de la caja y
-puede verse metida en una pared, como acepto el autor.
+**Fase 4 — HECHA en el codigo, ESPERANDO EL VISTO BUENO DEL AUTOR
+(2026-10-14).** Las ocho especies de cuatro patas tienen las patas en el
+cuadrado de su caja: troncos mas cortos (1,5 veces el ancho), patas en el
+borde del cuadrado, y la liebre, el zorro, el ciervo y el ibice algo mas
+anchos. La directriz 4 esta en `docs/guia-de-arte.md` con lo que entendi
+*por confirmar*, y las deducciones en `docs/juicio.md`. Se le enviaron dos
+capturas de la galeria con las cajas (`faunaGallery(true, 100)`), antes y
+despues. **Si pide retoques, van aqui**; cuando las de por buenas, se cierra
+la tanda con la auditoria. Los clavados no cambian: 0,0-0,5 % en cinco
+semillas.
 
 ## Pendiente del autor: las paredes de 2+ voxeles
 

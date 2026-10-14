@@ -109,7 +109,14 @@ la formula da 39 y 9.
   grande de lo que le toca, y la del joven un 10 % *(deduccion)*.
 - Los modelos y sus colores son mios.
 - `window.__verdant.faunaGallery()` devuelve los 30 modelos en una rejilla,
-  vistos en tres cuartos desde arriba.
+  vistos en tres cuartos desde arriba; `faunaGallery(true, 100)`, con su caja
+  de colision en cian y a 100 pixeles por bloque, que es como se revisa la
+  directriz 4 de la guia de arte (las patas en el cuadrado).
+- **Las patas caben en el cuadrado de su caja** (el autor, 2026-10-14;
+  `docs/guia-de-arte.md`, directriz 4): el 2026-10-14 se acortaron los troncos
+  y se acercaron las patas de las ocho especies de cuatro patas, y se
+  ensancharon un poco la liebre, el zorro, el ciervo y el ibice. La regla, en
+  la guia.
 
 ## Aparicion
 
@@ -370,16 +377,17 @@ Interpretacion mia, aprobada con el plan:
 
 - **de lado, 1,2 veces el ancho de su cuerpo** —el de sus partes `hit`, de
   lado a lado (*deduccion*)—, y **alta hasta el lomo**, lo alto de su tronco
-  (o del caparazon). Hoy, por ejemplo, ciervo adulto 0,43 × 0,43 × 1,08 y
-  bisonte 1,25 × 1,25 × 1,58;
+  (o del caparazon). Hoy, por ejemplo, ciervo adulto 0,48 × 0,48 × 1,08 y
+  bisonte 1,24 × 1,24 × 1,58;
 - **no gira** con el animal, y **choca por todas sus caras, siempre**: subiendo,
   bajando y de lado, contra el terreno, el agua, las cajas de los objetos y el
   borde de su bioma;
 - la cabeza puede quedar fuera y **se acepta que se vea metida en una pared**
   (el autor). Las cajas que se golpean siguen siendo sus partes (arriba).
 
-Que las patas queden dentro del cuadrado es cosa de los modelos: la fase 4 de
-la tanda los rediseña, con el autor (`docs/pendiente.md`).
+Que las patas queden dentro del cuadrado es cosa de los modelos: desde la
+fase 4 de la tanda (2026-10-14) caben, y lo afirma un test (arriba, «El cuerpo
+de bloques», y `docs/guia-de-arte.md`, directriz 4).
 
 - **El giro**: hacia su destino a **180°/s** *(deduccion)*. Como la caja no
   gira, girar nunca choca: gira sobre su centro en cualquier sitio.

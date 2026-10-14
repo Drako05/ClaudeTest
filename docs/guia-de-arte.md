@@ -106,3 +106,34 @@ que venga. Son **las directrices del autor** para el diseño.
     `#invOpen`);
   - los anillos de hambre (cubiertos) y salud (un corazon).
 - **Aplicada**: los catorce equipables (2026-10-04).
+
+## Directriz 4: las patas caben en el cuadrado de la caja de colision
+
+> «La idea de una caja con base cuadrada, es que cubra en gran medida las
+> patas del animal, pero a su vez, la caja no debe sobre salir demasiado del
+> ancho del animal. entonces, esto implica que las patas delanteras y
+> traseras, no pueden estar mucho mas separadas que el ancho del propio
+> animal, para que la base cuadrada las cubra.» — el autor, 2026-10-14
+>
+> Y al preguntarle: rediseñar los modelos para que la separacion entre patas
+> delanteras y traseras sea mas o menos el ancho del cuerpo; la directriz va a
+> esta guia, y el revisa los modelos nuevos con capturas.
+
+- **La caja** (`docs/reglas.md`, regla 21): de base cuadrada, de lado 1,2
+  veces el ancho del cuerpo, alta hasta el lomo y sin girar con el animal. Su
+  referente es la vaca de Minecraft.
+- **Lectura del agente, *por confirmar***:
+  - mirando el animal a lo largo de un eje, el borde de fuera de cada pata
+    queda **dentro del cuadrado**, y se ponen justo en su borde; en diagonal
+    asoman las esquinas, como en Minecraft;
+  - el tronco mide **1,5 veces el ancho del cuerpo** (la vaca de Minecraft:
+    1,125 de largo por 0,75 de ancho); la cabeza, el cuello y la cola se
+    acercan lo que se acorta;
+  - un animal muy estrecho se **ensancha** antes que quedarse en un cubito con
+    patas: se hizo con la liebre, el zorro, el ciervo y el ibice;
+  - no cuenta para las patas finas y sin caja (el cangrejo, la gaviota).
+- **Como se revisa**: `__verdant.faunaGallery(true, 100)` pinta las 30 en una
+  rejilla con su caja en cian; `tests/fauna-body.test.ts` afirma que ninguna
+  pata se sale.
+- **Aplicada**: las ocho especies de cuatro patas, en sus tres etapas
+  (2026-10-14), **pendiente del visto bueno del autor** con las capturas.
