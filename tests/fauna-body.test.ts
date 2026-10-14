@@ -179,6 +179,27 @@ describe('el plano del cuerpo', () => {
  * siendo las partes.
  */
 describe('la caja de colision', () => {
+  it('las patas caben en su cuadrado, mirando a lo largo de el (guia de arte, directriz 4)', () => {
+    // El autor, 2026-10-14: «las patas delanteras y traseras, no pueden estar
+    // mucho mas separadas que el ancho del propio animal, para que la base
+    // cuadrada las cubra». Con el animal mirando a lo largo de un eje.
+    let checked = 0;
+    for (let s = 0; s < SPECIES_COUNT; s++) {
+      for (let st = 0; st < STAGE_COUNT; st++) {
+        const { half } = collisionBoxOf(s as Species, st as Stage);
+        for (const p of partsOf(s as Species, st as Stage)) {
+          if (!p.name.startsWith('pata-del') && !p.name.startsWith('pata-tras')) continue;
+          const where = `${Species[s]} ${st} ${p.name}`;
+          expect(Math.abs(p.at[0]) + p.size[0] / 2, where).toBeLessThanOrEqual(half + 1e-9);
+          expect(Math.abs(p.at[2]) + p.size[2] / 2, where).toBeLessThanOrEqual(half + 1e-9);
+          checked++;
+        }
+      }
+    }
+    // Ocho especies con cuatro patas, en tres etapas.
+    expect(checked).toBe(8 * 4 * STAGE_COUNT);
+  });
+
   it('es cuadrada, de 1,2 veces el ancho del cuerpo, y alta hasta el lomo', () => {
     for (let s = 0; s < SPECIES_COUNT; s++) {
       for (let st = 0; st < STAGE_COUNT; st++) {

@@ -1268,8 +1268,8 @@ Object.defineProperty(window, '__verdant', {
       animalsKilled,
       faunaSizes: faunaView.sizes,
       faunaYaws: faunaView.yaws,
-      /** Las diez especies en sus tres etapas, en un lienzo: para mirar el dibujo. */
-      faunaGallery: () => faunaGallery(),
+      /** Las diez especies en sus tres etapas, en un lienzo: para mirar el dibujo (con su caja, `boxes`). */
+      faunaGallery: (boxes = false, pixelsPerBlock = 40) => faunaGallery(pixelsPerBlock, boxes),
       /** Cuanto se ve de un sprite pegado de lado a un bloque y con uno delante. */
       spriteDepthProbe: (snap?: ProbeView) => spriteDepthProbe(snap),
       facing: [e.facingX[id], e.facingY[id]],

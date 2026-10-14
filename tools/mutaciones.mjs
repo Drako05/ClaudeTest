@@ -11,49 +11,24 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los empujes entre cuerpos (el autor, 2026-10-14, fase 3 de la fisica
- * al estilo Minecraft): segun el tamaño, poco a poco, sin meter a nadie en una
- * pared.
+ * Ronda: los modelos con las patas en el cuadrado de su caja (el autor,
+ * 2026-10-14, fase 4; guia de arte, directriz 4).
  */
 export default [
-  // El tick sin empujes.
+  // Las patas del bisonte donde estaban: a lo largo de su tronco de antes.
   {
-    nombre: 'empujes: el tick no empuja',
-    fichero: 'packages/sim/src/tick.ts',
-    de: '  pushBodies(world, entities, state.fauna, playerId);',
-    a: '',
-    prueba: 'test:tests/push.test.ts',
+    nombre: 'modelos: las patas del bisonte fuera del cuadrado',
+    fichero: 'packages/shared/src/fauna-body.ts',
+    de: '        ...legs(0.7, 0.22, 0.52, 0.32),',
+    a: '        ...legs(0.7, 0.22, 0.75, 0.32),',
+    prueba: 'test:tests/fauna-body.test.ts',
   },
-  // Sin masa: cada uno se lleva la mitad, sea cual sea su tamaño.
+  // Una especie pequeña, un pelo fuera.
   {
-    nombre: 'empujes: sin masa',
-    fichero: 'packages/sim/src/systems/push.ts',
-    de: '      const shareA = mass[j]! / (mass[i]! + mass[j]!);',
-    a: '      const shareA = 0.5;',
-    prueba: 'test:tests/push.test.ts',
-  },
-  // De golpe: se separan en un tick.
-  {
-    nombre: 'empujes: de golpe',
-    fichero: 'packages/sim/src/systems/push.ts',
-    de: '      const speed = PUSH_SPEED * overlap;',
-    a: '      const speed = (overlap * reach) / dt;',
-    prueba: 'test:tests/push.test.ts',
-  },
-  // Un empuje que no mira el choque: mete en el agua y saca del bioma.
-  {
-    nombre: 'empujes: atraviesan paredes',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: '  if (dx !== 0 && !blocked(world, store, id, store.x[id] + dx, store.y[id], feet, margin, keep)) store.x[id] += dx;',
-    a: '  if (dx !== 0) store.x[id] += dx;',
-    prueba: 'test:tests/push.test.ts',
-  },
-  // El barrido corta antes de tiempo: solo mira su propia caja, no la mas ancha.
-  {
-    nombre: 'empujes: el barrido corta antes de tiempo',
-    fichero: 'packages/sim/src/systems/push.ts',
-    de: '      if (dx >= half[i]! + widest) break;',
-    a: '      if (dx >= half[i]! + half[i]!) break;',
-    prueba: 'test:tests/push.test.ts',
+    nombre: 'modelos: las patas de la marmota un pelo fuera',
+    fichero: 'packages/shared/src/fauna-body.ts',
+    de: '        ...legs(0.08, 0.07, 0.145, 0.1),',
+    a: '        ...legs(0.08, 0.07, 0.15, 0.1),',
+    prueba: 'test:tests/fauna-body.test.ts',
   },
 ];
