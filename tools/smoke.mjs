@@ -2513,9 +2513,10 @@ async function reliefPass(browser, baseUrl) {
     check(eyeOff < 1e-6, `parado, la camara no esta en los ojos: a ${eyeOff}`);
   }
 
-  // El escalon (2026-10-12): el cuerpo lo sube de golpe, como el nucleo, y la
-  // camara se queda abajo y lo sube en `STEP_SMOOTH` (0,1 s). Andando en linea
-  // recta hacia uno de medio bloque, fotograma a fotograma.
+  // El escalon (2026-10-14): el cuerpo lo sube tick a tick, sin dejar de andar
+  // (`CLIMB_SPEED`, medio bloque en 0,1 s), y la camara con el, sin suavizado
+  // aparte. Andando en linea recta hacia uno de medio bloque, fotograma a
+  // fotograma.
   check(step !== null, 'no se encontro ningun escalon de medio bloque al que subir andando');
   if (step) {
     const before = await open(page, baseUrl, `&x=${step.stand.x}&y=${step.stand.y}`);
@@ -2534,28 +2535,29 @@ async function reliefPass(browser, baseUrl) {
     await elapse(page, 50);
     const faced = Math.abs(wrap((await angle()) - want));
     await page.keyboard.down('KeyW');
-    let climb = null;
-    for (let f = 0; f < 120 && !climb; f++) {
+    // Los fotogramas en que sube, de pie, y lo que sube en cada uno.
+    const z0 = (await state(page)).z;
+    const rises = [];
+    let moving = 0;
+    for (let f = 0; f < 120 && (await state(page)).z < z0 + 0.5 - 1e-6; f++) {
       const prev = await state(page);
       await elapse(page, 1000 / 60);
       const now = await state(page);
-      if (now.z - prev.z > 0.4 && now.grounded) climb = { prev, now };
+      if (now.z > prev.z + 1e-9 && now.grounded && prev.grounded) {
+        rises.push(now.z - prev.z);
+        if (Math.hypot(now.x - prev.x, now.y - prev.y) > 1e-6) moving++;
+      }
     }
-    // Lo que queda de desfase cuando se ha apagado, sin andar mas.
     await page.keyboard.up('KeyW');
-    await elapse(page, 100);
-    const after = await state(page);
-    const rose = climb ? climb.now.z - climb.prev.z : 0;
-    const camRose = climb ? climb.now.camEyes[2] - climb.prev.camEyes[2] : 0;
-    console.log(`  escalon desde ${before.level}: encarado a ${faced.toFixed(3)} rad, el cuerpo sube ${rose.toFixed(2)} ` +
-      `y la camara ${camRose.toFixed(3)} ese fotograma; desfase ${after.camStep.toFixed(4)} a los 0,1 s ` +
-      `(el mayor, ${after.camStepPeak.toFixed(2)})`);
-    check(climb !== null, 'andando hacia el escalon, el cuerpo no lo subio');
-    check(!climb || camRose < rose / 2, `la camara subio el escalon de golpe con el cuerpo: ${camRose} de ${rose}`);
-    // Ni se hunde: interpolar la subida y ademas quedarse abajo la bajaria.
-    check(!climb || camRose > -1e-6, `al subir el escalon la camara bajo: ${camRose}`);
-    check(after.camStepPeak > 0.4, `subir el escalon no dejo la camara abajo: ${after.camStepPeak}`);
-    check(Math.abs(after.camStep) < 0.5 * 0.05, `a los 0,1 s la camara no ha subido el escalon: ${after.camStep}`);
+    const top = await state(page);
+    const most = Math.max(0, ...rises);
+    console.log(`  escalon desde ${before.level}: encarado a ${faced.toFixed(3)} rad, sube ${(top.z - z0).toFixed(2)} ` +
+      `en ${rises.length} fotogramas de pie (como mucho ${most.toFixed(3)} en uno), andando en ${moving}`);
+    check(top.z - z0 > 0.5 - 1e-6, `andando hacia el escalon, el cuerpo no lo subio: ${top.z - z0}`);
+    // Ni de golpe ni a saltos: medio bloque en 0,1 s son 6 fotogramas a 60 Hz.
+    check(rises.length >= 5, `el escalon se subio de golpe: en ${rises.length} fotogramas`);
+    check(most <= 0.5 / 6 + 1e-6, `un fotograma subio de golpe ${most}`);
+    check(moving >= rises.length - 1, `subiendo el escalon dejo de andar: ${moving} de ${rises.length}`);
   }
 
   // La cima.

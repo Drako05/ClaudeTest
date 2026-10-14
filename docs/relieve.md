@@ -74,6 +74,12 @@ casillas a paso completo, vuelo 0.400 s. `GRAVITY = 62` y `JUMP_SPEED = 12` son
 **deduccion del agente** a partir del caso que describio el autor, no numeros
 suyos: puede corregirlos, y `tests/jump.test.ts` afirma la relacion que los ata.
 
+**El salto de un animal es a medida** (el autor, 2026-10-14): con la misma
+gravedad, la fuerza justa para su escalon mas 0,1 m (`jumpSpeedFor`,
+`ANIMAL_JUMP_MARGIN`), y como mucho 1 m (`ANIMAL_JUMP_UP`). El del jugador no
+cambia. Y **ningun escalon se sube de golpe**: lo que mide ≤ 0,5 se sube
+andando tick a tick, medio bloque en 0,1 s (`CLIMB_SPEED`, regla 21).
+
 **El hambre gasta segun el esfuerzo** (decision del autor, 2026-09-30;
 `systems/survival.ts`): quieto o andando se vacia en `HUNGER_EMPTY_DAYS` dias
 de juego —dos; fue uno hasta el 2026-10-01—, y el ritmo **se deriva de `DAY_TICKS`**, para que si el dia

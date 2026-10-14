@@ -3,7 +3,7 @@
 Lee esto antes de tocar los animales: las especies (`shared/src/fauna.ts`),
 su generacion y su paseo (`sim/src/fauna.ts`, `sim/src/systems/wander.ts`),
 el golpe a algo vivo (`systems/gathering.ts`), **el plano de su cuerpo**
-(`shared/src/fauna-body.ts`), su choque (`sim/src/body.ts`, `walkAnimal`), su
+(`shared/src/fauna-body.ts`), su choque (`sim/src/boxes.ts`, `walkAnimal`), su
 modelo (`client/src/fauna-model.ts`) o su vista (`client/src/fauna-view.ts`).
 
 ## Primera tanda (2026-10-02): diez especies que deambulan
@@ -362,121 +362,73 @@ Interpretacion mia, aprobada con el plan:
 - El impacto va donde entra en la parte que toca.
 - La cabeza de un bisonte se golpea aunque quede lejos del tronco; su cola, no.
 
-### El choque con el terreno (`sim/src/body.ts`, `walkAnimal`)
+### El choque (`sim/src/boxes.ts`, `walkAnimal`)
 
-Decision del autor: **las cajas de sus partes giran con el rumbo y no entran
-en un bloque**. Un bisonte no cabe por un pasillo de un bloque, y si al girar
-su cabeza entrara en una pared, no gira.
+**Una caja de base cuadrada, como en Minecraft** (el autor, 2026-10-14; regla
+21). Es la misma fisica que el jugador, con la caja de cada especie y etapa
+(`collisionBoxOf`, en `shared/fauna-body.ts`, en cache):
 
-- **Solidos**: ninguna parte `hit` solapa en el suelo una casilla de agua.
-- **Objetos** (desde el 2026-10-05, ver `docs/reglas.md`, 21): ninguna parte
-  `hit` solapa en planta la caja de un objeto que choca —el tronco, la roca,
-  los minerales, las estaciones— si el techo de la caja pasa de la base de la
-  parte. La cabeza de un bisonte pasa por encima de una roca; sus patas no, y
-  la roca (1,0) se salta (`ANIMAL_JUMP_UP`).
-- **Todas sus cajas chocan siempre** (el autor, 2026-10-10: «todas las cajas
-  chocan con el terreno en todo momento»). Cada parte `hit` mide **su altura
-  de reposo** (`partsRest`, *deduccion*): lo mas alto bajo ella —el techo de
-  cada columna de 0,5 y de cada caja de objeto que solapa— menos lo que esa
-  parte esta por encima de los pies. El cuerpo reposa en el maximo de todas:
-  - **apoyo**: se esta de pie mientras alguna caja toque; **un animal con las
-    patas traseras sobre un escalon no cae hasta que caben abajo** (lo que el
-    autor vio el 2026-10-05, ya resuelto). Una caja que no es pata sostiene el
-    cuerpo a su altura, pero no lo sube;
-  - **el choque va por fases** (el autor, 2026-10-13; regla 21): andando y
-    subiendo, todas sus cajas por todas sus caras, y **solo la base sube
-    medio bloque andando** —sus patas (`baseMaskOf`); el cangrejo y la
-    gaviota, cuyas patas no tienen caja, sus cajas mas bajas *(deduccion)*—.
-    Bajando, solo la base: aterriza con ella (`landingFloor`), y lo demas que
-    se meta en algo lo saca la repulsion (`repel`), en horizontal a 4 m/s. La
-    cabeza de un bisonte pasa por encima de una pared que sus patas no;
-  - **solo subir medio bloque es de golpe**, y bajar es caer con la gravedad,
-    como el jugador (regla 21);
-  - si algo le crece debajo y asoma mas de lo que se sube, **se queda donde
-    esta**, sin subirse a medias;
-  - hasta el 2026-10-13 una cabeza que tocaba el borde de una pared a menos
-    de medio bloque por encima de su base subia al animal entero; el autor lo
-    vio y se veia mal, y ahora salta antes de tocar (abajo, «Todos saltan»);
-  - hasta el 2026-10-10 el terreno se media en el centro de los pies y cada
-    parte miraba una heuristica de escalones hacia los pies.
+- **de lado, 1,2 veces el ancho de su cuerpo** —el de sus partes `hit`, de
+  lado a lado (*deduccion*)—, y **alta hasta el lomo**, lo alto de su tronco
+  (o del caparazon). Hoy, por ejemplo, ciervo adulto 0,43 × 0,43 × 1,08 y
+  bisonte 1,25 × 1,25 × 1,58;
+- **no gira** con el animal, y **choca por todas sus caras, siempre**: subiendo,
+  bajando y de lado, contra el terreno, el agua, las cajas de los objetos y el
+  borde de su bioma;
+- la cabeza puede quedar fuera y **se acepta que se vea metida en una pared**
+  (el autor). Las cajas que se golpean siguen siendo sus partes (arriba).
+
+Que las patas queden dentro del cuadrado es cosa de los modelos: la fase 4 de
+la tanda los rediseña, con el autor (`docs/pendiente.md`).
+
+- **El giro**: hacia su destino a **180°/s** *(deduccion)*. Como la caja no
+  gira, girar nunca choca: gira sobre su centro en cualquier sitio.
+- **El avance**: a lo largo de su rumbo, eje a eje como el jugador, cuando el
+  rumbo esta a menos de **45°** de su destino *(deduccion)*. No anda de lado.
+- **Sube andando lo que mide ≤ 0,5, tick a tick** (el autor, 2026-10-14):
+  medio bloque en 0,1 s, sin dejar de andar, como el jugador.
+- **Salta lo que mide mas de 0,5 y como mucho 1 m** (`ANIMAL_JUMP_UP`, todas
+  las especies; los maximos especiales, mas adelante), **con la fuerza justa**:
+  hasta el escalon mas 0,1 m (`ANIMAL_JUMP_MARGIN`), con `vz = √(2·g·(escalon
+  + 0,1))` y la misma gravedad (`jumpSpeedFor`). Un escalon de 1 lo salta con
+  el apice a 1,1; el del jugador sigue llegando a 1,16.
+  - **Decide por lo que hay delante, por su rumbo**: si a un paso de su caja
+    hay un escalon de esos, salta aunque pudiera deslizarse a lo largo de la
+    pared (*deduccion*; hasta entonces solo saltaba si el paso lo dejaba
+    parado, y llegando en diagonal arrastraba la cabeza por la pared unos
+    metros: el punto 2 del autor).
+  - En el aire anda a su paso por su rumbo, con su inercia de 0,1 s, y se
+    estampa contra lo que no alcanza, como el jugador.
+  - Si se cae andando por un borde, en el aire sigue andando con lo que
+    llevaba.
 - **Inercia** (el autor, 2026-10-10): su avance arranca y frena en
   `INERTIA_TIME`, 0,1 s; al llegar a su punto de paso, o girando sin avanzar,
   se desliza frenando por su rumbo (`brakeAnimal`).
-- **El giro**: hacia su destino a **180°/s** *(deduccion)*. Un paso de giro que
-  meteria una parte en el terreno no se da.
-- **El avance**: a lo largo de su rumbo, eje a eje, cuando el rumbo esta a
-  menos de **45°** de su destino *(deduccion)*. No anda de lado.
-- **La indulgencia** *(deduccion)*: un cuerpo que no cabe —nacio asi, o crecio
-  algo a su lado— anda sin que sus partes le estorben, solo con sus pies,
-  hasta que vuelve a caber. Asi nunca se queda clavado.
-- **Al ponerlo** (al nacer o tras un salto de tiempo), prueba 8 rumbos desde el
-  de su origen a su punto de paso, y se queda con el primero en que cabe.
-  - Sale lo mismo lo mire alguien o no: la ley del observador.
-- **No choca con otros animales ni con el jugador** (decision del autor, de
-  momento).
-- **Lo que cuesta**: hasta cuatro posturas por tick, sobre casi las mismas
-  casillas.
-  - Cada ronda (`groundRound`) lee cada casilla y cada columna de 0,5 una vez
-    (`columnTopIn`); hasta los voxeles, el suelo salia del nivel y la rampa.
-  - Con 63 animales el tick paso de 0,17 ms a 2,2 ms sin la ronda, y a
-    0,26 ms con ella.
+- **La indulgencia** *(deduccion)*: una caja que ya esta metida en algo —un
+  arbol que crecio a su lado, o puesto a mano— anda mirando solo el punto de
+  sus pies, hasta que vuelve a caber. Asi nunca se queda clavado.
+- **Al ponerlo** (al nacer o tras un salto de tiempo): en su punto de paso, o
+  en su origen si su caja no cabe alli, mirando de su origen a su punto de
+  paso, y con los pies en lo que pisa su caja. Sale lo mismo lo mire alguien o
+  no: la ley del observador.
+- **No choca con otros animales ni con el jugador**, de momento: los empujes
+  segun el tamaño son la fase 3 de la tanda (`docs/pendiente.md`).
+- **Lo que cuesta**: cada ronda (`groundRound`) lee cada casilla y cada
+  columna de 0,5 una vez (`columnTopIn`). Con la caja cuadrada el tick medio
+  bajo de ~1,2 ms a 0,52 ms.
 
-### Lo que estorba no los deja clavados (2026-10-05)
+Del 2026-10-03 al 2026-10-14 chocaban las cajas de sus partes, giradas con su
+rumbo, con su altura de reposo y, desde el 2026-10-13, por fases
+(la base al bajar, la repulsion sacando lo demas, el impulso minimo del salto y
+el salto para girar). Lo retiro el autor por esta caja: `docs/historia.md`.
 
-El autor vio que los animales se paraban al topar con algo y no salian,
-**incluso de frente**. Dos causas:
-- iban en linea recta a su punto de paso y empujaban contra lo que hubiera en
-  medio hasta el siguiente (hasta 20 s);
-- pegados de frente, **ya no podian girar**: cualquier paso de giro metia una
-  esquina de la cabeza en la pared, la regla del giro lo rechazaba siempre, y
-  se quedaban asi para siempre.
+### Lo que estorba no los deja clavados
 
-Medido en 2 min de cinco semillas, pasaban clavados (lejos de su punto de paso
-y quietos 3 s) el **25-53 % del tiempo**.
+El autor vio el 2026-10-05 que los animales se paraban al topar con algo y no
+salian; el 2026-10-14, que retrocedian, empujaban y volvian a retroceder hasta
+salir. Con la caja cuadrada no hay giro que no quepa, asi que **ya no
+retroceden**; lo demas sigue (`movement.ts`):
 
-Lo que eligio el autor, y como esta hecho (`movement.ts`, `walkAnimal`):
-- **Retrocede y gira.** Si el giro no cabe, da un paso atras a lo largo de su
-  rumbo y vuelve a probar; gira sobre el centro de su tronco, y el cuerpo nunca
-  entra en la pared. Como mucho **1 bloque** (`ANIMAL_BACKUP`, *deduccion*).
-- **Y si ni asi, salta para girar** (el autor, 2026-10-13; `tryTurnJump`). En
-  una ladera de escalones de medio bloque, un animal de cabeza baja que mira
-  cuesta abajo no puede dar media vuelta en el suelo: la cabeza barre los
-  escalones de arriba, y desde la fisica por fases eso choca. Salta en el
-  sitio, sin avanzar, y gira en el aire a su ritmo, donde la cabeza ya pasa por
-  encima. Un salto son ~0,39 s, ~70°: media vuelta son dos o tres saltitos. Se
-  ensaya entero y se da si aterriza cabiendo y al menos 15° mas cerca de su
-  rumbo *(deduccion)*. Medido en cinco semillas, 2 min cada una: sin el, los
-  clavados pasaban del 0-7 % al 1,5-12 %; con el, 0,9-8 %.
-- **Todos saltan un bloque** (`ANIMAL_JUMP_UP`), con la parabola del jugador.
-  - **Saltan antes de tocar** (el autor, 2026-10-13): cuando el paso
-    siguiente meteria una caja en algo que no se sube andando —la cabeza, el
-    hocico o el cuello en cualquier escalon; las patas en uno de mas de medio
-    bloque— y no puede deslizarse a lo largo, salta ya, sin esperar a chocar.
-    Lo que llega antes a un escalon de medio bloque, mirando de frente: en
-    todas las crias y en liebre, jabali, zorro, ibice, marmota, cangrejo y
-    gaviota adultos, el hocico, la cabeza, el cuello o el tronco, y saltan;
-    los adultos de bisonte, ciervo y reno llegan con las patas y lo suben
-    andando. A uno de un bloque, todos con la cabeza o el cuello.
-  - **El escalon** es lo mas alto bajo las cajas que chocarian, y no puede
-    pasar de un bloque.
-  - **En el aire anda a su paso**, como el jugador (el autor, 2026-10-10:
-    «usando las mismas físicas que el jugador»), con su inercia de 0,1 s. Como
-    eso no basta cuando lo que sobresale es la cabeza (el hocico del bisonte
-    adulto asoma 0,85 m por delante de sus patas), **el salto lleva un impulso
-    horizontal, el minimo** para que sus patas delanteras lleguen arriba
-    (`impulse`; el autor, 2026-10-13): constante todo el vuelo, sumado a lo que
-    anda, aunque estuviera parado, y que solo no basta. Contra una cara se
-    pierde lo que anda en ese eje, como el jugador, pero no el impulso
-    *(deduccion)*.
-  - **El minimo se busca ensayando**: el salto entero, de 0 a 6 m/s a saltos
-    de 0,5 hasta el primero que llega, y afinado a 0,05 *(deduccion)*. No vale
-    biseccionar desde el maximo: en una escalera, el que se pasa aterriza con
-    la cabeza en el escalon siguiente. Si ninguno llega, lo bordea.
-  - En el aire no gira (salvo el salto de giro), y subiendo se estampa como el
-    jugador contra lo que no alcanza; bajando, lo que se mete lo saca la
-    repulsion.
-  - Si se cae andando por un borde, en el aire sigue andando con lo que
-    llevaba.
 - **Lo que no se salta lo bordea**: pared alta, agua, arbol, el borde de su
   bioma.
   - Rumbos, desde el de su punto de paso: ±45°, ±90°, ±135° y 180°, el
@@ -484,27 +436,19 @@ Lo que eligio el autor, y como esta hecho (`movement.ts`, `walkAnimal`):
   - Anda **1 bloque** por el (`ANIMAL_DETOUR`, *deduccion*) y vuelve a apuntar
     a su punto de paso. Contra una pared larga elige el mismo lado y la
     recorre.
-  - Se probaron dos refinamientos y se quitaron porque no mejoraban la medida:
-    empezar por el rumbo siguiente si se atascaba otra vez en el mismo sitio,
-    y contar como trecho del rodeo lo que avanza en el aire.
   - Si no sale ninguno, es un callejon: espera quieto a su siguiente punto de
     paso, que olvida todo lo anterior.
 - **Ensaya antes de hacer.** El salto y cada rodeo se prueban enteros con las
   mismas funciones que los van a mover, tick a tick como `stepFauna`, y se
   deshacen; solo se hace lo que en el ensayo sale. Como todo es determinista,
-  lo de verdad es lo ensayado. Se eligio asi porque suponer que un rumbo sirve
-  fallaba: casi todos los que se rendian habian elegido un rodeo cuyo giro no
-  cabia ni retrocediendo.
+  lo de verdad es lo ensayado. Un salto que en el ensayo no aterriza arriba no
+  se da: lo bordea.
 - **La ley del observador no cambia**: los puntos de paso son los mismos; solo
   cambia la forma de llegar.
 
-Despues, en las mismas cinco semillas: **0,1-11 % del tiempo**. Liebre, zorro,
-cangrejo, gaviota y reno, 0-4 %; la marmota, 0-12 % segun la semilla. Lo que
-queda es sobre todo de cuerpos grandes en sitios estrechos —el jabali (40-47 %)
-y el ciervo (16-23 %) entre los arboles del bosque, el bisonte (19-34 %), el
-ibice en algun risco (0-22 %)—: un cuerpo de dos bloques que no cabe al girar
-entre arboles a dos casillas. Esta en «Esperando tu
-juicio» de `docs/juicio.md`. El tick no cambia: 0,26 ms de media.
+Medido en 2 min de cinco semillas (lejos de su punto de paso y quietos 3 s):
+del 25-53 % del tiempo del 2026-10-05 se bajo al 0,1-11 % con los rodeos y al
+0,9-8 % con la fisica por fases; **con la caja cuadrada, 0,0-0,2 %**.
 
 ### El modelo (`client/src/fauna-model.ts`, `fauna-view.ts`)
 
@@ -543,11 +487,14 @@ cinco casos de terreno: nada mal tapado ni mal visto.
 - **`tests/fauna-body.test.ts`** mide:
   - el plano: su alto, los pies en el suelo, y que es `hit`;
   - la cabeza del bisonte se golpea y su cola no, y girado;
-  - el choque en mundos hechos a mano: el pasillo, la pared al girar, el
-    escalon y la escalera de medio bloque, y la indulgencia al girar y al avanzar;
-  - que no se quedan clavados: de frente contra una pared retrocede y gira;
-    un escalon de un bloque lo saltan la liebre y el bisonte sin meter la
-    cabeza; un pilar, un charco y una pared de dos bloques se bordean.
+  - la caja de colision: cuadrada, 1,2 × el ancho y alta hasta el lomo;
+  - el choque en mundos hechos a mano: el pasillo, el giro de 360° pegado a
+    una pared, que la caja nunca entra en el terreno (tampoco cayendo) y la
+    indulgencia de la caja metida;
+  - el escalon de medio bloque se sube tick a tick sin dejar de andar; el de
+    un bloque se salta con el apice a 1,1, antes de tocarlo y tambien
+    llegando en diagonal; una roca se salta; un pilar, un charco y una pared
+    de dos bloques se bordean.
 - **`tests/body-ray.test.ts`**: el rayo contra la caja del cuerpo y contra el
   terreno, la verdad de la sonda.
 - **La pasada `fauna` del humo** afirma:

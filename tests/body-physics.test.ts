@@ -3,8 +3,8 @@
  *
  * - **todas las cajas chocan con el terreno en todo momento**: el terreno se
  *   pisa con la huella entera, no en el centro;
- * - **solo subir es de golpe** (≤ `STEP_UP`); bajar, por poco que sea, es caer
- *   con la gravedad, y cayendo no se salta (sin margen);
+ * - **subir (≤ `STEP_UP`) es tick a tick** desde el 2026-10-14; bajar, por
+ *   poco que sea, es caer con la gravedad, y cayendo no se salta (sin margen);
  * - **inercia**: arrancar y frenar duran `INERTIA_TIME`, 0,1 s;
  * - y la cabeza choca con lo que tiene encima (el cuerpo mide 1,8).
  *
@@ -16,6 +16,7 @@ import { Feature, TICK_DT } from '@verdant/shared';
 import {
   applyVertical,
   BODY_RADIUS,
+  CLIMB_SPEED,
   EntityKind,
   EntityStore,
   INERTIA_TIME,
@@ -70,7 +71,7 @@ describe('El terreno se pisa con la huella entera', () => {
     expect(store.z[id]).toBe(0.5);
   });
 
-  it('con la huella metida en una pared, no sube de golpe a lo alto: solo sube de golpe medio bloque', () => {
+  it('con la huella metida en una pared, no sube a lo alto: solo sube medio bloque', () => {
     // Pared de un bloque a partir de x = 1; el cuerpo, puesto a mano con el
     // centro fuera y la huella dentro (como al aparecer en un sitio a mano).
     const wall = columns((vx) => (vx >= 2 ? 2 : 0));
@@ -91,7 +92,7 @@ describe('El terreno se pisa con la huella entera', () => {
   });
 });
 
-describe('Bajar es caer, y solo subir es de golpe', () => {
+describe('Bajar es caer, y subir andando es tick a tick', () => {
   const step = columns((vx) => (vx < 2 ? 1 : 0));
 
   it('bajar medio bloque cae con la gravedad: ~0,13 s, pasando por alturas intermedias', () => {
@@ -118,7 +119,7 @@ describe('Bajar es caer, y solo subir es de golpe', () => {
     expect(takeOff(store, id)).toBe(false);
   });
 
-  it('subir medio bloque es de golpe, como seguir andando', () => {
+  it('subir medio bloque es tick a tick, de pie: nunca de golpe (el autor, 2026-10-14)', () => {
     const { store, id } = standing(2.5, 0.5, 0);
     let maxRise = 0;
     for (let t = 0; t < 60; t++) {
@@ -128,7 +129,8 @@ describe('Bajar es caer, y solo subir es de golpe', () => {
       expect(store.grounded[id]).toBe(1);
     }
     expect(store.z[id]).toBe(0.5);
-    expect(maxRise).toBe(0.5);
+    // Hasta el 2026-10-14 subia 0,5 en un tick.
+    expect(maxRise).toBeCloseTo(CLIMB_SPEED / 60, 9);
   });
 });
 

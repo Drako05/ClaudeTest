@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { animalBoxes, BODY_RADIUS, createGame, EYE_HEIGHT, hitboxAt, type OrientedBox } from '@verdant/sim';
+import { animalBoxes, BODY_RADIUS, createGame, hitboxAt, PLAYER_HEIGHT, type OrientedBox } from '@verdant/sim';
 import { blocksBody, Feature } from '@verdant/shared';
 import { BOX_RADIUS, boxEdges, collectBoxes } from '../packages/client/src/debug-boxes.js';
 
@@ -72,16 +72,16 @@ describe('Cajas de depuracion', () => {
     expect(after.both - before.both).toBe(1);
   });
 
-  it('el jugador: su huella de choque, de los pies a los ojos', () => {
+  it('el jugador: su caja de choque, de los pies a lo alto del cuerpo', () => {
     const state = createGame(1);
     const { entities, playerId } = state;
     const x = entities.x[playerId];
     const z = entities.z[playerId];
     const p = points(collectBoxes(state).solid);
-    expect(p.some((q) => Math.abs(q[0] - (x - BODY_RADIUS)) < 1e-6 && Math.abs(q[1] - (z + EYE_HEIGHT)) < 1e-6)).toBe(true);
+    expect(p.some((q) => Math.abs(q[0] - (x - BODY_RADIUS)) < 1e-6 && Math.abs(q[1] - (z + PLAYER_HEIGHT)) < 1e-6)).toBe(true);
   });
 
-  it('los animales cercanos van en amarillo, una caja por parte que golpea', () => {
+  it('los animales cercanos: su caja en cian y cada parte que se golpea en rojo (2026-10-14)', () => {
     const state = createGame(1);
     const { entities, playerId } = state;
     // Junto al primer animal: al nacer no hay ninguno a menos de 12 casillas.
@@ -95,17 +95,19 @@ describe('Cajas de depuracion', () => {
     const parts = near.reduce((n, id) => n + animalBoxes(entities, id).length, 0);
     // Sin animales cerca esto seria 0 = 0 y no probaria nada.
     expect(parts).toBeGreaterThan(0);
-    // El amarillo: las partes de los animales y las cajas de los objetos que
-    // chocan (troncos, rocas, minerales).
+    // El rojo: las partes de los animales y lo que solo se golpea (arbustos,
+    // brotes, guijarros); el cian, la caja de cada cuerpo.
     const { world } = state;
     const px = Math.floor(entities.x[playerId]);
     const py = Math.floor(entities.y[playerId]);
-    let objects = 0;
+    let hitOnly = 0;
     for (let ty = py - BOX_RADIUS; ty <= py + BOX_RADIUS; ty++) {
       for (let tx = px - BOX_RADIUS; tx <= px + BOX_RADIUS; tx++) {
-        if (hitboxAt(world, tx, ty) && blocksBody(world.featureAt(tx, ty))) objects++;
+        if (hitboxAt(world, tx, ty) && !blocksBody(world.featureAt(tx, ty))) hitOnly++;
       }
     }
-    expect(collectBoxes(state).counts.both).toBe(parts + objects);
+    const counts = collectBoxes(state).counts;
+    expect(counts.hit).toBe(parts + hitOnly);
+    expect(counts.solid).toBe(near.length + 1);
   });
 });

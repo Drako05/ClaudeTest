@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BODY_RADIUS,
+  bodyOf,
   squareFloor,
   terrainUnder,
   animalBoxes,
@@ -297,23 +298,22 @@ describe('Fauna: lo que estorba no los deja clavados', () => {
     // ajustada al tronco y las patas con caja (2026-10-05), 3,6 % y 0,02 %:
     // entre troncos finos ya se pasa.
     //
-    // Desde la fisica por fases (el autor, 2026-10-13), andando solo las patas
-    // suben medio bloque, y en una ladera de escalones un animal de cabeza baja
-    // no puede dar media vuelta en el suelo: la cabeza barre los de arriba.
-    // **Salta para girar** (eleccion del autor), y aqui se ve que lo hace.
+    // Y desde la caja cuadrada (el autor, 2026-10-14), **ninguno queda nunca
+    // por debajo del suelo** que pisa su caja: hasta entonces, al caer solo
+    // chocaban sus patas, y algunos atravesaban el terreno (lo vio el autor).
     const state = createGame(5);
     const window = 3 * 60;
     const small = new Set([Species.Hare, Species.ArcticFox, Species.Marmot, Species.Crab, Species.Gull]);
     const trail = new Map<string, number[][]>();
-    const count = { all: 0, stuck: 0, small: 0, smallStuck: 0, turnJumps: 0 };
-    const wasGrounded = new Map<number, number>();
+    const count = { all: 0, stuck: 0, small: 0, smallStuck: 0, sunk: 0 };
     for (let t = 0; t < 60 * 60; t++) {
       step(state, emptyIntent());
       const e = state.entities;
       for (const [key, id] of state.fauna) {
-        const took = wasGrounded.get(id) === 1 && e.grounded[id] === 0 && e.vz[id] > 0;
-        if (took && (e.turnToX[id] !== 0 || e.turnToY[id] !== 0)) count.turnJumps++;
-        wasGrounded.set(id, e.grounded[id]);
+        // Subiendo un escalon andando, los pies van por debajo de lo alto de
+        // la caja como mucho medio bloque; mas, es que se ha hundido.
+        const { half } = bodyOf(e, id);
+        if (squareFloor(state.world, e.x[id], e.y[id], half, e.z[id] + bodyOf(e, id).height) - e.z[id] > 0.5 + 1e-6) count.sunk++;
         const far = Math.hypot(e.wanderX[id] - e.x[id], e.wanderY[id] - e.y[id]);
         const h = trail.get(key) ?? [];
         h.push([e.x[id], e.y[id], far]);
@@ -331,7 +331,7 @@ describe('Fauna: lo que estorba no los deja clavados', () => {
     expect(count.small).toBeGreaterThan(1000);
     expect(count.stuck / count.all).toBeLessThan(0.2);
     expect(count.smallStuck / count.small).toBeLessThan(0.05);
-    expect(count.turnJumps).toBeGreaterThan(0);
+    expect(count.sunk).toBe(0);
   });
 });
 

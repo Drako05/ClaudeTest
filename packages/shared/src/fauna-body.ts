@@ -292,6 +292,44 @@ export function partsOf(species: Species, stage: Stage): readonly BodyPart[] {
   return parts;
 }
 
+/**
+ * Cuanto mas ancha que el cuerpo es la caja de colision: 1,2 veces (el autor,
+ * 2026-10-14, como la vaca de Minecraft, 0,9 frente a 0,75).
+ */
+export const COLLISION_WIDTH_FACTOR = 1.2;
+
+/** La caja de colision de un animal: su medio lado en planta y su alto, en bloques. */
+export interface CollisionBox {
+  half: number;
+  height: number;
+}
+
+const collisionCache = new Map<number, CollisionBox>();
+
+/**
+ * **La caja de colision** de una especie y etapa (el autor, 2026-10-14): de
+ * **base cuadrada**, alineada con los ejes del mundo —no gira con el animal,
+ * asi que puede dar media vuelta en cualquier sitio—, con lado
+ * `COLLISION_WIDTH_FACTOR` × el ancho del cuerpo y alta **hasta el lomo**. La
+ * cabeza queda fuera, y puede verse metida en una pared, como en Minecraft
+ * (aceptado). Las cajas que se golpean siguen siendo las partes `hit`.
+ *
+ * **Deduccion mia**: el ancho es el de las partes `hit` de lado a lado; el
+ * lomo, lo alto del tronco (el caparazon del cangrejo).
+ */
+export function collisionBoxOf(species: Species, stage: Stage): CollisionBox {
+  const key = species * 8 + stage;
+  let box = collisionCache.get(key);
+  if (!box) {
+    const parts = hitPartsOf(species, stage);
+    const side = Math.max(...parts.map((p) => Math.abs(p.at[2]) + p.size[2] / 2));
+    const trunk = parts.find((p) => p.name === 'tronco' || p.name === 'caparazon') ?? parts[0];
+    box = { half: side * COLLISION_WIDTH_FACTOR, height: trunk.at[1] + trunk.size[1] / 2 };
+    collisionCache.set(key, box);
+  }
+  return box;
+}
+
 const hitCache = new Map<number, readonly BodyPart[]>();
 
 /** Las partes que golpean y chocan. */

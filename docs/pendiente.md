@@ -32,80 +32,112 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## PROXIMA TANDA: lo que dijo el autor al probar las fisicas (2026-10-10)
+## TANDA EN CURSO: la fisica de los animales al estilo Minecraft (2026-10-14)
 
-Hablarlo y hacer el plan. La tanda de fisicas, ya cerrada, esta en
-`docs/historia.md` («Fisicas: cajas que chocan siempre…»), con lo que pidio el
-autor literal y el modelo de la altura de reposo.
+El autor probo la fisica por fases (`520f018`; en `docs/historia.md`, «Lo que
+dijo el autor al probar las fisicas») y no le satisface.
+**Su texto, literal:**
 
-1. **El bloque a dos casillas que ya se alcanza: aceptado.** El autor, literal:
-   «no hay problema en que se alcancen más casillas siempre que se respeten las
-   leyes físicas». **Hecho en la auditoria del 2026-10-10**: fuera la fila de
-   `docs/juicio.md`, el test lo afirma como decision suya y `docs/reglas.md`
-   (regla 21) lo cuenta.
-2. **Los animales que suben primero la cabeza y luego las patas: se ve mal, hay
-   que arreglarlo, y toca debatirlo.** Pasa en los pequenos: el reposo por cajas
-   (`partsRest`) sube el cuerpo entero cuando la cabeza toca un borde a menos de
-   medio bloque sobre su base. La idea del autor, literal: «cuando los animales
-   choquen las paredes primero con algo diferente a sus patas, tengan que saltar
-   (no teletransportarse) desde el punto de impacto si quieren subir, esto
-   provocaría que su velocidad de movimiento —si no es suficiente para la
-   maniobra— deba ser aumentada al mínimo requerido para que pueda saltar un
-   escalón o un escalón doble (1m) (para los animales más altos) desde el punto
-   donde golpea su cabeza». Preguntas a llevar: que cuenta como «chocar con algo
-   que no son las patas» (cabeza, cuello, tronco, cola); si el impulso minimo
-   rompe «saltan a su paso» (decision suya del mismo dia) o es la excepcion; que
-   animales llegan a 1 m; y si las patas siguen subiendo medio bloque de golpe.
+> El comportamiento y físicas generales de los animales no son
+> satisfactorios, te nombrare algunas cosas que he notado y quiero arreglar.
+>
+> 1. Cuando suben un escalón saltando, saltan muy alto, se ve raro, seria
+>    mejor que aplicaran una fuerza de salto con respecto a la altura que
+>    desean alcanzar y dicha fuerza tenga un máximo dependiendo del animal (que
+>    en la mayoría de animales, el máximo seria lo justo para subir 1m).
+> 2. En ocasiones, los animales arrastran su cabeza contra las paredes a lo
+>    largo de unos pocos metros como si aun no se enteraran que deben salta,
+>    luego saltan. algo no se esta calculando bien ahi.
+> 3. creo que la cámara suavizada fue solucionar el problema equivocado. en
+>    realidad, nunca debimos dejar que el jugador o los animales se
+>    teletransportaran al subir un escalón, porque ahora se ve bien la camara
+>    para el jugador, pero ver animales subiendo escalones teletransportándose
+>    es un poco raro. lo que debíamos hacer es que esas subidas "automáticas"
+>    fueran tan rápidas que parecieran seguir caminando, pero en realidad el
+>    cuerpo si sube tick a tick, no teletransportado.
+> 4. El tema de los atascos de los animales. cuando retroceden, luego empujan
+>    hacia adelante y vuelve a retroceder y otra vez a empujar hacia adelante,
+>    es como si hicieran movimientos erráticos hasta salir.
+> 5. el problema de los animales con cabeza u hocico largo que no pueden subir
+>    escaleras. las patas delanteras que serian el primer apoyo de un animal al
+>    subir a un escalón, ni siquiera llegan al escalón si el animal tiene una
+>    cabeza y cuello que suman >= 1m de largo. no tengo claro como solucionarlo.
+> 6. observando minecraft, vi como ellos arreglan lo de los atascos de los
+>    animales y lo de subir escalones (1m para ellos). Todas las hitbox de
+>    minecraft tienen una base cuadrada, de forma que el animal puede girar 360
+>    grados sobre su centro en cualquier momento y asi siempre puede dar media
+>    vuelta y salir de cualquier atasco. y ya que todas sus bases son
+>    cuadradas, siempre habrá punto de apoyo para el animal por muy pequeña que
+>    sea la superficie del escalon.
+> 7. para solucionar el punto 4. (los atascos) y 5. (subir escalones), pense en
+>    inspirarme en minecraft y tambien hacer la base de la caja de colision de
+>    los animales cuadrada (con la altura variable segun el alto del
+>    dibujo/lomo del animal), pero con la diferencia que las cajas que se
+>    pueden golpear si seran todas las cajas que ya hemos hablado. para esto,
+>    me parece que tenemos que tener en cuenta ciertas directrices en el diseño
+>    de los modelos, porque la idea de una caja con base cuadrada, es que cubra
+>    en gran medida las patas del animal, pero a su vez, la caja no debe sobre
+>    salir demasiado del ancho del animal. entonces, esto implica que las patas
+>    delanteras y traseras, no pueden estar mucho mas separadas que el ancho del
+>    propio animal, para que la base cuadrada las cubra. te dejo capturas de una
+>    hitbox de vaca de minecraft para que entiendas de lo que te hablo.
+> 8. arreglando las cajas de colision como explico en el punto 7. y aplicando
+>    la subida de escalon tick a tick del punto 3., implica que ya los
+>    animales, por diseño, no saltaran los escalones <= 0.5m, sino que saltaran
+>    alturas > 0.5m (hasta su maximo de salto) y su fuerza de salto sera según
+>    el punto 1.
+> 9. los animales ahora también colisionaran con otros y con el jugador. me
+>    gustaria simular colisiones similares a las de minecraft, que no se
+>    sienten rígidas.
+> 10. vi que hay animales que por alguna razón, están cayendo por debajo del
+>     terreno. creo que esto se debe a la eliminación de colisión de sus cajas
+>     durante las caídas. entonces vale la pena hablar aqui de como cambian
+>     esas reglas de físicas antes dichas. como ahora las cajas de colision
+>     seran un simple cubo rectangular, chocaran por todas sus caras siempre,
+>     asi de simple y directo.
 
-   **HECHO (2026-10-13)**, con lo que pidio el autor ese dia: el animal cuyas
-   patas no serian lo primero en tocar un escalon de 0,5 o 1 salta antes de
-   tocarlo, con el **impulso horizontal minimo** para que sus patas delanteras
-   lleguen arriba (constante todo el vuelo, sumado a lo que anda en el aire); y
-   **el choque va por fases**, para animales y jugador: subiendo y en
-   horizontal, todas las cajas; bajando, solo la base, y lo demas lo saca la
-   **repulsion** (4 m/s, en horizontal, gana al mando). Al medirlo aparecio que
-   en las laderas de escalones un animal de cabeza baja no podia dar media
-   vuelta; el autor eligio **saltar para girar** («luego me explicas bien y lo
-   ajustamos»: **pendiente de explicarselo**). Esta en `docs/reglas.md` (21) y
-   `docs/fauna.md`; las deducciones, en `docs/juicio.md`.
-3. **La camara con retraso no sirve: «no ayudo en nada, incluso en primera
-   persona genera tirones raros, es injugable asi».** Pide un metodo de suavizado
-   de verdad, y deja la recomendacion al agente (sugiere, sin cerrarlo, inercia
-   en la camara). Sospechas a comprobar antes de proponer, por orden:
-   - **No hay interpolacion para el render** (regla 8 dice que es cosa del
-     cliente, y `main.ts` dibuja la `x/y/z` del ultimo tick): a una frecuencia de
-     pantalla que no es 60 Hz unos fotogramas avanzan dos ticks y otros cero, y
-     una persecucion sobre un blanco a saltos da tirones. Probablemente el
-     tiron de fondo, con o sin retraso.
-   - **Mirar al punto de mira desde unos ojos desplazados** hace que la
-     direccion de la camara salte cuando el rayo pasa de algo cercano a algo
-     lejano (un tronco, el suelo del fondo): en primera persona, con los ojos
-     medio bloque por debajo tras un escalon, eso es un cabeceo brusco al girar.
-   - El retraso en horizontal sobra: lo que el autor pidio suavizar es el
-     escalon, que es vertical.
-   Recomendacion a llevar (deduccion mia, no aprobada): quitar el retraso
-   general y hacer lo que hacen los juegos de primera persona con las
-   escaleras —**suavizar solo el salto vertical de subir un escalon** (un
-   desfase que nace al subir de golpe y se apaga en ~0,1 s, la camara mirando
-   en la direccion de la mirada, sin punto de mira)— mas **interpolar el render
-   entre ticks**. La inercia de camara no la recomendaria: anade latencia a la
-   mirada, que es la que apunta el golpe.
+**Sus respuestas a lo que se le pregunto (2026-10-14):**
+- **Modelos**: rediseñarlos para que la separacion entre patas delanteras y
+  traseras sea mas o menos el ancho del cuerpo; la directriz va a la guia de
+  arte y el revisa los modelos nuevos con capturas.
+- **Caja**: lado de **1,2 × el ancho** del cuerpo y alto **hasta el lomo**; la
+  cabeza queda fuera y **se acepta que se vea metida en una pared**, como en
+  Minecraft. La caja no gira.
+- **Subida**: **0,1 s** el medio bloque, sin dejar de andar, para jugador y
+  animales, y **fuera el suavizado de camara del escalon**.
+- **Salto**: hasta el escalon **mas 0,1 m**, como mucho **1 m** en todas las
+  especies (los maximos especiales, mas adelante). El del jugador no cambia.
+- **Empujes**: **segun el tamaño**: el grande aparta mas al pequeño; el jugador
+  cuenta como un cuerpo mas.
+- **Jugador**: tambien vuelve a chocar **por todas sus caras siempre**: fuera
+  el choque por fases y la repulsion.
+- **Se quitan** el impulso minimo, el salto para girar y el retroceder para
+  girar.
 
-   **HECHO (2026-10-12)**: el autor eligio esa recomendacion, «escalon +
-   interpolar». Fuera el retraso y el punto de mira (camera-lag.ts); el
-   jugador y la fauna se dibujan interpolados entre ticks, y la camara sube el
-   escalon en 0,1 s con un muelle (`smooth.ts`, `docs/controles.md`). Las
-   deducciones —la curva, lo que cuenta como escalon, el salto a 8—, en
-   `docs/juicio.md`. **El autor lo probo y lo da por bueno** (2026-10-12):
-   «se siente mucho la mejoria de la camara al subir escalones. Con 0,1 s se
-   notan los escalones sin ser incomodos, ya pasados los 0,2 s casi se pierde
-   el "jalon" del escalon, asi que considero adecuado mantenerlo en 0,1 s».
-   Y la vista «de cerca» de `slash` vuelve a tener puerta, como pidio
-   (`docs/pruebas.md`). Por el camino, `relief` dio una
-   vez 0,64 al correr en vez de 8,32 con el reloj manual, sin repetirse: el
-   humo dice ahora si el juego se puso en pausa por medio.
+**El plan, por fases**: (1-2) caja cuadrada que choca siempre, salto a medida
+y subida tick a tick, juntas a `main`; (3) los empujes; (4) el rediseño de los
+modelos, con capturas para el autor. Las deducciones, en `docs/juicio.md`.
 
-Aparte, y pendiente del autor: **las paredes de 2+ voxeles**, que el
+**Fases 1 y 2 — HECHAS (2026-10-14).** Cada cuerpo es una caja de base
+cuadrada que no gira y choca por todas sus caras siempre (`bodyOf`; la de un
+animal, `collisionBoxOf`); el escalon de ≤ 0,5 se sube tick a tick, medio
+bloque en 0,1 s (`CLIMB_SPEED`), para el jugador y los animales; un animal
+salta lo que mide mas de 0,5 y hasta 1 con la fuerza justa para el escalon
+mas 0,1 m, decidido por lo que tiene delante. Fuera las fases, la repulsion,
+el impulso, el salto para girar, el retroceder, el reposo por partes y el
+suavizado de camara del escalon. Medido en cinco semillas, 2 min: **clavados
+del 0,9-8 % al 0,0-0,2 %**, y el tick medio de ~1,2 ms a 0,52 ms. Contado en
+`docs/reglas.md` (21), `docs/fauna.md`, `docs/controles.md` y
+`docs/relieve.md`.
+
+**Lo que queda**: (3) los empujes entre cuerpos; (4) los modelos, con las
+patas dentro del cuadrado. Hasta la 4, en los animales de cabeza larga la
+cabeza queda fuera de la caja y puede verse metida en una pared, como acepto
+el autor.
+
+## Pendiente del autor: las paredes de 2+ voxeles
+
+**Las paredes de 2+ voxeles**, que el
 relieve interpolado casi elimino (de 38-47 m de pared de 1 m o mas por 100 m² a
 1,6-3); se le propusieron cuatro opciones (A: interpolar solo los desniveles de
 medio bloque; B: sin interpolar; C: mas relieve; D: zonas de acantilados).

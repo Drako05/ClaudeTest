@@ -11,58 +11,79 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: la fisica por fases del autor (2026-10-13). Andando, solo la base
- * sube medio bloque; el animal salta antes de tocar, con el impulso minimo;
- * cayendo, solo choca la base, y lo demas lo saca la repulsion, que gana al
- * mando.
+ * Ronda: la fisica de los animales al estilo Minecraft (el autor,
+ * 2026-10-14): la caja cuadrada que choca siempre, el escalon tick a tick, el
+ * salto con la fuerza justa.
  */
 export default [
-  // El fallo de partida: la cabeza con el margen de las patas sube al animal.
+  // El escalon de golpe, como hasta el 2026-10-14.
   {
-    nombre: 'fisica: la cabeza sube medio bloque andando',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: '  margin = 0,\n  baseMargin = STEP_UP,',
-    a: '  margin = STEP_UP,\n  baseMargin = STEP_UP,',
-    prueba: 'test:tests/fauna-body.test.ts',
-  },
-  // Sin impulso, las patas del bisonte no llegan a lo alto de un escalon de 1.
-  {
-    nombre: 'fisica: el salto sin impulso',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: '  store.impulse[id] = hi;',
-    a: '  store.impulse[id] = 0;',
-    prueba: 'test:tests/fauna-body.test.ts',
-  },
-  // Sin repulsion, lo que se mete cayendo se queda dentro.
-  {
-    nombre: 'fisica: sin repulsion',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: 'export const REPEL_SPEED = 4;',
-    a: 'export const REPEL_SPEED = 0;',
-    prueba: 'test:tests/fauna-body.test.ts',
-  },
-  // Si el mando gana a la repulsion, el jugador se hunde en la pared al caer.
-  {
-    nombre: 'fisica: el mando gana a la repulsion',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: 'return into < 0 ? [vx - into * rx, vy - into * ry] : [vx, vy];',
-    a: 'return [vx, vy];',
-    prueba: 'test:tests/jump.test.ts',
-  },
-  // Sin saltar para girar, en las laderas no se ve ni un salto de giro.
-  {
-    nombre: 'fisica: sin salto de giro',
-    fichero: 'packages/sim/src/systems/movement.ts',
-    de: '      if (tryTurnJump(world, store, id, goal, dt, keep)) return;',
-    a: '      if (goal !== goal) return;',
-    prueba: 'test:tests/fauna.test.ts',
-  },
-  // Si al caer aterriza con todo, y no solo con la base, sube a lo que tiene metido.
-  {
-    nombre: 'fisica: al caer aterriza con todo',
+    nombre: 'fisica: el escalon de golpe',
     fichero: 'packages/sim/src/systems/jump.ts',
-    de: '    : landingFloor(world, store, id);',
-    a: '    : footing(world, store, id, store.z[id] + STEP_UP);',
+    de: 'store.z[id] = Math.min(ground, store.z[id] + CLIMB_SPEED * dt);',
+    a: 'store.z[id] = ground;',
     prueba: 'test:tests/jump.test.ts',
+  },
+  {
+    nombre: 'fisica: el escalon de golpe, en el humo',
+    fichero: 'packages/sim/src/systems/jump.ts',
+    de: 'store.z[id] = Math.min(ground, store.z[id] + CLIMB_SPEED * dt);',
+    a: 'store.z[id] = ground;',
+    prueba: 'smoke:relief',
+  },
+  {
+    nombre: 'fisica: el escalon de golpe, en las leyes',
+    fichero: 'packages/sim/src/systems/jump.ts',
+    de: 'store.z[id] = Math.min(ground, store.z[id] + CLIMB_SPEED * dt);',
+    a: 'store.z[id] = ground;',
+    prueba: 'test:tests/world-laws.test.ts',
+  },
+  // El salto de altura fija, el del jugador: el apice a 1,16.
+  {
+    nombre: 'fisica: el salto de un animal, de altura fija',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'const speed = jumpSpeedFor(rise + ANIMAL_JUMP_MARGIN);',
+    a: 'const speed = jumpSpeedFor(1.16);',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  // La caja del ancho justo, no 1,2 veces.
+  {
+    nombre: 'fisica: la caja del ancho justo',
+    fichero: 'packages/shared/src/fauna-body.ts',
+    de: 'export const COLLISION_WIDTH_FACTOR = 1.2;',
+    a: 'export const COLLISION_WIDTH_FACTOR = 1;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  // En el aire, sin chocar de lado: lo que habia cayendo hasta el 2026-10-14.
+  {
+    nombre: 'fisica: el jugador en el aire sin chocar de lado',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: '  walk(world, store, id, moveX, moveY, dt, running, 0);',
+    a: '  walk(world, store, id, moveX, moveY, dt, running, Infinity);',
+    prueba: 'test:tests/jump.test.ts',
+  },
+  // Metido en algo, sin poder salir.
+  {
+    nombre: 'fisica: metido en algo, clavado',
+    fichero: 'packages/sim/src/systems/movement.ts',
+    de: 'const half = blocked(world, store, id, x, y, feet, STEP_UP, keep) ? 0 : undefined;',
+    a: 'const half = undefined;',
+    prueba: 'test:tests/fauna-body.test.ts',
+  },
+  // El auto salto midiendo desde los pies a mitad de subida: salta en la escalera.
+  {
+    nombre: 'fisica: el auto salto desde los pies a medio subir',
+    fichero: 'packages/sim/src/systems/autojump.ts',
+    de: 'const feet = Math.max(store.z[id], footing(world, store, id, store.z[id] + STEP_UP));',
+    a: 'const feet = store.z[id];',
+    prueba: 'test:tests/jump.test.ts',
+  },
+  // Sin la caja de los animales en el panel.
+  {
+    nombre: 'devtools: sin la caja de los animales',
+    fichero: 'packages/client/src/debug-boxes.ts',
+    de: '    bodyEdges(out, state, id);',
+    a: '',
+    prueba: 'test:tests/debug-boxes.test.ts',
   },
 ];

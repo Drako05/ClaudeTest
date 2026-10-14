@@ -373,19 +373,6 @@ export class World {
     return topOf(this.columnTop(voxelOf(wx), voxelOf(wy)));
   }
 
-  /**
-   * Lo mas bajo y lo mas alto del suelo de una columna (`vx`, `vy`), en el
-   * mundo, en `out[0]` y `out[1]`. Sin rampas, los dos son su techo; se queda
-   * con las dos cifras porque lo que mira el choque de las partes de un animal
-   * contra los escalones (`body.ts`) compara el pie de una con la cima de la
-   * vecina. Solo el terreno: lo que hay encima tiene su caja (`boxes.ts`).
-   */
-  floorRangeAt(vx: number, vy: number, out: Float64Array): void {
-    const top = topOf(this.columnTop(vx, vy));
-    out[0] = top;
-    out[1] = top;
-  }
-
   /** Lo que hay realmente en un tile. Unica fuente de verdad. */
   featureAt(wx: number, wy: number): Feature {
     const chunk = this.getChunk(toChunkCoord(wx), toChunkCoord(wy));

@@ -89,13 +89,13 @@ entero —el porque, las medidas y el fallo que motivo cada una— esta en
 15. *(Retirada con los voxeles: la rampa. Ver `docs/relieve.md`.)*
 16-20. *(Retiradas con el isometrico. Ver `docs/isometrico.md`.)*
 21. **La altura estorba, y estorba con UNA regla: no se entra donde el suelo
-    esta por encima de los pies** (`STEP_UP` andando, ninguno volando). El
-    terreno y los objetos que chocan se pisan con la huella entera
-    (`squareFloor`); **solo subir es de golpe: bajar es caer** con la gravedad.
-    Se anda con inercia (`INERTIA_TIME`, 0,1 s) y la cabeza choca (1,8).
-    **El choque va por fases**: subiendo y en horizontal chocan todas las
-    cajas, y solo la base sube medio bloque andando; bajando solo choca la
-    base, y lo demas que se meta lo saca la repulsion, en horizontal (`repel`).
+    esta por encima de los pies** (`STEP_UP` andando, ninguno volando). Cada
+    cuerpo es **una caja de base cuadrada que no gira y choca por todas sus
+    caras, siempre** (`bodyOf`; la de un animal, 1,2 × su ancho y alta hasta
+    el lomo), y pisa con la huella entera (`squareFloor`). **Nada sube de
+    golpe**: el escalon se sube tick a tick (`CLIMB_SPEED`, medio bloque en
+    0,1 s); **bajar es caer** con la gravedad. Se anda con inercia
+    (`INERTIA_TIME`, 0,1 s) y la cabeza choca.
 22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano, del
     que se pueda salir, en terreno que sostenga vida.
 23. **Cualquier medida de conectividad tiene que obedecer la fisica**: por
