@@ -33,6 +33,7 @@ import {
   BIOME_NAMES,
   CHUNK_SIZE,
   Feature,
+  hitPartsOf,
   isStation,
   Resource,
   TERRAIN_NAMES,
@@ -1130,15 +1131,31 @@ if (manualClock) {
   requestAnimationFrame(frame);
 }
 
-/** Cuantas cajas de objeto hay a `BOX_RADIUS` de (`px`, `py`): las que solo golpean y las que chocan. */
-function boxesNear(px: number, py: number): { hitOnly: number; blocking: number } {
-  const out = { hitOnly: 0, blocking: 0 };
+/**
+ * Cuantas cajas hay a `BOX_RADIUS` de (`px`, `py`), contadas aparte del panel:
+ * las de objeto que solo golpean y las que chocan, y los cuerpos (el jugador y
+ * cada animal a esa distancia) con las partes que se golpean de los animales.
+ */
+function boxesNear(
+  px: number,
+  py: number,
+): { hitOnly: number; blocking: number; bodies: number; animalParts: number } {
+  const out = { hitOnly: 0, blocking: 0, bodies: 1, animalParts: 0 };
   for (let y = py - BOX_RADIUS; y <= py + BOX_RADIUS; y++) {
     for (let x = px - BOX_RADIUS; x <= px + BOX_RADIUS; x++) {
       if (!hitboxAt(state.world, x, y)) continue;
       if (blocksBody(state.world.featureAt(x, y))) out.blocking++;
       else out.hitOnly++;
     }
+  }
+  const e = state.entities;
+  const me = state.playerId;
+  for (const id of state.fauna.values()) {
+    const animal = e.animal[id];
+    if (!animal) continue;
+    if (Math.abs(e.x[id] - e.x[me]) > BOX_RADIUS || Math.abs(e.y[id] - e.y[me]) > BOX_RADIUS) continue;
+    out.bodies++;
+    out.animalParts += hitPartsOf(animal.species, animal.stage).length;
   }
   return out;
 }

@@ -4,10 +4,11 @@
  * Decision del autor (2026-10-03): **los animales son de bloques**, con
  * detalle medio (de 10 a 16 cajas), y **la caja de golpe es la de su modelo**,
  * parte a parte: el cuello y la cabeza de un bisonte tienen caja; su cola, no,
- * para que el choque sea directamente en su trasero. Este fichero es el unico
- * sitio donde se dice como es un animal: el nucleo choca y golpea con las
- * partes `hit` y el cliente dibuja todas. Lo que se ve es lo que se golpea y
- * lo que choca, como el tronco de los arboles (regla 12) y las estaciones.
+ * para que el golpe sea directamente en su trasero. Este fichero es el unico
+ * sitio donde se dice como es un animal: el nucleo golpea las partes `hit`,
+ * choca con la caja que sale de ellas (`collisionBoxOf`, abajo) y el cliente
+ * dibuja todas. Lo que se ve es lo que se golpea, como el tronco de los
+ * arboles (regla 12) y las estaciones.
  *
  * Cada parte va en bloques, en el marco del animal:
  * - `x`, a lo largo de hacia donde mira (+ delante), con 0 en el centro del
@@ -44,7 +45,7 @@ export type BodyRole =
 export interface BodyPart {
   name: string;
   role: BodyRole;
-  /** Si cuenta para el golpe y para el choque con el terreno. */
+  /** Si cuenta para el golpe, y para medir la caja de colision (`collisionBoxOf`). */
   hit: boolean;
   /** Largo (a lo largo del rumbo), alto y ancho, en bloques. */
   size: readonly [number, number, number];
@@ -332,7 +333,7 @@ export function collisionBoxOf(species: Species, stage: Stage): CollisionBox {
 
 const hitCache = new Map<number, readonly BodyPart[]>();
 
-/** Las partes que golpean y chocan. */
+/** Las partes que se golpean, y de las que sale la caja de colision. */
 export function hitPartsOf(species: Species, stage: Stage): readonly BodyPart[] {
   const key = species * 8 + stage;
   let parts = hitCache.get(key);

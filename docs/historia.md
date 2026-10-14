@@ -11,6 +11,196 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## La fisica de los animales al estilo Minecraft — HECHA (2026-10-14)
+
+El autor probo la fisica por fases (`520f018`; en `docs/historia.md`, «Lo que
+dijo el autor al probar las fisicas») y no le satisface.
+**Su texto, literal:**
+
+> El comportamiento y físicas generales de los animales no son
+> satisfactorios, te nombrare algunas cosas que he notado y quiero arreglar.
+>
+> 1. Cuando suben un escalón saltando, saltan muy alto, se ve raro, seria
+>    mejor que aplicaran una fuerza de salto con respecto a la altura que
+>    desean alcanzar y dicha fuerza tenga un máximo dependiendo del animal (que
+>    en la mayoría de animales, el máximo seria lo justo para subir 1m).
+> 2. En ocasiones, los animales arrastran su cabeza contra las paredes a lo
+>    largo de unos pocos metros como si aun no se enteraran que deben salta,
+>    luego saltan. algo no se esta calculando bien ahi.
+> 3. creo que la cámara suavizada fue solucionar el problema equivocado. en
+>    realidad, nunca debimos dejar que el jugador o los animales se
+>    teletransportaran al subir un escalón, porque ahora se ve bien la camara
+>    para el jugador, pero ver animales subiendo escalones teletransportándose
+>    es un poco raro. lo que debíamos hacer es que esas subidas "automáticas"
+>    fueran tan rápidas que parecieran seguir caminando, pero en realidad el
+>    cuerpo si sube tick a tick, no teletransportado.
+> 4. El tema de los atascos de los animales. cuando retroceden, luego empujan
+>    hacia adelante y vuelve a retroceder y otra vez a empujar hacia adelante,
+>    es como si hicieran movimientos erráticos hasta salir.
+> 5. el problema de los animales con cabeza u hocico largo que no pueden subir
+>    escaleras. las patas delanteras que serian el primer apoyo de un animal al
+>    subir a un escalón, ni siquiera llegan al escalón si el animal tiene una
+>    cabeza y cuello que suman >= 1m de largo. no tengo claro como solucionarlo.
+> 6. observando minecraft, vi como ellos arreglan lo de los atascos de los
+>    animales y lo de subir escalones (1m para ellos). Todas las hitbox de
+>    minecraft tienen una base cuadrada, de forma que el animal puede girar 360
+>    grados sobre su centro en cualquier momento y asi siempre puede dar media
+>    vuelta y salir de cualquier atasco. y ya que todas sus bases son
+>    cuadradas, siempre habrá punto de apoyo para el animal por muy pequeña que
+>    sea la superficie del escalon.
+> 7. para solucionar el punto 4. (los atascos) y 5. (subir escalones), pense en
+>    inspirarme en minecraft y tambien hacer la base de la caja de colision de
+>    los animales cuadrada (con la altura variable segun el alto del
+>    dibujo/lomo del animal), pero con la diferencia que las cajas que se
+>    pueden golpear si seran todas las cajas que ya hemos hablado. para esto,
+>    me parece que tenemos que tener en cuenta ciertas directrices en el diseño
+>    de los modelos, porque la idea de una caja con base cuadrada, es que cubra
+>    en gran medida las patas del animal, pero a su vez, la caja no debe sobre
+>    salir demasiado del ancho del animal. entonces, esto implica que las patas
+>    delanteras y traseras, no pueden estar mucho mas separadas que el ancho del
+>    propio animal, para que la base cuadrada las cubra. te dejo capturas de una
+>    hitbox de vaca de minecraft para que entiendas de lo que te hablo.
+> 8. arreglando las cajas de colision como explico en el punto 7. y aplicando
+>    la subida de escalon tick a tick del punto 3., implica que ya los
+>    animales, por diseño, no saltaran los escalones <= 0.5m, sino que saltaran
+>    alturas > 0.5m (hasta su maximo de salto) y su fuerza de salto sera según
+>    el punto 1.
+> 9. los animales ahora también colisionaran con otros y con el jugador. me
+>    gustaria simular colisiones similares a las de minecraft, que no se
+>    sienten rígidas.
+> 10. vi que hay animales que por alguna razón, están cayendo por debajo del
+>     terreno. creo que esto se debe a la eliminación de colisión de sus cajas
+>     durante las caídas. entonces vale la pena hablar aqui de como cambian
+>     esas reglas de físicas antes dichas. como ahora las cajas de colision
+>     seran un simple cubo rectangular, chocaran por todas sus caras siempre,
+>     asi de simple y directo.
+
+**Sus respuestas a lo que se le pregunto (2026-10-14):**
+- **Modelos**: rediseñarlos para que la separacion entre patas delanteras y
+  traseras sea mas o menos el ancho del cuerpo; la directriz va a la guia de
+  arte y el revisa los modelos nuevos con capturas.
+- **Caja**: lado de **1,2 × el ancho** del cuerpo y alto **hasta el lomo**; la
+  cabeza queda fuera y **se acepta que se vea metida en una pared**, como en
+  Minecraft. La caja no gira.
+- **Subida**: **0,1 s** el medio bloque, sin dejar de andar, para jugador y
+  animales, y **fuera el suavizado de camara del escalon**.
+- **Salto**: hasta el escalon **mas 0,1 m**, como mucho **1 m** en todas las
+  especies (los maximos especiales, mas adelante). El del jugador no cambia.
+- **Empujes**: **segun el tamaño**: el grande aparta mas al pequeño; el jugador
+  cuenta como un cuerpo mas.
+- **Jugador**: tambien vuelve a chocar **por todas sus caras siempre**: fuera
+  el choque por fases y la repulsion.
+- **Se quitan** el impulso minimo, el salto para girar y el retroceder para
+  girar.
+
+**El plan, por fases**: (1-2) caja cuadrada que choca siempre, salto a medida
+y subida tick a tick, juntas a `main`; (3) los empujes; (4) el rediseño de los
+modelos, con capturas para el autor. Las deducciones, en `docs/juicio.md`.
+
+**Fases 1 y 2 — HECHAS (2026-10-14).** Cada cuerpo es una caja de base
+cuadrada que no gira y choca por todas sus caras siempre (`bodyOf`; la de un
+animal, `collisionBoxOf`); el escalon de ≤ 0,5 se sube tick a tick, medio
+bloque en 0,1 s (`CLIMB_SPEED`), para el jugador y los animales; un animal
+salta lo que mide mas de 0,5 y hasta 1 con la fuerza justa para el escalon
+mas 0,1 m, decidido por lo que tiene delante. Fuera las fases, la repulsion,
+el impulso, el salto para girar, el retroceder, el reposo por partes y el
+suavizado de camara del escalon. Medido en cinco semillas, 2 min: **clavados
+del 0,9-8 % al 0,0-0,2 %**, y el tick medio de ~1,2 ms a 0,52 ms. Contado en
+`docs/reglas.md` (21), `docs/fauna.md`, `docs/controles.md` y
+`docs/relieve.md`.
+
+**Fase 3 — HECHA (2026-10-14).** Los cuerpos —animales y jugador— no se
+chocan entre si: se empujan (`pushBodies`, `systems/push.ts`), poco a poco,
+hasta 2 m/s en proporcion al solape, repartido por la masa (el volumen de la
+caja), y por el choque de andar, sin meter a nadie en una pared ni sacar a un
+animal de su bioma. Las deducciones, en `docs/juicio.md`. Medido en cinco
+semillas, 2 min: clavados 0,0-0,5 % (sin empujes, 0,0-0,2 %); el empuje
+cuesta 0,15 ms por tick con 113 animales, tras ordenarlos a lo largo de x (a
+lo bruto, todos los pares, 0,65 ms).
+
+**Fase 4 — HECHA y APROBADA (2026-10-14).** Las ocho especies de cuatro
+patas tienen las patas en el cuadrado de su caja: troncos mas cortos (1,5
+veces el ancho), patas en el borde del cuadrado, y la liebre, el zorro, el
+ciervo y el ibice algo mas anchos. Se le enviaron dos capturas de la galeria
+con las cajas (`faunaGallery(true, 100)`), antes y despues, y el autor las
+dio por buenas: «aprobados esos diseños». La directriz 4 y como se aplico
+estan en `docs/guia-de-arte.md`. Los clavados no cambian: 0,0-0,5 % en cinco
+semillas.
+
+**Cerrada con la auditoria del 2026-10-14** (`docs/pendiente.md`, o ya aqui
+debajo si vino otra).
+
+## Auditoria al cerrar las fisicas y las pruebas (2026-10-10)
+
+Desde `3415d31` hasta `7e2d790`: los animales que se quedaban clavados, una
+caja por objeto, las cajas en el panel, la fase 1 de los voxeles, las tres
+fases de fisicas y las pruebas mas rapidas (22 commits).
+
+**Corregido:**
+- **Codigo muerto de un modelo sustituido** (escape 26): `bodyBoxes(…,
+  feetOnly)` y `footPartsOf` (el apoyo de los animales en sus partes mas
+  bajas) ya solo los usaban dos tests desde que `partsRest` mira todas las
+  cajas. Fuera, y los tests calculan lo suyo (`lowestOf`, mutado: caen los
+  dos).
+- **La regla 21 en `docs/reglas.md` contaba a los animales con el modelo de
+  antes de la fase B** (la heuristica de escalones y el apoyo en las partes
+  mas bajas). Ahora dice lo que hace el juego, como `fauna.md`. Y fuera la
+  fila de `docs/juicio.md` que preguntaba por aquel apoyo.
+- **`docs/leyes.md` citaba un test que no existia** con ese nombre (escape
+  25): «andando se sube como mucho medio bloque por tick» se seguia llamando
+  como en tiempos de las rampas. Renombrado, y el escaner tiene una categoria
+  que cruza la tabla con los tests.
+- **Numeros que no casaban** (escape 27): el resbalon al soltar era 0,26 m en
+  `movement.ts` y 0,22 en `reglas.md` y su test (0,26 es la cuenta continua;
+  el juego, a 60 Hz, da 0,22). La camara «exactamente 0,1 s por detras» son
+  0,092 a 60 Hz.
+- **El bloque a dos casillas**: lo acepto el autor; quitada su fila de
+  `juicio.md` y el «PENDIENTE DEL AUTOR» del test, y anotado en la regla 21.
+- **Lo que el autor ya juzgo, en el documento de su parte**: la camara con
+  retraso «injugable» en `docs/controles.md`, y la cabeza que sube primero en
+  `docs/fauna.md`, con su *Luego*.
+- Restos: «talud» en tres tests y el humo, «rampa» y «niveles» en nombres de
+  test y en `fauna.md`; un comentario suelto en `main.ts` (`boxesNear` entre
+  la doc de `__verdant` y la sonda); la cabecera de `terrain-mesh.ts`, que
+  decia que la usaba `shadow-patches.ts` (se la pasa `main.ts` a
+  `buildShadows`).
+
+**Dejado a proposito:**
+- Los 18 avisos de terminos retirados, todos en historia.
+- **Los animales en el aire no tienen inercia** (lente G): saltan cuando su
+  avance se atasca, casi parados, y en el aire van a su paso desde el primer
+  tick. El autor pidio arranque y frenada de 0,1 s tambien en el aire; esta
+  en «que decides tu», abajo, porque toca la fisica del salto que se va a
+  debatir con la cabeza que sube primero.
+- `mobile` seguia con el reloj de verdad: quedo fuera de la tanda de pruebas.
+  **Hecho el 2026-10-13**: va con el reloj manual (`docs/pruebas.md`).
+- **El registro de PC de `desktop` cayo otra vez en la CI de `pruebas`**
+  (`54028eb`): la linea murio sin verse moverse (`alive: false`, y 623 -> 0),
+  con la pasada a 304 s en un runner lento. Relanzada una vez, paso. Es la
+  comprobacion del escape 23, con el reloj de verdad a proposito; si vuelve a
+  caer, la salida es medir la deriva en la pagina con el tiempo del juego y
+  no con temporizadores del navegador, y no subir el plazo.
+
+**Verificado**: typecheck y los 515 tests en local; el escaner con su
+autoprueba (13 categorias); `analyze-world` (0,14/0,76/0,61 pt, como en la
+fase 1) y `shots`, que funcionan; y la CI de `pruebas`.
+
+**El alcance, dicho claro**: linea a linea, lo nuevo de fisicas
+(`movement.ts`, `boxes.ts`, `body.ts`, y camera-lag.ts, retirado el
+2026-10-12), el reloj
+(`clock.ts` y el bucle de `main.ts`) y sus documentos; lo demas, con el
+escaner, busquedas por lente y las cabeceras. Las comprobaciones de la tanda
+ya se mutaron en sus rondas; aqui solo las tocadas.
+
+**Aprendido** (fase 6): escapes 25-27 en la skill, la categoria 13 del
+escaner y sus patrones en las lentes A, D y F.
+
+**Que decides tu:**
+1. **Inercia de los animales en el aire**: (a) que arranquen el salto con lo
+   que llevaban y aceleren en el aire en 0,1 s, como el jugador; (b) dejarlo
+   como esta, porque un salto ya es un arranque; (c) decidirlo con lo de la
+   cabeza que sube primero.
+
 ## Lo que dijo el autor al probar las fisicas — HECHA (2026-10-10 a 2026-10-14)
 
 Hablarlo y hacer el plan. La tanda de fisicas, ya cerrada, esta en
@@ -140,6 +330,10 @@ pruebas posterior a cada tanda de cambios». Aprobo el plan de tres fases.
 
 ## Fisicas: cajas que chocan siempre, gravedad, inercia, camara — HECHA (2026-10-10)
 
+*Luego*: la camara con retraso de la fase C se retiro el 2026-10-12, y el
+reposo de un animal por sus partes, el 2026-10-14, por una caja cuadrada
+(`docs/reglas.md`, regla 21).
+
 Cerrada con la auditoria del 2026-10-10 (`docs/pendiente.md`). Lo que dijo
 el autor al probarla es la tanda siguiente, en `pendiente.md`. La de pruebas
 se metio delante por pedido suyo.
@@ -199,6 +393,9 @@ pidio medir en un claro y la camara baja en cuatro rumbos (`docs/pruebas.md`). L
 
 ## Una caja por objeto, con alto, y las patas con caja — HECHO (2026-10-05)
 
+*Luego*: desde el 2026-10-14 un animal ya no choca con sus partes sino con una
+caja cuadrada; sus partes `hit` solo se golpean. La caja por objeto sigue.
+
 Al ver las cajas en el panel, el autor afino las reglas:
 
 > En plantas, rocas y futuros recursos. La caja de daño y colisión será mixta,
@@ -254,6 +451,10 @@ roca. Colocar una estacion encima de la propia huella ya estaba prohibido
 (`placeTarget`).
 
 ## Fauna: lo que estorba no los deja clavados — HECHO (2026-10-05)
+
+*Luego*: el retroceder para girar se retiro el 2026-10-14, con la caja
+cuadrada que gira en cualquier sitio; los rodeos y el saltar siguen. Clavados
+hoy, 0,0-0,5 % (`docs/fauna.md`).
 
 Viste que los animales se paraban al topar con algo, incluso de frente, y no
 salian. Pasaban clavados el **25-53 % del tiempo** (2 min, cinco semillas): iban

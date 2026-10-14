@@ -62,3 +62,5 @@ Formato (el escaner lo lee):
 - `isRampEdge` — idem. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 - `RAMP_SHARE` — idem. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 - `footPartsOf` — el apoyo de los animales en sus partes mas bajas, retirado en la auditoria del 2026-10-10, que lo cuenta. En: `docs/pendiente.md`, `docs/historia.md`.
+- `partsRest` — el reposo de un animal por las cajas de sus partes, retirado el 2026-10-14 con la caja cuadrada; la historia de las fisicas lo cuenta. En: `docs/historia.md`.
+- `body.ts` — `sim/src/body.ts`, el choque por partes, borrado el 2026-10-14; lo cita la auditoria del 2026-10-10. En: `docs/historia.md`.

@@ -11,24 +11,32 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los modelos con las patas en el cuadrado de su caja (el autor,
- * 2026-10-14, fase 4; guia de arte, directriz 4).
+ * Ronda: la auditoria al cerrar la fisica al estilo Minecraft (2026-10-14).
  */
 export default [
-  // Las patas del bisonte donde estaban: a lo largo de su tronco de antes.
+  // El panel sin la caja de los animales: la pasada de desarrollo lo ve ahora
+  // junto a uno (en el nacimiento no hay ninguno a mano).
   {
-    nombre: 'modelos: las patas del bisonte fuera del cuadrado',
-    fichero: 'packages/shared/src/fauna-body.ts',
-    de: '        ...legs(0.7, 0.22, 0.52, 0.32),',
-    a: '        ...legs(0.7, 0.22, 0.75, 0.32),',
-    prueba: 'test:tests/fauna-body.test.ts',
+    nombre: 'auditoria: el panel sin la caja de los animales, en el humo',
+    fichero: 'packages/client/src/debug-boxes.ts',
+    de: '    bodyEdges(out, state, id);',
+    a: '',
+    prueba: 'smoke:devTools',
   },
-  // Una especie pequeña, un pelo fuera.
+  // Las partes de los animales pintadas como lo que choca.
   {
-    nombre: 'modelos: las patas de la marmota un pelo fuera',
-    fichero: 'packages/shared/src/fauna-body.ts',
-    de: '        ...legs(0.08, 0.07, 0.145, 0.1),',
-    a: '        ...legs(0.08, 0.07, 0.15, 0.1),',
-    prueba: 'test:tests/fauna-body.test.ts',
+    nombre: 'auditoria: las partes de los animales en cian, en el humo',
+    fichero: 'packages/client/src/debug-boxes.ts',
+    de: '      boxEdges(out.hit, part);\n      out.counts.hit++;',
+    a: '      boxEdges(out.solid, part);\n      out.counts.solid++;',
+    prueba: 'smoke:devTools',
+  },
+  // Los empujes con la masa ya no de `massOf`, sino igual para todos.
+  {
+    nombre: 'auditoria: empujes con la misma masa',
+    fichero: 'packages/sim/src/systems/push.ts',
+    de: '    mass[i] = massOf(store, ids[i]!);',
+    a: '    mass[i] = 1;',
+    prueba: 'test:tests/push.test.ts',
   },
 ];

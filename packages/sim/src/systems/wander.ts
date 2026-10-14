@@ -137,12 +137,6 @@ export function syncFauna(
 }
 
 /**
- * Un tick de paseo: cada animal anda hacia su punto de paso del periodo en
- * curso a su velocidad, sin salir de los tiles de su bioma, y se para al
- * llegar; lo que estorba lo salta o lo bordea (`walkAnimal`), y en el aire
- * sigue su salto (`airborneAnimal`). La gravedad, como al jugador.
- */
-/**
  * Donde puede estar el animal `id`: solo en su bioma. Lo miran su andar, su
  * salto y los empujes (`push.ts`); nada lo saca de el.
  */
@@ -151,6 +145,12 @@ export function keepIn(world: World, store: EntityStore, id: number): (x: number
   return (x, y) => biomeOfTerrain(world.terrainAt(Math.floor(x), Math.floor(y))) === biome;
 }
 
+/**
+ * Un tick de paseo: cada animal anda hacia su punto de paso del periodo en
+ * curso a su velocidad, sin salir de los tiles de su bioma, y se para al
+ * llegar; lo que estorba lo salta o lo bordea (`walkAnimal`), y en el aire
+ * sigue su salto (`airborneAnimal`). La gravedad, como al jugador.
+ */
 export function stepFauna(world: World, store: EntityStore, index: FaunaIndex, tick: number): void {
   for (const id of index.values()) {
     const animal = store.animal[id];
