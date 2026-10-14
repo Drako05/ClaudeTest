@@ -137,6 +137,26 @@ function slide(
 }
 
 /**
+ * Desplaza el cuerpo (`dx`, `dy`) eje a eje con el mismo choque que andar
+ * —medio bloque de subida de pie, ninguno en el aire—, **sin tocar su
+ * velocidad**: es lo que mueve un empuje (`systems/push.ts`), que no es andar.
+ * Lo que no cabe en un eje se pierde en ese eje.
+ */
+export function nudge(
+  world: World,
+  store: EntityStore,
+  id: number,
+  dx: number,
+  dy: number,
+  keep?: (x: number, y: number) => boolean,
+): void {
+  const feet = store.z[id];
+  const margin = store.grounded[id] ? STEP_UP : 0;
+  if (dx !== 0 && !blocked(world, store, id, store.x[id] + dx, store.y[id], feet, margin, keep)) store.x[id] += dx;
+  if (dy !== 0 && !blocked(world, store, id, store.x[id], store.y[id] + dy, feet, margin, keep)) store.y[id] += dy;
+}
+
+/**
  * Movimiento en el suelo.
  *
  * `vx`/`vy` son la velocidad que se lleva, **con inercia** (`steer`): la

@@ -95,7 +95,8 @@ entero —el porque, las medidas y el fallo que motivo cada una— esta en
     el lomo), y pisa con la huella entera (`squareFloor`). **Nada sube de
     golpe**: el escalon se sube tick a tick (`CLIMB_SPEED`, medio bloque en
     0,1 s); **bajar es caer** con la gravedad. Se anda con inercia
-    (`INERTIA_TIME`, 0,1 s) y la cabeza choca.
+    (`INERTIA_TIME`, 0,1 s) y la cabeza choca. Los cuerpos no se chocan entre
+    si: **se empujan**, poco a poco y segun su tamaño (`pushBodies`).
 22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano, del
     que se pueda salir, en terreno que sostenga vida.
 23. **Cualquier medida de conectividad tiene que obedecer la fisica**: por

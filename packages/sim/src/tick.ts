@@ -31,6 +31,7 @@ import { Inventory } from './inventory.js';
 import { toChunkCoord, World } from './world.js';
 import type { Vec3 } from './aim.js';
 import { settleFauna, stepFauna, syncFauna, type FaunaIndex } from './systems/wander.js';
+import { pushBodies } from './systems/push.js';
 
 /** Radio de chunks mantenidos cargados alrededor del jugador. */
 export const STREAM_RADIUS_CHUNKS = 3;
@@ -174,6 +175,9 @@ export function step(state: GameState, intent: Intent): void {
   world.setNow(state.tick);
   // Y la fauna da su paso: el golpe del jugador la encuentra donde esta ahora.
   stepFauna(world, entities, state.fauna, state.tick);
+  // Los cuerpos que se han metido uno en otro se apartan poco a poco: antes de
+  // que ande el jugador, asi que lo que le empujan no cuenta como su esfuerzo.
+  pushBodies(world, entities, state.fauna, playerId);
 
   if (entities.alive[playerId]) {
     // En el suelo y en el aire se anda igual; lo unico que cambia es el margen
