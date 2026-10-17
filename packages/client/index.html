@@ -120,13 +120,15 @@
       /* MODO y ENTRADA, mas pequenos que USAR, en un arco alrededor del ataque
          a la misma distancia de su centro (boceto del autor, 2026-10-01):
          ENTRADA arriba, hacia SALTAR, a 117 grados, y MODO abajo a la
-         izquierda, encima de USAR, a 153. Radio y tamano, mios: el arco de 84
-         deja libres SALTAR y USAR. */
-      :root { --modeb: 44px; --arc: 84px; }
+         izquierda, encima de USAR. Radio, angulos y tamano, mios. Con los
+         botones cuadrados (2026-10-17) sus esquinas se pisaban con el arco de
+         84 y MODO a 153 grados: el arco mas corto que deja 4 px libres con
+         todos es de 102, con MODO a 155,5 (*deduccion*, propuesta al autor). */
+      :root { --modeb: 44px; --arc: 102px; }
       #modeTouch, #inputMode { width: var(--modeb); height: var(--modeb); }
       #modeTouch {
-        right: calc(12px + var(--atk) / 2 + var(--arc) * .891 - var(--modeb) / 2 + env(safe-area-inset-right));
-        bottom: calc(10px + var(--atk) / 2 + var(--arc) * .454 - var(--modeb) / 2 + env(safe-area-inset-bottom));
+        right: calc(12px + var(--atk) / 2 + var(--arc) * .910 - var(--modeb) / 2 + env(safe-area-inset-right));
+        bottom: calc(10px + var(--atk) / 2 + var(--arc) * .415 - var(--modeb) / 2 + env(safe-area-inset-bottom));
       }
       #inputMode {
         right: calc(12px + var(--atk) / 2 + var(--arc) * .454 - var(--modeb) / 2 + env(safe-area-inset-right));
@@ -932,6 +934,46 @@
 
       @media (max-width: 560px) {
         #devPanel { width: 228px; font-size: 11px; max-height: 58vh; }
+      }
+
+      /*
+        Todos los botones, cuadrados y con relieve (el autor, 2026-10-17: «darles
+        una pequeña iluminación y sombra para generar la ilusión de relieve que
+        indique "soy un botón que puedes presionar". La ilusión de relieve no
+        debe ir en el dibujo del icono, sino en el botón»). Entra todo lo que se
+        pulsa; no las casillas, que se arrastran, ni los anillos, que indican.
+        Va al final y con los mismos selectores de cada boton, para ganarles.
+
+        La forma del relieve es mia (*deduccion*): un borde de luz por dentro
+        arriba a la izquierda, uno de sombra abajo a la derecha y una sombra
+        dura debajo, sin difuminar, como el pixelart. Pulsado, encendido o
+        abierto, se hunde: los bordes se invierten y baja 2 px.
+      */
+      :root {
+        --relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -2px -2px 0 rgba(0, 0, 0, .45), 0 3px 0 rgba(0, 0, 0, .4);
+        --hundido: inset 2px 2px 0 rgba(0, 0, 0, .45), inset -2px -2px 0 rgba(255, 255, 255, .1);
+      }
+      #proj, #thumbPad button, .round, #hudToggle, #statsToggle, #devToggle,
+      #invTabs button, #recipeTabs .slot, #discardAsk button, #dead button, .devRow button {
+        box-shadow: var(--relieve);
+      }
+      /* Las esquinas, las de bioma e informacion (12 px en 44), en proporcion. */
+      #proj, #thumbPad button, .round { border-radius: 12px; }
+      #thumbPad #action { border-radius: 20px; }
+      #thumbPad #use, #thumbPad #run, #thumbPad #jump { border-radius: 14px; }
+      #thumbPad #autoJump { border-radius: 8px; }
+      #invTabs button { border-radius: 8px; margin: 0 2px; }
+      #recipeTabs .slot.off { box-shadow: none; }
+      /* Hundido. */
+      #proj:active, #thumbPad button:active, .round:active,
+      #hudToggle:active, #statsToggle:active, #devToggle:active,
+      #invTabs button:active, #recipeTabs .slot:active, #discardAsk button:active, #dead button:active, .devRow button:active {
+        box-shadow: var(--hundido); transform: translateY(2px);
+      }
+      #thumbPad button.on, .round.open, #modeBar.on,
+      #hudToggle.open, #statsToggle.open, #devToggle.open,
+      #invTabs button.on, #recipeTabs .slot.on, .devRow button.on {
+        box-shadow: var(--hundido);
       }
 
     </style>

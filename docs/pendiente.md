@@ -123,6 +123,20 @@ solapa, hebilla y bolsillo, y una capa de frente con cuello alto):
     monocroma);
   - Herramientas: el pico y el hacha de los objetos, adaptados y cruzados como
     su referencia.
+- **Aprobada** («Aprobados, adelante con la ronda 2»).
+
+**Ronda 2 — HECHA, esperando al autor (2026-10-17)**: una sola regla al final
+del CSS (`index.html`, «Todos los botones, cuadrados y con relieve») para todo
+lo pulsable salvo casillas y anillos.
+- Esquinas de 12 px (20 en ATAQUE, 14 en USAR, CORRER y SALTAR, 8 en AUTO
+  SALTO).
+- Relieve con `box-shadow`, *deduccion*: luz por dentro arriba a la
+  izquierda, sombra abajo a la derecha y una sombra dura debajo. Pulsado,
+  encendido o abierto, se hunde.
+- Con esquinas, MODO y ENTRADA se pisaban (−7 px) y MODO tocaba USAR. El arco
+  mas corto que deja 4 px libres con todo, a la misma distancia del ataque,
+  es de **102** (era 84), con MODO a **155,5 grados** (era 153) y ENTRADA en
+  sus 117. Propuesta al autor.
 
 ## Auditoria al cerrar los iconos en pixelart (2026-10-17)
 
