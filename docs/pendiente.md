@@ -32,6 +32,52 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
+## TANDA EN CURSO: los iconos en pixelart (2026-10-17)
+
+**El pedido del autor, literal**, con una imagen de referencia (iconos de
+juego de unos 16-20 pixeles, contorno oscuro, 3-4 tonos, luz arriba a la
+izquierda, sobre fondo oscuro):
+
+> La siguiente tanda quiero que sea de iconos. vamos a generar svg para cada
+> objeto disponible actualmente en el juego. quiero que tengan aspecto
+> pixelart HD. te mande una imagen de referencia.
+
+**Sus respuestas:**
+- Rejilla de **24 × 24**.
+- El icono **en vez del nombre** donde hoy se ve un objeto: la barra, la
+  rejilla, las recetas y sus ingredientes, lo arrastrado y la zona de lo
+  seleccionado. El nombre queda al pasar el raton y en la descripcion. Y en el
+  aviso de lo recogido, **icono y texto**.
+- Sus palabras: «Los iconos de items seran pixelart a color. los iconos de las
+  casillas vacias del inventario y de los botones siguen siendo siluetas
+  monocromaticas. pero en esta tanda incluye pasar los iconos de casillas
+  vacias de inventario y los iconos de los botones a pixelart 24x24».
+- Tambien los cuatro botones de caracter (», ↑, A y el 🌿 de bioma).
+- **Revision**: primero una hoja con los 30, que aprueba o corrige; despues,
+  al juego.
+
+**El plan, por rondas**:
+1. El formato, la paleta y los 30 objetos, y su hoja.
+2. Las 14 siluetas de PERSONAJE y los 17 iconos de boton, y su hoja.
+3. La integracion en la interfaz, el humo, las mutaciones, la documentacion,
+   la CI y `main`.
+
+**Donde va cada cosa**:
+- `client/src/pixel-art.ts`: el formato. Cada icono son 24 filas de 24
+  caracteres; `.` es transparente.
+- `client/src/item-icons.ts`: los 30 objetos y su paleta comun.
+- La hoja: `?iconos=1` (`icon-sheet.ts`).
+- El test: `tests/pixel-icons.test.ts`.
+
+Las rejillas las saco de formas (elipses, poligonos, trazos), con el contorno
+y la luz puestos solos, con un generador que vive en el contenedor y muere con
+el. **Desde que estan en el repo, se retocan a mano, pixel a pixel.**
+
+**Ronda 1 — HECHA, esperando al autor (2026-10-17)**: los 30, enviados en la
+hoja.
+
+---
+
 ## Auditoria al cerrar la fisica al estilo Minecraft (2026-10-14)
 
 **El alcance**: de `7e2d790` a `2b3e3cc`, nueve commits: la camara sin
