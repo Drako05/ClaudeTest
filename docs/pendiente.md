@@ -73,8 +73,19 @@ Las rejillas las saco de formas (elipses, poligonos, trazos), con el contorno
 y la luz puestos solos, con un generador que vive en el contenedor y muere con
 el. **Desde que estan en el repo, se retocan a mano, pixel a pixel.**
 
-**Ronda 1 — HECHA, esperando al autor (2026-10-17)**: los 30, enviados en la
-hoja.
+**Ronda 1 — HECHA y APROBADA (2026-10-17)**: los 30, en la hoja. El autor:
+«Aprobados, adelante con la ronda 2».
+
+**Ronda 2 — HECHA, esperando al autor (2026-10-17)**: las 14 siluetas de
+PERSONAJE y los 20 iconos de boton, en `client/src/silhouette-icons.ts`, en
+la misma hoja. Son 20 porque el ojo son cuatro piezas que alterna el juego:
+abierto, pupila, entornado y la mira de la primera persona.
+- Los de PERSONAJE traducen a pixel los que el autor ya corrigio.
+- Los cuatro de caracter son lectura mia, por confirmar: correr con dos
+  galones, saltar con una flecha, el auto salto con una flecha que salta un
+  bloque, y el bioma con una ramita.
+- Duda mia, para el autor: las hombreras, a 24 pixeles, salen con aire de
+  corona.
 
 ---
 

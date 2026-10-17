@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { RESOURCE_COUNT, type Resource } from '@verdant/shared';
 import { CLEAR, PIXEL_GRID, pixelPaths, pixelSvg, type PixelArt } from '../packages/client/src/pixel-art.js';
 import { ITEM_PALETTE, itemArt } from '../packages/client/src/item-icons.js';
+import { BUTTON_ICONS, buttonArt, equipArt, SILHOUETTE_PALETTE } from '../packages/client/src/silhouette-icons.js';
+import { EQUIP_COUNT, type Equip } from '@verdant/shared';
 
 /**
  * Los iconos en pixelart (el autor, 2026-10-17: «aspecto pixelart HD», rejilla
@@ -77,5 +79,29 @@ describe('Los iconos de los objetos', () => {
   it('cada uno es distinto de los demas', () => {
     const seen = new Set(all.map((art) => art.rows.join('\n')));
     expect(seen.size).toBe(all.length);
+  });
+});
+
+describe('Las siluetas: los huecos de PERSONAJE y los botones', () => {
+  const equip = Array.from({ length: EQUIP_COUNT }, (_, i) => equipArt(i as Equip));
+  const buttons = BUTTON_ICONS.map((b) => buttonArt(b));
+
+  it('hay una por hueco (14) y una por boton, cada pieza del ojo aparte (20)', () => {
+    expect(equip.length).toBe(14);
+    expect(buttons.length).toBe(20);
+  });
+
+  it('son de 24 × 24 y de UN solo color, el del texto (directriz 3: siluetas monocromaticas)', () => {
+    expect(SILHOUETTE_PALETTE).toEqual({ '#': 'currentColor' });
+    [...equip, ...buttons].forEach((art, i) => {
+      wellFormed(art, `silueta ${i}`);
+      expect(art.palette).toBe(SILHOUETTE_PALETTE);
+      expect(new Set(art.rows.join('').replaceAll(CLEAR, '')), `silueta ${i}`).toEqual(new Set(['#']));
+    });
+  });
+
+  it('cada una es distinta de las demas', () => {
+    const all = [...equip, ...buttons];
+    expect(new Set(all.map((art) => art.rows.join('\n'))).size).toBe(all.length);
   });
 });
