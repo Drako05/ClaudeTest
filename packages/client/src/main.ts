@@ -72,6 +72,7 @@ import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { FaunaView } from './fauna-view.js';
 import { faunaGallery } from './fauna-gallery.js';
+import { showIconSheet } from './icon-sheet.js';
 import { spriteDepthProbe, type ProbeView } from './sprite-depth-probe.js';
 import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
@@ -100,6 +101,7 @@ import { TickInterpolation } from './smooth.js';
 import * as clock from './clock.js';
 import {
   faunaShownFromLocation,
+  iconSheetFromLocation,
   manualClockFromLocation,
   onlySlashFromLocation,
   randomSeed,
@@ -683,6 +685,9 @@ function restart(): void {
 }
 
 // --------------------------------------------------------------- bucle
+
+/** Con `?iconos=1`, la hoja de los iconos encima de todo (`icon-sheet.ts`). */
+const iconSheetCount = iconSheetFromLocation() ? showIconSheet() : 0;
 
 /** Con `?reloj=manual` el bucle no corre solo: lo avanza la prueba (`clock.ts`). */
 const manualClock = manualClockFromLocation();
@@ -1287,6 +1292,8 @@ Object.defineProperty(window, '__verdant', {
       faunaYaws: faunaView.yaws,
       /** Las diez especies en sus tres etapas, en un lienzo: para mirar el dibujo (con su caja, `boxes`). */
       faunaGallery: (boxes = false, pixelsPerBlock = 40) => faunaGallery(pixelsPerBlock, boxes),
+      /** Cuantos iconos tiene la hoja de `?iconos=1` (0 sin ella). */
+      iconSheet: iconSheetCount,
       /** Cuanto se ve de un sprite pegado de lado a un bloque y con uno delante. */
       spriteDepthProbe: (snap?: ProbeView) => spriteDepthProbe(snap),
       facing: [e.facingX[id], e.facingY[id]],

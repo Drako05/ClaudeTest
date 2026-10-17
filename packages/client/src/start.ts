@@ -15,6 +15,8 @@
  *   impacto, ni esquirlas, ni escombros. Tambien para `tools/slash.mjs`: el
  *   impacto es un destello blanco sin prueba de profundidad, y con el barrido
  *   sin ancho la vista normal contaba 25.506 pixeles suyos en un pinar.
+ * - `?iconos=1` tapa el juego con la hoja de los iconos, para revisarlos
+ *   (`icon-sheet.ts`).
  * - `?reloj=manual` para el bucle: el juego solo avanza cuando la prueba de
  *   humo lo pide, frame a frame y sin dibujar (`window.__reloj`, `clock.ts`).
  *   Sin GPU el navegador de las pruebas va a ~5 FPS, y esperar en tiempo real
@@ -56,6 +58,11 @@ export function faunaShownFromLocation(): boolean {
 /** Si de los efectos del golpe solo se dibuja el barrido: con `?efectos=barrido`. */
 export function onlySlashFromLocation(): boolean {
   return param('efectos') === 'barrido';
+}
+
+/** Si se abre la hoja de los iconos para revisarlos (`icon-sheet.ts`): con `?iconos=1`. */
+export function iconSheetFromLocation(): boolean {
+  return param('iconos') === '1';
 }
 
 /** Si el bucle va con el reloj manual de las pruebas: con `?reloj=manual`. */
