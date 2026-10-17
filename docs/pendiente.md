@@ -112,6 +112,17 @@ solapa, hebilla y bolsillo, y una capa de frente con cuello alto):
 - Piedra mas oscura e hierro mas claro, en la paleta de los iconos (y la veta
   de hierro) y en el mundo: `ROCK_FACES`, `MINERAL_FACES[IronNode]` y, por
   ser de piedra, el horno (`STATION_FACES`; esto ultimo es *deduccion*).
+- **El autor aprobo el resto y corrigio tres** (2026-10-17):
+  - el icono de la mesa se veia mas oscuro que su bloque. **Medido**: three.js
+    trata la textura del lienzo como lineal y la pasa a sRGB al pintarla, asi
+    que en pantalla `#8a5a30` es `#c2a078` (lo mismo el horno). El generador
+    aplica esa conversion; los colores de las estaciones en `ITEM_PALETTE`
+    son ahora los que se miden en pantalla. **Cualquier icono futuro de un
+    bloque tiene que pasar por ella**;
+  - la capa, mas sencilla, como su segundo ejemplo (sin la cruz: va
+    monocroma);
+  - Herramientas: el pico y el hacha de los objetos, adaptados y cruzados como
+    su referencia.
 
 ## Auditoria al cerrar los iconos en pixelart (2026-10-17)
 

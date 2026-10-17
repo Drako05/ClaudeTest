@@ -102,33 +102,35 @@ export const ITEM_PALETTE: Readonly<Record<string, string>> = {
   8: '#9f7f3e', // sombra
   // Las estaciones: los colores de su modelo 3D (`STATION_FACES`, y los
   // fijos de `stations-view.ts`), con la luz de cada cara horneada (la tapa
-  // entera, el frente al 95 % y el costado al 74 %), como se ven en el mundo.
+  // entera, el frente al 95 % y el costado al 74 %) y **pasados a sRGB como
+  // los pinta three.js**, que trata la textura como lineal: es el color que se
+  // mide en pantalla (el autor vio el icono mas oscuro que el bloque).
   // La mesa de trabajo
-  '!': '#5a3a1e',
-  '@': '#8a5a30',
-  $: '#b07a44',
-  '%': '#a77441',
-  '&': '#825a32',
-  '*': '#83562e',
-  '+': '#664324',
-  '=': '#281b0f',
-  '?': '#1f150c',
-  '~': '#bfc3c8',
-  '^': '#56371d',
-  ':': '#432b16',
+  '!': '#a08360',
+  '@': '#c2a078',
+  $: '#d8b88d',
+  '%': '#d4b48a',
+  '&': '#bda17b',
+  '*': '#be9d75',
+  '+': '#aa8c68',
+  '=': '#6e5b45',
+  '?': '#62513d',
+  '~': '#e0e2e5',
+  '^': '#9d805e',
+  ':': '#8c7253',
   // El horno
-  ';': '#6c6c75',
-  ',': '#48484f',
-  _: '#1d1d22',
-  '<': '#ff8a2a',
-  '>': '#44444b',
-  '/': '#67676f',
-  '|': '#505057',
-  '(': '#35353a',
-  ')': '#86868f',
-  '{': '#17171b',
-  '}': '#f2c865',
-  '[': '#f28328',
+  ';': '#aeaeb4',
+  ',': '#919197',
+  _: '#5f5f66',
+  '<': '#ffc271',
+  '>': '#8d8d94',
+  '/': '#aaaab0',
+  '|': '#98989d',
+  '(': '#7e7e84',
+  ')': '#c0c0c6',
+  '{': '#54545b',
+  '}': '#f9e5a9',
+  '[': '#f9be6e',
 };
 
 const ROWS: Record<Resource, readonly string[]> = {
