@@ -8,9 +8,10 @@ Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
 indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `ab51f9b`, 2026-10-17** (los iconos en pixelart,
-desde `2b3e3cc`). La proxima parte de aqui: ver `.claude/skills/auditoria/` y
-«Auditoria al cerrar los iconos en pixelart», mas abajo.
+**Ultima auditoria: commit `47c7cc5`, 2026-10-17** (las correcciones a los
+iconos, desde `ab51f9b`). La proxima parte de aqui: ver
+`.claude/skills/auditoria/` y «Auditoria al cerrar las correcciones a los
+iconos», mas abajo.
 
 **Como leerlo.** Desde el 2026-10-10 son tres ficheros, partidos como se partio
 `CLAUDE.md` el 2026-10-02 y por lo mismo: este se lee al empezar cada tanda, y
@@ -31,166 +32,34 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## TANDA EN CURSO: correcciones a los iconos (2026-10-17)
+## Auditoria al cerrar las correcciones a los iconos (2026-10-17)
 
-**El pedido del autor, literal** (con dos imagenes de ejemplo: una mochila con
-solapa, hebilla y bolsillo, y una capa de frente con cuello alto):
-
-> El icono de inventario quedó demasiado pegado al borde de su botón y no se
-> ve bien. Ya que 24x24 sería muy pequeño, vamos a pasar todos los botones
-> redondos a cuadrados (como el botón de bioma o información) y darles una
-> pequeña iluminación y sombra para generar la ilusión de relieve que indique
-> "soy un botón que puedes presionar". La ilusión de relieve no debe ir en el
-> dibujo del icono, sino en el botón. Esto aplicara para todos los botones del
-> juego.
->
-> Me hicieron falta los iconos de las categorías de las recetas. Diseñalos
-> como monocromaticos para que se entienda que son representaciones
-> generales. Cómo esto son botones, su botón también va con la ilusión de
-> relieve.
->
-> Los iconos de las estaciones deben ser lo más parecido a sus bloques 3d. Lo
-> mismo para todos los iconos de bloques que se puedan poner en el mundo de
-> ahora en adelante.
->
-> El icono de auto salto vuelve a que sea una "A" pero hecha en pixelart.
->
-> En el icono del corazón de vida, haz que sean más uniformes las líneas
-> horizontales que forman la punta inferior. Actualmente tienen como un bache.
->
-> Los iconos de capa y mochila no me convencen. Te mandé unos ejemplos, pero
-> recuerda que estos seran iconos, así que deben ir monocromaticos. Usa el
-> mismo icono de mochila para el botón de inventario.
->
-> Los colores del hierro y la piedra son muy similares, has la piedra un poco
-> más oscura y el hierro un poco más claro (en todo, tanto en la mena como en
-> los ítems y recetas).
->
-> Las barras de durabilidad no se mostraran cuando el arma o herramienta este
-> a su máxima durabilidad (nueva o con futuras expansiones de reparación).
->
-> Agrega unos pequeños botones de + y - para cambiar la cantidad de veces que
-> se ejecuta una receta. Los puedes poner uno sobre el otro al lado derecho de
-> los ingredientes de la receta (alineando nuevamente toda la fila hacia el
-> centro del hud). Cada receta tendrá estos botones, pero solo estarán
-> habilitados en aquellas recetas de ítems apilables (las herramientas, armas
-> y equipables no son apilables).
-
-**Sus respuestas a las preguntas:**
-- Fabricar N: «Salen las N de golpe con un solo mantener. Además, baja el
-  tiempo de mantener a 1s.»
-- La N sube hasta lo que alcanzan los ingredientes y el sitio, y se ve en el
-  resultado (lo que sale en total); los ingredientes, tengo/necesito para N.
-- «Todos los botones»: todo lo pulsable salvo las casillas. Los anillos de
-  hambre y salud se quedan redondos.
-- El objeto *Mochila de armazon* (a color) no cambia; solo las siluetas de
-  Capa y Bolso y el boton INVENTARIO.
-- Piedra e hierro: en los iconos **y en el mundo 3D**.
-- Las estaciones: el bloque en 3/4, isometrico, como el inventario de
-  Minecraft.
-- Antes, sobre los ingredientes del movil (el icono de 48 en una casilla que
-  ensena 44): «mientras se mantenga así entonces no hay necesidad de tocar las
-  proporciones en los hud de recetas».
-
-**El plan, por rondas** (cada una se ensena antes de seguir):
-1. Los dibujos, en la hoja `?iconos=1`.
-2. El aspecto de los botones, en capturas de PC y movil.
-3. El resto al juego —fabricar N, el mantener a 1 s, la durabilidad, las
-   categorias con icono, los colores 3D—, el humo, las mutaciones, la CI y
-   `main`.
-
-**Ronda 1 — HECHA, esperando al autor (2026-10-17):**
-- Las 6 categorias, en `silhouette-icons.ts` (`CATEGORY_ROWS`, por el nombre
-  de la categoria en `RECIPES`): el pico y el hacha, la mesa de lado, el
-  crisol con la llama, la tunica, el muslo y la espada. Son diseños mios.
-- La mesa y el horno, en 3/4, sacados de las **mismas texturas** que pinta
-  `stations-view.ts`, con sus colores y la luz de cada cara (tapa 100 %,
-  frente 95 %, costado 74 %), y su contorno. Los saca un generador del
-  contenedor; desde que estan en el repo se retocan a mano.
-- La «A», el corazon con la punta en escalones iguales, y la capa y la
-  mochila nuevas. INVENTARIO usa la rejilla del hueco Bolso.
-- Piedra mas oscura e hierro mas claro, en la paleta de los iconos (y la veta
-  de hierro) y en el mundo: `ROCK_FACES`, `MINERAL_FACES[IronNode]` y, por
-  ser de piedra, el horno (`STATION_FACES`; esto ultimo es *deduccion*).
-- **El autor aprobo el resto y corrigio tres** (2026-10-17):
-  - el icono de la mesa se veia mas oscuro que su bloque. **Medido**: three.js
-    trata la textura del lienzo como lineal y la pasa a sRGB al pintarla, asi
-    que en pantalla `#8a5a30` es `#c2a078` (lo mismo el horno). El generador
-    aplica esa conversion; los colores de las estaciones en `ITEM_PALETTE`
-    son ahora los que se miden en pantalla. **Cualquier icono futuro de un
-    bloque tiene que pasar por ella**;
-  - la capa, mas sencilla, como su segundo ejemplo (sin la cruz: va
-    monocroma);
-  - Herramientas: el pico y el hacha de los objetos, adaptados y cruzados como
-    su referencia.
-- **Aprobada** («Aprobados, adelante con la ronda 2»).
-
-**Ronda 2 — HECHA, esperando al autor (2026-10-17)**: una sola regla al final
-del CSS (`index.html`, «Todos los botones, cuadrados y con relieve») para todo
-lo pulsable salvo casillas y anillos.
-- Esquinas de 12 px (20 en ATAQUE, 14 en USAR, CORRER y SALTAR, 8 en AUTO
-  SALTO).
-- Relieve con `box-shadow`, *deduccion*: luz por dentro arriba a la
-  izquierda, sombra abajo a la derecha y una sombra dura debajo. Pulsado,
-  encendido o abierto, se hunde.
-- Con esquinas, MODO y ENTRADA se pisaban (−7 px) y MODO tocaba USAR. El arco
-  mas corto que deja 4 px libres con todo, a la misma distancia del ataque,
-  es de **102** (era 84), con MODO a **155,5 grados** (era 153) y ENTRADA en
-  sus 117. Propuesta al autor.
-- **Aprobada** («Todo va bien. Continúa»).
-
-**Ronda 3 — HECHA (2026-10-17)**:
-- **Fabricar N**: `tryCraft(..., times)` todo o nada y `craftableTimes` en
-  `sim/systems/gathering.ts`, `Intent.craftTimes`, y + y - en cada receta
-  (`inventory-ui.ts`), apagados en lo que no se apila y en su tope. El
-  resultado dice el total y los ingredientes, tengo/necesito para las N.
-  Tests en `tests/craft-times.test.ts`.
-- **Mantener 1 s** (`CRAFT_HOLD_MS`).
-- **La barra de desgaste** no se pinta con la herramienta entera.
-- **Las categorias**, con su icono; su nombre va en `data-category`, `title`
-  y `aria-label`.
-- **El humo**: en `stations` el + se para en lo que alcanza y un mantener
-  hace 5 lingotes (el mantener de esa pasada es de 1,2 s, para distinguir 1 de
-  1,5), y las herramientas tienen + y - apagados y sin barra; en `desktop` y
-  `mobile`, los botones cuadrados y con relieve; en `mobile`, la holgura entre
-  mandos se mide de caja a caja. Nueve mutaciones.
-
-## Auditoria al cerrar los iconos en pixelart (2026-10-17)
-
-**El alcance**: de `2b3e3cc` a `ab51f9b`: la auditoria anterior y las tres
-rondas de los iconos —el formato y los 30 objetos, las siluetas de PERSONAJE
-y de los botones, y su llegada al juego—. La tanda, entera, en
+**El alcance**: de `ab51f9b` a `47c7cc5`: la auditoria anterior, los iconos a
+multiplo de 24, la regla de `CLAUDE.md` («una pregunta del autor se responde,
+no se ejecuta») y las tres rondas de correcciones. La tanda, entera, en
 `docs/historia.md`.
 
 **Corregido:**
-- **El ojo de la primera persona salia fuera de la rejilla** (escape 31): el
-  CSS seguia encogiendo la pupila con `scale(.55)`, pensado para el vector, y
-  en pixelart pintaba pixeles mas pequenos que los del resto. Es la vista de
-  arranque. Ahora la mira lleva su propia pupila de 2 × 2, dibujada en la
-  rejilla, y la grande se oculta; el humo lo mira y su mutacion cae.
-- **Una comprobacion del humo que corria contra el reloj** (patron 13): la
-  del icono del registro leia las lineas en otra ida y vuelta, y cada una
-  vive 3 s. Ahora la mira el observador que ve nacer la linea.
-- **Filas de `docs/juicio.md` sobre lo que ya no existe** (escape 32): dos
-  median los dibujos de trazo retirados (los cubiertos y los iconos de los
-  botones), dos los citaban, y una hablaba de los huecos «Espalda» y
-  «Cintura», que no existen desde el 2026-10-04.
-- **USAR mide 32 px** y la documentacion de los tamanos no lo decia.
-- **CSS muerto**: el `font-size: 9px` de la barra del movil era del nombre.
-- Comentarios: el del ojo en `index.html` (eran dos formas y la clase
-  `.flat`; son cuatro piezas), y las cabeceras de los iconos dicen ahora que
-  el autor aprobo los dibujos.
+- **Cuatro colores huerfanos en la paleta** (escape 33): los del fuego y el
+  hondo de la piedra, que solo usaba el horno viejo. Fuera, y un test nuevo
+  exige que cada color lo use algun icono.
+- **`docs/controles.md` mentia en dos frases**: llamaba «mochila de
+  explorador» al icono de INVENTARIO y decia que AUTO SALTO «era una A»,
+  cuando ahora lo vuelve a ser.
+- **CSS muerto**: la letra de 8 px de las categorias, que ya no escriben su
+  nombre.
+- La fila de la paleta en `docs/juicio.md` ya no cuenta los colores.
 
 **Ejecutado**: el escaner y su autoprueba; `npm run shots` y
-`tools/analyze-world.ts`, que funcionan; typecheck y 531 tests; la pasada
-`desktop`; el ojo, capturado ampliado antes y despues; dos mutaciones nuevas.
+`tools/analyze-world.ts`; typecheck y los tests; una mutacion nueva.
 
-**Dejado para el autor**: USAR (32 px), INVENTARIO (36) y AUTO SALTO (18) no
-eran multiplos de 24, y sus pixeles salian desiguales; lo mismo los iconos que
-encogian con una casilla pequena. **Lo decidio el mismo dia**: «Puedes ajustar
-solo el icono y dejar las casillas/botones del tamaño actual?». Hecho: todos a
-24 o 48 (tambien los anillos del movil, a 36, que cazo la comprobacion nueva
-del humo), y las casillas pasan a 24 donde no cabe el de 48.
+**Escapes de la tanda** (fase 6): la pasada `resources` afirmaba algo de la
+fila de receta y no la corri en local antes de la CI (P6); ahora las pasadas
+que se corren salen de buscar los selectores tocados.
+
+**Sin verificar con dedos**: los + y - se pulsan en el movil con un toque
+normal (`click`), pero los gestos no los prueban, porque con E no hay ninguna
+receta apilable.
 
 ---
 

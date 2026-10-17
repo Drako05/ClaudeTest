@@ -52,6 +52,11 @@ describe('Los iconos de los objetos', () => {
     });
   });
 
+  it('cada color de la paleta lo usa algun icono: al rehacer un dibujo no quedan huerfanos', () => {
+    const used = new Set(all.flatMap((art) => [...art.rows.join('')]));
+    expect(Object.keys(ITEM_PALETTE).filter((k) => !used.has(k))).toEqual([]);
+  });
+
   it('ninguno esta vacio, y todos dejan un pixel de margen', () => {
     all.forEach((art, i) => {
       expect(art.rows.join('').replaceAll(CLEAR, '').length, `objeto ${i}`).toBeGreaterThan(40);

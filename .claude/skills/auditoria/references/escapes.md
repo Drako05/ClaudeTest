@@ -430,6 +430,16 @@ Formato:
   fila miente.
 - **Donde vive ahora**: lente F, punto 2, con el metodo concreto.
 
+### 33. Un color de la paleta que ya no usa ningun icono (2026-10-17)
+- **Que paso**: al rehacer el horno en 3/4, sus colores del fuego (`Y`, `Z`,
+  `0`) y el hondo de la piedra (`l`) se quedaron en `ITEM_PALETTE` sin que los
+  usara ningun icono.
+- **Por que se escapo**: el test miraba que cada icono usara colores de la
+  paleta, no al reves.
+- **Que lo habria visto**: lo contrario, que cada color lo use alguien.
+- **Donde vive ahora**: `tests/pixel-icons.test.ts`, «cada color de la paleta
+  lo usa algun icono», con su mutacion.
+
 ## Del proceso del agente
 
 Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
@@ -478,3 +488,13 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
 - **Metodo**: la herramienta que se toca se CORRE una vez en local antes de
   empujar, aunque su casilla este en la CI: el procedimiento ya lo dice
   («solo la pasada que se esta escribiendo o tocando»).
+
+### P6. Una pasada que miraba lo tocado y no se corrio en local (2026-10-17)
+- **Que paso**: la ronda 3 metio los + y - dentro de la fila de la receta. Se
+  corrieron en local `stations`, `desktop`, `mobile`, `devTools` y los gestos,
+  pero no `resources`, que es la que afirma que la carga acaba en los
+  ingredientes. Cayo en la CI: una vuelta entera perdida.
+- **Metodo**: antes de elegir las pasadas «que se tocan», se buscan en
+  `tools/smoke.mjs` y `tools/gestures.mjs` los selectores de lo que cambio
+  (`grep -n "\.recipe" tools/*.mjs`) y se corren todas las que salgan, no las
+  que uno cree.

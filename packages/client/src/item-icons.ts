@@ -35,7 +35,6 @@ export const ITEM_PALETTE: Readonly<Record<string, string>> = {
   i: '#c2c2ca', // luz
   j: '#8e8e9a', // base
   k: '#65656f', // sombra
-  l: '#42424c', // hondo
   // hierro: mas claro, por lo mismo
   m: '#ffffff', // luz
   n: '#d2dae4', // base
@@ -85,10 +84,6 @@ export const ITEM_PALETTE: Readonly<Record<string, string>> = {
   V: '#a9c46a', // luz
   W: '#6f9440', // base
   X: '#4b6c2c', // sombra
-  // fuego
-  Y: '#fff3a8', // luz
-  Z: '#ffc23f', // base
-  0: '#ff7a2a', // sombra
   // cardenillo
   1: '#42c2a0', // base
   2: '#238a74', // sombra
