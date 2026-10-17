@@ -74,12 +74,15 @@ export const LOOKS: Partial<Record<Feature, SpeciesLook>> = {
  */
 export const MINERAL_FACES: Partial<Record<Feature, readonly string[]>> = {
   [Feature.CoalNode]: ['#2b2b31', '#3d3d45', '#55555f'],
-  [Feature.IronNode]: ['#5d4a41', '#87695a', '#a98a78'],
+  // Mas claro que la roca, para no confundirse con ella (el autor,
+  // 2026-10-17: «has la piedra un poco más oscura y el hierro un poco más
+  // claro», en los iconos y en el mundo).
+  [Feature.IronNode]: ['#6e584e', '#9c7d6c', '#c2a28e'],
   [Feature.CopperNode]: ['#6b4326', '#a5643a', '#d19a5c'],
 };
 
-/** Las tres caras de la roca, en el mismo orden en que se pintan. */
-export const ROCK_FACES: readonly string[] = ['#6f6f78', '#9a9aa4', '#b8b8c2'];
+/** Las tres caras de la roca, en el mismo orden en que se pintan. Mas oscuras desde el 2026-10-17 (el autor). */
+export const ROCK_FACES: readonly string[] = ['#5c5c65', '#84848e', '#a1a1ab'];
 
 /**
  * Los colores de las estaciones, de oscuro a claro, y el de su detalle (la
@@ -88,7 +91,8 @@ export const ROCK_FACES: readonly string[] = ['#6f6f78', '#9a9aa4', '#b8b8c2'];
  */
 export const STATION_FACES: Partial<Record<Feature, readonly string[]>> = {
   [Feature.Workbench]: ['#5a3a1e', '#8a5a30', '#b07a44', '#c9cdd2'],
-  [Feature.Furnace]: ['#55555e', '#7e7e88', '#a2a2ac', '#ff8a2a'],
+  // Es de piedra, y se oscurecio con ella (2026-10-17; *deduccion*).
+  [Feature.Furnace]: ['#48484f', '#6c6c75', '#8d8d97', '#ff8a2a'],
 };
 
 function toHex(color: string): number {

@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { RESOURCE_COUNT, type Resource } from '@verdant/shared';
 import { CLEAR, PIXEL_GRID, pixelPaths, pixelSvg, type PixelArt } from '../packages/client/src/pixel-art.js';
 import { ITEM_PALETTE, itemArt } from '../packages/client/src/item-icons.js';
-import { BUTTON_ICONS, buttonArt, equipArt, SILHOUETTE_PALETTE } from '../packages/client/src/silhouette-icons.js';
-import { EQUIP_COUNT, type Equip } from '@verdant/shared';
+import { BUTTON_ICONS, buttonArt, CATEGORY_ICONS, categoryArt, equipArt, SILHOUETTE_PALETTE } from '../packages/client/src/silhouette-icons.js';
+import { RECIPES } from '@verdant/shared';
+import { Equip, EQUIP_COUNT } from '@verdant/shared';
 
 /**
  * Los iconos en pixelart (el autor, 2026-10-17: «aspecto pixelart HD», rejilla
@@ -82,26 +83,34 @@ describe('Los iconos de los objetos', () => {
   });
 });
 
-describe('Las siluetas: los huecos de PERSONAJE y los botones', () => {
+describe('Las siluetas: los huecos de PERSONAJE, los botones y las categorias', () => {
   const equip = Array.from({ length: EQUIP_COUNT }, (_, i) => equipArt(i as Equip));
   const buttons = BUTTON_ICONS.map((b) => buttonArt(b));
+  const categories = CATEGORY_ICONS.map((c) => categoryArt(c) as PixelArt);
 
   it('hay una por hueco (14) y una por boton, cada pieza del ojo aparte (20)', () => {
     expect(equip.length).toBe(14);
     expect(buttons.length).toBe(20);
   });
 
+  it('cada categoria de las recetas tiene la suya (el autor, 2026-10-17), y no sobra ninguna', () => {
+    const used = new Set(RECIPES.map((r) => r.category));
+    expect(new Set(CATEGORY_ICONS)).toEqual(used);
+    for (const c of used) expect(categoryArt(c), c).not.toBeNull();
+  });
+
   it('son de 24 × 24 y de UN solo color, el del texto (directriz 3: siluetas monocromaticas)', () => {
     expect(SILHOUETTE_PALETTE).toEqual({ '#': 'currentColor' });
-    [...equip, ...buttons].forEach((art, i) => {
+    [...equip, ...buttons, ...categories].forEach((art, i) => {
       wellFormed(art, `silueta ${i}`);
       expect(art.palette).toBe(SILHOUETTE_PALETTE);
       expect(new Set(art.rows.join('').replaceAll(CLEAR, '')), `silueta ${i}`).toEqual(new Set(['#']));
     });
   });
 
-  it('cada una es distinta de las demas', () => {
-    const all = [...equip, ...buttons];
+  it('cada una es distinta de las demas, salvo INVENTARIO, que es el hueco Bolso (el autor, 2026-10-17)', () => {
+    expect(buttonArt('inventory').rows).toBe(equipArt(Equip.Bag).rows);
+    const all = [...equip, ...buttons.filter((_, i) => BUTTON_ICONS[i] !== 'inventory'), ...categories];
     expect(new Set(all.map((art) => art.rows.join('\n'))).size).toBe(all.length);
   });
 });
