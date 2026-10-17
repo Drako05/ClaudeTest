@@ -136,10 +136,20 @@ reposo; **USAR** a su izquierda, apoyado en su mismo borde de abajo; y
 **CORRER** y **SALTAR** en columna encima del ataque, alineados a su borde
 derecho. Los **anillos de salud y hambre** van abajo a la izquierda.
 Arriba, **OTROS** a la izquierda, la **barra de la mano** en el centro exacto
-(sus casillas encogen en pantallas estrechas para no pisar a los redondos) e
+(sus casillas encogen en pantallas estrechas para no pisar a OTROS e
+INVENTARIO) e
 **INVENTARIO** a la derecha; OTROS despliega **en columna debajo de el** el
 ojo, el HUD, el entorno y, desde el 2026-10-05, el **panel de desarrollo** (una
-llave inglesa; en PC es F3, ver `docs/devtools.md`), y se cierra tocando fuera. **Los botones son solo
+llave inglesa; en PC es F3, ver `docs/devtools.md`), y se cierra tocando fuera. **Todos los botones son cuadrados y con relieve** (el autor, 2026-10-17:
+«darles una pequeña iluminación y sombra para generar la ilusión de relieve que
+indique "soy un botón que puedes presionar". La ilusión de relieve no debe ir
+en el dibujo del icono, sino en el botón. Esto aplicara para todos los botones
+del juego»). Entra todo lo que se pulsa salvo las casillas, que se arrastran;
+los anillos de hambre y salud siguen redondos, porque indican. Una sola regla al
+final del CSS de `index.html`: esquinas de 12 px como bioma e informacion (20
+en ATAQUE, 14 en USAR, CORRER y SALTAR, 8 en AUTO SALTO), un borde de luz por
+dentro arriba a la izquierda, uno de sombra abajo a la derecha y una sombra dura
+debajo; pulsado, encendido o abierto, se hunde (la forma, *deduccion*). **Los botones son solo
 iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
 USAR, espada y pico cruzados en ATAQUE, una **mochila de explorador** en
 INVENTARIO (asa, solapa con dos cierres y bolsillos, casi tan ancha como alta
@@ -159,11 +169,13 @@ cada uno es *deduccion*; eran 32, 36 y 36, y AUTO SALTO, 18). El humo mide
 todos los que se ven. Y **MODO** (2026-09-30) y **ENTRADA**
 (2026-10-01), mas pequenos que USAR y en un **arco alrededor del ataque**, a la
 misma distancia de su centro (boceto del autor): ENTRADA arriba, hacia SALTAR,
-y MODO abajo a la izquierda, encima de USAR; radio y tamano, mios. MODO: un
+y MODO abajo a la izquierda, encima de USAR; radio y tamano, mios. Con los
+botones cuadrados el arco paso de 84 a **102** y MODO de 153 a **155,5
+grados**: el mas corto en que ninguna esquina se pisa (4 px de holgura). MODO: un
 toque cambia de modo de golpe, su icono dice cual —un tajo para el barrido, una mirilla para
 el preciso— y **se enciende al pulsarlo**, como USAR y SALTAR (en PC tambien,
 y con TAB). ENTRADA alterna **MIRA** y **TAP** (abajo), con la cruz o una
-mano tocando por icono, y se recuerda. Y **AUTO SALTO** (2026-09-30), un redondo pequeno montado sobre la
+mano tocando por icono, y se recuerda. Y **AUTO SALTO** (2026-09-30), un boton pequeno montado sobre la
 esquina de arriba a la izquierda de SALTAR, como el boceto del autor: un toque
 lo enciende o apaga, se ilumina encendido, **arranca apagado y se recuerda**
 en el navegador de cada dispositivo (`localStorage`, como el angulo de

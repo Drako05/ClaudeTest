@@ -175,7 +175,7 @@
 
       /*
         Arriba en el movil (boceto del autor): OTROS a la izquierda, la barra de
-        la mano en medio e INVENTARIO a la derecha, los dos redondos. OTROS
+        la mano en medio e INVENTARIO a la derecha. OTROS
         despliega en columna, debajo de el, el ojo, el HUD y el entorno, que
         sin el menu no se ven; en PC siguen donde estaban.
       */
@@ -584,7 +584,20 @@
         border: 1px solid rgba(140, 190, 255, 0.22);
       }
       .recipe .ingredients .slot { width: 56px; height: 56px; cursor: default; }
-      /* Fabricar es mantener pulsado 1,5 s: la fila se llena de izquierda a
+      /* + encima de -, a la derecha de los ingredientes: cuantas veces se
+         fabrica (el autor, 2026-10-17). Solo en lo apilable; en lo demas, y en
+         su tope, apagados. Tamano, mio. */
+      .recipe .qty { display: flex; flex-direction: column; gap: 6px; }
+      .recipe .qty button {
+        -webkit-appearance: none; appearance: none; width: 26px; height: 26px; padding: 0;
+        border-radius: 6px; font: 700 16px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: #e8eef7; background: rgba(8, 14, 28, 0.82); border: 1px solid rgba(140, 190, 255, 0.34);
+        cursor: pointer; touch-action: manipulation;
+      }
+      .recipe .qty button:disabled { opacity: .3; cursor: default; }
+      /* El icono de cada categoria, a 48 como los objetos. */
+      #recipeTabs .slot .catIcon { flex: none; width: 48px; height: 48px; }
+      /* Fabricar es mantener pulsado 1 s: la fila se llena de izquierda a
          derecha como una barra de carga (decision del autor). */
       .recipe .charge {
         position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 8px;
@@ -954,7 +967,7 @@
         --hundido: inset 2px 2px 0 rgba(0, 0, 0, .45), inset -2px -2px 0 rgba(255, 255, 255, .1);
       }
       #proj, #thumbPad button, .round, #hudToggle, #statsToggle, #devToggle,
-      #invTabs button, #recipeTabs .slot, #discardAsk button, #dead button, .devRow button {
+      #invTabs button, #recipeTabs .slot, #discardAsk button, #dead button, .devRow button, .recipe .qty button {
         box-shadow: var(--relieve);
       }
       /* Las esquinas, las de bioma e informacion (12 px en 44), en proporcion. */
@@ -963,11 +976,12 @@
       #thumbPad #use, #thumbPad #run, #thumbPad #jump { border-radius: 14px; }
       #thumbPad #autoJump { border-radius: 8px; }
       #invTabs button { border-radius: 8px; margin: 0 2px; }
-      #recipeTabs .slot.off { box-shadow: none; }
+      #recipeTabs .slot.off, .recipe .qty button:disabled { box-shadow: none; }
       /* Hundido. */
       #proj:active, #thumbPad button:active, .round:active,
       #hudToggle:active, #statsToggle:active, #devToggle:active,
-      #invTabs button:active, #recipeTabs .slot:active, #discardAsk button:active, #dead button:active, .devRow button:active {
+      #invTabs button:active, #recipeTabs .slot:active, #discardAsk button:active, #dead button:active, .devRow button:active,
+      .recipe .qty button:enabled:active {
         box-shadow: var(--hundido); transform: translateY(2px);
       }
       #thumbPad button.on, .round.open, #modeBar.on,
@@ -1153,8 +1167,8 @@
         </div>
       </div>
       <div class="barSide right">
-        <!-- Una mochila de explorador, como el segundo adjunto del autor: asa,
-             solapa, bolsillo delantero y dos laterales. -->
+        <!-- La mochila del hueco Bolso (el autor, 2026-10-17): asa, solapa con
+             hebilla, bolsillo delantero y dos laterales. -->
         <button id="invOpen" class="round" type="button" aria-expanded="false" aria-controls="invPanel" aria-label="Inventario">
           <svg data-pixel="inventory" aria-hidden="true"></svg>
         <kbd class="btnKey">E</kbd></button>

@@ -270,7 +270,7 @@ check(!(await probe()).tapInput, 'el boton ENTRADA no volvio a MIRA');
 
 // El inventario con el dedo: arrastrar dentro de la barra con el inventario
 // cerrado, arrastrar una casilla a otra y a la barra con el abierto, y mantener
-// una receta 1,5 s para fabricarla (decisiones del autor). Con materiales del
+// una receta 1 s para fabricarla (decisiones del autor). Con materiales del
 // panel de desarrollo.
 await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904&dev=1&view=perspectiva`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__verdant && window.__verdant.tick > 0, null, { timeout: 30000 });
@@ -326,7 +326,7 @@ check(afterDrag.itemsSent.move > beforeDrag.itemsSent.move && afterDrag.slots[6]
 await dragReal(await slotAt(7), await at('#hotbar .slot:nth-child(4)'));
 const toBar = await probe();
 check(toBar.slots[3].item === moving, `arrastrar de la rejilla a la barra no movio: ${items(toBar).slice(0, 8)}`);
-// A recetas, con su pestana, y mantener el pico 1,5 s.
+// A recetas, con su pestana, y mantener el pico 1 s.
 await tapReal(await at('#invTabs button:nth-child(3)'));
 check((await probe()).inventoryPage === 'recetas', 'la pestana Recetas no cambio de pagina');
 const result = await page.evaluate(() => {
@@ -340,7 +340,7 @@ await real('touchEnd', []);
 await page.waitForTimeout(400);
 const afterHold2 = await probe();
 console.log(`  fabricar manteniendo: ${beforeHold.inventory[11]} -> ${afterHold2.inventory[11]} picos`);
-check(afterHold2.inventory[11] === beforeHold.inventory[11] + 1, 'mantener la receta 1,5 s con el dedo no fabrico');
+check(afterHold2.inventory[11] === beforeHold.inventory[11] + 1, 'mantener la receta 1 s con el dedo no fabrico');
 await page.screenshot({ path: 'screenshots/movil-recetas.png' });
 
 // La mesa y la ropa con el dedo (tanda 2): fabricar la mesa, llevarla a la
@@ -356,7 +356,7 @@ const holdTouch = async (p) => {
   await page.waitForTimeout(400);
 };
 const tabNamed = (name) => page.evaluate((n) => {
-  const t = Array.from(document.querySelectorAll('#recipeTabs .slot')).find((el) => el.textContent === n);
+  const t = Array.from(document.querySelectorAll('#recipeTabs .slot')).find((el) => el.dataset.category === n);
   const r = t.getBoundingClientRect();
   return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 }, name);

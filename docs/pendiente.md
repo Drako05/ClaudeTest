@@ -137,6 +137,23 @@ lo pulsable salvo casillas y anillos.
   mas corto que deja 4 px libres con todo, a la misma distancia del ataque,
   es de **102** (era 84), con MODO a **155,5 grados** (era 153) y ENTRADA en
   sus 117. Propuesta al autor.
+- **Aprobada** («Todo va bien. Continúa»).
+
+**Ronda 3 — HECHA (2026-10-17)**:
+- **Fabricar N**: `tryCraft(..., times)` todo o nada y `craftableTimes` en
+  `sim/systems/gathering.ts`, `Intent.craftTimes`, y + y - en cada receta
+  (`inventory-ui.ts`), apagados en lo que no se apila y en su tope. El
+  resultado dice el total y los ingredientes, tengo/necesito para las N.
+  Tests en `tests/craft-times.test.ts`.
+- **Mantener 1 s** (`CRAFT_HOLD_MS`).
+- **La barra de desgaste** no se pinta con la herramienta entera.
+- **Las categorias**, con su icono; su nombre va en `data-category`, `title`
+  y `aria-label`.
+- **El humo**: en `stations` el + se para en lo que alcanza y un mantener
+  hace 5 lingotes (el mantener de esa pasada es de 1,2 s, para distinguir 1 de
+  1,5), y las herramientas tienen + y - apagados y sin barra; en `desktop` y
+  `mobile`, los botones cuadrados y con relieve; en `mobile`, la holgura entre
+  mandos se mide de caja a caja. Nueve mutaciones.
 
 ## Auditoria al cerrar los iconos en pixelart (2026-10-17)
 

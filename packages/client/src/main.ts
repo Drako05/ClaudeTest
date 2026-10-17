@@ -854,6 +854,7 @@ function runFrame(now: number, draw: boolean): void {
     if (asked) {
       intent.select = asked.select;
       intent.craft = asked.craft;
+      intent.craftTimes = asked.craftTimes;
       intent.moveFrom = asked.moveFrom;
       intent.moveTo = asked.moveTo;
       intent.discard = asked.discard;

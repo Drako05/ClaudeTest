@@ -60,7 +60,7 @@ VERDANT_URL=https://drako05.github.io/ClaudeTest npm run smoke
 | Clic derecho | Usar: mirando una estacion, la abre; si no, lo de la mano (una baya se come, una semilla se siembra, una estacion se pone, tambien contra una pared) |
 | `Espacio` | Saltar |
 | `Shift` | Correr: interruptor, se queda encendido |
-| `E` | Inventario y recetas (no pausa): arrastrar mueve o apila, soltar fuera tira (pide confirmacion), mantener 1,5 s una receta la fabrica |
+| `E` | Inventario y recetas (no pausa): arrastrar mueve o apila, soltar fuera tira (pide confirmacion), mantener 1 s una receta la fabrica (con + y - en lo apilable, las veces que se quiera) |
 | `1`-`4` | Elegir la casilla de la barra: lo que se lleva en la mano |
 | `I` / `B` | Informacion (HUD y controles) / panel del bioma. Cada boton de PC lleva su tecla escrita abajo a la izquierda |
 | `R` | Mundo nuevo |

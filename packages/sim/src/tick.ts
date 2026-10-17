@@ -223,7 +223,7 @@ export function step(state: GameState, intent: Intent): void {
     if (intent.moveFrom >= 0 && intent.moveTo >= 0) inventory.move(intent.moveFrom, intent.moveTo);
     if (intent.discard >= 0) inventory.discard(intent.discard);
     if (intent.craft >= 0) {
-      const crafted = craftNear(world, entities, playerId, inventory, intent.craft);
+      const crafted = craftNear(world, entities, playerId, inventory, intent.craft, intent.craftTimes);
       if (crafted === 'ok') state.lastCrafted = intent.craft;
       else if (crafted === 'full') state.lastBlocked = 'full';
     }

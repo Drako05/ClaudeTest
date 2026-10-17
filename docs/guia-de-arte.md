@@ -183,8 +183,24 @@ que venga. Son **las directrices del autor** para el diseño.
   «Puedes ajustar solo el icono y dejar las casillas/botones del tamaño
   actual?»): 24 o 48 px, nunca lo que quepa. Si no, sus pixeles salen
   desiguales. El humo mide cada icono que se ve.
-- **Como se revisa**: `?iconos=1` abre en el juego la hoja de los 64 (30
-  objetos, 14 huecos y 20 botones), cada uno a 48 px y a 96, con su nombre.
+- **El relieve va en el boton, no en el icono** (el autor, 2026-10-17: «La
+  ilusión de relieve no debe ir en el dibujo del icono, sino en el botón»).
+  Los botones son cuadrados y llevan luz y sombra (`docs/controles.md`); el
+  icono, plano.
+- **Los bloques que se ponen en el mundo, como su bloque 3D** (el autor,
+  2026-10-17: «Los iconos de las estaciones deben ser lo más parecido a sus
+  bloques 3d. Lo mismo para todos los iconos de bloques que se puedan poner en
+  el mundo de ahora en adelante»), y al preguntarle, **en 3/4, isometricos**,
+  como el inventario de Minecraft. Se sacan de **las mismas texturas** del
+  modelo, con la luz de cada cara (tapa 100 %, frente 95 %, costado 74 %) y
+  **pasadas a sRGB como las pinta three.js**, que trata la textura del lienzo
+  como lineal: es el color que se ve en pantalla (sin eso, el icono salia mas
+  oscuro que el bloque; lo noto el autor).
+- **Las categorias de las recetas, monocromas** (el autor, 2026-10-17: «para
+  que se entienda que son representaciones generales»), como los botones.
+- **Como se revisa**: `?iconos=1` abre en el juego la hoja de los 70 (30
+  objetos, 14 huecos, 20 botones y 6 categorias), cada uno a 48 px y a 96, con
+  su nombre.
 - **Aplicada**: los 30 objetos, los 14 huecos y los botones (2026-10-17).
   Los diseños son del agente, y **el autor los aprobo en dos hojas**
   («Aprobados, adelante con la ronda 2», «Aprobados, adelante con la ronda

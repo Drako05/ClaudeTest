@@ -14,8 +14,12 @@
  *   mano; cerrado, dentro de la barra. **Soltarlo fuera del panel lo tira**,
  *   previa confirmacion, y solo con el panel abierto: desde la barra cerrada,
  *   soltar al vacio no hace nada.
- * - **Fabricar es mantener pulsado 1,5 s** el resultado de la receta, y la fila
- *   se llena de izquierda a derecha como una barra de carga.
+ * - **Fabricar es mantener pulsado 1 s** el resultado de la receta (1,5 hasta
+ *   el 2026-10-17), y la fila se llena de izquierda a derecha como una barra
+ *   de carga. Con **+ y -** (solo en lo apilable) se elige cuantas veces: un
+ *   solo mantener fabrica las N, hasta lo que alcance (el autor, 2026-10-17).
+ * - **Las categorias de las recetas van por su icono**, monocromo; el nombre,
+ *   al pasar el raton.
  * - **Cada estacion tiene sus recetas** (decision del autor, tanda 2): con E se
  *   ven las de mano; al USAR una mesa o un horno se abre este mismo panel con
  *   las suyas, bajo su nombre, y se cierra solo al salir del alcance, medido
@@ -34,7 +38,7 @@
  * 5). Estas peticiones no se tiran en pausa, al reves que las del mundo.
  */
 
-import { equipSlot, EYE_HEIGHT, HOTBAR_SLOTS, hitboxAt, stationNear, type GameState } from '@verdant/sim';
+import { craftableTimes, equipSlot, EYE_HEIGHT, HOTBAR_SLOTS, hitboxAt, stationNear, type GameState } from '@verdant/sim';
 import {
   type Equip,
   EQUIP_COUNT,
@@ -51,10 +55,12 @@ import { makePlayerArt } from './art.js';
 import { now } from './clock.js';
 import { equipIcon } from './equip-icons.js';
 import { itemIcon } from './item-icons.js';
+import { pixelIcon } from './pixel-art.js';
+import { categoryArt } from './silhouette-icons.js';
 import { ScrollRail } from './scroll-rail-view.js';
 
-/** Lo que se tarda en fabricar manteniendo pulsado (decision del autor). */
-export const CRAFT_HOLD_MS = 1500;
+/** Lo que se tarda en fabricar manteniendo pulsado (el autor; 1 s desde el 2026-10-17). */
+export const CRAFT_HOLD_MS = 1000;
 /** Lo que hay que mover el puntero para que un toque sea un arrastre. **Propuesta mia.** */
 const DRAG_SLOP = 6;
 /** Categorias del recetario que se dibujan (boceto: cinco). */
@@ -102,6 +108,8 @@ const DESCRIPTIONS: Record<number, string> = {
 export interface ItemRequests {
   select: number;
   craft: number;
+  /** Las veces de `craft`, de los + y - de su receta. */
+  craftTimes: number;
   moveFrom: number;
   moveTo: number;
   discard: number;
@@ -160,7 +168,14 @@ export class InventoryUi {
   onToggle: ((open: boolean) => void) | null = null;
 
   private static none(): ItemRequests {
-    return { select: -1, craft: -1, moveFrom: -1, moveTo: -1, discard: -1 };
+    return { select: -1, craft: -1, craftTimes: 1, moveFrom: -1, moveTo: -1, discard: -1 };
+  }
+
+  /** Las veces elegidas para cada receta (por su indice en `RECIPES`). */
+  private readonly times = new Map<number, number>();
+
+  private timesOf(recipe: number): number {
+    return this.times.get(recipe) ?? 1;
   }
 
   constructor(private readonly current: () => GameState) {
@@ -452,6 +467,7 @@ export class InventoryUi {
       (this.hold.row.querySelector('.charge') as HTMLElement).style.width = `${t * 100}%`;
       if (t >= 1) {
         this.pending.craft = this.hold.recipe;
+        this.pending.craftTimes = this.timesOf(this.hold.recipe);
         this.cancelHold();
       }
     }
@@ -483,6 +499,12 @@ export class InventoryUi {
     el.appendChild(itemIcon(item));
     const tool = toolStats(item);
     if (tool) {
+      // Entera, no se ve (el autor, 2026-10-17: nueva, o reparada cuando la
+      // haya).
+      if (wear >= tool.uses) {
+        el.title = RESOURCE_NAMES[item];
+        return;
+      }
       const bar = document.createElement('i');
       bar.className = 'wear';
       bar.style.width = `${(wear / tool.uses) * 100}%`;
@@ -591,7 +613,14 @@ export class InventoryUi {
       tab.className = 'slot';
       const cat = categories[i];
       if (cat) {
-        tab.textContent = cat;
+        // Su icono, monocromo (el autor, 2026-10-17); el nombre, al pasar el
+        // raton y para el lector de pantalla.
+        tab.dataset.category = cat;
+        tab.title = cat;
+        tab.setAttribute('aria-label', cat);
+        const art = categoryArt(cat);
+        if (art) tab.appendChild(pixelIcon(art, 'catIcon'));
+        else tab.textContent = cat;
         tab.addEventListener('click', () => {
           this.category = cat;
           this.buildList();
@@ -608,7 +637,7 @@ export class InventoryUi {
   private buildList(): void {
     this.recipeList.replaceChildren();
     Array.from(this.recipeTabs.children).forEach((tab) =>
-      tab.classList.toggle('on', tab.textContent === this.category),
+      tab.classList.toggle('on', (tab as HTMLElement).dataset.category === this.category),
     );
     RECIPES.forEach((recipe, i) => {
       if (recipe.station !== this.mode || recipe.category !== this.category) return;
@@ -627,7 +656,21 @@ export class InventoryUi {
         s.className = 'slot';
         ingredients.appendChild(s);
       }
-      row.append(charge, result, ingredients);
+      // + encima de -, a la derecha de los ingredientes (el autor, 2026-10-17).
+      const qty = document.createElement('div');
+      qty.className = 'qty';
+      for (const [label, step] of [['+', 1], ['-', -1]] as const) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = label;
+        b.setAttribute('aria-label', step > 0 ? 'Una vez mas' : 'Una vez menos');
+        b.addEventListener('click', () => {
+          this.times.set(i, this.timesOf(i) + step);
+          this.render(this.current());
+        });
+        qty.appendChild(b);
+      }
+      row.append(charge, result, ingredients, qty);
       this.bindHold(result, row, i);
       this.recipeList.appendChild(row);
     });
@@ -641,10 +684,8 @@ export class InventoryUi {
   private bindHold(el: HTMLElement, row: HTMLElement, recipe: number): void {
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      const inv = this.current().inventory;
-      const r = RECIPES[recipe];
-      if (r.inputs.some((input) => inv.count(input.item) < input.count)) return;
-      if (!inv.fits([{ item: r.output, count: r.count }], r.inputs)) return;
+      // Sin ingredientes o sin sitio para las N veces, no arranca.
+      if (craftableTimes(this.current().inventory, recipe) < this.timesOf(recipe)) return;
       this.cancelHold();
       this.hold = { recipe, since: now(), row };
     });
@@ -732,22 +773,36 @@ export class InventoryUi {
     this.describe(this.charSelSlot, this.charSelDesc, onBody ? item : null, this.picked);
 
     for (const row of Array.from(this.recipeList.children) as HTMLElement[]) {
-      const r = RECIPES[Number(row.dataset.recipe)];
+      const recipe = Number(row.dataset.recipe);
+      const r = RECIPES[recipe];
+      // Las veces elegidas con + y -, entre 1 y lo que alcanza (el autor,
+      // 2026-10-17). Si deja de alcanzar, baja sola (*deduccion*).
+      const most = craftableTimes(inv, recipe);
+      const times = Math.max(1, Math.min(this.timesOf(recipe), most));
+      this.times.set(recipe, times);
       let ok = true;
-      this.paint(row.querySelector('.result') as HTMLElement, r.output, r.count, toolStats(r.output)?.uses ?? 0);
+      // El resultado dice lo que sale en total (el autor: «en el resultado»).
+      this.paint(row.querySelector('.result') as HTMLElement, r.output, r.count * times, toolStats(r.output)?.uses ?? 0);
       const cells = Array.from(row.querySelectorAll('.ingredients .slot')) as HTMLElement[];
       cells.forEach((cell, k) => {
         const input = r.inputs[k];
         cell.replaceChildren();
         if (!input) return;
         const have = inv.count(input.item);
-        if (have < input.count) ok = false;
+        const need = input.count * times;
+        if (have < need) ok = false;
         const n = document.createElement('em');
-        n.textContent = `${Math.min(have, input.count)}/${input.count}`;
+        n.textContent = `${Math.min(have, need)}/${need}`;
         cell.append(itemIcon(input.item), n);
         cell.title = RESOURCE_NAMES[input.item];
       });
       row.classList.toggle('missing', !ok);
+      // + y -: solo en lo apilable (el autor), y cada uno hasta su tope.
+      const stacks = stackMax(r.output) > 1;
+      const [more, less] = Array.from(row.querySelectorAll<HTMLButtonElement>('.qty button'));
+      more.disabled = !stacks || times >= most;
+      less.disabled = !stacks || times <= 1;
+      row.querySelector('.qty')?.classList.toggle('off', !stacks);
     }
   }
 

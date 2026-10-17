@@ -11,24 +11,80 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los iconos a un multiplo entero de su rejilla (2026-10-17).
+ * Ronda: las correcciones a los iconos (2026-10-17): fabricar N, el mantener
+ * de 1 s, la durabilidad, las categorias con icono y los botones cuadrados.
  */
 export default [
-  // USAR con su icono a 32 px, como antes: solo se ve en el movil.
+  // El + sin tope: sigue habilitado pasado lo que alcanza.
   {
-    nombre: 'multiplo de 24: USAR a 32 px',
-    fichero: 'packages/client/index.html',
-    de: '      #use svg { width: 48px; height: 48px; }',
-    a: '      #use svg { width: 32px; height: 32px; }',
-    prueba: 'smoke:mobile',
+    nombre: 'correcciones: el + sin tope',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: '      more.disabled = !stacks || times >= most;',
+    a: '      more.disabled = !stacks;',
+    prueba: 'smoke:stations',
   },
-  // Las casillas otra vez encogiendo el icono a lo que cabe (la barra de PC
-  // lo dejaba en 46).
+  // El nucleo fabrica una aunque se pidan N.
   {
-    nombre: 'multiplo de 24: el icono encoge con la casilla',
+    nombre: 'correcciones: fabricar una aunque se pidan N',
+    fichero: 'packages/sim/src/tick.ts',
+    de: 'craftNear(world, entities, playerId, inventory, intent.craft, intent.craftTimes)',
+    a: 'craftNear(world, entities, playerId, inventory, intent.craft)',
+    prueba: 'smoke:stations',
+  },
+  // tryCraft no multiplica: lo mira el test.
+  {
+    nombre: 'correcciones: tryCraft ignora las veces',
+    fichero: 'packages/sim/src/systems/gathering.ts',
+    de: '  const n = Math.floor(times);',
+    a: '  const n = 1;',
+    prueba: 'test:tests/craft-times.test.ts',
+  },
+  // El tope sin mirar el sitio.
+  {
+    nombre: 'correcciones: el tope no mira el sitio',
+    fichero: 'packages/sim/src/systems/gathering.ts',
+    de: '  while (n > 0 && !fits(n)) n--;',
+    a: '',
+    prueba: 'test:tests/craft-times.test.ts',
+  },
+  // La barra de desgaste tambien con la herramienta entera.
+  {
+    nombre: 'correcciones: la barra a desgaste entero',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: '      if (wear >= tool.uses) {',
+    a: '      if (false) {',
+    prueba: 'smoke:stations',
+  },
+  // El mantener otra vez de 1,5 s.
+  {
+    nombre: 'correcciones: mantener 1,5 s',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: 'export const CRAFT_HOLD_MS = 1000;',
+    a: 'export const CRAFT_HOLD_MS = 1500;',
+    prueba: 'smoke:stations',
+  },
+  // Las categorias con su nombre escrito, sin icono.
+  {
+    nombre: 'correcciones: las categorias sin icono',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: "        if (art) tab.appendChild(pixelIcon(art, 'catIcon'));",
+    a: '        if (art) tab.textContent = cat;',
+    prueba: 'smoke:stations',
+  },
+  // Los botones redondos otra vez.
+  {
+    nombre: 'correcciones: los botones redondos',
     fichero: 'packages/client/index.html',
-    de: '      .slot .itemIcon, .slot .equipIcon { flex: none; width: 48px; height: 48px; }',
-    a: '      .slot .itemIcon, .slot .equipIcon { flex: none; width: min(48px, 100%); height: min(48px, 100%); }',
+    de: '      #proj, #thumbPad button, .round { border-radius: 12px; }',
+    a: '      #proj, #thumbPad button, .round { border-radius: 50%; }',
     prueba: 'smoke:desktop',
+  },
+  // El arco de antes: con cajas, sus esquinas se pisan.
+  {
+    nombre: 'correcciones: el arco de 84 con botones cuadrados',
+    fichero: 'packages/client/index.html',
+    de: '      :root { --modeb: 44px; --arc: 102px; }',
+    a: '      :root { --modeb: 44px; --arc: 84px; }',
+    prueba: 'smoke:mobile',
   },
 ];
