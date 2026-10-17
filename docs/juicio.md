@@ -21,7 +21,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Iconos: **las reglas de estilo que saque de tu referencia**: contorno oscuro de 1 pixel alrededor de todo (`#1d1a26`, lo afirma un test), luz arriba a la izquierda, 3-4 tonos por material y 1 pixel de margen. Las hojas las aprobaste; las reglas, escritas asi, no las has visto | `docs/guia-de-arte.md`, directriz 5 | la paleta y un test |
 | Iconos: **una paleta comun** de 61 colores por material (madera, corteza, piedra, hierro, cobre, carbon, hoja, baya, carne, hueso, fibra, piel, pluma, caparazon, fuego…), de la que salen los 30 | `docs/guia-de-arte.md`, directriz 5 | `ITEM_PALETTE` |
 | Iconos: **48 px en las casillas**, el doble exacto de la rejilla, para que cada pixel mida 2; donde la casilla es menor, encoge con ella. La cantidad y el desgaste van encima, con sombra | `docs/recoleccion.md`, el panel | un numero en `index.html` |
-| Iconos: **los botones a 24 px**, su rejilla a 1×, salvo ATAQUE (48), INVENTARIO (36) y AUTO SALTO (18); y los diseños de los cuatro que eran un caracter (CORRER, SALTAR, AUTO SALTO y el bioma) | `docs/controles.md`, los botones | numeros en `index.html` |
+| Iconos: **los botones a 24 px**, su rejilla a 1×, salvo ATAQUE (48), USAR (32), INVENTARIO (36) y AUTO SALTO (18), los tamaños que ya tenian; esos tres no son multiplos de 24 y sus pixeles salen desiguales (lo mismo los iconos que encogen con una casilla pequeña); y los diseños de los cuatro que eran un caracter (CORRER, SALTAR, AUTO SALTO y el bioma) | `docs/controles.md`, los botones | numeros en `index.html` |
 | Iconos: **la linea del registro de lo recogido mide 26 px** (era 15), para el icono de 24 | `docs/recoleccion.md`, el registro | `FEED_LINE` |
 | Fisica Minecraft: **el ancho** de cada especie y etapa es el de sus partes `hit` de lado a lado, y **el lomo**, lo alto del tronco (o del caparazon). Hoy, ciervo adulto 0,48 × 0,48 × 1,08; bisonte 1,24 × 1,24 × 1,58 | `docs/fauna.md`, el choque | `collisionBoxOf` |
 | Fisica Minecraft: **la subida**: tus 0,5 en 0,1 s son 5 m/s en vertical (`CLIMB_SPEED`); se sigue andando mientras sube, y la caja puede asomar un instante dentro del borde que esta subiendo | `docs/reglas.md`, regla 21 | un numero |
@@ -48,7 +48,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Una caja por objeto: las **medidas por casilla** (el nacimiento, `reachableArea`, `analyze-world`) siguen contando una casilla con tronco o roca como que no se cruza: miden **por lo bajo** de lo que el cuerpo recorre | Una caja por objeto, mas abajo | una regla en `World.isSolidAt` |
 | Una caja por objeto: las **medidas de las cajas** (la roca 0,9 de ancho y 1,0 de alto, sacadas de su dibujo) ahora tambien chocan: entre dos rocas vecinas no se pasa, y una se sube de un salto | `sim/boxes.ts` | numeros en `ROCK_BOX` |
 | Cajas de depuracion: **12 casillas** a la redonda; el **jugador de los pies a los ojos**; se rehacen en cada fotograma | `docs/devtools.md`, las cajas | numeros en `debug-boxes.ts` |
-| El boton de desarrollo del movil: una **llave inglesa de trazo** (como el resto de esa columna, a falta de tu juicio sobre la directriz 3), y el **panel al lado de la columna**, como el HUD | `docs/devtools.md`, el movil | un icono y una regla CSS |
+| El boton de desarrollo del movil: el **panel al lado de la columna**, como el HUD (la llave inglesa, en pixelart desde el 2026-10-17, la aprobaste en la hoja) | `docs/devtools.md`, el movil | una regla CSS |
 | Equipables: los **usos de las armas**, 30, 90 y 180, tres cuartos de los de la herramienta de su material (tu pediste «menos») | Equipables, mas abajo | tres numeros en `toolStats` |
 | Equipables: **que gasta un golpe**: lo que da impacto (un animal, o algo que se trabaja); al aire o a un brote, nada; **uno por golpe y por objeto**, asi un barrido a un animal y un arbol gasta uno del arma puesta y otro de la mano | Equipables, mas abajo | una regla en `tryHarvestArea` |
 | Equipables: **soltar sobre lo puesto lo intercambia** si lo puesto se podria quitar (la espada sobre el punal, la mochila sobre la bolsa con sus casillas vacias) | Equipables, mas abajo | una regla en `Inventory.moveWorn` |
@@ -92,7 +92,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La noche como **vela sobre la pantalla**, no bajando las luces | El isometrico se retira | trabajo de verdad si se quiere luz |
 | Sin `?seed` se juega un mundo al azar (el 3D usaba siempre el 12345) | El isometrico se retira | una linea |
 | Salud y hambre **sin numero** en los anillos | La franja de salud y hambre | CSS |
-| Los iconos de los botones y la «i» del HUD en **monocromo**, como el ojo; a color solo el corazon y los cubiertos | La franja de salud y hambre | SVG |
+| A color solo **el corazon y los cubiertos**, en el rojo y el naranja de su anillo (que los botones van en monocromo es tuyo desde el 2026-10-17) | La franja de salud y hambre | CSS en `index.html` |
 | El dedo de ACCION no gira la camara hasta moverse **6 px** (`TAP_SLOP`), para que el pulgar quieto no de tirones | `docs/controles.md`, el dedo de ACCION | un numero |
 | Primera persona: catalejo hasta **15°** (el campo de vision ya es tuyo: 70-120, 70 por defecto) | `docs/controles.md`, las tres vistas | un numero en `camera.ts` |
 | Sensibilidad del raton capturado: **0,0025 rad por pixel** (unos 0,14 grados) | El raton lleva la mirada | un numero en `camera.ts` |
@@ -110,7 +110,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Las estaciones se apilan **hasta 100** como un material; herramientas y prendas, de una en una | Recoleccion y fabricacion, tanda 2 | `stackMax` |
 | Nivel de las herramientas: **piedra 1, cobre 2, hierro 3** (el hierro pide 2) | Recoleccion y fabricacion, tanda 2 | `toolStats` |
 | El **dibujo** de la mesa (tablas, cuadricula arriba, patas, sierra y martillo) y del horno (ladrillo, boca con brasa, tiro arriba); el frente mira **hacia quien la puso** desde la 7.ª ronda (en la diagonal exacta gana el eje y, deduccion mia) | Recoleccion y fabricacion, tanda 2 | `stations-view.ts` |
-| Nombres cortos y descripciones de los objetos nuevos; los huecos de ropa vacios dicen «Espalda» y «Cintura» | Recoleccion y fabricacion, tanda 2 | texto en `inventory-ui.ts` |
+| Las descripciones de los objetos nuevos (los nombres cortos de las casillas se fueron con los iconos, 2026-10-17) | Recoleccion y fabricacion, tanda 2 | texto en `inventory-ui.ts` |
 | «Materiales de metal» en el panel de desarrollo: lo justo para toda la tanda 2 | Recoleccion y fabricacion, tanda 2 | quitarlo |
 | Con el inventario abierto **se salta** (tu dijiste «solo moverse») | Ajustes de la tanda 2 | una linea en `main.ts` |
 | El modo de golpe **arranca en barrido** y no se recuerda entre partidas | Ajustes de la tanda 2 | una linea |
@@ -144,7 +144,6 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El salto cobra su 0,25 % **al despegar**, no al pulsar: pulsar en el aire no cobra | Ajustes de la tanda 2, 3.ª ronda | una linea en `tick.ts` |
 | Saltar el tiempo (`skipTime`) gasta hambre **como quieto** | Ajustes de la tanda 2, 3.ª ronda | — |
 | Zona del joystick **sin medir** (antes de que aparezcan los botones tactiles): el cuadrante de antes | Ajustes de la tanda 2, 3.ª ronda | una linea en `gestures.ts` |
-| Cubiertos: la cuchara **3,2** a la izquierda y el tenedor **1,5** a la derecha; puas a **3,2** de eje a eje | Ajustes de la tanda 2, 3.ª ronda | SVG en `index.html` |
 | La **estocada** nace en el punto de pantalla **(0,55; −0,55)** —abajo a la derecha, en coordenadas normalizadas— a la **profundidad de los ojos** (al menos 1 delante de la camara) | Ajustes de la tanda 2, 2.ª ronda | `STAB_SCREEN` en `effects.ts` |
 | Anillos del movil de **80 px** (USAR 64, ATAQUE 96), con un **disco oscuro** detras, **hambre primero** como en PC, a 12 px del borde y 10 entre ellos | Ajustes de la tanda 2, 2.ª ronda | CSS en `index.html` |
 | **TAB** tambien enciende el boton MODO de PC; la luz dura lo que el toque y **al menos 150 ms**, como USAR y SALTAR | Ajustes de la tanda 2, 2.ª ronda | una linea en `controls.ts` |
@@ -160,7 +159,6 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Los ocho equipables sin ropa todavia se ven **apagados** | Inventario de los bocetos | CSS |
 | La zona de lo seleccionado mide siempre lo mismo (una descripcion larga se desliza dentro); en PERSONAJE describe la prenda tocada | Ajustes del inventario, 2.ª ronda | CSS |
 | Usar mirando a algo que no es una estacion **aun no hace nada** | Inventario de los bocetos | llega con puertas y demas |
-| Los **dibujos** de los iconos: mano abierta, espada y pico cruzados, mochila, tres barras | Ajustes del inventario | SVG en `index.html` |
 | Pestanas del movil en letra de **16 px**, subrayada la elegida | Ajustes del inventario | CSS |
 | El **dibujo nuevo del ataque**: espada con hoja de contorno, guarda y pomo, y pico en media luna; el mango se corta bajo la hoja | Ajustes, 3.ª ronda | SVG en `index.html` |
 | La rueda: **hacia abajo, la siguiente**; **una muesca, una casilla**; un trackpad acumula **50 px** por casilla; da la vuelta | Ajustes, 3.ª ronda | numeros en `controls.ts` |
