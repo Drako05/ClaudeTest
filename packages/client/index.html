@@ -114,7 +114,9 @@
         right: calc(12px + var(--atk) + 10px + env(safe-area-inset-right));
         bottom: calc(10px + env(safe-area-inset-bottom));
       }
-      #use svg { width: 32px; height: 32px; }
+      /* Los iconos de los botones, a un multiplo entero de su rejilla de 24 (el
+         autor, 2026-10-17: solo el icono, el boton se queda como esta). */
+      #use svg { width: 48px; height: 48px; }
       /* MODO y ENTRADA, mas pequenos que USAR, en un arco alrededor del ataque
          a la misma distancia de su centro (boceto del autor, 2026-10-01):
          ENTRADA arriba, hacia SALTAR, a 117 grados, y MODO abajo a la
@@ -153,7 +155,7 @@
         right: calc(12px + var(--side) / 2 + var(--side) / 2 * .7071 - var(--autob) / 2 + env(safe-area-inset-right));
         bottom: calc(10px + var(--atk) + 12px + var(--side) / 2 + var(--side) / 2 * .7071 - var(--autob) / 2 + env(safe-area-inset-bottom));
       }
-      #autoJump svg { width: 18px; height: 18px; }
+      #autoJump svg { width: 24px; height: 24px; }
       /* Los anillos de salud y hambre, los mismos de PC, uno al lado del otro en
          la esquina de abajo a la izquierda y apoyados en el borde de abajo de
          ATAQUE y USAR (decisiones del autor, 2026-09-30). Entre USAR y ATAQUE
@@ -167,7 +169,7 @@
       }
       body.touch-active #hungerRing { left: calc(12px + env(safe-area-inset-left)); }
       body.touch-active #healthRing { left: calc(12px + var(--ringm) + 10px + env(safe-area-inset-left)); }
-      body.touch-active .ringIcon { width: 36px; height: 36px; }
+      body.touch-active .ringIcon { width: 48px; height: 48px; }
 
       /*
         Arriba en el movil (boceto del autor): OTROS a la izquierda, la barra de
@@ -426,8 +428,9 @@
       #modeBar.on {
         background: rgba(60, 104, 168, .86); border-color: rgba(170, 214, 255, .75); color: #f4f9ff;
       }
-      /* La mochila, mas grande que los demas iconos redondos (pedido del autor). */
-      #invOpen svg { width: 36px; height: 36px; }
+      /* La mochila, mas grande que los demas iconos redondos (pedido del autor):
+         al doble de su rejilla, que llega justo al borde del redondo. */
+      #invOpen svg { width: 48px; height: 48px; }
       /* En el movil la barra y el INVENTARIO vuelven arriba, los anillos a su
          esquina (arriba, con el racimo del pulgar), y el MODO de PC no esta. */
       body.touch-active #bottomBar,
@@ -513,14 +516,19 @@
       #charGrid .slot { width: var(--eq); height: var(--eq); }
       /* El icono de lo que va en cada casilla vacia (`equip-icons.ts`):
          silueta de un color en pixelart de 24 (directrices 3 y 5 de la guia de
-         arte), al doble exacto en una casilla de 60. */
-      #charGrid .slot .equipIcon {
-        flex: none; width: calc(var(--eq) * .8); height: calc(var(--eq) * .8); color: #6f82a0;
+         arte). */
+      #charGrid .slot .equipIcon { color: #6f82a0; }
+      /* El icono de un objeto (`item-icons.ts`, directriz 5): pixelart a color.
+         El numero y el desgaste van encima, abajo. Los dos, siempre a un
+         multiplo entero de su rejilla (el autor, 2026-10-17: la casilla se
+         queda como esta): a 48 si cabe y a 24 si no. «Cabe» es 40 px de
+         contenido: el dibujo trae un pixel de margen transparente, 2 px a 48,
+         y puede invadir el relleno de la casilla sin perder nada. */
+      .slot { container-type: inline-size; }
+      .slot .itemIcon, .slot .equipIcon { flex: none; width: 48px; height: 48px; }
+      @container (max-width: 39.9px) {
+        .slot .itemIcon, .slot .equipIcon { width: 24px; height: 24px; }
       }
-      /* El icono de un objeto (`item-icons.ts`, directriz 5): pixelart a color,
-         a 48 px (el doble exacto de su rejilla) en las casillas de 60, y lo que
-         cabe en las menores. El numero y el desgaste van encima, abajo. */
-      .slot .itemIcon { flex: none; width: min(48px, 100%); height: min(48px, 100%); }
       .slot em { text-shadow: 0 1px 0 #000, 0 0 3px #000; z-index: 1; }
       .slot .wear { z-index: 1; }
       /* La hoja de los iconos (`?iconos=1`, `icon-sheet.ts`): encima de todo,

@@ -179,7 +179,9 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
    enteras en `docs/reglas.md`, asi que lo que cambie en una cambia en las dos.
 2. `docs/juicio.md`, «Esperando tu juicio»: cada fila **sigue existiendo en
    el juego**. Una deduccion sobre un boton que ya no existe no espera el
-   juicio de nadie.
+   juicio de nadie. **Se buscan en el codigo los literales de cada fila** de
+   la parte tocada (los textos entre «…» y los numeros): si no estan, la fila
+   miente (#32: «Espalda» y «Cintura» sobrevivieron tres auditorias).
 3. Secciones de historia («HECHO», «SUSTITUIDO»): si el presente las
    contradice, llevan su «*Luego*: …» en una linea. La historia no se reescribe,
    se anota.
@@ -219,6 +221,12 @@ el codigo delante.
   verticales contra horizontales, tiempo escalado contra real.
 - **Entradas raras**: rueda de trackpad contra la de raton, toque contra raton
   en el mismo boton, teclas con el cursor capturado o sin capturar.
+- **Un dibujo que cambia de formato** (#31): si la tanda cambia como se
+  pinta algo (vector a pixelart, sprite a modelo), cada regla que lo escala o
+  transforma (`transform`, `scale`, `width`) se relee con el formato nuevo, y
+  se captura ampliado el resultado compuesto en cada estado, no las piezas
+  sueltas. En pixelart, un tamano que no es multiplo entero de la rejilla
+  pinta pixeles desiguales.
 - **Algo nuevo que se mueve o tapa** (#24): si la tanda mete en la escena algo
   que se mueve por su cuenta o tapa (la fauna), repasa cada medida en pixeles
   (`slash`, la sonda de profundidad, `shots`) y aislala de ello (`?fauna=0`).

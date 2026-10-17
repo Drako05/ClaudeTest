@@ -397,6 +397,39 @@ Formato:
 
 ---
 
+### 31. Un dibujo pasado a otro formato, con el CSS del formato viejo (2026-10-17)
+- **Que paso**: los botones pasaron de vectores de trazo a pixelart de 24 ×
+  24. El ojo de la primera persona —la vista de arranque— seguia encogiendo
+  su pupila con `transform: scale(.55)`, que en un vector no se nota y en
+  pixelart pinta pixeles mas pequenos que los del resto del icono, fuera de
+  la rejilla. La hoja de revision ensenaba cada pieza del ojo suelta, nunca
+  compuesta como la ve el jugador, y el humo solo miraba que el ojo llevara
+  la clase `.fp`.
+- **Por que se escapo**: la tanda cambio el contenido de los `<svg>` y dejo
+  intactas las reglas CSS que los transforman; nadie las releyo con el
+  formato nuevo en la cabeza. Y la revision del autor fue de piezas, no del
+  resultado.
+- **Que lo habria visto**: al cambiar el formato de un dibujo, listar cada
+  regla que lo escala, recorta o transforma (`transform`, `width`, `scale`)
+  y mirarla con el formato nuevo; y capturar el resultado compuesto en cada
+  estado, ampliado.
+- **Donde vive ahora**: lente G, «un dibujo que cambia de formato»; el humo
+  mira que en primera persona la pupila grande no se ve y la mira si.
+
+### 32. Una fila de juicio sobre algo que el codigo ya no tiene (2026-10-17)
+- **Que paso**: `docs/juicio.md` decia que «los huecos de ropa vacios dicen
+  "Espalda" y "Cintura"». Esos textos no existen desde el 2026-10-04, cuando
+  PERSONAJE paso a catorce casillas con icono: tres auditorias pasaron por
+  encima. En la misma tabla, dos filas median los dibujos de trazo que esta
+  tanda retiro.
+- **Por que se escapo**: la lente F pregunta si cada fila «sigue existiendo
+  en el juego», pero nadie buscaba sus literales: se leia la fila y sonaba
+  plausible.
+- **Que lo habria visto**: para cada fila de la parte tocada, buscar en el
+  codigo sus literales entre comillas («…») y sus numeros. Si no estan, la
+  fila miente.
+- **Donde vive ahora**: lente F, punto 2, con el metodo concreto.
+
 ## Del proceso del agente
 
 Fallos de como trabaja el agente, no del codigo. Tambien se repiten.

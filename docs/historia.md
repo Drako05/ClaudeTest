@@ -11,6 +11,120 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Los iconos en pixelart — HECHA (2026-10-17)
+
+**El pedido del autor, literal**, con una imagen de referencia (iconos de
+juego de unos 16-20 pixeles, contorno oscuro, 3-4 tonos, luz arriba a la
+izquierda, sobre fondo oscuro):
+
+> La siguiente tanda quiero que sea de iconos. vamos a generar svg para cada
+> objeto disponible actualmente en el juego. quiero que tengan aspecto
+> pixelart HD. te mande una imagen de referencia.
+
+**Sus respuestas:**
+- Rejilla de **24 × 24**.
+- El icono **en vez del nombre** donde hoy se ve un objeto: la barra, la
+  rejilla, las recetas y sus ingredientes, lo arrastrado y la zona de lo
+  seleccionado. El nombre queda al pasar el raton y en la descripcion. Y en el
+  aviso de lo recogido, **icono y texto**.
+- Sus palabras: «Los iconos de items seran pixelart a color. los iconos de las
+  casillas vacias del inventario y de los botones siguen siendo siluetas
+  monocromaticas. pero en esta tanda incluye pasar los iconos de casillas
+  vacias de inventario y los iconos de los botones a pixelart 24x24».
+- Tambien los cuatro botones de caracter (», ↑, A y el 🌿 de bioma).
+- **Revision**: primero una hoja con los 30, que aprueba o corrige; despues,
+  al juego.
+
+**El plan, por rondas**:
+1. El formato, la paleta y los 30 objetos, y su hoja.
+2. Las 14 siluetas de PERSONAJE y los iconos de boton (salieron 20), y su hoja.
+3. La integracion en la interfaz, el humo, las mutaciones, la documentacion,
+   la CI y `main`.
+
+**Donde va cada cosa**:
+- `client/src/pixel-art.ts`: el formato. Cada icono son 24 filas de 24
+  caracteres; `.` es transparente.
+- `client/src/item-icons.ts`: los 30 objetos y su paleta comun.
+- La hoja: `?iconos=1` (`icon-sheet.ts`).
+- El test: `tests/pixel-icons.test.ts`.
+
+Las rejillas las saco de formas (elipses, poligonos, trazos), con el contorno
+y la luz puestos solos, con un generador que vive en el contenedor y muere con
+el. **Desde que estan en el repo, se retocan a mano, pixel a pixel.**
+
+**Ronda 1 — HECHA y APROBADA (2026-10-17)**: los 30, en la hoja. El autor:
+«Aprobados, adelante con la ronda 2».
+
+**Ronda 2 — HECHA y APROBADA (2026-10-17)**: el autor, «Aprobados, adelante
+con la ronda 3»: las 14 siluetas de
+PERSONAJE y los 20 iconos de boton, en `client/src/silhouette-icons.ts`, en
+la misma hoja. Son 20 porque el ojo son cuatro piezas que alterna el juego:
+abierto, pupila, entornado y la mira de la primera persona.
+- Los de PERSONAJE traducen a pixel los que el autor ya corrigio.
+- Los cuatro de caracter son lectura mia, por confirmar: correr con dos
+  galones, saltar con una flecha, el auto salto con una flecha que salta un
+  bloque, y el bioma con una ramita.
+- Duda mia, para el autor: las hombreras, a 24 pixeles, salen con aire de
+  corona.
+
+**Ronda 3 — HECHA (2026-10-17)**: al juego.
+- **Las casillas** (`paint()` en `inventory-ui.ts`) ponen `itemIcon(item)` a
+  48 px en vez del nombre; la cantidad y el desgaste, encima. Igual el
+  resultado y los ingredientes de las recetas, lo arrastrado y la zona de lo
+  seleccionado. PERSONAJE, al equipar, cambia la silueta por el icono.
+- **El registro**: «+5 [icono] Madera»; la linea pasa de 15 a 26 px.
+- **Los botones**: cada `<svg>` de `index.html` va vacio con `data-pixel` y se
+  rellena al arrancar (`installButtonIcons`, 22 piezas); los cuatro de
+  caracter tambien.
+- **El humo** lo afirma en `desktop` (casillas, ingredientes, registro y que
+  se rellenaron los 22), `mobile` (los ocho botones con su icono pintado) y
+  `devTools` (la hoja, con sus 64). Siete mutaciones.
+- **Docs**: la directriz 5 en `docs/guia-de-arte.md` y la 3 al dia;
+  `recoleccion.md`, `controles.md`, cinco filas en `juicio.md` y los retirados.
+
+## Auditoria al cerrar la fisica al estilo Minecraft (2026-10-14)
+
+**El alcance**: de `7e2d790` a `2b3e3cc`, nueve commits: la camara sin
+tirones (interpolar entre ticks, y el escalon suavizado que luego se retiro),
+la puerta de la vista de cerca de `slash`, `mobile` con el reloj manual, la
+fisica por fases (sustituida) y las cuatro fases de la fisica al estilo
+Minecraft —caja cuadrada, escalon tick a tick, salto a medida, empujes y
+modelos con las patas en el cuadrado—. La tanda, entera, en
+`docs/historia.md`.
+
+**Corregido:**
+- **Una comprobacion del humo que no veia lo nuevo** (escape 28): la pasada
+  `devTools` miraba las cajas del panel en el nacimiento, donde no hay ningun
+  animal a 12 casillas, y daba por bueno «en cian solo el jugador». Quitar del
+  panel la caja de los animales no la hacia caer. Ahora cuenta aparte los
+  cuerpos y las partes de los animales (`boxesNear`) y se repite junto a un
+  animal: mutada, cae por las dos vias.
+- **Una doc suelta** (escape 29): `keepIn` quedo entre la doc de `stepFauna`
+  y la funcion. Y para que no vuelva, `tools/a-pruebas.sh` pasa ahora el
+  escaner entero y ensena sus avisos vivos antes de empujar.
+- **Un numero viejo** (escape 30): la cabecera de `push.ts` daba la caja del
+  bisonte de antes de la fase 4 (1,25; es 1,24). Las medidas viejas entran en
+  `retirados.md`.
+- **`massOf` solo la usaban los tests** (patron #26): `push.ts` repetia su
+  formula a mano. Ahora la usa, y su mutacion cae.
+- **Comentarios que decian que las partes de un animal chocan**
+  (`fauna-body.ts`, tres sitios): desde la caja cuadrada solo se golpean; la
+  cabecera de `movement.ts` cuenta ahora que entre cuerpos no hay choque sino
+  empujes.
+- **Historia sin su «*Luego*»**: tres secciones de `docs/historia.md` que
+  cuentan modelos ya sustituidos (el reposo por partes, la camara con retraso,
+  retroceder para girar).
+- `docs/fauna.md`, el coste de los empujes en «Lo que cuesta».
+
+**Ejecutado**: `npm run shots` y `tools/analyze-world.ts`, que la CI no
+corre, funcionan; el escaner y su autoprueba; typecheck y 522 tests; las
+pasadas `devTools` y `fauna`; tres mutaciones nuevas, las tres caen.
+
+**Dejado a proposito**: las citas al reposo por partes y a su fichero en la
+historia (en `ignorar.md`, con su ambito); y el README dice que el jugador mide «dos
+bloques», cuando el sprite mide 1,93 y su caja 1,8: es una aproximacion de
+antes de esta tanda.
+
 ## La fisica de los animales al estilo Minecraft — HECHA (2026-10-14)
 
 El autor probo la fisica por fases (`520f018`; en `docs/historia.md`, «Lo que

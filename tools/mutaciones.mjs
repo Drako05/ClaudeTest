@@ -11,24 +11,24 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: la auditoria al cerrar los iconos en pixelart (2026-10-17).
+ * Ronda: los iconos a un multiplo entero de su rejilla (2026-10-17).
  */
 export default [
-  // El registro con solo el texto: la comprobacion se mudo al observador que
-  // ve nacer la linea.
+  // USAR con su icono a 32 px, como antes: solo se ve en el movil.
   {
-    nombre: 'auditoria: el registro sin el icono, visto al nacer',
-    fichero: 'packages/client/src/main.ts',
-    de: "      if (line.item >= 0) el.append(`${amount} `, itemIcon(line.item as Resource), ` ${name.join(' ')}`);",
-    a: "      if (line.item >= 0) el.append(`${amount} ${name.join(' ')}`);",
-    prueba: 'smoke:desktop',
-  },
-  // La pupila grande, encogida otra vez debajo de la mira.
-  {
-    nombre: 'auditoria: la pupila grande en primera persona',
+    nombre: 'multiplo de 24: USAR a 32 px',
     fichero: 'packages/client/index.html',
-    de: '      #proj.fp .eye-pupil { display: none; }',
-    a: '      #proj.fp .eye-pupil { transform: scale(.55); transform-origin: 12px 12px; }',
+    de: '      #use svg { width: 48px; height: 48px; }',
+    a: '      #use svg { width: 32px; height: 32px; }',
+    prueba: 'smoke:mobile',
+  },
+  // Las casillas otra vez encogiendo el icono a lo que cabe (la barra de PC
+  // lo dejaba en 46).
+  {
+    nombre: 'multiplo de 24: el icono encoge con la casilla',
+    fichero: 'packages/client/index.html',
+    de: '      .slot .itemIcon, .slot .equipIcon { flex: none; width: 48px; height: 48px; }',
+    a: '      .slot .itemIcon, .slot .equipIcon { flex: none; width: min(48px, 100%); height: min(48px, 100%); }',
     prueba: 'smoke:desktop',
   },
 ];

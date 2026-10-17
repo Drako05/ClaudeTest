@@ -8,10 +8,9 @@ Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
 indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `2b3e3cc`, 2026-10-14** (la fisica al estilo
-Minecraft y lo que vino antes, desde `7e2d790`). La proxima parte de aqui: ver
-`.claude/skills/auditoria/` y «Auditoria al cerrar la fisica al estilo
-Minecraft», mas abajo.
+**Ultima auditoria: commit `ab51f9b`, 2026-10-17** (los iconos en pixelart,
+desde `2b3e3cc`). La proxima parte de aqui: ver `.claude/skills/auditoria/` y
+«Auditoria al cerrar los iconos en pixelart», mas abajo.
 
 **Como leerlo.** Desde el 2026-10-10 son tres ficheros, partidos como se partio
 `CLAUDE.md` el 2026-10-02 y por lo mismo: este se lee al empezar cada tanda, y
@@ -32,121 +31,44 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## TANDA EN CURSO: los iconos en pixelart (2026-10-17)
+## Auditoria al cerrar los iconos en pixelart (2026-10-17)
 
-**El pedido del autor, literal**, con una imagen de referencia (iconos de
-juego de unos 16-20 pixeles, contorno oscuro, 3-4 tonos, luz arriba a la
-izquierda, sobre fondo oscuro):
-
-> La siguiente tanda quiero que sea de iconos. vamos a generar svg para cada
-> objeto disponible actualmente en el juego. quiero que tengan aspecto
-> pixelart HD. te mande una imagen de referencia.
-
-**Sus respuestas:**
-- Rejilla de **24 × 24**.
-- El icono **en vez del nombre** donde hoy se ve un objeto: la barra, la
-  rejilla, las recetas y sus ingredientes, lo arrastrado y la zona de lo
-  seleccionado. El nombre queda al pasar el raton y en la descripcion. Y en el
-  aviso de lo recogido, **icono y texto**.
-- Sus palabras: «Los iconos de items seran pixelart a color. los iconos de las
-  casillas vacias del inventario y de los botones siguen siendo siluetas
-  monocromaticas. pero en esta tanda incluye pasar los iconos de casillas
-  vacias de inventario y los iconos de los botones a pixelart 24x24».
-- Tambien los cuatro botones de caracter (», ↑, A y el 🌿 de bioma).
-- **Revision**: primero una hoja con los 30, que aprueba o corrige; despues,
-  al juego.
-
-**El plan, por rondas**:
-1. El formato, la paleta y los 30 objetos, y su hoja.
-2. Las 14 siluetas de PERSONAJE y los iconos de boton (salieron 20), y su hoja.
-3. La integracion en la interfaz, el humo, las mutaciones, la documentacion,
-   la CI y `main`.
-
-**Donde va cada cosa**:
-- `client/src/pixel-art.ts`: el formato. Cada icono son 24 filas de 24
-  caracteres; `.` es transparente.
-- `client/src/item-icons.ts`: los 30 objetos y su paleta comun.
-- La hoja: `?iconos=1` (`icon-sheet.ts`).
-- El test: `tests/pixel-icons.test.ts`.
-
-Las rejillas las saco de formas (elipses, poligonos, trazos), con el contorno
-y la luz puestos solos, con un generador que vive en el contenedor y muere con
-el. **Desde que estan en el repo, se retocan a mano, pixel a pixel.**
-
-**Ronda 1 — HECHA y APROBADA (2026-10-17)**: los 30, en la hoja. El autor:
-«Aprobados, adelante con la ronda 2».
-
-**Ronda 2 — HECHA y APROBADA (2026-10-17)**: el autor, «Aprobados, adelante
-con la ronda 3»: las 14 siluetas de
-PERSONAJE y los 20 iconos de boton, en `client/src/silhouette-icons.ts`, en
-la misma hoja. Son 20 porque el ojo son cuatro piezas que alterna el juego:
-abierto, pupila, entornado y la mira de la primera persona.
-- Los de PERSONAJE traducen a pixel los que el autor ya corrigio.
-- Los cuatro de caracter son lectura mia, por confirmar: correr con dos
-  galones, saltar con una flecha, el auto salto con una flecha que salta un
-  bloque, y el bioma con una ramita.
-- Duda mia, para el autor: las hombreras, a 24 pixeles, salen con aire de
-  corona.
-
-**Ronda 3 — HECHA (2026-10-17)**: al juego.
-- **Las casillas** (`paint()` en `inventory-ui.ts`) ponen `itemIcon(item)` a
-  48 px en vez del nombre; la cantidad y el desgaste, encima. Igual el
-  resultado y los ingredientes de las recetas, lo arrastrado y la zona de lo
-  seleccionado. PERSONAJE, al equipar, cambia la silueta por el icono.
-- **El registro**: «+5 [icono] Madera»; la linea pasa de 15 a 26 px.
-- **Los botones**: cada `<svg>` de `index.html` va vacio con `data-pixel` y se
-  rellena al arrancar (`installButtonIcons`, 22 piezas); los cuatro de
-  caracter tambien.
-- **El humo** lo afirma en `desktop` (casillas, ingredientes, registro y que
-  se rellenaron los 22), `mobile` (los ocho botones con su icono pintado) y
-  `devTools` (la hoja, con sus 64). Siete mutaciones.
-- **Docs**: la directriz 5 en `docs/guia-de-arte.md` y la 3 al dia;
-  `recoleccion.md`, `controles.md`, cinco filas en `juicio.md` y los retirados.
-
----
-
-## Auditoria al cerrar la fisica al estilo Minecraft (2026-10-14)
-
-**El alcance**: de `7e2d790` a `2b3e3cc`, nueve commits: la camara sin
-tirones (interpolar entre ticks, y el escalon suavizado que luego se retiro),
-la puerta de la vista de cerca de `slash`, `mobile` con el reloj manual, la
-fisica por fases (sustituida) y las cuatro fases de la fisica al estilo
-Minecraft —caja cuadrada, escalon tick a tick, salto a medida, empujes y
-modelos con las patas en el cuadrado—. La tanda, entera, en
+**El alcance**: de `2b3e3cc` a `ab51f9b`: la auditoria anterior y las tres
+rondas de los iconos —el formato y los 30 objetos, las siluetas de PERSONAJE
+y de los botones, y su llegada al juego—. La tanda, entera, en
 `docs/historia.md`.
 
 **Corregido:**
-- **Una comprobacion del humo que no veia lo nuevo** (escape 28): la pasada
-  `devTools` miraba las cajas del panel en el nacimiento, donde no hay ningun
-  animal a 12 casillas, y daba por bueno «en cian solo el jugador». Quitar del
-  panel la caja de los animales no la hacia caer. Ahora cuenta aparte los
-  cuerpos y las partes de los animales (`boxesNear`) y se repite junto a un
-  animal: mutada, cae por las dos vias.
-- **Una doc suelta** (escape 29): `keepIn` quedo entre la doc de `stepFauna`
-  y la funcion. Y para que no vuelva, `tools/a-pruebas.sh` pasa ahora el
-  escaner entero y ensena sus avisos vivos antes de empujar.
-- **Un numero viejo** (escape 30): la cabecera de `push.ts` daba la caja del
-  bisonte de antes de la fase 4 (1,25; es 1,24). Las medidas viejas entran en
-  `retirados.md`.
-- **`massOf` solo la usaban los tests** (patron #26): `push.ts` repetia su
-  formula a mano. Ahora la usa, y su mutacion cae.
-- **Comentarios que decian que las partes de un animal chocan**
-  (`fauna-body.ts`, tres sitios): desde la caja cuadrada solo se golpean; la
-  cabecera de `movement.ts` cuenta ahora que entre cuerpos no hay choque sino
-  empujes.
-- **Historia sin su «*Luego*»**: tres secciones de `docs/historia.md` que
-  cuentan modelos ya sustituidos (el reposo por partes, la camara con retraso,
-  retroceder para girar).
-- `docs/fauna.md`, el coste de los empujes en «Lo que cuesta».
+- **El ojo de la primera persona salia fuera de la rejilla** (escape 31): el
+  CSS seguia encogiendo la pupila con `scale(.55)`, pensado para el vector, y
+  en pixelart pintaba pixeles mas pequenos que los del resto. Es la vista de
+  arranque. Ahora la mira lleva su propia pupila de 2 × 2, dibujada en la
+  rejilla, y la grande se oculta; el humo lo mira y su mutacion cae.
+- **Una comprobacion del humo que corria contra el reloj** (patron 13): la
+  del icono del registro leia las lineas en otra ida y vuelta, y cada una
+  vive 3 s. Ahora la mira el observador que ve nacer la linea.
+- **Filas de `docs/juicio.md` sobre lo que ya no existe** (escape 32): dos
+  median los dibujos de trazo retirados (los cubiertos y los iconos de los
+  botones), dos los citaban, y una hablaba de los huecos «Espalda» y
+  «Cintura», que no existen desde el 2026-10-04.
+- **USAR mide 32 px** y la documentacion de los tamanos no lo decia.
+- **CSS muerto**: el `font-size: 9px` de la barra del movil era del nombre.
+- Comentarios: el del ojo en `index.html` (eran dos formas y la clase
+  `.flat`; son cuatro piezas), y las cabeceras de los iconos dicen ahora que
+  el autor aprobo los dibujos.
 
-**Ejecutado**: `npm run shots` y `tools/analyze-world.ts`, que la CI no
-corre, funcionan; el escaner y su autoprueba; typecheck y 522 tests; las
-pasadas `devTools` y `fauna`; tres mutaciones nuevas, las tres caen.
+**Ejecutado**: el escaner y su autoprueba; `npm run shots` y
+`tools/analyze-world.ts`, que funcionan; typecheck y 531 tests; la pasada
+`desktop`; el ojo, capturado ampliado antes y despues; dos mutaciones nuevas.
 
-**Dejado a proposito**: las citas al reposo por partes y a su fichero en la
-historia (en `ignorar.md`, con su ambito); y el README dice que el jugador mide «dos
-bloques», cuando el sprite mide 1,93 y su caja 1,8: es una aproximacion de
-antes de esta tanda.
+**Dejado para el autor**: USAR (32 px), INVENTARIO (36) y AUTO SALTO (18) no
+eran multiplos de 24, y sus pixeles salian desiguales; lo mismo los iconos que
+encogian con una casilla pequena. **Lo decidio el mismo dia**: «Puedes ajustar
+solo el icono y dejar las casillas/botones del tamaño actual?». Hecho: todos a
+24 o 48 (tambien los anillos del movil, a 36, que cazo la comprobacion nueva
+del humo), y las casillas pasan a 24 donde no cabe el de 48.
+
+---
 
 ## Pendiente del autor: las paredes de 2+ voxeles
 
@@ -283,8 +205,17 @@ poco a poco. Estan en `docs/guia-de-arte.md`, con tu texto literal:
 1. **Lo que va en la piel se pinta en el cubo de su parte**: patrones del
    pelaje y ojos.
 2. **Lo delgado va en laminas cruzadas**, como los arboles.
+3. **Los iconos son siluetas de aventurero medieval** (2026-10-04); desde el
+   2026-10-17, en pixelart de 24 × 24 y aplicada tambien a los botones.
+4. **Las patas caben en el cuadrado de la caja** (2026-10-14), aplicada.
+5. **Los iconos son pixelart HD de 24 × 24; los objetos, a color**
+   (2026-10-17), aplicada a los 30 objetos, los 14 huecos y los botones.
 
 Lo que espera tu juicio:
+
+- **Las reglas que saque de tu referencia para la 5** (contorno de 1 pixel,
+  luz arriba a la izquierda, 3-4 tonos por material, una paleta comun):
+  aprobaste los dibujos, pero no las reglas escritas.
 
 - **Si mi lectura de la 1 vale.** Entraria tambien lo que hoy son cajas finas
   pegadas al cuerpo: la barriga clara, la grupa blanca, el disco del hocico, la

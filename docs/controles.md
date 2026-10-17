@@ -152,9 +152,11 @@ SALTAR, AUTO SALTO (era una «A») y el bioma (era 🌿). Viven en
 `silhouette-icons.ts` (`BUTTON_ROWS`): en `index.html` cada `<svg>` va vacio
 con su `data-pixel="nombre"` y se rellena al arrancar, asi que las clases que
 cambian de icono segun el estado (MODO, ENTRADA, el ojo) siguen en el CSS.
-Miden 24 px, su rejilla a 1×, salvo ATAQUE (48), USAR (32), INVENTARIO (36) y
-AUTO SALTO (18) (*deduccion*); esos tres ultimos no son multiplos enteros de
-24 y sus pixeles salen desiguales (pendiente del autor). Y **MODO** (2026-09-30) y **ENTRADA**
+**Siempre a un multiplo entero de su rejilla** (el autor, 2026-10-17: «ajusta
+solo el icono» y el boton se queda como esta), o sus pixeles salen desiguales:
+24 px, salvo ATAQUE, USAR, INVENTARIO y los anillos del movil, a 48 (cual va a
+cada uno es *deduccion*; eran 32, 36 y 36, y AUTO SALTO, 18). El humo mide
+todos los que se ven. Y **MODO** (2026-09-30) y **ENTRADA**
 (2026-10-01), mas pequenos que USAR y en un **arco alrededor del ataque**, a la
 misma distancia de su centro (boceto del autor): ENTRADA arriba, hacia SALTAR,
 y MODO abajo a la izquierda, encima de USAR; radio y tamano, mios. MODO: un
