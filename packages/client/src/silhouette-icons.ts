@@ -6,7 +6,8 @@
  * El mismo formato que los objetos (`pixel-art.ts`): `#` es la silueta,
  * pintada con `currentColor`, y `.` lo transparente. Los detalles van
  * calados, en transparente. **Los dibujos son mios**: los de PERSONAJE
- * traducen a pixel los que el autor ya corrigio (2026-10-04).
+ * traducen a pixel los que el autor ya corrigio (2026-10-04). El autor los
+ * aprobo en la hoja de la ronda 2 (2026-10-17).
  */
 
 import { Equip } from '@verdant/shared';
@@ -587,7 +588,7 @@ const BUTTON_ROWS = {
     '........................',
     '........................',
   ],
-  // Su pupila (encoge en primera persona)
+  // Su pupila (en primera persona se oculta: la mira lleva la suya, pequena)
   eyePupil: [
     '........................',
     '........................',
@@ -654,8 +655,8 @@ const BUTTON_ROWS = {
     '........##....##........',
     '........#......#........',
     '.......#........#.......',
-    '.......#........#.......',
-    '.......#........#.......',
+    '.......#...##...#.......',
+    '.......#...##...#.......',
     '.......#........#.......',
     '........#......#........',
     '........##....##........',
@@ -964,9 +965,9 @@ export const BUTTON_NAMES: Readonly<Record<ButtonIcon, string>> = {
   inputTap: 'ENTRADA toque: la mano con el indice tocando',
   action: 'ATAQUE: la espada y el pico cruzados',
   eyeOpen: 'El ojo abierto (perspectiva)',
-  eyePupil: 'Su pupila (encoge en primera persona)',
+  eyePupil: 'Su pupila (en primera persona, la de la mira)',
   eyeFlat: 'El ojo entornado (ortografica)',
-  eyeAim: 'La mira de la primera persona, encima del ojo',
+  eyeAim: 'La mira de la primera persona, con su pupila pequena, encima del ojo',
   info: 'La «i» de informacion',
   others: 'OTROS: tres barras',
   inventory: 'INVENTARIO: la mochila de explorador',

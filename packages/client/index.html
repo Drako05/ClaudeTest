@@ -51,10 +51,11 @@
       #proj:not(.flat) .eye-flat { display: none; }
       /* `.fp` es la primera persona: el ojo abierto con un punto de mira encima
          —un anillo alrededor de la pupila y dos marcas arriba y abajo—, «ves a
-         traves de sus ojos». Eleccion del autor. */
+         traves de sus ojos». Eleccion del autor. La pupila pequena va en la
+         mira, dibujada en la rejilla: encoger la grande la sacaba de ella. */
       #proj .eye-aim { display: none; }
       #proj.fp .eye-aim { display: inline; }
-      #proj.fp .eye-pupil { transform: scale(.55); transform-origin: 12px 12px; }
+      #proj.fp .eye-pupil { display: none; }
       #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
       /*
         Los mandos del pulgar, segun el boceto del movil del autor: el ATAQUE,
@@ -622,7 +623,7 @@
         top: calc(12px + env(safe-area-inset-top)); bottom: auto;
         grid-template-columns: repeat(4, min(56px, (100vw - 166px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 4));
       }
-      body.touch-active #hotbar .slot { width: 100%; font-size: 9px; }
+      body.touch-active #hotbar .slot { width: 100%; }
 
       /* En el movil, una pagina a la vez, entre la fila de arriba y los mandos. */
       body.touch-active #invPanel {
@@ -971,8 +972,9 @@
       </button>
     </div>
     <!-- El ojo: en SVG y no un emoji, porque 👁 se pinta a color y distinto en
-         cada sistema, y aqui tiene que ir monocromo como el resto de glifos.
-         Las dos formas viven en el mismo SVG y las alterna la clase `.flat`. -->
+         cada sistema, y aqui tiene que ir monocromo como el resto de iconos.
+         Sus cuatro piezas viven en el mismo SVG y las alternan las clases del
+         boton: abierto con su pupila, entornado con `.flat` y la mira con `.fp`. -->
     <button id="proj" type="button" aria-label="Vista en perspectiva; tocar para ortográfica">
       <svg viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">
         <g class="eye-open" data-pixel="eyeOpen"></g>

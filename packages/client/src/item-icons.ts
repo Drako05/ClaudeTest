@@ -8,7 +8,8 @@
  * arriba a la izquierda y sombra abajo a la derecha, 3-4 tonos por material, y
  * los de una misma familia iguales salvo el material (hachas, picos, espadas,
  * lingotes, minerales). Salen todos de **una paleta comun**, por material, para
- * que se lean como una familia.
+ * que se lean como una familia. El autor aprobo los dibujos en la hoja de la
+ * ronda 1 (2026-10-17); las reglas, escritas asi, siguen por confirmar.
  *
  * El formato, en `pixel-art.ts`: 24 filas de 24 caracteres, `.` transparente.
  */

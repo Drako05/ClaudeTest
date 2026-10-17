@@ -619,11 +619,6 @@ async function desktopPass(browser, baseUrl) {
   // Lo que dice y lo que se pinta, leidos a la vez: una linea vive 3 s.
   const painted = await page.evaluate(() => [window.__verdant.feed.length, document.querySelectorAll('#pickupFeed div').length]);
   check(painted[0] === painted[1], `el registro no se pinta: ${painted}`);
-  // Y cada linea lleva el icono de su objeto entre la cantidad y el nombre
-  // (el autor, 2026-10-17: «+5 [icono] Madera»).
-  const feedIcons = await page.evaluate(() => Array.from(document.querySelectorAll('#pickupFeed div'))
-    .map((el) => !!el.querySelector('svg.itemIcon path') && /^[+-]\d+ +\S/.test(el.textContent)));
-  check(feedIcons.length > 0 && feedIcons.every(Boolean), `el registro no lleva el icono del objeto: ${JSON.stringify(feedIcons)}`);
   // En PC, encima del boton INVENTARIO y bajando hacia el (pedido del autor,
   // 2026-10-02). Lo mide la propia pagina, porque cada ida y vuelta se come la
   // vida de la linea (3 s) en este navegador lento: con el registro vacio, un
@@ -639,6 +634,10 @@ async function desktopPass(browser, baseUrl) {
       const el = box.firstElementChild;
       if (!el) return;
       watch.disconnect();
+      // Y lleva el icono de su objeto entre la cantidad y el nombre (el autor,
+      // 2026-10-17: «+5 [icono] Madera»). Se mira al nacer: leerla despues,
+      // en otra ida y vuelta, era una carrera contra sus 3 s (escape 13).
+      const icon = !!el.querySelector('svg.itemIcon path') && /^[+-]\d+ +\S/.test(el.textContent);
       requestAnimationFrame(() => {
         const r0 = el.getBoundingClientRect();
         // Hasta que se mueva o pasen 2,5 s, dentro de su vida de 3: un plazo
@@ -654,7 +653,7 @@ async function desktopPass(browser, baseUrl) {
           const button = document.getElementById('invOpen').getBoundingClientRect();
           const mid = r1.left + r1.width / 2;
           const above = el.isConnected && r1.bottom <= button.top + 0.5 && mid >= button.left && mid <= button.right;
-          window.__feedPc = { above, y0: r0.y, y1: r1.y, alive: el.isConnected };
+          window.__feedPc = { above, y0: r0.y, y1: r1.y, alive: el.isConnected, icon, text: el.textContent };
         };
         setTimeout(look, 100);
       });
@@ -668,6 +667,7 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  registro en PC: encima de INVENTARIO ${feedPc?.above}, y ${feedPc?.y0.toFixed(1)} -> ${feedPc?.y1.toFixed(1)}`);
   check(feedPc !== null && feedPc.above, `el registro no va encima de INVENTARIO: ${JSON.stringify(feedPc)}`);
   check(feedPc !== null && feedPc.alive && feedPc.y1 > feedPc.y0, `el registro no baja hacia INVENTARIO: ${JSON.stringify(feedPc)}`);
+  check(feedPc !== null && feedPc.icon, `el registro no lleva el icono del objeto: ${JSON.stringify(feedPc)}`);
   // La cruz, en el centro exacto de la pantalla.
   const cross = await page.evaluate(() => document.getElementById('crosshair').getBoundingClientRect().toJSON());
   check(await page.isVisible('#crosshair') && Math.abs(cross.x + cross.width / 2 - 640) <= 1 && Math.abs(cross.y + cross.height / 2 - 360) <= 1,
@@ -1143,6 +1143,13 @@ async function desktopPass(browser, baseUrl) {
   const fp = await state(page);
   check(fp.projection === 'primera', `el ojo no cambio a primera persona (${fp.projection})`);
   check(await page.isVisible('#proj.fp'), 'el ojo no lleva la mira en primera persona');
+  // Con la mira, la pupila grande se va (la mira lleva la suya, en la rejilla):
+  // encogerla con CSS la sacaba del pixelart (auditoria de los iconos).
+  const eye = await page.evaluate(() => ['eye-aim', 'eye-pupil'].map((c) => {
+    const g = document.querySelector(`#proj .${c}`);
+    return getComputedStyle(g).display !== 'none' && g.getBoundingClientRect().width > 0;
+  }));
+  check(eye[0] && !eye[1], `el ojo de la primera persona no es la mira con su pupila pequena: ${JSON.stringify(eye)}`);
   check(fp.playerVisible === false, 'en primera persona se ve el cuerpo del personaje');
   // La barra del angulo: sale al PASAR el raton por el ojo, sin clic; salir
   // no la cierra, y cualquier accion —una tecla, un clic fuera— si.
