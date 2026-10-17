@@ -440,6 +440,30 @@ Formato:
 - **Donde vive ahora**: `tests/pixel-icons.test.ts`, «cada color de la paleta
   lo usa algun icono», con su mutacion.
 
+### 34. «Baja 2 px» medido solo en los iconos (2026-10-17)
+- **Que paso**: al pulsar, los botones de texto bajan su texto pasando 2 px
+  del relleno de abajo al de arriba. En el + y el - de las recetas, que miden
+  26 px de alto fijo, el texto va centrado en lo que queda, y 2 px de relleno
+  lo bajaban 1. El humo media el icono que baja, no el texto.
+- **Por que se escapo**: la comprobacion se escribio sobre el caso que se
+  enseno al autor (la categoria, con icono), y el resto se dio por igual.
+- **Que lo habria visto**: medir lo que de verdad baja (el texto, con un
+  `Range`) en cada clase de boton que la regla toca, no en uno.
+- **Donde vive ahora**: el humo `stations` mide el texto del + y el -
+  pulsados, con su mutacion; y la lente G, «un dibujo que cambia de
+  formato», pide medir cada clase de boton.
+
+### 35. Dos filas de juicio sobre un sitio que la tanda cambio (2026-10-17)
+- **Que paso**: la tanda movio MODO y ENTRADA y puso su fila nueva en
+  `docs/juicio.md`, pero dejo dos viejas: MODO «a 72 px del centro del
+  ataque» y «el arco de 84 px». Es el escape 32 otra vez, ahora dentro de la
+  propia tanda.
+- **Por que se escapo**: se buscaron en `juicio.md` las filas del valor que
+  cambiaba (el arco de 102), no todas las del mismo boton.
+- **Que lo habria visto**: al cambiar algo, buscar en `juicio.md` por el
+  NOMBRE de lo que cambia (`grep -n "MODO" docs/juicio.md`), no por su valor.
+- **Donde vive ahora**: lente F, punto 2.
+
 ## Del proceso del agente
 
 Fallos de como trabaja el agente, no del codigo. Tambien se repiten.

@@ -157,8 +157,9 @@ se mueve**: invierte sus luces y **baja solo el icono**, 2 px (el autor: «que
 sea solo el icono quien haga el efecto de bajar y el botón lo acompañe con el
 intercambio de luces»); encendido o abierto, igual, con el icono abajo («Sí, el
 icono abajo»). En los botones de texto (las pestanas, Cancelar y Tirar,
-Reiniciar, el panel de desarrollo, + y -) baja el texto: 2 px del relleno de
-abajo pasan arriba. **Los botones son solo
+Reiniciar, el panel de desarrollo, + y -) baja el texto 2 px: pasan 2 px del
+relleno de abajo al de arriba, salvo en + y -, que miden 26 de alto fijo y
+centran el texto en lo que queda, asi que llevan 4 arriba. **Los botones son solo
 iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
 USAR, espada y pico cruzados en ATAQUE, una **mochila** en INVENTARIO, mas
 grande que los otros iconos (pedido del autor, 2026-09-30; desde el

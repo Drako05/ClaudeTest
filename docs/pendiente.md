@@ -8,10 +8,10 @@ Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
 indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `47c7cc5`, 2026-10-17** (las correcciones a los
-iconos, desde `ab51f9b`). La proxima parte de aqui: ver
-`.claude/skills/auditoria/` y «Auditoria al cerrar las correcciones a los
-iconos», mas abajo.
+**Ultima auditoria: commit `bf82a04`, 2026-10-17** (los ajustes despues de
+jugar en el movil, desde `47c7cc5`). La proxima parte de aqui: ver
+`.claude/skills/auditoria/` y «Auditoria al cerrar los ajustes despues de
+jugar en el movil», mas abajo.
 
 **Como leerlo.** Desde el 2026-10-10 son tres ficheros, partidos como se partio
 `CLAUDE.md` el 2026-10-02 y por lo mismo: este se lee al empezar cada tanda, y
@@ -32,71 +32,28 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## Ajustes despues de jugar en el movil (2026-10-17) — HECHA, falta la auditoria
+## Auditoria al cerrar los ajustes despues de jugar en el movil (2026-10-17)
 
-El autor probo en su movil las correcciones a los iconos y pidio, literal:
-
-> Los botones de + y - en recetas, quiero que al dejar presionados sumen o
-> resten más rápidamente (de uno en uno, pero varias veces por segundo e
-> incrementando la frecuencia de aumento por segundo entre más tiempo se deje
-> presionado, es decir, al dejar presionado al principio aumenta por ejemplo
-> 3/s y al segundo siguiente pasa a 4/s y al siguiente 5/s y así, es solo un
-> ejemplo). Al cerrar el inventario, el contador de + en recetas vuelve a 1.
-
-Y en el movil: MODO y ENTRADA con el mismo espacio entre ellos y con USAR y
-SALTAR; las pestanas pisaban la linea; «A todos los botones le pusiste una
-sombra que sobre sale… Preferiría que ya sea sombra o iluminación, estén
-dibujadas solo en el área del propio botón»; y «me gustaría probar con que sea
-solo el icono quien haga el efecto de bajar y el botón lo acompañe con el
-intercambio de luces e iluminación, pero que el propio botón no se mueva de su
-posición».
-
-**Lo que se decidio con el autor** (con capturas, antes del codigo): ATAQUE,
-USAR, SALTAR y CORRER no se mueven; MODO a 10 px de USAR y ENTRADA a 10 de
-SALTAR, corridos **4 px en espejo** (MODO dentro del ancho de USAR, ENTRADA
-dentro del alto de SALTAR), con MODO–ENTRADA medido de esquina a esquina (7,2
-px); encendido, el icono tambien abajo.
-
-**Hecho**: `qty-hold.ts` (el ritmo, con su test), el mantener en
-`inventory-ui.ts`, la vuelta a 1 en `toggle()`, el relieve por dentro y el
-icono que baja (la regla comun al final del CSS; fuera los `scale` de los
-`:active`, que ya no hacian nada), y MODO y ENTRADA con `--modegap` y
-`--modeshift`. El humo lo mide en `stations`, `desktop` y `mobile`; las
-deducciones, en `docs/juicio.md`.
-
-**Sin verificar con dedos**: mantener + o - en el movil (`pointerdown` con el
-dedo); los gestos no lo prueban, por lo mismo de abajo.
-
----
-
-## Auditoria al cerrar las correcciones a los iconos (2026-10-17)
-
-**El alcance**: de `ab51f9b` a `47c7cc5`: la auditoria anterior, los iconos a
-multiplo de 24, la regla de `CLAUDE.md` («una pregunta del autor se responde,
-no se ejecuta») y las tres rondas de correcciones. La tanda, entera, en
-`docs/historia.md`.
+**El alcance**: de `47c7cc5` a `bf82a04`: la auditoria anterior y los ajustes
+(+ y - mantenidos, la vuelta a 1, el relieve por dentro con el icono que baja,
+MODO y ENTRADA). La tanda, entera, en `docs/historia.md`.
 
 **Corregido:**
-- **Cuatro colores huerfanos en la paleta** (escape 33): los del fuego y el
-  hondo de la piedra, que solo usaba el horno viejo. Fuera, y un test nuevo
-  exige que cada color lo use algun icono.
-- **`docs/controles.md` mentia en dos frases**: llamaba «mochila de
-  explorador» al icono de INVENTARIO y decia que AUTO SALTO «era una A»,
-  cuando ahora lo vuelve a ser.
-- **CSS muerto**: la letra de 8 px de las categorias, que ya no escriben su
-  nombre.
-- La fila de la paleta en `docs/juicio.md` ya no cuenta los colores.
+- **El texto del + y el - pulsados bajaba 1 px, no 2**: miden 26 px de alto
+  fijo, y el texto va centrado en lo que deja el relleno. Ahora 4 px de
+  relleno lo bajan 2; el humo `stations` lo mide, con su mutacion.
+- **Dos filas de `docs/juicio.md` sobre un sitio de MODO que ya no existe**
+  (a 72 px del ataque, el arco de 84). Fuera; queda la del tamano.
+- La historia del arco de 102 y la sombra de fuera lleva su «*Luego*».
 
 **Ejecutado**: el escaner y su autoprueba; `npm run shots` y
 `tools/analyze-world.ts`; typecheck y los tests; una mutacion nueva.
 
-**Escapes de la tanda** (fase 6): la pasada `resources` afirmaba algo de la
-fila de receta y no la corri en local antes de la CI (P6); ahora las pasadas
-que se corren salen de buscar los selectores tocados.
+**Escapes de la tanda** (fase 6): el 34 («baja 2 px» medido solo en los
+iconos) y el 35 (filas de juicio buscadas por el valor y no por el nombre).
 
-**Sin verificar con dedos**: los + y - se pulsan en el movil con un toque
-normal (`click`), pero los gestos no los prueban, porque con E no hay ninguna
-receta apilable.
+**Sin verificar con dedos**: mantener + o - en el movil; los gestos no lo
+prueban, porque con E no hay ninguna receta apilable.
 
 ---
 
