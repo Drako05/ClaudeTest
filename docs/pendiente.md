@@ -58,7 +58,7 @@ izquierda, sobre fondo oscuro):
 
 **El plan, por rondas**:
 1. El formato, la paleta y los 30 objetos, y su hoja.
-2. Las 14 siluetas de PERSONAJE y los 17 iconos de boton, y su hoja.
+2. Las 14 siluetas de PERSONAJE y los iconos de boton (salieron 20), y su hoja.
 3. La integracion en la interfaz, el humo, las mutaciones, la documentacion,
    la CI y `main`.
 
@@ -76,7 +76,8 @@ el. **Desde que estan en el repo, se retocan a mano, pixel a pixel.**
 **Ronda 1 — HECHA y APROBADA (2026-10-17)**: los 30, en la hoja. El autor:
 «Aprobados, adelante con la ronda 2».
 
-**Ronda 2 — HECHA, esperando al autor (2026-10-17)**: las 14 siluetas de
+**Ronda 2 — HECHA y APROBADA (2026-10-17)**: el autor, «Aprobados, adelante
+con la ronda 3»: las 14 siluetas de
 PERSONAJE y los 20 iconos de boton, en `client/src/silhouette-icons.ts`, en
 la misma hoja. Son 20 porque el ojo son cuatro piezas que alterna el juego:
 abierto, pupila, entornado y la mira de la primera persona.
@@ -86,6 +87,21 @@ abierto, pupila, entornado y la mira de la primera persona.
   bloque, y el bioma con una ramita.
 - Duda mia, para el autor: las hombreras, a 24 pixeles, salen con aire de
   corona.
+
+**Ronda 3 — HECHA (2026-10-17)**: al juego.
+- **Las casillas** (`paint()` en `inventory-ui.ts`) ponen `itemIcon(item)` a
+  48 px en vez del nombre; la cantidad y el desgaste, encima. Igual el
+  resultado y los ingredientes de las recetas, lo arrastrado y la zona de lo
+  seleccionado. PERSONAJE, al equipar, cambia la silueta por el icono.
+- **El registro**: «+5 [icono] Madera»; la linea pasa de 15 a 26 px.
+- **Los botones**: cada `<svg>` de `index.html` va vacio con `data-pixel` y se
+  rellena al arrancar (`installButtonIcons`, 22 piezas); los cuatro de
+  caracter tambien.
+- **El humo** lo afirma en `desktop` (casillas, ingredientes, registro y que
+  se rellenaron los 22), `mobile` (los ocho botones con su icono pintado) y
+  `devTools` (la hoja, con sus 64). Siete mutaciones.
+- **Docs**: la directriz 5 en `docs/guia-de-arte.md` y la 3 al dia;
+  `recoleccion.md`, `controles.md`, cinco filas en `juicio.md` y los retirados.
 
 ---
 

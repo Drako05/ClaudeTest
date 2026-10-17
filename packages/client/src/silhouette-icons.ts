@@ -10,7 +10,7 @@
  */
 
 import { Equip } from '@verdant/shared';
-import type { PixelArt } from './pixel-art.js';
+import { PIXEL_GRID, pixelInner, type PixelArt } from './pixel-art.js';
 
 /** La paleta de las siluetas: un solo color, el del texto de donde vayan. */
 export const SILHOUETTE_PALETTE: Readonly<Record<string, string>> = { '#': 'currentColor' };
@@ -978,3 +978,24 @@ export const BUTTON_NAMES: Readonly<Record<ButtonIcon, string>> = {
   autoJump: 'AUTO SALTO: un bloque y la flecha que lo salta sola (era «A»)',
   biome: 'El bioma: una ramita con hojas (era el emoji 🌿)',
 };
+
+/**
+ * Rellena cada icono de boton del documento: los `<svg>` y los `<g>` con
+ * `data-pixel="nombre"` de `index.html`. Un `<svg>` recibe tambien su caja de
+ * 24 y el borde de pixel; un `<g>` va dentro de un `<svg>` que ya los tiene (las
+ * piezas del ojo). Devuelve cuantos relleno.
+ */
+export function installButtonIcons(root: ParentNode = document): number {
+  let filled = 0;
+  for (const el of Array.from(root.querySelectorAll<SVGElement>('[data-pixel]'))) {
+    const name = el.dataset.pixel as ButtonIcon;
+    if (!(name in BUTTON_ROWS)) continue;
+    if (el.tagName.toLowerCase() === 'svg') {
+      el.setAttribute('viewBox', `0 0 ${PIXEL_GRID} ${PIXEL_GRID}`);
+      el.setAttribute('shape-rendering', 'crispEdges');
+    }
+    el.innerHTML = pixelInner(buttonArt(name));
+    filled++;
+  }
+  return filled;
+}

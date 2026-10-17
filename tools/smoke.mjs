@@ -619,6 +619,11 @@ async function desktopPass(browser, baseUrl) {
   // Lo que dice y lo que se pinta, leidos a la vez: una linea vive 3 s.
   const painted = await page.evaluate(() => [window.__verdant.feed.length, document.querySelectorAll('#pickupFeed div').length]);
   check(painted[0] === painted[1], `el registro no se pinta: ${painted}`);
+  // Y cada linea lleva el icono de su objeto entre la cantidad y el nombre
+  // (el autor, 2026-10-17: «+5 [icono] Madera»).
+  const feedIcons = await page.evaluate(() => Array.from(document.querySelectorAll('#pickupFeed div'))
+    .map((el) => !!el.querySelector('svg.itemIcon path') && /^[+-]\d+ +\S/.test(el.textContent)));
+  check(feedIcons.length > 0 && feedIcons.every(Boolean), `el registro no lleva el icono del objeto: ${JSON.stringify(feedIcons)}`);
   // En PC, encima del boton INVENTARIO y bajando hacia el (pedido del autor,
   // 2026-10-02). Lo mide la propia pagina, porque cada ida y vuelta se come la
   // vida de la linea (3 s) en este navegador lento: con el registro vacio, un
@@ -778,6 +783,26 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  equipables: ${JSON.stringify(equips)}`);
   check(equips.n === 14 && equips.cols === 5, `faltan las casillas de equipables: ${JSON.stringify(equips)}`);
   check(equips.icons === 14 && equips.text === 0, `los equipables vacios no ensenan su icono, o llevan texto: ${JSON.stringify(equips)}`);
+  // Los objetos se ven por su icono en pixelart, no por su nombre (el autor,
+  // 2026-10-17): cada casilla llena de la rejilla y de la barra lleva el suyo,
+  // de 40 px o mas, y no escribe mas que la cantidad o el desgaste. Lo mismo
+  // los ingredientes del recetario. Y los botones, rellenos al arrancar.
+  const icons = await page.evaluate(() => {
+    const filled = Array.from(document.querySelectorAll('#invGrid .slot, #hotbar .slot')).filter((el) => !el.classList.contains('empty'));
+    const named = (el) => Array.from(el.childNodes).some((n) => n.nodeType === 3 ? n.textContent.trim() !== '' : !['EM', 'I', 'svg'].includes(n.nodeName));
+    return {
+      filled: filled.length,
+      icons: filled.filter((el) => { const svg = el.querySelector('svg.itemIcon'); return svg && svg.querySelector('path') && svg.getBoundingClientRect().width >= 40; }).length,
+      named: filled.filter(named).map((el) => el.title),
+      inputs: Array.from(document.querySelectorAll('#recipeList .ingredients .slot')).filter((el) => el.querySelector('em') && !el.querySelector('svg.itemIcon')).length,
+      buttons: window.__verdant.buttonIcons,
+    };
+  });
+  console.log(`  iconos de los objetos: ${JSON.stringify(icons)}`);
+  check(icons.filled > 0 && icons.icons === icons.filled && icons.named.length === 0,
+    `hay casillas llenas sin su icono, o con el nombre escrito: ${JSON.stringify(icons)}`);
+  check(icons.inputs === 0, `hay ingredientes sin su icono: ${JSON.stringify(icons)}`);
+  check(icons.buttons === 22, `los botones no recibieron sus iconos en pixelart: ${icons.buttons}`);
   // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
   // no llevan numero, llevan desgaste).
   const hudTotal = await page.evaluate(() =>
@@ -1750,11 +1775,13 @@ async function mobilePass(browser, baseUrl) {
     ['action', 'use', 'jump', 'run', 'others', 'invOpen', 'modeTouch', 'inputMode'].map((id) => {
       const b = document.getElementById(id);
       // `innerText` y no `textContent`: la tecla escrita de PC va oculta en el movil.
-      return { id, text: b.innerText.replace(/[\s\u00bb\u2191]/g, ''), label: b.getAttribute('aria-label'), svg: !!b.querySelector('svg') };
+      return { id, text: b.innerText.replace(/\s/g, ''), label: b.getAttribute('aria-label'), svg: !!b.querySelector('svg path') };
     }),
   );
   check(labels.every((l) => l.text === '' && l.label), `hay botones con rotulo: ${JSON.stringify(labels)}`);
-  check(labels.filter((l) => l.svg).length === 6, 'USAR, ATAQUE, OTROS, INVENTARIO, MODO o ENTRADA no llevan su icono');
+  // Los ocho con su icono pintado, tambien los que eran un caracter (», ↑ y A;
+  // el autor, 2026-10-17: todos en pixelart de 24 × 24).
+  check(labels.every((l) => l.svg), `hay botones sin su icono: ${JSON.stringify(labels.filter((l) => !l.svg))}`);
   // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
   check(await page.isVisible('#crosshair'), 'la cruz no se ve en el movil');
   const feedR = await rect('pickupFeed');
@@ -2225,6 +2252,18 @@ async function devToolsPass(browser, baseUrl) {
   const start = await open(page, baseUrl, '&dev=1');
   check(start.dev === true, 'el panel no se activo con ?dev=1');
   check(await page.isVisible('#devPanel'), 'el panel de desarrollo no es visible');
+
+  // La hoja de los iconos (`?iconos=1`, la revision de la tanda del
+  // 2026-10-17): los 30 objetos, los 14 huecos de PERSONAJE y los 20 botones,
+  // cada uno pintado a 48 px y a 96.
+  const sheet = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  await sheet.goto(`${baseUrl}/?seed=${SEED}&iconos=1`, { waitUntil: 'load' });
+  await sheet.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+  const sheetIcons = await sheet.evaluate(() => [window.__verdant.iconSheet,
+    document.querySelectorAll('#iconSheet figure').length, document.querySelectorAll('#iconSheet svg path').length > 0]);
+  await sheet.close();
+  console.log(`  hoja de iconos: ${JSON.stringify(sheetIcons)}`);
+  check(sheetIcons[0] === 64 && sheetIcons[1] === 64 && sheetIcons[2], `la hoja de iconos no tiene los 64: ${JSON.stringify(sheetIcons)}`);
 
   // Bordes de chunk y de bioma.
   await page.click('[data-toggle="chunks"]');

@@ -73,6 +73,7 @@ import { BillboardSet } from './billboards.js';
 import { FaunaView } from './fauna-view.js';
 import { faunaGallery } from './fauna-gallery.js';
 import { showIconSheet } from './icon-sheet.js';
+import { itemIcon } from './item-icons.js';
 import { spriteDepthProbe, type ProbeView } from './sprite-depth-probe.js';
 import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
@@ -110,6 +111,10 @@ import {
   viewFromLocation,
   writeSeedToLocation,
 } from './start.js';
+import { installButtonIcons } from './silhouette-icons.js';
+
+/** Los iconos de los botones, en pixelart, antes que nada (`silhouette-icons.ts`). */
+const buttonIcons = installButtonIcons();
 
 /** Radio de chunks que se mallan alrededor del jugador. */
 const RADIUS = 3;
@@ -259,7 +264,11 @@ function drawFeed(): void {
     if (!el) {
       el = document.createElement('div');
       el.className = line.gain ? 'gain' : 'loss';
-      el.textContent = line.text;
+      // «+5 [icono] Madera»: el numero, el icono del objeto y su nombre (el
+      // autor, 2026-10-17).
+      const [amount, ...name] = line.text.split(' ');
+      if (line.item >= 0) el.append(`${amount} `, itemIcon(line.item as Resource), ` ${name.join(' ')}`);
+      else el.textContent = line.text;
       feedEl.appendChild(el);
       feedEls.set(line.id, el);
     }
@@ -1294,6 +1303,8 @@ Object.defineProperty(window, '__verdant', {
       faunaGallery: (boxes = false, pixelsPerBlock = 40) => faunaGallery(pixelsPerBlock, boxes),
       /** Cuantos iconos tiene la hoja de `?iconos=1` (0 sin ella). */
       iconSheet: iconSheetCount,
+      /** Cuantos iconos de boton se rellenaron al arrancar (`installButtonIcons`). */
+      buttonIcons,
       /** Cuanto se ve de un sprite pegado de lado a un bloque y con uno delante. */
       spriteDepthProbe: (snap?: ProbeView) => spriteDepthProbe(snap),
       facing: [e.facingX[id], e.facingY[id]],

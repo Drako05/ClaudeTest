@@ -54,7 +54,8 @@ Decisiones del autor, que no se tocan sin preguntarle:
   `lastBlocked`, pero nadie lo pinta. Fabricar sin sitio se resolvera en otra
   tanda, con objetos que se tiran al suelo.
 - **Lo que entra y sale del inventario sale escrito**: «+5 Madera», «-1
-  Bayas», en letra pequena debajo del boton INVENTARIO en el movil, subiendo
+  Bayas», **con el icono del objeto entre la cantidad y el nombre** (el autor,
+  2026-10-17: icono y texto; la linea mide 26 px para el icono de 24, *deduccion*), en letra pequena debajo del boton INVENTARIO en el movil, subiendo
   hacia el, y **en PC encima de ese boton, bajando hacia el** (pedido del
   autor, 2026-10-02; antes, abajo a la derecha): cada linea se desliza
   despacio mientras se desvanece, la mas vieja la mas cerca del boton (en
@@ -155,10 +156,19 @@ Lo que el codigo tiene que respetar:
   **PERSONAJE** es el segundo boceto del autor, en PC y en el movil, con la
   columna que anadio el 2026-10-04: el dibujo en medio, tres equipables a su
   izquierda, seis en dos columnas a su derecha y cinco debajo. **Cada casilla
-  lleva un icono en vez de su nombre** (`equip-icons.ts`: siluetas rellenas
-  de armadura y equipo medieval, segun la directriz 3 de
-  `docs/guia-de-arte.md`; dibujos mios), que **se oculta al equipar algo**; el nombre
-  queda solo al pasar el raton. En el movil las cinco columnas encogen hasta
+  lleva un icono en vez de su nombre** (`equip-icons.ts`: siluetas de
+  armadura y equipo medieval, de un color y en pixelart de 24 × 24 desde el
+  2026-10-17, segun las directrices 3 y 5 de `docs/guia-de-arte.md`; dibujos
+  mios), que **se cambia por el del objeto al equipar algo**; el nombre
+  queda solo al pasar el raton.
+  **Los objetos se ven por su icono, no por su nombre** (el autor,
+  2026-10-17): un pixelart a color de 24 × 24 por objeto (`item-icons.ts`,
+  directriz 5), pintado a **48 px**, el doble exacto (*deduccion*), en la
+  barra, la rejilla, PERSONAJE, el resultado y los ingredientes de las
+  recetas, lo arrastrado y la zona de lo seleccionado. Donde la casilla es
+  menor, encoge con ella. La cantidad o el desgaste van encima, abajo, con
+  sombra para leerse; el nombre, al pasar el raton y en la descripcion. Hasta
+  entonces cada casilla escribia el nombre, recortado (`SHORT`). En el movil las cinco columnas encogen hasta
   caber en 360 px. **PERSONAJE e INVENTARIO** llevan abajo la zona de lo seleccionado y
   su descripcion, del mismo tamano y a la misma altura. En el movil **no se
   desliza el panel entero**: pestanas, zona de lo seleccionado y categorias

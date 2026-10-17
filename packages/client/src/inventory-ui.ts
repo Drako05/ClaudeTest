@@ -20,8 +20,11 @@
  *   ven las de mano; al USAR una mesa o un horno se abre este mismo panel con
  *   las suyas, bajo su nombre, y se cierra solo al salir del alcance, medido
  *   hasta su cara (`stationNear`, la misma cuenta con que el nucleo acepta).
+ * - **Cada objeto se ve por su icono en pixelart** (el autor, 2026-10-17;
+ *   `item-icons.ts`): en las casillas, en los ingredientes y en lo que se
+ *   arrastra. El nombre queda al pasar el raton y en la descripcion.
  * - **PERSONAJE tiene catorce casillas** (decision del autor, 2026-10-04), cada
- *   una con su icono en vez de su nombre, que se oculta al equipar algo. La
+ *   una con la silueta de lo que va en ella, que se oculta al equipar algo. La
  *   bolsa o la mochila van al **Bolso** y abren sus casillas en la rejilla
  *   (las que no se abren no se ven); un arma va al **Arma**, y con ella se
  *   golpea a los seres vivos.
@@ -47,6 +50,7 @@ import {
 import { makePlayerArt } from './art.js';
 import { now } from './clock.js';
 import { equipIcon } from './equip-icons.js';
+import { itemIcon } from './item-icons.js';
 import { ScrollRail } from './scroll-rail-view.js';
 
 /** Lo que se tarda en fabricar manteniendo pulsado (decision del autor). */
@@ -95,28 +99,6 @@ const DESCRIPTIONS: Record<number, string> = {
     'Arma: 45 de dano a los animales. Equipada en Arma, en PERSONAJE, golpea con ella aunque lleves otra cosa en la mano.',
 };
 
-/** Nombre corto para una casilla, que es estrecha. Sin iconos (decision del autor). */
-const SHORT: Record<number, string> = {
-  [Resource.TreeSeed]: 'Sem. arbol',
-  [Resource.PlantSeed]: 'Sem. planta',
-  [Resource.Iron]: 'Min. hierro',
-  [Resource.Copper]: 'Min. cobre',
-  [Resource.StoneAxe]: 'Hacha piedra',
-  [Resource.StonePickaxe]: 'Pico piedra',
-  [Resource.CopperIngot]: 'Ling. cobre',
-  [Resource.IronIngot]: 'Ling. hierro',
-  [Resource.CopperAxe]: 'Hacha cobre',
-  [Resource.CopperPickaxe]: 'Pico cobre',
-  [Resource.IronAxe]: 'Hacha hierro',
-  [Resource.IronPickaxe]: 'Pico hierro',
-  [Resource.Workbench]: 'Mesa',
-  [Resource.FiberBag]: 'Bolsa',
-  [Resource.FrameBackpack]: 'Mochila',
-  [Resource.StoneDagger]: 'Punal piedra',
-  [Resource.CopperSword]: 'Espada cobre',
-  [Resource.IronSword]: 'Espada hierro',
-};
-
 export interface ItemRequests {
   select: number;
   craft: number;
@@ -129,9 +111,6 @@ function byId<T extends HTMLElement = HTMLElement>(id: string): T {
   return document.getElementById(id) as T;
 }
 
-function nameOf(item: Resource): string {
-  return SHORT[item] ?? RESOURCE_NAMES[item];
-}
 
 export class InventoryUi {
   private readonly panel = byId('invPanel');
@@ -489,8 +468,10 @@ export class InventoryUi {
   }
 
   /**
-   * Pinta una casilla: nombre y, abajo a la izquierda, solo el numero; una
-   * herramienta o un arma, su desgaste; y un bolso, nada, porque va de uno en uno.
+   * Pinta una casilla: su icono en pixelart (el autor, 2026-10-17: el icono
+   * en vez del nombre, que queda al pasar el raton) y, encima, abajo a la
+   * izquierda, solo el numero; una herramienta o un arma, su desgaste; y un
+   * bolso, nada, porque va de uno en uno.
    */
   private paint(el: HTMLElement, item: Resource | null, count: number, wear: number): void {
     el.replaceChildren();
@@ -499,9 +480,7 @@ export class InventoryUi {
       el.title = 'Vacia';
       return;
     }
-    const name = document.createElement('span');
-    name.textContent = nameOf(item);
-    el.appendChild(name);
+    el.appendChild(itemIcon(item));
     const tool = toolStats(item);
     if (tool) {
       const bar = document.createElement('i');
@@ -544,7 +523,7 @@ export class InventoryUi {
         if (item === null) return;
         d.moving = true;
         el.classList.add('dragging');
-        this.ghost.textContent = nameOf(item);
+        this.ghost.replaceChildren(itemIcon(item));
         this.ghost.style.display = 'block';
       }
       this.ghost.style.left = `${e.clientX}px`;
@@ -763,11 +742,9 @@ export class InventoryUi {
         if (!input) return;
         const have = inv.count(input.item);
         if (have < input.count) ok = false;
-        const name = document.createElement('span');
-        name.textContent = nameOf(input.item);
         const n = document.createElement('em');
         n.textContent = `${Math.min(have, input.count)}/${input.count}`;
-        cell.append(name, n);
+        cell.append(itemIcon(input.item), n);
         cell.title = RESOURCE_NAMES[input.item];
       });
       row.classList.toggle('missing', !ok);

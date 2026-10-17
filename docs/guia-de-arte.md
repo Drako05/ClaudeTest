@@ -87,25 +87,23 @@ que venga. Son **las directrices del autor** para el diseño.
 - **El tema** es el de un aventurero de un mundo medieval y de fantasia:
   armadura, cuero, metal, blasones. **Nada que se lea como un objeto de hoy**:
   el bolso de mano que tenia el Bolso fue justo el error que la origino.
-- **Como se hacen** (los equipables, `client/src/equip-icons.ts`):
-  - SVG en una caja de 24 × 24, rellenos con `currentColor`;
-  - los calados con `fill-rule: evenodd`, que vive en el CSS;
-  - lo simetrico (las hombreras, las grebas) se dibuja una vez y se espeja.
+- **Como se hacen** desde el 2026-10-17 (directriz 5): **en pixelart de 24 ×
+  24, de un solo color** (`currentColor`), en `client/src/silhouette-icons.ts`.
+  Los calados son pixeles transparentes. De la primera version, en vectores
+  con `fill-rule: evenodd` y lo simetrico espejado, queda el diseño: el
+  pixelart lo traslado.
 - **Lectura del agente, *por confirmar***: vale para **todo icono del
-  juego**, no solo para los equipables.
-- **Lo que hoy no la cumple**: los iconos de trazo de los botones
-  (`client/index.html`). Algunos son de manejo, no de mundo, y puede que no
-  deban cambiar; eso lo decide el autor.
-  - USAR (una mano abierta);
-  - ATAQUE (`#action`);
-  - MODO, barrido y preciso (un tajo y una mirilla, `#modeTouch`, `#modeBar`);
-  - ENTRADA, mira y toque (una mano que toca, `#inputMode`);
-  - la vista en perspectiva (`#proj`) y la informacion (`#hudToggle`);
-  - OTROS (tres barras);
-  - INVENTARIO (la «mochila de explorador» de trazo de `docs/controles.md`,
-    `#invOpen`);
-  - los anillos de hambre (cubiertos) y salud (un corazon).
-- **Aplicada**: los catorce equipables (2026-10-04).
+  juego**, no solo para los equipables. **Matizada por el autor** el
+  2026-10-17: los **objetos** van a color (directriz 5); las siluetas de un
+  color siguen en los huecos vacios de PERSONAJE y en los botones.
+- **Aplicada**:
+  - los catorce equipables (2026-10-04, y en pixel el 2026-10-17);
+  - **los botones** (2026-10-17): USAR, ATAQUE, MODO (barrido y preciso),
+    ENTRADA (mira y toque), el ojo en sus tres estados y la mira, la
+    informacion, OTROS, INVENTARIO, la llave inglesa, los cubiertos y el
+    corazon de los anillos, y los cuatro que eran un caracter: correr (»),
+    saltar (↑), el auto salto (A) y el bioma (🌿). Sus diseños son del agente,
+    aprobados por el autor en la hoja de la ronda 2 («Aprobados»).
 
 ## Directriz 4: las patas caben en el cuadrado de la caja de colision
 
@@ -139,3 +137,51 @@ que venga. Son **las directrices del autor** para el diseño.
 - **Aplicada**: las ocho especies de cuatro patas, en sus tres etapas
   (2026-10-14), aprobadas por el autor con las capturas. Un modelo nuevo
   sigue la misma regla.
+
+## Directriz 5: los iconos son pixelart HD de 24 × 24; los objetos, a color
+
+> «La siguiente tanda quiero que sea de iconos. vamos a generar svg para cada
+> objeto disponible actualmente en el juego. quiero que tengan aspecto
+> pixelart HD. te mande una imagen de referencia.» — el autor, 2026-10-17
+>
+> «Los iconos de items seran pixelart a color. los iconos de las casillas
+> vacias del inventario y de los botones siguen siendo siluetas
+> monocromaticas. pero en esta tanda incluye pasar los iconos de casillas
+> vacias de inventario y los iconos de los botones a pixelart 24x24.» — el
+> autor, 2026-10-17
+
+- **El referente**: la imagen que adjunto el autor, que el repo no guarda.
+  Iconos de unos 16-20 pixeles sobre fondo oscuro, con contorno oscuro de 1
+  pixel, 3-4 tonos por color y la luz arriba a la izquierda.
+- **Del autor** (respuestas del 2026-10-17):
+  - **rejilla de 24 × 24**;
+  - **el icono sustituye al nombre** donde se ve un objeto (las casillas, las
+    recetas, lo arrastrado, lo seleccionado); el nombre queda al pasar el
+    raton y en la descripcion; el registro de lo recogido lleva **icono y
+    texto**;
+  - **los objetos, a color**; los huecos vacios y los botones, **siluetas de
+    un color** (directriz 3), tambien en 24 × 24.
+- **Lo que el agente saco de la referencia, *por confirmar***:
+  - **contorno oscuro de 1 pixel** (`#1d1a26`) alrededor de todo: ningun
+    pixel de color toca lo transparente (lo afirma
+    `tests/pixel-icons.test.ts`);
+  - **luz arriba a la izquierda**, sombra abajo a la derecha;
+  - **3-4 tonos por material** (luz, base, sombra y a veces hondo), sacados de
+    **una paleta comun** por material (`ITEM_PALETTE`, en
+    `client/src/item-icons.ts`: madera, corteza, piedra, hierro, cobre,
+    carbon, hoja, baya, carne, hueso, fibra, piel, pluma, caparazon, fuego…),
+    para que los 30 se lean como una familia;
+  - **un pixel de margen** como minimo;
+  - **los de una familia, iguales salvo el material**: hachas, picos,
+    espadas, lingotes y minerales.
+- **Como se hacen**: `client/src/pixel-art.ts`. Cada icono son 24 filas de 24
+  caracteres; `.` es transparente y cada letra, un color de su paleta. Se
+  pinta como SVG, un `<path>` por color con los pixeles seguidos juntos, con
+  `shape-rendering: crispEdges`. Se dibujan y se corrigen **a mano, en la
+  rejilla**.
+- **Como se revisa**: `?iconos=1` abre en el juego la hoja de los 64 (30
+  objetos, 14 huecos y 20 botones), cada uno a 48 px y a 96, con su nombre.
+- **Aplicada**: los 30 objetos, los 14 huecos y los botones (2026-10-17).
+  Los diseños son del agente, y **el autor los aprobo en dos hojas**
+  («Aprobados, adelante con la ronda 2», «Aprobados, adelante con la ronda
+  3»). Un objeto nuevo necesita su icono: el test falla si falta.

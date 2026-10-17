@@ -23,8 +23,12 @@ export const FEED_SECONDS = 3;
 export const FEED_FAST_SECONDS = 0.3;
 /** Lo que sube una linea a lo largo de su vida, en pixeles. **Deduccion mia.** */
 export const FEED_RISE = 18;
-/** Alto de una linea, en pixeles: lo que la separa de la de debajo. */
-export const FEED_LINE = 15;
+/**
+ * Alto de una linea, en pixeles: lo que la separa de la de debajo. Desde el
+ * 2026-10-17 la linea lleva el icono del objeto a 24 px (su rejilla, a 1×), y
+ * mide eso mas un poco de aire (*deduccion*; era 15, solo texto).
+ */
+export const FEED_LINE = 26;
 /** Nunca mas de cinco a la vez (del autor). */
 export const FEED_MAX = 5;
 /** Fraccion de la vida que pasa entera antes de empezar a desvanecerse. */
@@ -58,6 +62,8 @@ export interface FeedLine {
   readonly id: number;
   readonly text: string;
   readonly gain: boolean;
+  /** El objeto de la linea, para su icono (el autor, 2026-10-17: icono y texto); -1, ninguno. */
+  readonly item: number;
   age: number;
   /** Edad a la que se va. Se acorta cuando le toca apagarse deprisa. */
   life: number;
@@ -75,12 +81,13 @@ export class PickupFeed {
   private nextId = 0;
 
   /** Una linea nueva, debajo de las que ya hay. */
-  push(text: string, gain: boolean): void {
+  push(text: string, gain: boolean, item = -1): void {
     const n = this.lines.length;
     this.lines.push({
       id: this.nextId++,
       text,
       gain,
+      item,
       age: 0,
       life: FEED_SECONDS,
       fast: null,
@@ -100,7 +107,7 @@ export class PickupFeed {
 
   /** Lo que haya en el inventario: una linea por objeto que cambio. */
   pushDeltas(deltas: readonly Delta[]): void {
-    for (const d of deltas) this.push(deltaText(d), d.delta > 0);
+    for (const d of deltas) this.push(deltaText(d), d.delta > 0, d.item);
   }
 
   /** Avanza `dt` segundos de tiempo real. */
