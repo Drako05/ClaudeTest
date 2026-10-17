@@ -18,6 +18,11 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
+| Botones: **la forma del relieve**: un borde de luz de 2 px por dentro arriba a la izquierda, uno de sombra abajo a la derecha y una sombra dura de 3 px debajo; pulsado, encendido o abierto, los bordes se invierten y baja 2 px. Las esquinas: 12 px, y en proporcion 20 en ATAQUE, 14 en USAR, CORRER y SALTAR y 8 en AUTO SALTO | `docs/controles.md`, los botones | una regla al final del CSS |
+| Botones: **el arco de MODO y ENTRADA de 102** (era 84) y MODO a **155,5 grados** (era 153): con esquinas se pisaban, y es el mas corto que deja 4 px con todo, a la misma distancia del ataque | `docs/controles.md`, el arco | `--arc` y dos numeros en el CSS |
+| Recetas: **+ y - de 26 px**, apagados tambien en su tope (el + en lo que alcanza, el - en 1); y **la N se queda despues de fabricar**, bajando sola si ya no alcanza | `docs/recoleccion.md`, fabricar | CSS y `inventory-ui.ts` |
+| Recetas: **los diseños de las 6 categorias** (pico y hacha, la mesa de lado, el crisol con la llama, la tunica, el muslo y la espada); los viste en la hoja | `docs/guia-de-arte.md`, directriz 5 | `CATEGORY_ROWS` |
+| Colores: **el horno se oscurecio con la piedra**, por ser de piedra | `docs/pendiente.md`, la tanda | `STATION_FACES` |
 | Iconos: **las reglas de estilo que saque de tu referencia**: contorno oscuro de 1 pixel alrededor de todo (`#1d1a26`, lo afirma un test), luz arriba a la izquierda, 3-4 tonos por material y 1 pixel de margen. Las hojas las aprobaste; las reglas, escritas asi, no las has visto | `docs/guia-de-arte.md`, directriz 5 | la paleta y un test |
 | Iconos: **una paleta comun** de 61 colores por material (madera, corteza, piedra, hierro, cobre, carbon, hoja, baya, carne, hueso, fibra, piel, pluma, caparazon, fuego…), de la que salen los 30 | `docs/guia-de-arte.md`, directriz 5 | `ITEM_PALETTE` |
 | Iconos: **48 px en las casillas**, el doble exacto de la rejilla, y **24 donde no caben 40 px de contenido** (el dibujo trae 2 px de margen a 48 y puede invadir el relleno); que sea siempre un multiplo entero es tuyo. La cantidad y el desgaste van encima, con sombra | `docs/recoleccion.md`, el panel | un numero en `index.html` |

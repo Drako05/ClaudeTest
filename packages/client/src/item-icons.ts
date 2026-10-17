@@ -30,15 +30,16 @@ export const ITEM_PALETTE: Readonly<Record<string, string>> = {
   f: '#7d5232', // base
   g: '#573620', // sombra
   h: '#3a2414', // hondo
-  // piedra
-  i: '#dcdce2', // luz
-  j: '#a9a9b4', // base
-  k: '#7b7b87', // sombra
-  l: '#52525e', // hondo
-  // hierro
-  m: '#f2f5f8', // luz
-  n: '#c3ccd6', // base
-  p: '#8b98a8', // sombra
+  // piedra: mas oscura desde el 2026-10-17, para no confundirse con el hierro
+  // (el autor)
+  i: '#c2c2ca', // luz
+  j: '#8e8e9a', // base
+  k: '#65656f', // sombra
+  l: '#42424c', // hondo
+  // hierro: mas claro, por lo mismo
+  m: '#ffffff', // luz
+  n: '#d2dae4', // base
+  p: '#9eabbb', // sombra
   // cobre
   q: '#ffcb94', // luz
   r: '#e8914f', // base
@@ -91,14 +92,45 @@ export const ITEM_PALETTE: Readonly<Record<string, string>> = {
   // cardenillo
   1: '#42c2a0', // base
   2: '#238a74', // sombra
-  // veta de hierro
-  3: '#f2d2b0', // luz
-  4: '#d49c74', // base
-  5: '#a66a48', // sombra
+  // veta de hierro: mas clara desde el 2026-10-17, como su veta en el mundo
+  3: '#fbe2c6', // luz
+  4: '#e4b28c', // base
+  5: '#bb8460', // sombra
   // semilla
   6: '#f0d9a0', // luz
   7: '#cfae68', // base
   8: '#9f7f3e', // sombra
+  // Las estaciones: los colores de su modelo 3D (`STATION_FACES`, y los
+  // fijos de `stations-view.ts`), con la luz de cada cara horneada (la tapa
+  // entera, el frente al 95 % y el costado al 74 %) y **pasados a sRGB como
+  // los pinta three.js**, que trata la textura como lineal: es el color que se
+  // mide en pantalla (el autor vio el icono mas oscuro que el bloque).
+  // La mesa de trabajo
+  '!': '#a08360',
+  '@': '#c2a078',
+  $: '#d8b88d',
+  '%': '#d4b48a',
+  '&': '#bda17b',
+  '*': '#be9d75',
+  '+': '#aa8c68',
+  '=': '#6e5b45',
+  '?': '#62513d',
+  '~': '#e0e2e5',
+  '^': '#9d805e',
+  ':': '#8c7253',
+  // El horno
+  ';': '#aeaeb4',
+  ',': '#919197',
+  _: '#5f5f66',
+  '<': '#ffc271',
+  '>': '#8d8d94',
+  '/': '#aaaab0',
+  '|': '#98989d',
+  '(': '#7e7e84',
+  ')': '#c0c0c6',
+  '{': '#54545b',
+  '}': '#f9e5a9',
+  '[': '#f9be6e',
 };
 
 const ROWS: Record<Resource, readonly string[]> = {
@@ -588,57 +620,58 @@ const ROWS: Record<Resource, readonly string[]> = {
     '.....oo.................',
     '........................',
   ],
-  // Mesa de trabajo
+  // Mesa de trabajo: su bloque en 3/4, sacado de las texturas de su modelo
+  // (`stations-view.ts`) con sus colores y su luz (el autor, 2026-10-17)
   [Resource.Workbench]: [
     '........................',
-    '........................',
-    '........................',
-    '........................',
-    '........................',
-    '..........oooooo........',
-    '.......oooaaaiijo.......',
-    '....oooaaabbfijkaooo....',
-    '..ooaaabbeffgjkkaaaao...',
-    '.obcabbffgaaaaaaabbbco..',
-    '.obcbbcaaaaaaaabbcccdo..',
-    '.occcccbcabbbbbccccddo..',
-    '..oooccccbbcccccdddoo...',
-    '...oefoocccccdddooefo...',
-    '...oego.oooccooo.oego...',
-    '...oego...oefo...oego...',
-    '...oego...oego...oego...',
-    '...oego...oego...oego...',
-    '...oego...oego...oego...',
-    '...oego...oego...oego...',
-    '...ofgo...oego...ofgo...',
-    '....oo....ofgo....oo....',
     '...........oo...........',
+    '.........oo!!oo.........',
+    '.......oo!!@@@!oo.......',
+    '.....oo!!@@$@@@@!oo.....',
+    '...oo!@@@!!$$@@@@@!oo...',
+    '..o!@@!@@@@!@@@@@@@@!o..',
+    '.o%%!@@@!!@@@@@@@@!!&&o.',
+    '.o***%!@@@!@@@@@@!&+++o.',
+    '.o=****%!@@@!@@!&++++?o.',
+    '.o=%*=***%!@@!&+++??+?o.',
+    '.o=%*===***%&+++????+?o.',
+    '.o=%*~~~==**++??????+?o.',
+    '.o=%*==~^~**&+??????+?o.',
+    '.o=%*====%**?+??????+?o.',
+    '.o=%*^===%**?+????::+?o.',
+    '..o%*=^^==**?+??::??+o..',
+    '...o====^^**?+::????o...',
+    '....oo====**?+????oo....',
+    '......oo==**?+??oo......',
+    '........oo**?+oo........',
+    '..........oooo..........',
+    '........................',
     '........................',
   ],
-  // Horno
+  // Horno: igual, su bloque en 3/4 con la boca y la brasa
   [Resource.Furnace]: [
     '........................',
-    '........................',
-    '........ooooooooooooo...',
-    '.......oiiiiiiiiiiiiio..',
-    '......oiiiiiiiiiiiijko..',
-    '.....oiiiiiiiiiiiijklo..',
-    '....oiiiiiiiiiiiijkklo..',
-    '...oijjjjijjjjjjjkkklo..',
-    '..oiiiiiiliiiiiijkkklo..',
-    '..oijjjjjljjjjjjkkkklo..',
-    '..oijjjjjljjjjjjkkkklo..',
-    '..oijjjjjljjjjjjkkkklo..',
-    '..ollllllllllllllkkklo..',
-    '..oijjlkttujkjjjkkkklo..',
-    '..oijkttuuutuijjkkkklo..',
-    '..oijktuuvvuvijjkkkklo..',
-    '..oijkuvvYZuZjjjkkklo...',
-    '..oijkuZuYZY0uijkklo....',
-    '..oijkuYYZZZ0uijkko.....',
-    '..oijkuZ00000uijko......',
-    '..ojkkuuuuuuuvjkko......',
-    '...oooooooooooooo.......',
+    '...........oo...........',
+    '.........oo;,oo.........',
+    '.......oo;,;;;,oo.......',
+    '.....oo;,;;,,;;,,oo.....',
+    '....o;,;;;,___,;;;,o....',
+    '...o;;;,,;_<<_;,,;;;o...',
+    '..o>/>,;;,,;;;,;;;,||o..',
+    '..o>///>;;;,,;;,(|||(o..',
+    '..o//>///>,;;,(|(|(||o..',
+    '..o//>/>///>(|||(|(||o..',
+    '..o>>>)//>//||(|||(((o..',
+    '..o>//>>)>>>(((|((||(o..',
+    '..o>>{{{>>//||(((||((o..',
+    '..o//{{{{{>>((||(((||o..',
+    '..o>>{{{{{//|||(||(((o..',
+    '..o>/{{}{{>>(((||((||o..',
+    '...o///{[{//||(((|||o...',
+    '....oo///{>/|((|(|oo....',
+    '......oo///>(|||oo......',
+    '........oo//||oo........',
+    '..........oooo..........',
     '........................',
     '........................',
   ],

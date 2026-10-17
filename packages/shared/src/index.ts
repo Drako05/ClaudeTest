@@ -969,6 +969,11 @@ export interface Intent {
   /** Receta que se quiere fabricar (indice en `RECIPES`), o -1. */
   craft: number;
   /**
+   * Cuantas veces de golpe (el autor, 2026-10-17: los botones + y - de la
+   * receta, y un solo mantener fabrica las N). Todo o nada; 1 por defecto.
+   */
+  craftTimes: number;
+  /**
    * Mover lo de una casilla a otra (arrastrar): el mismo objeto se apila y uno
    * distinto se intercambia. Los huecos de PERSONAJE tienen indice propio
    * (`equipSlot` en `sim/inventory.ts`): hacia ellos se equipa, desde ellos se
@@ -996,6 +1001,7 @@ export function emptyIntent(): Intent {
     aimRoll: 0,
     select: -1,
     craft: -1,
+    craftTimes: 1,
     moveFrom: -1,
     moveTo: -1,
     discard: -1,

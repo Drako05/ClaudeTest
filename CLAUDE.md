@@ -118,6 +118,14 @@ por su cuenta la forma de la curva de crecimiento, los tiempos de rebrote y que
 la piedra fuera finita. Eran decisiones de diseno del autor, no de
 implementacion, y varias no coincidian con lo que el tenia en mente.
 
+**Una pregunta del autor se responde, no se ejecuta** (2026-10-17). Si pregunta
+«¿puedes hacer X?», se contesta si se puede, como se haria y que decisiones
+quedan abiertas, y **se espera a que confirme** antes de tocar codigo. Surgio
+de otro error real: a «¿puedes ajustar solo el icono…?» el agente respondio
+cambiando el codigo, pasando el humo, las mutaciones y la CI, y empujando a
+`main`, con tamanos elegidos por su cuenta. Cada cambio arrastra ese
+procedimiento entero, y si el autor no esta de acuerdo es tiempo perdido.
+
 Proponer interpretaciones es bienvenido; darlas por aprobadas no. Cuando una
 decision se tome por deduccion (por ejemplo, derivar una tasa a partir de unos
 tiempos que dio el autor), hay que decirlo explicitamente para que pueda

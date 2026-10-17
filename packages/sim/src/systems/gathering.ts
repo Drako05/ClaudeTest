@@ -597,19 +597,42 @@ export function harvestTile(
  *
  * `near` dice si hay una estacion de ese tipo a mano; sin ella, solo valen las
  * recetas de mano. `step` le pasa `stationNear` con la posicion del jugador.
+ *
+ * `times` la fabrica N veces de golpe, **todo o nada** (el autor, 2026-10-17:
+ * un solo mantener fabrica las N): hacen falta N veces los ingredientes y
+ * sitio para N veces el resultado.
  */
 export function tryCraft(
   inventory: Inventory,
   recipe: number,
   near: (s: Station) => boolean = (s) => s === Station.Hand,
+  times = 1,
 ): 'ok' | 'missing' | 'full' {
   const r = RECIPES[recipe];
-  if (!r || !near(r.station)) return 'missing';
-  for (const input of r.inputs) if (inventory.count(input.item) < input.count) return 'missing';
-  if (!inventory.fits([{ item: r.output, count: r.count }], r.inputs)) return 'full';
-  for (const input of r.inputs) inventory.remove(input.item, input.count);
-  inventory.add(r.output, r.count);
+  const n = Math.floor(times);
+  if (!r || !near(r.station) || n < 1) return 'missing';
+  const inputs = r.inputs.map((input) => ({ item: input.item, count: input.count * n }));
+  for (const input of inputs) if (inventory.count(input.item) < input.count) return 'missing';
+  const output = { item: r.output, count: r.count * n };
+  if (!inventory.fits([output], inputs)) return 'full';
+  for (const input of inputs) inventory.remove(input.item, input.count);
+  inventory.add(output.item, output.count);
   return 'ok';
+}
+
+/**
+ * Cuantas veces de golpe alcanza una receta: lo que dan los ingredientes y lo
+ * que cabe del resultado. 0 si ni una. El tope del + de la receta (el autor,
+ * 2026-10-17: «hasta lo que alcanza»).
+ */
+export function craftableTimes(inventory: Inventory, recipe: number): number {
+  const r = RECIPES[recipe];
+  if (!r) return 0;
+  let n = Math.min(...r.inputs.map((input) => Math.floor(inventory.count(input.item) / input.count)));
+  const fits = (k: number) =>
+    inventory.fits([{ item: r.output, count: r.count * k }], r.inputs.map((input) => ({ item: input.item, count: input.count * k })));
+  while (n > 0 && !fits(n)) n--;
+  return n;
 }
 
 /** Que hizo un `use`. */
@@ -747,8 +770,9 @@ export function craftNear(
   id: number,
   inventory: Inventory,
   recipe: number,
+  times = 1,
 ): 'ok' | 'missing' | 'full' {
-  return tryCraft(inventory, recipe, (s) => stationNear(world, eyeOf(store, id), s, (tx, ty) => hitboxAt(world, tx, ty)));
+  return tryCraft(inventory, recipe, (s) => stationNear(world, eyeOf(store, id), s, (tx, ty) => hitboxAt(world, tx, ty)), times);
 }
 
 /**

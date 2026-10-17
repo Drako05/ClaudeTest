@@ -3,14 +3,15 @@
  * «hoja con los 30, y luego al juego»). Tapa el juego con un panel del color
  * de las casillas y pone cada icono a su tamano real en una casilla (48 px, el
  * doble exacto de su rejilla) y ampliado ×4, con su nombre debajo, por grupos:
- * los objetos, los huecos de PERSONAJE y los botones. No toca el mundo: es
+ * los objetos, los huecos de PERSONAJE, los botones y las categorias de las
+ * recetas. No toca el mundo: es
  * solo dibujo.
  */
 
 import { EQUIP_COUNT, EQUIP_NAMES, RESOURCE_COUNT, RESOURCE_NAMES, type Equip, type Resource } from '@verdant/shared';
 import { itemArt } from './item-icons.js';
 import { pixelIcon, type PixelArt } from './pixel-art.js';
-import { BUTTON_ICONS, BUTTON_NAMES, buttonArt, equipArt } from './silhouette-icons.js';
+import { BUTTON_ICONS, BUTTON_NAMES, buttonArt, CATEGORY_ICONS, categoryArt, equipArt } from './silhouette-icons.js';
 
 interface SheetGroup {
   title: string;
@@ -29,10 +30,12 @@ function groups(): SheetGroup[] {
     art: equipArt(i as Equip),
   }));
   const buttons = BUTTON_ICONS.map((b) => ({ name: BUTTON_NAMES[b], art: buttonArt(b) }));
+  const categories = CATEGORY_ICONS.map((c) => ({ name: c, art: categoryArt(c) as PixelArt }));
   return [
     { title: 'Objetos', tone: '', icons: items },
     { title: 'Huecos de PERSONAJE', tone: 'slotTone', icons: equip },
     { title: 'Botones', tone: 'buttonTone', icons: buttons },
+    { title: 'Categorias de recetas', tone: 'buttonTone', icons: categories },
   ];
 }
 

@@ -128,7 +128,7 @@ async function shot(page, name) {
  * se quedan como estan). Fuera de multiplo, sus pixeles salen desiguales.
  */
 function offGridIcons(page) {
-  return page.evaluate(() => Array.from(document.querySelectorAll('svg.itemIcon, svg.equipIcon, svg[data-pixel], svg:has(> [data-pixel])'))
+  return page.evaluate(() => Array.from(document.querySelectorAll('svg.itemIcon, svg.equipIcon, svg.catIcon, svg[data-pixel], svg:has(> [data-pixel])'))
     .map((svg) => ({ svg, r: svg.getBoundingClientRect() }))
     .filter(({ r }) => r.width > 0 && r.height > 0)
     .filter(({ r }) => Math.abs(r.width - r.height) > 0.01 || r.width < 23.99 || Math.abs(r.width / 24 - Math.round(r.width / 24)) > 0.001)
@@ -816,6 +816,14 @@ async function desktopPass(browser, baseUrl) {
     `hay casillas llenas sin su icono, o con el nombre escrito: ${JSON.stringify(icons)}`);
   check(icons.inputs === 0, `hay ingredientes sin su icono: ${JSON.stringify(icons)}`);
   check(icons.buttons === 22, `los botones no recibieron sus iconos en pixelart: ${icons.buttons}`);
+  // Todos los botones, cuadrados y con relieve (el autor, 2026-10-17): las
+  // esquinas, menos de medio lado; el relieve, en una sombra por dentro.
+  const shapes = await page.evaluate(() => ['hudToggle', 'statsToggle', 'proj', 'invOpen', 'modeBar'].map((id) => {
+    const el = document.getElementById(id);
+    const s = getComputedStyle(el);
+    return { id, square: parseFloat(s.borderTopLeftRadius) < el.getBoundingClientRect().width / 2 - 1, relief: s.boxShadow.includes('inset') };
+  }).filter((x) => !(x.square && x.relief)));
+  check(shapes.length === 0, `hay botones redondos o sin relieve: ${JSON.stringify(shapes)}`);
   const offPc = await offGridIcons(page);
   check(offPc.length === 0, `hay iconos en pixelart fuera de un multiplo de 24: ${offPc.join(', ')}`);
   // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
@@ -1333,7 +1341,7 @@ async function resourcesPass(browser, baseUrl) {
     await drag(await center('#invGrid .slot:nth-child(6)'), await center('#invGrid .slot:nth-child(2)'));
     const swapped = await state(page);
     check(swapped.slots[1].item === 8 && swapped.slots[5].item === 1, 'arrastrar sobre otro objeto no los intercambio');
-    // Fabricar: mantener 1,5 s el resultado. Soltar antes no fabrica.
+    // Fabricar: mantener 1 s el resultado (1,5 hasta el 2026-10-17). Soltar antes no fabrica.
     const pickRow = '#recipeList .recipe:nth-child(2) .result';
     const beforeCraft = await state(page);
     const at = await center(pickRow);
@@ -1342,7 +1350,7 @@ async function resourcesPass(browser, baseUrl) {
     await elapse(page, 500);
     await page.mouse.up();
     await elapse(page, 300);
-    check((await state(page)).itemsSent.craft === beforeCraft.itemsSent.craft, 'soltar antes de 1,5 s fabrico');
+    check((await state(page)).itemsSent.craft === beforeCraft.itemsSent.craft, 'soltar antes de 1 s fabrico');
     await page.mouse.down();
     await elapse(page, 1900);
     await page.mouse.up();
@@ -1353,7 +1361,7 @@ async function resourcesPass(browser, baseUrl) {
     check(made.feed.includes('+1 Pico de piedra') && made.feed.some((t) => t.startsWith('-')),
       `el registro no anoto lo fabricado y lo gastado: ${JSON.stringify(made.feed)}`);
     check(made.feed.length <= 5, 'el registro paso de cinco lineas');
-    check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'mantener 1,5 s no fabrico');
+    check(made.itemsSent.craft > beforeCraft.itemsSent.craft, 'mantener 1 s no fabrico');
     // La carga acaba en el borde derecho de los ingredientes, no en el del panel.
     const rowEdge = await page.evaluate(() => {
       const row = document.querySelector('#recipeList .recipe:nth-child(2)');
@@ -1452,15 +1460,34 @@ async function stationsPass(browser, baseUrl) {
     await page.mouse.up();
     await elapse(page, 300);
   };
-  const tabs = () => page.evaluate(() => Array.from(document.querySelectorAll('#recipeTabs .slot:not(.off)')).map((t) => t.textContent));
+  // Las categorias van por su icono (el autor, 2026-10-17): su nombre, en
+  // `data-category`.
+  const tabs = () => page.evaluate(() => Array.from(document.querySelectorAll('#recipeTabs .slot:not(.off)')).map((t) => t.dataset.category));
   const category = (name) =>
-    page.evaluate((n) => Array.from(document.querySelectorAll('#recipeTabs .slot')).find((t) => t.textContent === n)?.click(), name);
-  /** Mantener 1,9 s el resultado de la receta n de la lista. */
+    page.evaluate((n) => Array.from(document.querySelectorAll('#recipeTabs .slot')).find((t) => t.dataset.category === n)?.click(), name);
+  /** Lo que dice la receta n: el total que sale, y si + y - estan habilitados. */
+  const qty = (n) => page.evaluate((k) => {
+    const row = document.querySelector(`#recipeList .recipe:nth-child(${k})`);
+    const [more, less] = row.querySelectorAll('.qty button');
+    return { shown: Number(row.querySelector('.result em')?.textContent ?? 1), more: !more.disabled, less: !less.disabled, off: row.querySelector('.qty').classList.contains('off') };
+  }, n);
+  /** Pulsar + (o -) de la receta n tantas veces. */
+  const press = async (n, sign, times) => {
+    for (let i = 0; i < times; i++) {
+      await page.evaluate(([k, b]) => document.querySelector(`#recipeList .recipe:nth-child(${k}) .qty button:nth-child(${b})`).click(), [n, sign === '+' ? 1 : 2]);
+    }
+    await elapse(page, 100);
+  };
+  /**
+   * Mantener 1,2 s el resultado de la receta n de la lista: mas que 1 s (el
+   * autor, 2026-10-17) y menos que los 1,5 de antes, para que lo distinga. Con
+   * el reloj manual no hay margen que dar.
+   */
   const craft = async (n) => {
     const at = await center(`#recipeList .recipe:nth-child(${n}) .result`);
     await page.mouse.move(at.x, at.y);
     await page.mouse.down();
-    await elapse(page, 1900);
+    await elapse(page, 1200);
     await page.mouse.up();
     await elapse(page, 300);
   };
@@ -1485,6 +1512,18 @@ async function stationsPass(browser, baseUrl) {
   check((await state(page)).panelStation === 0, 'con E el panel no es el de mano');
   check(handTabs.includes('Estaciones') && handTabs.includes('Armas') && !handTabs.includes('Fundicion') && !handTabs.includes('Ropa'),
     `con E salen recetas de estacion: ${handTabs}`);
+  // Las categorias, con su icono y sin nombre escrito; las herramientas no
+  // se apilan, asi que su + y su - estan apagados (el autor, 2026-10-17), y
+  // nuevas no ensenan su barra de desgaste.
+  const handLook = await page.evaluate(() => ({
+    icons: Array.from(document.querySelectorAll('#recipeTabs .slot:not(.off)')).every((t) => t.querySelector('svg.catIcon path') && t.textContent.trim() === ''),
+    qty: Array.from(document.querySelectorAll('#recipeList .qty')).map((q) => q.classList.contains('off') && Array.from(q.querySelectorAll('button')).every((b) => b.disabled)),
+    wear: document.querySelectorAll('#recipeList .result .wear').length,
+  }));
+  console.log(`  recetas de mano: ${JSON.stringify(handLook)}`);
+  check(handLook.icons, 'las categorias de las recetas no llevan su icono, o llevan texto');
+  check(handLook.qty.length > 0 && handLook.qty.every(Boolean), `una receta que no se apila tiene + o - habilitados: ${JSON.stringify(handLook.qty)}`);
+  check(handLook.wear === 0, 'una herramienta nueva ensena su barra de desgaste');
   await category('Estaciones');
   await craft(1);
   await craft(2);
@@ -1553,7 +1592,20 @@ async function stationsPass(browser, baseUrl) {
   console.log(`  usar el horno: panel ${furnace.inventoryOpen ? 'abierto' : 'cerrado'}, «${await page.textContent('#recipeTitle')}», ${furnaceTabs}`);
   check(furnace.inventoryOpen && furnace.panelStation === 2, 'USAR mirando el horno no abrio su panel');
   check(furnaceTabs.join() === 'Fundicion,Cocina', `el horno ensena otras recetas: ${furnaceTabs}`);
-  for (let i = 0; i < 5; i++) await craft(1);
+  // Cuantas veces, con + y - (el autor, 2026-10-17): el + sube hasta lo que
+  // alcanza y se para; el resultado dice el total. Y un solo mantener fabrica
+  // las 5.
+  const most = Math.min(Math.floor(furnace.inventory[7] / 2), furnace.inventory[5]);
+  const q0 = await qty(1);
+  await press(1, '+', most + 3);
+  const qMax = await qty(1);
+  await press(1, '-', most - 5);
+  const q5 = await qty(1);
+  console.log(`  lingote por cantidad: ${JSON.stringify({ q0, most, qMax, q5 })}`);
+  check(!q0.off && q0.shown === 1 && q0.more && !q0.less, `el lingote no arranca en 1 con + habilitado: ${JSON.stringify(q0)}`);
+  check(qMax.shown === most && !qMax.more && qMax.less, `el + no se para en lo que alcanza (${most}): ${JSON.stringify(qMax)}`);
+  check(q5.shown === 5, `con - no se vuelve a 5: ${JSON.stringify(q5)}`);
+  await craft(1);
   const smelted = await state(page);
   console.log(`  fundir: lingotes de cobre ${smelted.inventory[12]}; registro ${JSON.stringify(smelted.feed)}`);
   check(smelted.inventory[12] === 5, `no se fundieron 5 lingotes de cobre: ${smelted.inventory[12]}`);
@@ -1779,7 +1831,9 @@ async function mobilePass(browser, baseUrl) {
   const auto = await rect('autoJump');
   const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
   const ctr = (r) => ({ x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2, r: r.width / 2 });
-  const gapOf = (a, b) => { const p = ctr(a), q = ctr(b); return Math.hypot(p.x - q.x, p.y - q.y) - p.r - q.r; };
+  // La holgura entre dos botones, de caja a caja: desde el 2026-10-17 son
+  // cuadrados (el autor), y medirlos como circulos no veia sus esquinas.
+  const gapOf = (a, b) => Math.max(b.left - a.right, a.left - b.right, b.top - a.bottom, a.top - b.bottom);
   const fromAtk = (r) => Math.hypot(ctr(r).x - ctr(atk).x, ctr(r).y - ctr(atk).y);
   console.log(`  MODO y ENTRADA: a ${fromAtk(mode).toFixed(1)} y ${fromAtk(entry).toFixed(1)} del centro del ataque; holgura minima ` +
     `${Math.min(...[use, jump, run, atk, auto].flatMap((o) => [gapOf(mode, o), gapOf(entry, o)]), gapOf(mode, entry)).toFixed(1)} px`);
@@ -1804,6 +1858,12 @@ async function mobilePass(browser, baseUrl) {
   // Los ocho con su icono pintado, tambien los que eran un caracter (», ↑ y A;
   // el autor, 2026-10-17: todos en pixelart de 24 × 24).
   check(labels.every((l) => l.svg), `hay botones sin su icono: ${JSON.stringify(labels.filter((l) => !l.svg))}`);
+  const roundOnes = await page.evaluate(() => ['action', 'use', 'jump', 'run', 'autoJump', 'others', 'invOpen', 'modeTouch', 'inputMode'].filter((id) => {
+    const el = document.getElementById(id);
+    const s = getComputedStyle(el);
+    return !(parseFloat(s.borderTopLeftRadius) < el.getBoundingClientRect().width / 2 - 1 && s.boxShadow.includes('inset'));
+  }));
+  check(roundOnes.length === 0, `hay botones del movil redondos o sin relieve: ${roundOnes}`);
   const offButtons = await offGridIcons(page);
   check(offButtons.length === 0, `hay iconos de boton fuera de un multiplo de 24: ${offButtons.join(', ')}`);
   // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
@@ -2287,7 +2347,8 @@ async function devToolsPass(browser, baseUrl) {
   check(await page.isVisible('#devPanel'), 'el panel de desarrollo no es visible');
 
   // La hoja de los iconos (`?iconos=1`, la revision de la tanda del
-  // 2026-10-17): los 30 objetos, los 14 huecos de PERSONAJE y los 20 botones,
+  // 2026-10-17): los 30 objetos, los 14 huecos de PERSONAJE, los 20 botones y
+  // las 6 categorias de las recetas,
   // cada uno pintado a 48 px y a 96.
   const sheet = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   await sheet.goto(`${baseUrl}/?seed=${SEED}&iconos=1`, { waitUntil: 'load' });
@@ -2296,7 +2357,7 @@ async function devToolsPass(browser, baseUrl) {
     document.querySelectorAll('#iconSheet figure').length, document.querySelectorAll('#iconSheet svg path').length > 0]);
   await sheet.close();
   console.log(`  hoja de iconos: ${JSON.stringify(sheetIcons)}`);
-  check(sheetIcons[0] === 64 && sheetIcons[1] === 64 && sheetIcons[2], `la hoja de iconos no tiene los 64: ${JSON.stringify(sheetIcons)}`);
+  check(sheetIcons[0] === 70 && sheetIcons[1] === 70 && sheetIcons[2], `la hoja de iconos no tiene los 70: ${JSON.stringify(sheetIcons)}`);
 
   // Bordes de chunk y de bioma.
   await page.click('[data-toggle="chunks"]');

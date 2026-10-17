@@ -142,3 +142,11 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `fill-rule|evenodd` — los calados de los iconos por la regla de relleno; desde el 2026-10-17 son pixeles transparentes. Permitido en: `docs/guia-de-arte.md` (cuenta como era la directriz 3), `docs/historia.md`, `docs/pendiente.md`.
 - `glifo de CORRER|con su glifo` — CORRER, SALTAR, AUTO SALTO y el bioma con un caracter (», ↑, A, 🌿); desde el 2026-10-17, iconos en pixelart. Permitido en: `docs/historia.md`, `docs/pendiente.md`.
 - `min\(48px, 100%\)|var\(--eq\) \* \.8|#use svg \{ width: 32px|#invOpen svg \{ width: 36px|#autoJump svg \{ width: 18px|\.ringIcon \{ width: 36px` — los iconos a un tamano que no era multiplo de su rejilla (encoger con la casilla, el 80 % de PERSONAJE, USAR a 32, la mochila a 36, AUTO SALTO a 18, los anillos del movil a 36); desde el 2026-10-17, siempre 24 o 48. Permitido en: `tools/mutaciones.mjs` (las mutaciones los reintroducen), `docs/historia.md`.
+
+## Las correcciones a los iconos (2026-10-17)
+
+- `mantener (pulsado )?1,5 s|1,5 s (una receta|con el dedo)|CRAFT_HOLD_MS = 1500` — fabricar manteniendo 1,5 s; desde el 2026-10-17, 1 s (el autor). Permitido en: `docs/historia.md`, `docs/pendiente.md`, `docs/recoleccion.md` (cuenta que lo era), `tools/mutaciones.mjs` (la mutacion lo reintroduce), `packages/client/src/inventory-ui.ts` (lo cuenta su cabecera), `tools/smoke.mjs` (comentarios que lo cuentan).
+- `--arc: 84px|arco de 84` — el arco de MODO y ENTRADA con botones redondos; desde el 2026-10-17, 102. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `docs/juicio.md`, `docs/controles.md`, `packages/client/index.html` (lo cuentan), `tools/mutaciones.mjs`.
+- `un redondo pequeno|los dos redondos|no pisar a los redondos` — los botones redondos; desde el 2026-10-17 son cuadrados con relieve. Permitido en: `docs/historia.md`, `docs/pendiente.md`.
+- `tab\.textContent === |t\.textContent === n` — buscar la categoria de las recetas por su texto; desde el 2026-10-17 lleva icono y su nombre va en `data-category`. Permitido en: `docs/historia.md`.
+- `mochila de explorador|la flecha que lo salta sola|cuello alto y abierto en dos picos` — los dibujos de INVENTARIO, AUTO SALTO y Capa que el autor hizo rehacer el 2026-10-17. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `docs/controles.md` (cuenta la mochila de 2026-09-30).

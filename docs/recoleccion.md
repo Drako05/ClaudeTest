@@ -45,10 +45,22 @@ Decisiones del autor, que no se tocan sin preguntarle:
   arrastra entre la rejilla y la barra de la mano; **cerrado, dentro de la
   barra**. **Soltarlo fuera del panel lo tira, previa confirmacion**; desde la
   barra con el inventario cerrado, soltar al vacio no hace nada.
-- **Fabricar es mantener pulsado 1,5 s** el resultado de la receta, con la fila
-  llenandose de izquierda a derecha **hasta el borde derecho de los
-  ingredientes** (la fila mide lo que su contenido); sin ingredientes se ve
-  apagada y no hace nada, y sin sitio tampoco.
+- **Fabricar es mantener pulsado 1 s** el resultado de la receta (1,5 hasta el
+  2026-10-17, el autor), con la fila llenandose de izquierda a derecha **hasta
+  el borde derecho de los ingredientes** (la fila mide lo que su contenido);
+  sin ingredientes se ve apagada y no hace nada, y sin sitio tampoco.
+- **Cuantas veces, con + y -** (el autor, 2026-10-17): uno encima del otro a la
+  derecha de los ingredientes, en cada receta, pero **habilitados solo en lo
+  que se apila** (herramientas, armas y equipables no). **Un solo mantener
+  fabrica las N**, todo o nada (`tryCraft(..., times)` en el nucleo, y
+  `Intent.craftTimes`). El + sube **hasta lo que alcanza**, de ingredientes y
+  de sitio (`craftableTimes`); el resultado dice **lo que sale en total** y
+  los ingredientes, tengo/necesito para las N. Despues de fabricar, la N se
+  queda, y baja sola si ya no alcanza (*deduccion*).
+- **La barra de desgaste no se ve con la herramienta o el arma entera** (el
+  autor, 2026-10-17: «nueva o con futuras expansiones de reparación»).
+- **Las categorias de las recetas van por su icono**, monocromo
+  (`silhouette-icons.ts`, `CATEGORY_ROWS`), con el nombre al pasar el raton.
 - **No hay avisos en pantalla** (decision del autor, 2026-09-29): ni «necesitas
   un pico», ni «inventario lleno», ni «fabricado». El nucleo sigue dejando
   `lastBlocked`, pero nadie lo pinta. Fabricar sin sitio se resolvera en otra
@@ -209,7 +221,7 @@ Lo que el codigo tiene que respetar:
   casillas no caben, y los gestos arrastran el mando con un dedo de verdad.
 - **Arrastrar se prueba con toques de verdad** (`tools/gestures.mjs`): dentro
   de la barra con el inventario cerrado (y al vacio, sin tirar), de casilla a
-  casilla y de la rejilla a la barra, y mantener una receta 1,5 s. En PC lo
+  casilla y de la rejilla a la barra, y mantener una receta 1 s. En PC lo
   hace el humo con el raton, confirmacion de tirar incluida.
 
 Para probar sin juntarlo todo a mano, el panel de desarrollo tiene
