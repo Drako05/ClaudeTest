@@ -43,21 +43,16 @@
         backdrop-filter: blur(6px); cursor: pointer;
         touch-action: manipulation;
       }
-      #proj svg {
-        width: 24px; height: 24px; display: block;
-        fill: none; stroke: currentColor; stroke-width: 1.8;
-        stroke-linecap: round; stroke-linejoin: round;
-      }
-      /* La pupila es lo unico macizo, para que el ojo abierto se lea de un
-         vistazo a 24 px. */
-      #proj .eye-pupil { fill: currentColor; stroke: none; }
+      /* El ojo, en pixelart de un color (`silhouette-icons.ts`): cuatro piezas
+         —abierto, pupila, entornado y la mira— que alternan estas clases. */
+      #proj svg { width: 24px; height: 24px; display: block; }
       /* `.flat` es la ortografica: se cierra el parpado y desaparece la pupila. */
       #proj.flat .eye-open, #proj.flat .eye-pupil { display: none; }
       #proj:not(.flat) .eye-flat { display: none; }
       /* `.fp` es la primera persona: el ojo abierto con un punto de mira encima
          —un anillo alrededor de la pupila y dos marcas arriba y abajo—, «ves a
          traves de sus ojos». Eleccion del autor. */
-      #proj .eye-aim { display: none; stroke-width: 1.4; }
+      #proj .eye-aim { display: none; }
       #proj.fp .eye-aim { display: inline; }
       #proj.fp .eye-pupil { transform: scale(.55); transform-origin: 12px 12px; }
       #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
@@ -93,12 +88,9 @@
         touch-action: none;
       }
       /* Solo el icono, sin rotulo (decision del autor); el nombre va en
-         `aria-label`. Glifo o SVG monocromo, del color del texto. */
-      #thumbPad button b { display: block; line-height: 1; }
-      #thumbPad svg, .round svg {
-        display: block; fill: none; stroke: currentColor; stroke-width: 1.8;
-        stroke-linecap: round; stroke-linejoin: round;
-      }
+         `aria-label`. Silueta de un color en pixelart de 24, del color del
+         texto (`silhouette-icons.ts`, 2026-10-17). */
+      #thumbPad svg, .round svg { display: block; }
       #thumbPad button:active { transform: scale(.95); }
       #thumbPad button:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
       /* Encendido o pulsado: tiene que verse, porque cambia lo que hace el juego. */
@@ -113,7 +105,7 @@
         right: calc(12px + env(safe-area-inset-right));
         bottom: calc(10px + env(safe-area-inset-bottom));
       }
-      #action svg { width: 46px; height: 46px; }
+      #action svg { width: 48px; height: 48px; }
       /* USAR apoyado en el mismo borde de abajo que el ataque, y CORRER y SALTAR
          en el mismo borde derecho (decision del autor). */
       #use {
@@ -149,7 +141,7 @@
       }
       #jump { bottom: calc(10px + var(--atk) + 12px + env(safe-area-inset-bottom)); }
       #run { bottom: calc(10px + var(--atk) + 12px + var(--side) + 10px + env(safe-area-inset-bottom)); }
-      #run b, #jump b { font-size: 26px; }
+      #run svg, #jump svg { width: 24px; height: 24px; }
       /* AUTO SALTO: pequeno y montado sobre la esquina de arriba a la izquierda
          de SALTAR, como el boceto del autor (2026-09-30). Su centro cae en el
          borde de SALTAR a 45 grados; el tamano y la letra son mios. */
@@ -159,9 +151,8 @@
         width: var(--autob); height: var(--autob);
         right: calc(12px + var(--side) / 2 + var(--side) / 2 * .7071 - var(--autob) / 2 + env(safe-area-inset-right));
         bottom: calc(10px + var(--atk) + 12px + var(--side) / 2 + var(--side) / 2 * .7071 - var(--autob) / 2 + env(safe-area-inset-bottom));
-        font-size: 15px;
       }
-      #autoJump b { font-weight: 800; }
+      #autoJump svg { width: 18px; height: 18px; }
       /* Los anillos de salud y hambre, los mismos de PC, uno al lado del otro en
          la esquina de abajo a la izquierda y apoyados en el borde de abajo de
          ATAQUE y USAR (decisiones del autor, 2026-09-30). Entre USAR y ATAQUE
@@ -193,7 +184,7 @@
         border: 1px solid rgba(140, 190, 255, 0.34);
         backdrop-filter: blur(6px); cursor: pointer; touch-action: manipulation;
       }
-      .round svg { width: 28px; height: 28px; }
+      .round svg { width: 24px; height: 24px; }
       .round.open { background: rgba(60, 104, 168, .72); }
       body.touch-active .round { display: flex; }
       #others { left: calc(12px + env(safe-area-inset-left)); }
@@ -333,11 +324,7 @@
         border: 1px solid rgba(140, 190, 255, 0.22);
         backdrop-filter: blur(6px); touch-action: manipulation;
       }
-      #hudToggle svg, #devToggle svg {
-        width: 22px; height: 22px; display: block;
-        fill: none; stroke: currentColor; stroke-width: 1.8;
-        stroke-linecap: round; stroke-linejoin: round;
-      }
+      #hudToggle svg, #devToggle svg, #statsToggle svg { width: 24px; height: 24px; display: block; }
       #hudToggle:active, #statsToggle:active, #devToggle:active { transform: scale(.94); }
       #hudToggle:focus-visible, #statsToggle:focus-visible, #devToggle:focus-visible {
         outline: 2px solid #8fc4ff; outline-offset: 3px;
@@ -421,12 +408,13 @@
       .ring .fill { transition: stroke-dasharray .12s linear, stroke-dashoffset .12s linear; }
       #hungerArc { stroke: #ff8a1f; }
       #healthArc { stroke: #e0403f; }
+      /* Los iconos de los anillos: siluetas en pixelart de 24, del color de su
+         anillo (`silhouette-icons.ts`). */
       .ringIcon {
-        position: absolute; left: 50%; top: 50%; width: 26px; height: 26px;
-        transform: translate(-50%, -50%);
-        fill: none; stroke: #ff8a1f; stroke-width: 2.2; stroke-linecap: round;
+        position: absolute; left: 50%; top: 50%; width: 24px; height: 24px;
+        transform: translate(-50%, -50%); color: #ff8a1f;
       }
-      .ringIcon.heart { fill: #e0403f; stroke: none; }
+      .ringIcon.heart { color: #e0403f; }
       /* El boton MODO dice el modo con su icono: tajo o mirilla. */
       /* Con ids: `#thumbPad svg` pone `display: block` y, con clases, ganaba en
          el movil (lo cazaron los gestos: salia la mirilla en barrido). */
@@ -438,7 +426,7 @@
         background: rgba(60, 104, 168, .86); border-color: rgba(170, 214, 255, .75); color: #f4f9ff;
       }
       /* La mochila, mas grande que los demas iconos redondos (pedido del autor). */
-      #invOpen svg { width: 34px; height: 34px; }
+      #invOpen svg { width: 36px; height: 36px; }
       /* En el movil la barra y el INVENTARIO vuelven arriba, los anillos a su
          esquina (arriba, con el racimo del pulgar), y el MODO de PC no esta. */
       body.touch-active #bottomBar,
@@ -473,7 +461,7 @@
       .slots { display: grid; grid-template-columns: repeat(4, 60px); gap: 6px; }
       .slot {
         -webkit-appearance: none; appearance: none; position: relative;
-        width: 60px; height: 60px; padding: 4px 3px 14px; border-radius: 8px;
+        width: 60px; height: 60px; padding: 2px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center; text-align: center;
         font: 600 10px/1.15 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         color: #e8eef7; background: rgba(8, 14, 28, 0.78);
@@ -523,12 +511,17 @@
       }
       #charGrid .slot { width: var(--eq); height: var(--eq); }
       /* El icono de lo que va en cada casilla vacia (`equip-icons.ts`):
-         silueta rellena con los detalles calados (directriz 3 de la guia de
-         arte). */
+         silueta de un color en pixelart de 24 (directrices 3 y 5 de la guia de
+         arte), al doble exacto en una casilla de 60. */
       #charGrid .slot .equipIcon {
-        flex: none; width: calc(var(--eq) / 2); height: calc(var(--eq) / 2); margin-top: 10px; color: #6f82a0;
-        fill: currentColor; fill-rule: evenodd; stroke: none;
+        flex: none; width: calc(var(--eq) * .8); height: calc(var(--eq) * .8); color: #6f82a0;
       }
+      /* El icono de un objeto (`item-icons.ts`, directriz 5): pixelart a color,
+         a 48 px (el doble exacto de su rejilla) en las casillas de 60, y lo que
+         cabe en las menores. El numero y el desgaste van encima, abajo. */
+      .slot .itemIcon { flex: none; width: min(48px, 100%); height: min(48px, 100%); }
+      .slot em { text-shadow: 0 1px 0 #000, 0 0 3px #000; z-index: 1; }
+      .slot .wear { z-index: 1; }
       /* La hoja de los iconos (`?iconos=1`, `icon-sheet.ts`): encima de todo,
          del color de las casillas, cada icono a 48 px en una casilla y a ×4. */
       #iconSheet {
@@ -587,12 +580,12 @@
         background: rgba(143, 196, 255, 0.28); pointer-events: none;
       }
       .recipe.missing { opacity: .42; }
+      /* Lo que se arrastra: su icono, con una sombra para leerse sobre el mundo. */
       #dragGhost {
         position: fixed; z-index: 30; pointer-events: none; display: none;
-        padding: 6px 10px; border-radius: 8px; transform: translate(-50%, -60%);
-        font: 600 11px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        color: #0b1020; background: #ffe89a;
+        transform: translate(-50%, -60%); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .7));
       }
+      #dragGhost .itemIcon { display: block; width: 48px; height: 48px; }
       #invTabs { display: none; }
 
       /* Tirar pide confirmacion (decision del autor). */
@@ -757,9 +750,12 @@
       }
       #pickupFeed div {
         position: absolute; right: 0; bottom: 0; white-space: nowrap;
-        font: 600 11px/15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        display: flex; align-items: center; gap: 2px;
+        font: 600 11px/26px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         text-shadow: 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, .9), 0 0 4px rgba(0, 0, 0, .6);
       }
+      /* Su icono, a 24 px: la rejilla a 1× (el autor, 2026-10-17: icono y texto). */
+      #pickupFeed .itemIcon { width: 24px; height: 24px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .8)); }
       #pickupFeed .gain { color: #c9f2cf; }
       #pickupFeed .loss { color: #f5c6c6; }
       /* En PC, encima del boton INVENTARIO y centrado sobre el (pedido del
@@ -938,69 +934,51 @@
     <!-- El orden del DOM es el de la pantalla: correr y saltar a la izquierda,
          y la accion pegada al borde derecho, que es donde cae el pulgar. -->
     <div id="thumbPad">
+      <!-- Los iconos de los botones son siluetas de un color en pixelart de 24
+           (el autor, 2026-10-17; `silhouette-icons.ts`): cada `data-pixel` se
+           rellena al arrancar con su dibujo, y las clases de estado se quedan
+           aqui, donde el CSS las alterna. -->
       <button id="run" type="button" aria-label="Correr" aria-pressed="false">
-        <b aria-hidden="true">&#187;</b>
+        <svg data-pixel="run" aria-hidden="true"></svg>
       </button>
       <button id="jump" type="button" aria-label="Saltar">
-        <b aria-hidden="true">&#8593;</b>
+        <svg data-pixel="jump" aria-hidden="true"></svg>
       </button>
       <!-- AUTO SALTO, montado sobre SALTAR (boceto del autor). Interruptor. -->
       <button id="autoJump" type="button" aria-label="Auto salto" aria-pressed="false">
-        <b aria-hidden="true">A</b>
+        <svg data-pixel="autoJump" aria-hidden="true"></svg>
       </button>
       <!-- Una mano abierta. -->
       <button id="use" type="button" aria-label="Usar">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M8 12.5V5.8a1.5 1.5 0 0 1 3 0v5.7M11 11V4.3a1.5 1.5 0 0 1 3 0V11M14 11V5.3a1.5 1.5 0 0 1 3 0v6.2M17 11.5V8.3a1.5 1.5 0 0 1 3 0v6.2c0 4.1-2.9 7.2-6.8 7.2h-1.4c-2.1 0-3.5-.9-4.6-2.5l-3.3-4.9a1.5 1.5 0 0 1 2.4-1.8L8 14.3" />
-        </svg>
+        <svg data-pixel="use" aria-hidden="true"></svg>
       </button>
       <!-- MODO de golpe, en la diagonal de arriba a la izquierda del ataque y mas
            pequeno que USAR (decision del autor). Los mismos iconos que en PC. -->
       <button id="modeTouch" class="modeBtn" type="button" aria-pressed="false" aria-label="Modo barrido">
-        <svg class="mode-sweep" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 20C5 11 11 5 20 4C13.5 7.2 9 12 4 20z" />
-          <path d="M7.5 20.5C9 14.5 13 9.5 19.5 8" />
-        </svg>
-        <svg class="mode-precise" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="6.5" />
-          <path d="M12 2.5v5.2M12 16.3v5.2M2.5 12h5.2M16.3 12h5.2" />
-          <circle cx="12" cy="12" r="1" />
-        </svg>
+        <svg class="mode-sweep" data-pixel="modeSweep" aria-hidden="true"></svg>
+        <svg class="mode-precise" data-pixel="modePrecise" aria-hidden="true"></svg>
       </button>
       <!-- ENTRADA: MIRA (se actua hacia la cruz) o TAP (se actua donde se toca).
            Interruptor, como MODO, y se recuerda (decisiones del autor). -->
       <button id="inputMode" class="modeBtn" type="button" aria-pressed="false" aria-label="Entrada: mira">
-        <svg class="input-aim" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 4v16M4 12h16" />
-        </svg>
+        <svg class="input-aim" data-pixel="inputAim" aria-hidden="true"></svg>
         <!-- Una mano con el indice extendido tocando, y el toque en la punta. -->
-        <svg class="input-tap" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M9.5 13.5V6.2a1.5 1.5 0 0 1 3 0v6.3M12.5 11.5a1.5 1.5 0 0 1 3 0v1.5M15.5 12.2a1.5 1.5 0 0 1 3 0v3.6c0 3.4-2.4 6.2-5.7 6.2h-1.1c-1.8 0-3-.8-4-2.1l-2.6-3.8a1.4 1.4 0 0 1 2.2-1.7l1.2 1.4" />
-          <path d="M7.2 4.6a4.2 4.2 0 0 1 7.6 0" />
-        </svg>
+        <svg class="input-tap" data-pixel="inputTap" aria-hidden="true"></svg>
       </button>
-      <!-- Una espada y un pico cruzados. El mango del pico se corta donde lo
-           cruza la hoja, para que la espada quede delante. -->
+      <!-- Una espada y un pico cruzados. -->
       <button id="action" type="button" aria-label="Ataque">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M20 20l-6.4-6.4M10.4 10.4 5.2 5.2" />
-          <path d="M2.4 10.4Q3.2 3.2 10.4 2.4" stroke-width="2.6" />
-          <path d="M21 3l-.5 2.2-10.2 10.2-1.7-1.7L18.8 3.5z" />
-          <path d="M6.85 11.95l5.2 5.2M9.45 14.55 5.8 18.2" />
-          <circle cx="5" cy="19" r="1.1" />
-        </svg>
+        <svg data-pixel="action" aria-hidden="true"></svg>
       </button>
     </div>
     <!-- El ojo: en SVG y no un emoji, porque 👁 se pinta a color y distinto en
          cada sistema, y aqui tiene que ir monocromo como el resto de glifos.
          Las dos formas viven en el mismo SVG y las alterna la clase `.flat`. -->
     <button id="proj" type="button" aria-label="Vista en perspectiva; tocar para ortográfica">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path class="eye-open" d="M1.8 12S5.8 5.6 12 5.6 22.2 12 22.2 12s-4 6.4-10.2 6.4S1.8 12 1.8 12z" />
-        <circle class="eye-pupil" cx="12" cy="12" r="3" />
-        <path class="eye-flat" d="M1.8 12S5.8 9.4 12 9.4 22.2 12 22.2 12s-4 2.6-10.2 2.6S1.8 12 1.8 12z" />
-        <circle class="eye-aim" cx="12" cy="12" r="4.4" />
-        <path class="eye-aim" d="M12 .8v3.4M12 19.8v3.4" />
+      <svg viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">
+        <g class="eye-open" data-pixel="eyeOpen"></g>
+        <g class="eye-pupil" data-pixel="eyePupil"></g>
+        <g class="eye-flat" data-pixel="eyeFlat"></g>
+        <g class="eye-aim" data-pixel="eyeAim"></g>
       </svg>
     <kbd class="btnKey">P</kbd></button>
     <!-- El angulo de vision de la primera persona. Va DESPUES del ojo en el
@@ -1017,11 +995,7 @@
          «i» de informacion, monocroma como el ojo. -->
     <button id="hudToggle" type="button" aria-expanded="false" aria-controls="hud"
             aria-label="Mostrar informacion">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9.2" />
-        <path d="M12 11v6" />
-        <circle cx="12" cy="7.4" r=".6" />
-      </svg>
+      <svg data-pixel="info" aria-hidden="true"></svg>
     <kbd class="btnKey">I</kbd></button>
     <div id="hud" hidden>
       <div class="row"><span>Hora</span><span id="clock">00:00</span></div>
@@ -1089,7 +1063,7 @@
     <!-- Arriba en el movil: OTROS e INVENTARIO. -->
     <!-- Tres barras. -->
     <button id="others" class="round" type="button" aria-expanded="false" aria-label="Otros">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+      <svg data-pixel="others" aria-hidden="true"></svg>
     </button>
     <!-- La barra de abajo de PC, segun el boceto del autor (2026-09-30): MODO,
          y una caja centrada con el anillo del hambre, la barra de la mano y el
@@ -1100,15 +1074,8 @@
       <div class="barSide left">
         <button id="modeBar" class="round modeBtn" type="button" aria-pressed="false" aria-label="Modo barrido">
           <!-- Un tajo curvo (barrido) y una mirilla (preciso): el icono dice el modo. -->
-          <svg class="mode-sweep" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 20C5 11 11 5 20 4C13.5 7.2 9 12 4 20z" />
-            <path d="M7.5 20.5C9 14.5 13 9.5 19.5 8" />
-          </svg>
-          <svg class="mode-precise" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="6.5" />
-            <path d="M12 2.5v5.2M12 16.3v5.2M2.5 12h5.2M16.3 12h5.2" />
-            <circle cx="12" cy="12" r="1" />
-          </svg>
+          <svg class="mode-sweep" data-pixel="modeSweep" aria-hidden="true"></svg>
+          <svg class="mode-precise" data-pixel="modePrecise" aria-hidden="true"></svg>
         <kbd class="btnKey">TAB</kbd></button>
       </div>
       <div id="barBox">
@@ -1119,20 +1086,8 @@
             <circle class="track" cx="24" cy="24" r="20" />
             <circle class="fill" id="hungerArc" cx="24" cy="24" r="20" />
           </svg>
-          <!-- Cuchara y tenedor cruzados, como en el boceto. La cuchara va 3,2 a
-               la izquierda y el tenedor 1,5 a la derecha, para que ninguna cabeza
-               pise el otro trazo (pedido del autor): asi se ve el cuello de la
-               cuchara antes del cruce. Las puas, a 3,2 de eje a eje, dejan una
-               unidad de aire entre ellas con el trazo de 2,2. -->
-          <svg class="ringIcon" viewBox="0 0 24 24" aria-hidden="true">
-            <g transform="translate(-3.2 0)">
-              <path d="M20 20l-8.4-8.4" />
-              <ellipse cx="8.6" cy="8.6" rx="2.8" ry="4.3" transform="rotate(-45 8.6 8.6)" />
-            </g>
-            <g transform="translate(1.5 0)">
-              <path d="M4 20l10-10M11.74 7.74l4.52 4.52M11.74 7.74l3.8-3.8M14 10l3.8-3.8M16.26 12.26l3.8-3.8" />
-            </g>
-          </svg>
+          <!-- Cuchara y tenedor cruzados, como en el boceto. -->
+          <svg class="ringIcon" data-pixel="hunger" aria-hidden="true"></svg>
         </div>
         <!-- La barra de la mano: las casillas 1 a 4. -->
         <div id="hotbar" class="slots" aria-label="Barra de la mano"></div>
@@ -1142,24 +1097,14 @@
             <circle class="track" cx="24" cy="24" r="20" />
             <circle class="fill" id="healthArc" cx="24" cy="24" r="20" />
           </svg>
-          <svg class="ringIcon heart" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 21s-7.4-4.5-9.5-9.1C1 8.5 3.1 4.4 6.8 4.4c2.1 0 3.6 1.2 5.2 3.2 1.6-2 3.1-3.2 5.2-3.2 3.7 0 5.8 4.1 4.3 7.5C19.4 16.5 12 21 12 21z" />
-          </svg>
+          <svg class="ringIcon heart" data-pixel="heart" aria-hidden="true"></svg>
         </div>
       </div>
       <div class="barSide right">
         <!-- Una mochila de explorador, como el segundo adjunto del autor: asa,
-             solapa con dos cierres, bolsillo delantero y dos laterales. Casi
-             tan ancha como alta, para que quepa grande en el boton. -->
+             solapa, bolsillo delantero y dos laterales. -->
         <button id="invOpen" class="round" type="button" aria-expanded="false" aria-controls="invPanel" aria-label="Inventario">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M10 5.2V4.3a2 2 0 0 1 4 0v.9" />
-            <path d="M8.5 5.2h7a3 3 0 0 1 3 3v9.3a3 3 0 0 1-3 3h-7a3 3 0 0 1-3-3V8.2a3 3 0 0 1 3-3z" />
-            <path d="M5.5 10.5Q12 12.6 18.5 10.5" />
-            <path d="M9.5 11v2M14.5 11v2" />
-            <path d="M9 14.8h6a1 1 0 0 1 1 1v2.2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.2a1 1 0 0 1 1-1z" />
-            <path d="M5.5 12.5H4.2a.9.9 0 0 0-.9.9v3.6a2.3 2.3 0 0 0 2.2 2.3M18.5 12.5h1.3a.9.9 0 0 1 .9.9v3.6a2.3 2.3 0 0 1-2.2 2.3" />
-          </svg>
+          <svg data-pixel="inventory" aria-hidden="true"></svg>
         <kbd class="btnKey">E</kbd></button>
         <!-- Los botones que vendran (pedido del autor). -->
         <div id="barExtras"></div>
@@ -1173,14 +1118,12 @@
     </div>
 
     <button id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"
-            aria-label="Estado del entorno">&#127807;<kbd class="btnKey">B</kbd></button>
+            aria-label="Estado del entorno"><svg data-pixel="biome" aria-hidden="true"></svg><kbd class="btnKey">B</kbd></button>
 
     <!-- El panel de desarrollo en el movil, que no tiene F3: el cuarto de la
          columna de OTROS (pedido del autor, 2026-10-05). Una llave inglesa. -->
     <button id="devToggle" type="button" aria-expanded="false" aria-label="Desarrollo">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-      </svg>
+      <svg data-pixel="dev" aria-hidden="true"></svg>
     </button>
 
     <div id="statsPanel" hidden>

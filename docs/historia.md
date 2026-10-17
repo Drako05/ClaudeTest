@@ -1044,6 +1044,8 @@ tanda del nado y como se aplica la ley del observador.
   redondeados a mano; la formula aprobada da 39 y 9.
 - Las casillas del inventario no llevan iconos (decision tuya), asi que los
   objetos nuevos solo tienen su nombre y su descripcion: el plan decia iconos.
+  **Luego** (2026-10-17): los iconos llegaron con su propia tanda, en
+  pixelart (`docs/guia-de-arte.md`, directriz 5).
 
 ## `CLAUDE.md` adelgazado: cada parte en su documento — HECHO (2026-10-02)
 

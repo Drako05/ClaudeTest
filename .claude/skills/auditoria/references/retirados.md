@@ -134,3 +134,10 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `subir es de golpe|solo subir es de golpe|sube(n)? de golpe medio bloque` — el escalon que se subia de golpe (hasta el 2026-10-14). Permitido en: `docs/historia.md`, `docs/pendiente.md`.
 - `sin chocar con nadie|no choca con otros animales ni con el jugador` — los animales que se atravesaban entre si y con el jugador; desde el 2026-10-14 se empujan (`pushBodies`). Permitido en: `docs/historia.md`, `docs/pendiente.md`.
 - `0,43 × 0,43|1,25 × 1,25 × 1,58|bisonte adulto 2,47` — las medidas de las cajas de colision antes de poner las patas en el cuadrado (ciervo adulto 0,43 de lado, bisonte 1,25, su masa 2,47); desde el 2026-10-14, 0,48, 1,24 y 2,45. (Un «2,47» suelto no: es tambien a donde llega el suelo del golpe, en `tests/strike.test.ts`.) Permitido en: `docs/historia.md`.
+
+## Los iconos en pixelart (2026-10-17)
+
+- `\bSHORT\b|\bnameOf\b` — el nombre recortado que escribia cada casilla (`inventory-ui.ts`); desde el 2026-10-17 la casilla lleva el icono del objeto (`itemIcon`). Permitido en: `docs/recoleccion.md` (cuenta que se retiro), `docs/historia.md`, `docs/pendiente.md`.
+- `\bMIRROR\b|%MASK%|BOOT_CUTS` — las siluetas vectoriales de los equipables, con lo simetrico espejado y los calados por mascara; desde el 2026-10-17 son pixelart de 24 × 24 (`silhouette-icons.ts`). Permitido en: `docs/historia.md`, `docs/pendiente.md`.
+- `fill-rule|evenodd` — los calados de los iconos por la regla de relleno; desde el 2026-10-17 son pixeles transparentes. Permitido en: `docs/guia-de-arte.md` (cuenta como era la directriz 3), `docs/historia.md`, `docs/pendiente.md`.
+- `glifo de CORRER|con su glifo` — CORRER, SALTAR, AUTO SALTO y el bioma con un caracter (», ↑, A, 🌿); desde el 2026-10-17, iconos en pixelart. Permitido en: `docs/historia.md`, `docs/pendiente.md`.

@@ -144,8 +144,16 @@ iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
 USAR, espada y pico cruzados en ATAQUE, una **mochila de explorador** en
 INVENTARIO (asa, solapa con dos cierres y bolsillos, casi tan ancha como alta
 y mas grande que los otros iconos, como el adjunto del autor del 2026-09-30),
-tres barras en OTROS, y CORRER y SALTAR con su glifo; el nombre va en
-`aria-label`. Los dibujos son mios. Y **MODO** (2026-09-30) y **ENTRADA**
+tres barras en OTROS, y CORRER y SALTAR con su flecha (eran los caracteres
+» y ↑); el nombre va en `aria-label`. Los dibujos son mios. **Desde el
+2026-10-17 todos son pixelart de 24 × 24 y de un color** (el autor; directrices
+3 y 5 de `docs/guia-de-arte.md`), tambien los que eran un caracter: CORRER,
+SALTAR, AUTO SALTO (era una «A») y el bioma (era 🌿). Viven en
+`silhouette-icons.ts` (`BUTTON_ROWS`): en `index.html` cada `<svg>` va vacio
+con su `data-pixel="nombre"` y se rellena al arrancar, asi que las clases que
+cambian de icono segun el estado (MODO, ENTRADA, el ojo) siguen en el CSS.
+Miden 24 px, su rejilla a 1×, salvo ATAQUE (48), INVENTARIO (36) y AUTO SALTO
+(18) (*deduccion*). Y **MODO** (2026-09-30) y **ENTRADA**
 (2026-10-01), mas pequenos que USAR y en un **arco alrededor del ataque**, a la
 misma distancia de su centro (boceto del autor): ENTRADA arriba, hacia SALTAR,
 y MODO abajo a la izquierda, encima de USAR; radio y tamano, mios. MODO: un
@@ -208,7 +216,8 @@ sale hacia donde hay sitio: hacia la izquierda con el ojo pegado al borde
 derecho, hacia la derecha si cabe, y si no, justo debajo del ojo (deduccion mia;
 dentro de OTROS se abria encima del propio ojo y el dedo lo pisaba). Va en SVG y no en emoji —`👁` se pinta a color y distinto en cada
 sistema— y **dice cual esta activa con su propia forma**: abierto en perspectiva,
-que tiene fuga, y entrecerrado en ortografica, que lo aplana todo. Lo eligio asi
+que tiene fuga, entrecerrado en ortografica, que lo aplana todo, y en primera
+persona, la mira (en pixelart desde el 2026-10-17, como los demas botones). Lo eligio asi
 el autor entre tres opciones; el simbolo cuenta la diferencia en vez de limitarse
 a senalar que hay un interruptor.
 

@@ -14,7 +14,7 @@
  */
 
 import { Resource } from '@verdant/shared';
-import type { PixelArt } from './pixel-art.js';
+import { pixelIcon, type PixelArt } from './pixel-art.js';
 
 /** La paleta comun de los iconos de color: `o` es el contorno. */
 export const ITEM_PALETTE: Readonly<Record<string, string>> = {
@@ -916,4 +916,20 @@ const ROWS: Record<Resource, readonly string[]> = {
 /** El icono de cada objeto. */
 export function itemArt(item: Resource): PixelArt {
   return { rows: ROWS[item], palette: ITEM_PALETTE };
+}
+
+const built = new Map<Resource, SVGSVGElement>();
+
+/**
+ * El icono de un objeto como elemento (`svg.itemIcon`), para una casilla, lo
+ * arrastrado o un aviso. Se construye una vez por objeto y se clona: el panel
+ * repinta sus casillas a 10 Hz.
+ */
+export function itemIcon(item: Resource): SVGSVGElement {
+  let svg = built.get(item);
+  if (!svg) {
+    svg = pixelIcon(itemArt(item), 'itemIcon');
+    built.set(item, svg);
+  }
+  return svg.cloneNode(true) as SVGSVGElement;
 }

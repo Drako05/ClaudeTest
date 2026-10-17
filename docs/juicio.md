@@ -18,6 +18,11 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
+| Iconos: **las reglas de estilo que saque de tu referencia**: contorno oscuro de 1 pixel alrededor de todo (`#1d1a26`, lo afirma un test), luz arriba a la izquierda, 3-4 tonos por material y 1 pixel de margen. Las hojas las aprobaste; las reglas, escritas asi, no las has visto | `docs/guia-de-arte.md`, directriz 5 | la paleta y un test |
+| Iconos: **una paleta comun** de 61 colores por material (madera, corteza, piedra, hierro, cobre, carbon, hoja, baya, carne, hueso, fibra, piel, pluma, caparazon, fuego…), de la que salen los 30 | `docs/guia-de-arte.md`, directriz 5 | `ITEM_PALETTE` |
+| Iconos: **48 px en las casillas**, el doble exacto de la rejilla, para que cada pixel mida 2; donde la casilla es menor, encoge con ella. La cantidad y el desgaste van encima, con sombra | `docs/recoleccion.md`, el panel | un numero en `index.html` |
+| Iconos: **los botones a 24 px**, su rejilla a 1×, salvo ATAQUE (48), INVENTARIO (36) y AUTO SALTO (18); y los diseños de los cuatro que eran un caracter (CORRER, SALTAR, AUTO SALTO y el bioma) | `docs/controles.md`, los botones | numeros en `index.html` |
+| Iconos: **la linea del registro de lo recogido mide 26 px** (era 15), para el icono de 24 | `docs/recoleccion.md`, el registro | `FEED_LINE` |
 | Fisica Minecraft: **el ancho** de cada especie y etapa es el de sus partes `hit` de lado a lado, y **el lomo**, lo alto del tronco (o del caparazon). Hoy, ciervo adulto 0,48 × 0,48 × 1,08; bisonte 1,24 × 1,24 × 1,58 | `docs/fauna.md`, el choque | `collisionBoxOf` |
 | Fisica Minecraft: **la subida**: tus 0,5 en 0,1 s son 5 m/s en vertical (`CLIMB_SPEED`); se sigue andando mientras sube, y la caja puede asomar un instante dentro del borde que esta subiendo | `docs/reglas.md`, regla 21 | un numero |
 | Fisica Minecraft: **el salto se decide por lo que hay delante, por su rumbo**: si un paso por delante de su caja hay un escalon de mas de 0,5 y no mas de 1, salta aunque pudiera deslizarse de lado (era tu punto 2). Se ensaya entero antes de darlo; si no aterriza arriba, lo bordea | `docs/fauna.md`, el choque | el disparador de `tryJump` |

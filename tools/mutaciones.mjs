@@ -11,32 +11,63 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: la auditoria al cerrar la fisica al estilo Minecraft (2026-10-14).
+ * Ronda: los iconos en pixelart (2026-10-17).
  */
 export default [
-  // El panel sin la caja de los animales: la pasada de desarrollo lo ve ahora
-  // junto a uno (en el nacimiento no hay ninguno a mano).
+  // Las casillas sin su icono: vuelven a no decir que hay en ellas.
   {
-    nombre: 'auditoria: el panel sin la caja de los animales, en el humo',
-    fichero: 'packages/client/src/debug-boxes.ts',
-    de: '    bodyEdges(out, state, id);',
+    nombre: 'iconos: las casillas sin su icono',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: '    el.appendChild(itemIcon(item));\n',
+    a: '',
+    prueba: 'smoke:desktop',
+  },
+  // Los ingredientes con solo su «tengo/necesito».
+  {
+    nombre: 'iconos: los ingredientes sin su icono',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: '        cell.append(itemIcon(input.item), n);',
+    a: '        cell.append(n);',
+    prueba: 'smoke:desktop',
+  },
+  // El registro con solo el texto, como antes.
+  {
+    nombre: 'iconos: el registro sin el icono',
+    fichero: 'packages/client/src/main.ts',
+    de: "      if (line.item >= 0) el.append(`${amount} `, itemIcon(line.item as Resource), ` ${name.join(' ')}`);",
+    a: "      if (line.item >= 0) el.append(`${amount} ${name.join(' ')}`);",
+    prueba: 'smoke:desktop',
+  },
+  // Los botones contados pero sin pintar: los ve la de los botones del movil.
+  {
+    nombre: 'iconos: los botones sin rellenar',
+    fichero: 'packages/client/src/silhouette-icons.ts',
+    de: '    el.innerHTML = pixelInner(buttonArt(name));',
+    a: '',
+    prueba: 'smoke:mobile',
+  },
+  // La hoja de revision sin los botones.
+  {
+    nombre: 'iconos: la hoja sin los botones',
+    fichero: 'packages/client/src/icon-sheet.ts',
+    de: "    { title: 'Botones', tone: 'buttonTone', icons: buttons },",
     a: '',
     prueba: 'smoke:devTools',
   },
-  // Las partes de los animales pintadas como lo que choca.
+  // Un color que la paleta ya no tiene.
   {
-    nombre: 'auditoria: las partes de los animales en cian, en el humo',
-    fichero: 'packages/client/src/debug-boxes.ts',
-    de: '      boxEdges(out.hit, part);\n      out.counts.hit++;',
-    a: '      boxEdges(out.solid, part);\n      out.counts.solid++;',
-    prueba: 'smoke:devTools',
+    nombre: 'iconos: un pixel fuera de la paleta',
+    fichero: 'packages/client/src/item-icons.ts',
+    de: "  A: '#e0405f', // base\n",
+    a: '',
+    prueba: 'test:tests/pixel-icons.test.ts',
   },
-  // Los empujes con la masa ya no de `massOf`, sino igual para todos.
+  // La madera con un hueco en su contorno.
   {
-    nombre: 'auditoria: empujes con la misma masa',
-    fichero: 'packages/sim/src/systems/push.ts',
-    de: '    mass[i] = massOf(store, ids[i]!);',
-    a: '    mass[i] = 1;',
-    prueba: 'test:tests/push.test.ts',
+    nombre: 'iconos: el contorno roto',
+    fichero: 'packages/client/src/item-icons.ts',
+    de: "'.oefffggggfgabcbbcbco...',",
+    a: "'.eefffggggfgabcbbcbco...',",
+    prueba: 'test:tests/pixel-icons.test.ts',
   },
 ];
