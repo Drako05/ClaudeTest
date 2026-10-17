@@ -587,7 +587,14 @@
       /* + encima de -, a la derecha de los ingredientes: cuantas veces se
          fabrica (el autor, 2026-10-17). Solo en lo apilable; en lo demas, y en
          su tope, apagados. Tamano, mio. */
-      .recipe .qty { display: flex; flex-direction: column; gap: 6px; }
+      /* Fuera de la caja de la fila, pegados a su derecha: la carga acaba en los
+         ingredientes (pedido del autor), y el margen de la fila les guarda el
+         sitio, asi que lo centrado sigue siendo la fila entera con ellos. */
+      .recipe { margin-right: 34px; }
+      .recipe .qty {
+        position: absolute; left: calc(100% + 8px); top: 50%; transform: translateY(-50%);
+        display: flex; flex-direction: column; gap: 6px;
+      }
       .recipe .qty button {
         -webkit-appearance: none; appearance: none; width: 26px; height: 26px; padding: 0;
         border-radius: 6px; font: 700 16px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
