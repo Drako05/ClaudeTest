@@ -179,6 +179,10 @@ que venga. Son **las directrices del autor** para el diseño.
   pinta como SVG, un `<path>` por color con los pixeles seguidos juntos, con
   `shape-rendering: crispEdges`. Se dibujan y se corrigen **a mano, en la
   rejilla**.
+- **Siempre a un multiplo entero de la rejilla** (el autor, 2026-10-17:
+  «Puedes ajustar solo el icono y dejar las casillas/botones del tamaño
+  actual?»): 24 o 48 px, nunca lo que quepa. Si no, sus pixeles salen
+  desiguales. El humo mide cada icono que se ve.
 - **Como se revisa**: `?iconos=1` abre en el juego la hoja de los 64 (30
   objetos, 14 huecos y 20 botones), cada uno a 48 px y a 96, con su nombre.
 - **Aplicada**: los 30 objetos, los 14 huecos y los botones (2026-10-17).

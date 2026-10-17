@@ -61,11 +61,12 @@ y de los botones, y su llegada al juego—. La tanda, entera, en
 `tools/analyze-world.ts`, que funcionan; typecheck y 531 tests; la pasada
 `desktop`; el ojo, capturado ampliado antes y despues; dos mutaciones nuevas.
 
-**Dejado a proposito, para el autor**: USAR (32 px), INVENTARIO (36) y AUTO
-SALTO (18) no son multiplos de 24, y sus pixeles salen desiguales; lo mismo
-los iconos que encogen con una casilla pequena (en el movil, los
-ingredientes). Son los tamanos que ya tenian esos botones; cambiarlos mueve
-la maquetacion, y eso lo decide el (fila en `docs/juicio.md`).
+**Dejado para el autor**: USAR (32 px), INVENTARIO (36) y AUTO SALTO (18) no
+eran multiplos de 24, y sus pixeles salian desiguales; lo mismo los iconos que
+encogian con una casilla pequena. **Lo decidio el mismo dia**: «Puedes ajustar
+solo el icono y dejar las casillas/botones del tamaño actual?». Hecho: todos a
+24 o 48 (tambien los anillos del movil, a 36, que cazo la comprobacion nueva
+del humo), y las casillas pasan a 24 donde no cabe el de 48.
 
 ---
 

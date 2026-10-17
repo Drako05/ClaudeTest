@@ -123,6 +123,19 @@ async function shot(page, name) {
 }
 
 /**
+ * Los iconos en pixelart que se ven y NO miden un multiplo entero de su rejilla
+ * de 24 (el autor, 2026-10-17: solo el icono se ajusta; la casilla o el boton
+ * se quedan como estan). Fuera de multiplo, sus pixeles salen desiguales.
+ */
+function offGridIcons(page) {
+  return page.evaluate(() => Array.from(document.querySelectorAll('svg.itemIcon, svg.equipIcon, svg[data-pixel], svg:has(> [data-pixel])'))
+    .map((svg) => ({ svg, r: svg.getBoundingClientRect() }))
+    .filter(({ r }) => r.width > 0 && r.height > 0)
+    .filter(({ r }) => Math.abs(r.width - r.height) > 0.01 || r.width < 23.99 || Math.abs(r.width / 24 - Math.round(r.width / 24)) > 0.001)
+    .map(({ svg, r }) => `${svg.closest('[id]')?.id ?? '?'}:${r.width.toFixed(2)}x${r.height.toFixed(2)}`));
+}
+
+/**
  * Espera a que el bucle haya corrido de verdad, no solo a que cargue: se mide el
  * AVANCE del reloj, que un mundo puede nacer ya entrado en la manana.
  */
@@ -803,6 +816,8 @@ async function desktopPass(browser, baseUrl) {
     `hay casillas llenas sin su icono, o con el nombre escrito: ${JSON.stringify(icons)}`);
   check(icons.inputs === 0, `hay ingredientes sin su icono: ${JSON.stringify(icons)}`);
   check(icons.buttons === 22, `los botones no recibieron sus iconos en pixelart: ${icons.buttons}`);
+  const offPc = await offGridIcons(page);
+  check(offPc.length === 0, `hay iconos en pixelart fuera de un multiplo de 24: ${offPc.join(', ')}`);
   // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
   // no llevan numero, llevan desgaste).
   const hudTotal = await page.evaluate(() =>
@@ -1789,6 +1804,8 @@ async function mobilePass(browser, baseUrl) {
   // Los ocho con su icono pintado, tambien los que eran un caracter (», ↑ y A;
   // el autor, 2026-10-17: todos en pixelart de 24 × 24).
   check(labels.every((l) => l.svg), `hay botones sin su icono: ${JSON.stringify(labels.filter((l) => !l.svg))}`);
+  const offButtons = await offGridIcons(page);
+  check(offButtons.length === 0, `hay iconos de boton fuera de un multiplo de 24: ${offButtons.join(', ')}`);
   // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
   check(await page.isVisible('#crosshair'), 'la cruz no se ve en el movil');
   const feedR = await rect('pickupFeed');
@@ -1894,6 +1911,15 @@ async function mobilePass(browser, baseUrl) {
     });
   };
   const [lp, li, lr] = [await layout(1), await layout(2), await layout(3)];
+  // Y en cada pagina, las casillas mas pequenas del movil (barra e
+  // ingredientes) con sus iconos a un multiplo de 24.
+  const offPages = [];
+  for (const n of [1, 2, 3]) {
+    await page.tap(`#invTabs button:nth-child(${n})`);
+    await page.waitForTimeout(100);
+    offPages.push(...(await offGridIcons(page)));
+  }
+  check(offPages.length === 0, `hay iconos del inventario fuera de un multiplo de 24: ${offPages.join(', ')}`);
   await page.tap('#invTabs button:nth-child(2)');
   const midX = (b) => (b.left + b.right) / 2;
   for (const [name, l] of [['personaje', lp], ['inventario', li], ['recetas', lr]]) {

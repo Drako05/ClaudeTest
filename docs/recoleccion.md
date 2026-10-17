@@ -165,8 +165,11 @@ Lo que el codigo tiene que respetar:
   2026-10-17): un pixelart a color de 24 × 24 por objeto (`item-icons.ts`,
   directriz 5), pintado a **48 px**, el doble exacto (*deduccion*), en la
   barra, la rejilla, PERSONAJE, el resultado y los ingredientes de las
-  recetas, lo arrastrado y la zona de lo seleccionado. Donde la casilla es
-  menor, encoge con ella. La cantidad o el desgaste van encima, abajo, con
+  recetas, lo arrastrado y la zona de lo seleccionado. **Siempre a un
+  multiplo entero de su rejilla** (el autor, 2026-10-17: solo el icono, la
+  casilla se queda): a 48 donde caben 40 px de contenido —el dibujo trae un
+  pixel de margen transparente y puede invadir el relleno—, y a 24 donde no
+  (una consulta por contenedor, `@container`). Igual las siluetas de PERSONAJE. La cantidad o el desgaste van encima, abajo, con
   sombra para leerse; el nombre, al pasar el raton y en la descripcion. Hasta
   entonces cada casilla escribia el nombre, recortado (`SHORT`). En el movil las cinco columnas encogen hasta
   caber en 360 px. **PERSONAJE e INVENTARIO** llevan abajo la zona de lo seleccionado y
