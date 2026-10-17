@@ -56,7 +56,14 @@ Decisiones del autor, que no se tocan sin preguntarle:
   `Intent.craftTimes`). El + sube **hasta lo que alcanza**, de ingredientes y
   de sitio (`craftableTimes`); el resultado dice **lo que sale en total** y
   los ingredientes, tengo/necesito para las N. Despues de fabricar, la N se
-  queda, y baja sola si ya no alcanza (*deduccion*).
+  queda, y baja sola si ya no alcanza (*deduccion*); **al cerrar el
+  inventario, todas vuelven a 1** (el autor, 2026-10-17). **Mantenidos, + y -
+  repiten** de uno en uno y **cada segundo mas deprisa** (el autor: «al
+  principio aumenta por ejemplo 3/s y al segundo siguiente pasa a 4/s y al
+  siguiente 5/s»): uno en el acto, 3 el primer segundo, 4 el siguiente, 5…,
+  repartidos a partes iguales en cada segundo (`qty-hold.ts`; que sea su
+  ejemplo tal cual, *deduccion*). Los para su tope, que apaga el boton; un
+  toque da uno, y el teclado tambien.
 - **La barra de desgaste no se ve con la herramienta o el arma entera** (el
   autor, 2026-10-17: «nueva o con futuras expansiones de reparación»).
 - **Las categorias de las recetas van por su icono**, monocromo

@@ -56,7 +56,7 @@
       #proj .eye-aim { display: none; }
       #proj.fp .eye-aim { display: inline; }
       #proj.fp .eye-pupil { display: none; }
-      #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
+      #proj:active { background: rgba(60, 104, 168, .72); }
       /*
         Los mandos del pulgar, segun el boceto del movil del autor: el ATAQUE,
         el mas grande, en la esquina de abajo a la derecha, que es donde cae el
@@ -92,7 +92,6 @@
          `aria-label`. Silueta de un color en pixelart de 24, del color del
          texto (`silhouette-icons.ts`, 2026-10-17). */
       #thumbPad svg, .round svg { display: block; }
-      #thumbPad button:active { transform: scale(.95); }
       #thumbPad button:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
       /* Encendido o pulsado: tiene que verse, porque cambia lo que hace el juego. */
       #thumbPad button.on {
@@ -117,22 +116,26 @@
       /* Los iconos de los botones, a un multiplo entero de su rejilla de 24 (el
          autor, 2026-10-17: solo el icono, el boton se queda como esta). */
       #use svg { width: 48px; height: 48px; }
-      /* MODO y ENTRADA, mas pequenos que USAR, en un arco alrededor del ataque
-         a la misma distancia de su centro (boceto del autor, 2026-10-01):
-         ENTRADA arriba, hacia SALTAR, a 117 grados, y MODO abajo a la
-         izquierda, encima de USAR. Radio, angulos y tamano, mios. Con los
-         botones cuadrados (2026-10-17) sus esquinas se pisaban con el arco de
-         84 y MODO a 153 grados: el arco mas corto que deja 4 px libres con
-         todos es de 102, con MODO a 155,5 (*deduccion*, propuesta al autor). */
-      :root { --modeb: 44px; --arc: 102px; }
+      /* MODO y ENTRADA, mas pequenos que USAR, entre el ataque, USAR y SALTAR
+         (boceto del autor, 2026-10-01: ENTRADA arriba, hacia SALTAR, y MODO
+         abajo a la izquierda, encima de USAR). Desde el 2026-10-17 (el autor),
+         sin mover los demas, que guardan su simetria:
+         - MODO a `--modegap` (10 px) encima de USAR, y ENTRADA a 10 px a la
+           izquierda de SALTAR;
+         - **en espejo**: lo que MODO se corre a la derecha dentro del ancho
+           de USAR, ENTRADA baja dentro del alto de SALTAR (`--modeshift`);
+         - con 4 px, sus esquinas mas cercanas quedan a 7,2 px en linea recta,
+           para que a la vista se lean igual de cerca que los 10 de los otros
+           (el autor eligio 4, sin decimales). Tamano, mio. */
+      :root { --modeb: 44px; --modegap: 10px; --modeshift: 4px; }
       #modeTouch, #inputMode { width: var(--modeb); height: var(--modeb); }
       #modeTouch {
-        right: calc(12px + var(--atk) / 2 + var(--arc) * .910 - var(--modeb) / 2 + env(safe-area-inset-right));
-        bottom: calc(10px + var(--atk) / 2 + var(--arc) * .415 - var(--modeb) / 2 + env(safe-area-inset-bottom));
+        right: calc(12px + var(--atk) + 10px + var(--useb) - var(--modeb) - var(--modeshift) + env(safe-area-inset-right));
+        bottom: calc(10px + var(--useb) + var(--modegap) + env(safe-area-inset-bottom));
       }
       #inputMode {
-        right: calc(12px + var(--atk) / 2 + var(--arc) * .454 - var(--modeb) / 2 + env(safe-area-inset-right));
-        bottom: calc(10px + var(--atk) / 2 + var(--arc) * .891 - var(--modeb) / 2 + env(safe-area-inset-bottom));
+        right: calc(12px + var(--side) + var(--modegap) + env(safe-area-inset-right));
+        bottom: calc(10px + var(--atk) + 12px + var(--side) - var(--modeb) - var(--modeshift) + env(safe-area-inset-bottom));
       }
       #modeTouch svg, #inputMode svg { width: 24px; height: 24px; }
       /* ENTRADA dice cual esta puesta con su icono: la cruz del centro de la
@@ -330,7 +333,6 @@
         backdrop-filter: blur(6px); touch-action: manipulation;
       }
       #hudToggle svg, #devToggle svg, #statsToggle svg { width: 24px; height: 24px; display: block; }
-      #hudToggle:active, #statsToggle:active, #devToggle:active { transform: scale(.94); }
       #hudToggle:focus-visible, #statsToggle:focus-visible, #devToggle:focus-visible {
         outline: 2px solid #8fc4ff; outline-offset: 3px;
       }
@@ -932,7 +934,6 @@
         border: 1px solid rgba(255,255,255,.14);
         touch-action: manipulation; white-space: nowrap;
       }
-      .devRow button:active { transform: scale(.96); }
       .devRow button:focus-visible { outline: 2px solid #ffc46b; outline-offset: 2px; }
       .devRow button.on {
         background: rgba(255, 196, 107, .22); border-color: rgba(255, 196, 107, .55);
@@ -964,14 +965,17 @@
         pulsa; no las casillas, que se arrastran, ni los anillos, que indican.
         Va al final y con los mismos selectores de cada boton, para ganarles.
 
-        La forma del relieve es mia (*deduccion*): un borde de luz por dentro
-        arriba a la izquierda, uno de sombra abajo a la derecha y una sombra
-        dura debajo, sin difuminar, como el pixelart. Pulsado, encendido o
-        abierto, se hunde: los bordes se invierten y baja 2 px.
+        La forma del relieve es mia (*deduccion*), y va **solo dentro del boton**
+        (el autor, 2026-10-17: «ya sea sombra o iluminación, estén dibujadas solo
+        en el área del propio botón»): un borde de luz de 2 px arriba a la
+        izquierda y uno de sombra de 3 px abajo a la derecha, que da el grosor.
+        Pulsado, encendido o abierto, **el boton no se mueve**: se invierten sus
+        luces y **baja el icono** 2 px (el autor: «que sea solo el icono quien
+        haga el efecto de bajar»); en los de texto baja el texto.
       */
       :root {
-        --relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -2px -2px 0 rgba(0, 0, 0, .45), 0 3px 0 rgba(0, 0, 0, .4);
-        --hundido: inset 2px 2px 0 rgba(0, 0, 0, .45), inset -2px -2px 0 rgba(255, 255, 255, .1);
+        --relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -3px -3px 0 rgba(0, 0, 0, .45);
+        --hundido: inset 3px 3px 0 rgba(0, 0, 0, .45), inset -2px -2px 0 rgba(255, 255, 255, .1);
       }
       #proj, #thumbPad button, .round, #hudToggle, #statsToggle, #devToggle,
       #invTabs button, #recipeTabs .slot, #discardAsk button, #dead button, .devRow button, .recipe .qty button {
@@ -985,18 +989,28 @@
       #invTabs button { border-radius: 8px; }
       body.touch-active #invTabs { column-gap: 4px; }
       #recipeTabs .slot.off, .recipe .qty button:disabled { box-shadow: none; }
-      /* Hundido. */
+      /* Hundido: las luces al reves, y el boton quieto. */
       #proj:active, #thumbPad button:active, .round:active,
       #hudToggle:active, #statsToggle:active, #devToggle:active,
       #invTabs button:active, #recipeTabs .slot:active, #discardAsk button:active, #dead button:active, .devRow button:active,
-      .recipe .qty button:enabled:active {
-        box-shadow: var(--hundido); transform: translateY(2px);
-      }
+      .recipe .qty button:enabled:active,
       #thumbPad button.on, .round.open, #modeBar.on,
       #hudToggle.open, #statsToggle.open, #devToggle.open,
       #invTabs button.on, #recipeTabs .slot.on, .devRow button.on {
-        box-shadow: var(--hundido);
+        box-shadow: var(--hundido); transform: none;
       }
+      /* Lo que baja es el icono: tambien encendido (el autor). */
+      #proj:active > svg, #thumbPad button:active > svg, .round:active > svg,
+      #hudToggle:active > svg, #statsToggle:active > svg, #devToggle:active > svg, #recipeTabs .slot:active > svg,
+      #thumbPad button.on > svg, .round.open > svg, #modeBar.on > svg,
+      #hudToggle.open > svg, #statsToggle.open > svg, #devToggle.open > svg, #recipeTabs .slot.on > svg {
+        transform: translateY(2px);
+      }
+      /* Y en los de texto, el texto: 2 px del relleno de abajo pasan arriba. */
+      #invTabs button:active, #invTabs button.on { padding: 16px 0 10px; }
+      #discardAsk button:active, #dead button:active { padding-top: 11px; padding-bottom: 7px; }
+      .devRow button:active, .devRow button.on { padding-top: 7px; padding-bottom: 3px; }
+      .recipe .qty button:enabled:active { padding-top: 2px; }
 
     </style>
   </head>

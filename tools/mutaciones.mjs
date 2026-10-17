@@ -11,88 +11,73 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: las correcciones a los iconos (2026-10-17): fabricar N, el mantener
- * de 1 s, la durabilidad, las categorias con icono y los botones cuadrados.
+ * Ronda: los ajustes despues de jugar en el movil (2026-10-17): + y -
+ * mantenidos, la vuelta a 1 al cerrar, MODO y ENTRADA, y el relieve por dentro
+ * con el icono que baja.
  */
 export default [
-  // El + sin tope: sigue habilitado pasado lo que alcanza.
+  // Mantener + no repite: un paso y nada mas.
   {
-    nombre: 'correcciones: el + sin tope',
+    nombre: 'ajustes: mantener + no repite',
     fichero: 'packages/client/src/inventory-ui.ts',
-    de: '      more.disabled = !stacks || times >= most;',
-    a: '      more.disabled = !stacks;',
+    de: '    const due = qtySteps(now() - q.since);',
+    a: '    const due = 1;',
     prueba: 'smoke:stations',
   },
-  // El nucleo fabrica una aunque se pidan N.
+  // El ritmo sin crecer: 3 por segundo siempre.
   {
-    nombre: 'correcciones: fabricar una aunque se pidan N',
-    fichero: 'packages/sim/src/tick.ts',
-    de: 'craftNear(world, entities, playerId, inventory, intent.craft, intent.craftTimes)',
-    a: 'craftNear(world, entities, playerId, inventory, intent.craft)',
+    nombre: 'ajustes: el ritmo sin crecer',
+    fichero: 'packages/client/src/qty-hold.ts',
+    de: '  const rate = QTY_FIRST_RATE + s;',
+    a: '  const rate = QTY_FIRST_RATE;',
+    prueba: 'test:tests/qty-hold.test.ts',
+  },
+  // Un toque da dos: el del puntero y el del `click`.
+  {
+    nombre: 'ajustes: un toque da dos',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: '          if (e.detail === 0) this.stepTimes(i, step);',
+    a: '          this.stepTimes(i, step);',
     prueba: 'smoke:stations',
   },
-  // tryCraft no multiplica: lo mira el test.
+  // Al cerrar, cada receta se queda con lo que tenia.
   {
-    nombre: 'correcciones: tryCraft ignora las veces',
-    fichero: 'packages/sim/src/systems/gathering.ts',
-    de: '  const n = Math.floor(times);',
-    a: '  const n = 1;',
-    prueba: 'test:tests/craft-times.test.ts',
-  },
-  // El tope sin mirar el sitio.
-  {
-    nombre: 'correcciones: el tope no mira el sitio',
-    fichero: 'packages/sim/src/systems/gathering.ts',
-    de: '  while (n > 0 && !fits(n)) n--;',
+    nombre: 'ajustes: no vuelve a 1 al cerrar',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: '      this.times.clear();',
     a: '',
-    prueba: 'test:tests/craft-times.test.ts',
-  },
-  // La barra de desgaste tambien con la herramienta entera.
-  {
-    nombre: 'correcciones: la barra a desgaste entero',
-    fichero: 'packages/client/src/inventory-ui.ts',
-    de: '      if (wear >= tool.uses) {',
-    a: '      if (false) {',
     prueba: 'smoke:stations',
   },
-  // El mantener otra vez de 1,5 s.
+  // Pulsado, el boton entero baja otra vez.
   {
-    nombre: 'correcciones: mantener 1,5 s',
-    fichero: 'packages/client/src/inventory-ui.ts',
-    de: 'export const CRAFT_HOLD_MS = 1000;',
-    a: 'export const CRAFT_HOLD_MS = 1500;',
-    prueba: 'smoke:stations',
-  },
-  // Las categorias con su nombre escrito, sin icono.
-  {
-    nombre: 'correcciones: las categorias sin icono',
-    fichero: 'packages/client/src/inventory-ui.ts',
-    de: "        if (art) tab.appendChild(pixelIcon(art, 'catIcon'));",
-    a: '        if (art) tab.textContent = cat;',
-    prueba: 'smoke:stations',
-  },
-  // Los botones redondos otra vez.
-  {
-    nombre: 'correcciones: los botones redondos',
+    nombre: 'ajustes: el boton entero baja',
     fichero: 'packages/client/index.html',
-    de: '      #proj, #thumbPad button, .round { border-radius: 12px; }',
-    a: '      #proj, #thumbPad button, .round { border-radius: 50%; }',
+    de: '        box-shadow: var(--hundido); transform: none;',
+    a: '        box-shadow: var(--hundido); transform: translateY(2px);',
     prueba: 'smoke:desktop',
   },
-  // El arco de antes: con cajas, sus esquinas se pisan.
+  // Pulsado o encendido, el icono se queda arriba.
   {
-    nombre: 'correcciones: el arco de 84 con botones cuadrados',
+    nombre: 'ajustes: el icono no baja',
     fichero: 'packages/client/index.html',
-    de: '      :root { --modeb: 44px; --arc: 102px; }',
-    a: '      :root { --modeb: 44px; --arc: 84px; }',
+    de: '        transform: translateY(2px);\n',
+    a: '        transform: none;\n',
+    prueba: 'smoke:desktop',
+  },
+  // La sombra de fuera, la que sobresalia del boton.
+  {
+    nombre: 'ajustes: la sombra de fuera',
+    fichero: 'packages/client/index.html',
+    de: '--relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -3px -3px 0 rgba(0, 0, 0, .45);',
+    a: '--relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -3px -3px 0 rgba(0, 0, 0, .45), 0 3px 0 rgba(0, 0, 0, .5);',
     prueba: 'smoke:mobile',
   },
-  // Auditoria: un color que ya no usa nadie, en la paleta.
+  // MODO y ENTRADA sin correrse: alineados al borde de USAR y SALTAR.
   {
-    nombre: 'auditoria: un color huerfano en la paleta',
-    fichero: 'packages/client/src/item-icons.ts',
-    de: "  o: '#1d1a26', // contorno\n",
-    a: "  o: '#1d1a26', // contorno\n  '#': '#ff00ff',\n",
-    prueba: 'test:tests/pixel-icons.test.ts',
+    nombre: 'ajustes: MODO y ENTRADA sin correrse',
+    fichero: 'packages/client/index.html',
+    de: '--modeshift: 4px',
+    a: '--modeshift: 0px',
+    prueba: 'smoke:mobile',
   },
 ];

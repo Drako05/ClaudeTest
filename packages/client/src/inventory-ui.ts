@@ -58,6 +58,7 @@ import { itemIcon } from './item-icons.js';
 import { pixelIcon } from './pixel-art.js';
 import { categoryArt } from './silhouette-icons.js';
 import { ScrollRail } from './scroll-rail-view.js';
+import { qtySteps } from './qty-hold.js';
 
 /** Lo que se tarda en fabricar manteniendo pulsado (el autor; 1 s desde el 2026-10-17). */
 export const CRAFT_HOLD_MS = 1000;
@@ -158,6 +159,9 @@ export class InventoryUi {
     over: HTMLElement | null;
   } | null = null;
   private hold: { recipe: number; since: number; row: HTMLElement } | null = null;
+  /** El + o - mantenido: repite, cada vez mas deprisa (`qtySteps`). */
+  private qtyHold: { recipe: number; step: number; since: number; done: number; button: HTMLButtonElement } | null =
+    null;
   private category = '';
   /** De donde son las recetas que se ven: a mano (E) o una estacion usada. */
   private mode: Station = Station.Hand;
@@ -370,6 +374,9 @@ export class InventoryUi {
     this.invOpen.setAttribute('aria-expanded', String(open));
     if (!open) {
       this.cancelHold();
+      this.qtyHold = null;
+      // Al cerrar, todas las recetas vuelven a 1 (el autor, 2026-10-17).
+      this.times.clear();
       this.answer(false);
     }
     this.onToggle?.(open);
@@ -471,6 +478,24 @@ export class InventoryUi {
         this.cancelHold();
       }
     }
+    this.repeatQty();
+  }
+
+  /** El + o - mantenido da los pasos que le tocan; lo para su tope, que apaga el boton. */
+  private repeatQty(): void {
+    const q = this.qtyHold;
+    if (!q) return;
+    const due = qtySteps(now() - q.since);
+    while (q.done < due && !q.button.disabled) {
+      this.stepTimes(q.recipe, q.step);
+      q.done++;
+    }
+    if (q.button.disabled) this.qtyHold = null;
+  }
+
+  private stepTimes(recipe: number, step: number): void {
+    this.times.set(recipe, this.timesOf(recipe) + step);
+    this.render(this.current());
   }
 
   // ------------------------------------------------------------ casillas
@@ -664,9 +689,20 @@ export class InventoryUi {
         b.type = 'button';
         b.textContent = label;
         b.setAttribute('aria-label', step > 0 ? 'Una vez mas' : 'Una vez menos');
-        b.addEventListener('click', () => {
-          this.times.set(i, this.timesOf(i) + step);
-          this.render(this.current());
+        // Mantenido, repite y acelera (el autor, 2026-10-17). El primer paso,
+        // en el acto; el teclado (un `click` sin puntero) da uno.
+        b.addEventListener('pointerdown', (e) => {
+          if (e.button !== 0 || b.disabled) return;
+          this.qtyHold = { recipe: i, step, since: now(), done: 0, button: b };
+          this.repeatQty();
+        });
+        for (const type of ['pointerup', 'pointerleave', 'pointercancel']) {
+          b.addEventListener(type, () => {
+            if (this.qtyHold?.button === b) this.qtyHold = null;
+          });
+        }
+        b.addEventListener('click', (e) => {
+          if (e.detail === 0) this.stepTimes(i, step);
         });
         qty.appendChild(b);
       }

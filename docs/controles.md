@@ -147,9 +147,18 @@ en el dibujo del icono, sino en el botón. Esto aplicara para todos los botones
 del juego»). Entra todo lo que se pulsa salvo las casillas, que se arrastran;
 los anillos de hambre y salud siguen redondos, porque indican. Una sola regla al
 final del CSS de `index.html`: esquinas de 12 px como bioma e informacion (20
-en ATAQUE, 14 en USAR, CORRER y SALTAR, 8 en AUTO SALTO), un borde de luz por
-dentro arriba a la izquierda, uno de sombra abajo a la derecha y una sombra dura
-debajo; pulsado, encendido o abierto, se hunde (la forma, *deduccion*). **Los botones son solo
+en ATAQUE, 14 en USAR, CORRER y SALTAR, 8 en AUTO SALTO), y **el relieve, todo
+dentro del boton** (el autor, 2026-10-17, despues de jugar en el movil: «ya sea
+sombra o iluminación, estén dibujadas solo en el área del propio botón»; la
+sombra de fuera hacia que no se vieran cuadrados y que las pestanas del movil
+pisaran su linea): un borde de luz de 2 px por dentro arriba a la izquierda y
+uno de sombra de 3 px abajo a la derecha (*deduccion*). **Pulsado, el boton no
+se mueve**: invierte sus luces y **baja solo el icono**, 2 px (el autor: «que
+sea solo el icono quien haga el efecto de bajar y el botón lo acompañe con el
+intercambio de luces»); encendido o abierto, igual, con el icono abajo («Sí, el
+icono abajo»). En los botones de texto (las pestanas, Cancelar y Tirar,
+Reiniciar, el panel de desarrollo, + y -) baja el texto: 2 px del relleno de
+abajo pasan arriba. **Los botones son solo
 iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
 USAR, espada y pico cruzados en ATAQUE, una **mochila** en INVENTARIO, mas
 grande que los otros iconos (pedido del autor, 2026-09-30; desde el
@@ -168,11 +177,19 @@ solo el icono» y el boton se queda como esta), o sus pixeles salen desiguales:
 24 px, salvo ATAQUE, USAR, INVENTARIO y los anillos del movil, a 48 (cual va a
 cada uno es *deduccion*; eran 32, 36 y 36, y AUTO SALTO, 18). El humo mide
 todos los que se ven. Y **MODO** (2026-09-30) y **ENTRADA**
-(2026-10-01), mas pequenos que USAR y en un **arco alrededor del ataque**, a la
-misma distancia de su centro (boceto del autor): ENTRADA arriba, hacia SALTAR,
-y MODO abajo a la izquierda, encima de USAR; radio y tamano, mios. Con los
-botones cuadrados el arco paso de 84 a **102** y MODO de 153 a **155,5
-grados**: el mas corto en que ninguna esquina se pisa (4 px de holgura). MODO: un
+(2026-10-01), mas pequenos que USAR (44 px, mio): ENTRADA arriba, a la
+izquierda de SALTAR, y MODO abajo, encima de USAR (boceto del autor). Desde el
+2026-10-17 **con el mismo espacio entre ellos y con sus vecinos**, y sin mover
+ATAQUE, USAR, SALTAR ni CORRER (el autor: «Entre ataque-usar debe haber el
+mismo espacio que entre ataque-saltar y saltar-correr… Debes dejar esos botones
+tal como están y solo intentar mover MODO y ENTRADA»): MODO a **10 px** encima
+de USAR y ENTRADA a 10 a la izquierda de SALTAR, el espacio de USAR–ATAQUE. **En
+espejo**: lo que MODO se corre dentro del ancho de USAR, ENTRADA se corre dentro
+del alto de SALTAR, **4 px** (el autor: «no me gusta que quede en decimales»),
+y entre MODO y ENTRADA quedan **7,2 px de esquina a esquina**, medidos de sus
+esquinas mas cercanas. En el CSS, `--modegap` y `--modeshift`; antes iban en un
+arco del mismo radio alrededor del ataque, que con espacios iguales no cabe.
+MODO: un
 toque cambia de modo de golpe, su icono dice cual —un tajo para el barrido, una mirilla para
 el preciso— y **se enciende al pulsarlo**, como USAR y SALTAR (en PC tambien,
 y con TAB). ENTRADA alterna **MIRA** y **TAP** (abajo), con la cruz o una
