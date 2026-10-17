@@ -87,4 +87,12 @@ export default [
     a: '      :root { --modeb: 44px; --arc: 84px; }',
     prueba: 'smoke:mobile',
   },
+  // Auditoria: un color que ya no usa nadie, en la paleta.
+  {
+    nombre: 'auditoria: un color huerfano en la paleta',
+    fichero: 'packages/client/src/item-icons.ts',
+    de: "  o: '#1d1a26', // contorno\n",
+    a: "  o: '#1d1a26', // contorno\n  '#': '#ff00ff',\n",
+    prueba: 'test:tests/pixel-icons.test.ts',
+  },
 ];

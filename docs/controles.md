@@ -151,14 +151,15 @@ en ATAQUE, 14 en USAR, CORRER y SALTAR, 8 en AUTO SALTO), un borde de luz por
 dentro arriba a la izquierda, uno de sombra abajo a la derecha y una sombra dura
 debajo; pulsado, encendido o abierto, se hunde (la forma, *deduccion*). **Los botones son solo
 iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
-USAR, espada y pico cruzados en ATAQUE, una **mochila de explorador** en
-INVENTARIO (asa, solapa con dos cierres y bolsillos, casi tan ancha como alta
-y mas grande que los otros iconos, como el adjunto del autor del 2026-09-30),
+USAR, espada y pico cruzados en ATAQUE, una **mochila** en INVENTARIO, mas
+grande que los otros iconos (pedido del autor, 2026-09-30; desde el
+2026-10-17, la misma del hueco Bolso, sacada de su ejemplo),
 tres barras en OTROS, y CORRER y SALTAR con su flecha (eran los caracteres
 » y ↑); el nombre va en `aria-label`. Los dibujos son mios. **Desde el
 2026-10-17 todos son pixelart de 24 × 24 y de un color** (el autor; directrices
 3 y 5 de `docs/guia-de-arte.md`), tambien los que eran un caracter: CORRER,
-SALTAR, AUTO SALTO (era una «A») y el bioma (era 🌿). Viven en
+SALTAR, AUTO SALTO (una «A», como era, ahora en pixelart) y el bioma (era 🌿).
+Viven en
 `silhouette-icons.ts` (`BUTTON_ROWS`): en `index.html` cada `<svg>` va vacio
 con su `data-pixel="nombre"` y se rellena al arrancar, asi que las clases que
 cambian de icono segun el estado (MODO, ENTRADA, el ojo) siguen en el CSS.

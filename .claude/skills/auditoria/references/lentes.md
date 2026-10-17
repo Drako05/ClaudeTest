@@ -93,6 +93,9 @@ que nadie toco es justo lo que ninguna tanda mira.
   `waitForTimeout` y luego «se movio». En una maquina cargada no da tiempo a
   un fotograma. Se espera hasta que se mueva, con un tope dentro de la vida
   de lo que se mide, y se muta lo que lo mueve para verla caer.
+- **Las pasadas que miran lo tocado** (P6): se sacan con `grep` de los
+  selectores que cambiaron en `tools/smoke.mjs` y `tools/gestures.mjs`, no de
+  memoria.
 - **El caso nuevo, cero veces en el escenario** (#28): si la tanda mete una
   clase nueva de cosa que una comprobacion cuenta (la caja de cada animal en
   el panel), se imprime cuantas hay donde mira la prueba. Si son cero, la
