@@ -185,6 +185,9 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
    juicio de nadie. **Se buscan en el codigo los literales de cada fila** de
    la parte tocada (los textos entre «…» y los numeros): si no estan, la fila
    miente (#32: «Espalda» y «Cintura» sobrevivieron tres auditorias).
+   Y las filas se buscan por el **nombre** de lo que cambio (`grep -n "MODO"
+   docs/juicio.md`), no por su valor viejo: una fila de otro valor del mismo
+   boton tambien se queda vieja (#35).
 3. Secciones de historia («HECHO», «SUSTITUIDO»): si el presente las
    contradice, llevan su «*Luego*: …» en una linea. La historia no se reescribe,
    se anota.
@@ -230,6 +233,9 @@ el codigo delante.
   se captura ampliado el resultado compuesto en cada estado, no las piezas
   sueltas. En pixelart, un tamano que no es multiplo entero de la rejilla
   pinta pixeles desiguales.
+  Y si una regla mueve lo de dentro de un boton (el icono, el texto), se mide
+  lo que de verdad se mueve en **cada clase de boton** que toca: en uno de
+  alto fijo, el relleno se reparte y baja la mitad (#34).
 - **Algo nuevo que se mueve o tapa** (#24): si la tanda mete en la escena algo
   que se mueve por su cuenta o tapa (la fauna), repasa cada medida en pixeles
   (`slash`, la sonda de profundidad, `shots`) y aislala de ello (`?fauna=0`).

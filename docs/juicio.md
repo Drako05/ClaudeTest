@@ -135,10 +135,9 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El barrido del TAP en **tercera persona** gira lo que haga falta para **verse** mas horizontal (en primera, tu «primero Y y luego X», exacto); se mira con 5 rayos y 19 giros | Ajustes de la tanda 2, 6.ª ronda | `flattestRoll` en `tap-input.ts` |
 | Los dibujos del **tajo** y la **mirilla**; los anillos de PC de **56 px** y trazo 5 | Ajustes de la tanda 2 | SVG y CSS en `index.html` |
 | La **mochila** redibujada como tu adjunto, casi cuadrada, a **34 px** en el boton (antes 28) | Ajustes de la tanda 2, 2.ª ronda | SVG y CSS en `index.html` |
-| MODO en el movil de **44 px**, a 72 px (en cada eje) del centro del ataque | Ajustes de la tanda 2 | CSS |
+| MODO y ENTRADA en el movil de **44 px** (su sitio, desde el 2026-10-17, es del autor: ver la fila de los 10 px) | Ajustes de la tanda 2 | CSS |
 | ENTRADA en TAP: el sostenido empieza a los **300 ms** quieto (`HOLD_MS`); el joystick no cuenta como «pantalla» | Ajustes de la tanda 2, 5.ª ronda | un numero en `gestures.ts` |
 | En TAP, sin nada bajo el dedo (el cielo), se apunta a un punto lejano del rayo; el sostenido apunta al dedo **en cada golpe** | Ajustes de la tanda 2, 5.ª ronda | `aimAt` en `main.ts` |
-| El arco de MODO y ENTRADA: **84 px** del centro del ataque, botones de **44**, a 153 y 117 grados | Ajustes de la tanda 2, 5.ª ronda | CSS en `index.html` |
 | El dibujo de la **mano que toca** (TAP) y la cruz (MIRA) en ENTRADA | Ajustes de la tanda 2, 5.ª ronda | SVG en `index.html` |
 | En PC la franja de la barra deslizable es de **18 px** (en el movil, 24) | Ajustes de la tanda 2, 5.ª ronda | CSS |
 | Auto salto: se mira la **linea del centro del cuerpo** (la que decide la altura en la colision) y se salta a la distancia que se recorre mientras los pies pasan del borde, **con un tick de mas** | Ajustes de la tanda 2, 4.ª ronda | `systems/autojump.ts` |

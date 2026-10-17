@@ -72,6 +72,15 @@ export default [
     a: '--relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -3px -3px 0 rgba(0, 0, 0, .45), 0 3px 0 rgba(0, 0, 0, .5);',
     prueba: 'smoke:mobile',
   },
+  // Auditoria: el texto del + y el - pulsados, con el relleno de antes, que
+  // en un boton de alto fijo solo lo bajaba 1 px.
+  {
+    nombre: 'auditoria: el texto del + baja 1 px',
+    fichero: 'packages/client/index.html',
+    de: '.recipe .qty button:enabled:active { padding-top: 4px; }',
+    a: '.recipe .qty button:enabled:active { padding-top: 2px; }',
+    prueba: 'smoke:stations',
+  },
   // MODO y ENTRADA sin correrse: alineados al borde de USAR y SALTAR.
   {
     nombre: 'ajustes: MODO y ENTRADA sin correrse',

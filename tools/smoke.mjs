@@ -1629,7 +1629,15 @@ async function stationsPass(browser, baseUrl) {
   const holdQty = async (sign) => {
     const at = await center(`#recipeList .recipe:nth-child(1) .qty button:nth-child(${sign === '+' ? 1 : 2})`);
     await page.mouse.move(at.x, at.y);
+    const textTop = () => page.evaluate((s) => {
+      const b = document.querySelector(`#recipeList .recipe:nth-child(1) .qty button:nth-child(${s})`);
+      const r = document.createRange();
+      r.selectNodeContents(b);
+      return r.getBoundingClientRect().top - b.getBoundingClientRect().top;
+    }, sign === '+' ? 1 : 2);
+    const before = await textTop();
     await page.mouse.down();
+    pressedText.push((await textTop()) - before);
     const seen = [];
     for (const ms of [200, 300, 300, 300]) {
       await elapse(page, ms);
@@ -1639,6 +1647,9 @@ async function stationsPass(browser, baseUrl) {
     await elapse(page, 100);
     return seen;
   };
+  // Y pulsado, su texto baja 2 px (el autor, 2026-10-17: lo que baja es lo
+  // de dentro, no el boton).
+  const pressedText = [];
   const upHeld = await holdQty('+');
   const atTop = await qty(1);
   const downHeld = await holdQty('-');
@@ -1647,11 +1658,12 @@ async function stationsPass(browser, baseUrl) {
   await page.mouse.click(tapAt.x, tapAt.y);
   await elapse(page, 100);
   const tapped = await qty(1);
-  console.log(`  + y - mantenidos: ${upHeld} y ${downHeld}; un toque: ${tapped.shown}`);
+  console.log(`  + y - mantenidos: ${upHeld} y ${downHeld}; un toque: ${tapped.shown}; pulsados, el texto baja ${pressedText}`);
   check(most === 5, `el kit ya no da para 5 lingotes, y las cuentas de abajo son para 5: ${most}`);
   check(upHeld.join() === '2,3,4,5' && !atTop.more, `mantener + no sube de uno en uno, 3 por segundo, hasta 5: ${upHeld}`);
   check(downHeld.join() === '4,3,2,1', `mantener - no baja de uno en uno, 3 por segundo, hasta 1: ${downHeld}`);
   check(tapped.shown === 2, `un toque en + no suma uno: ${tapped.shown}`);
+  check(pressedText.every((d) => Math.abs(d - 2) < 0.5), `pulsados, el texto de + y - no baja 2 px: ${pressedText}`);
   // Al cerrar el inventario, la cantidad vuelve a 1 (el autor, 2026-10-17).
   await page.keyboard.press('Escape');
   await elapse(page, 400);

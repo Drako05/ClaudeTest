@@ -11,6 +11,70 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Ajustes despues de jugar en el movil (2026-10-17) — HECHA
+
+El autor probo en su movil las correcciones a los iconos y pidio, literal:
+
+> Los botones de + y - en recetas, quiero que al dejar presionados sumen o
+> resten más rápidamente (de uno en uno, pero varias veces por segundo e
+> incrementando la frecuencia de aumento por segundo entre más tiempo se deje
+> presionado, es decir, al dejar presionado al principio aumenta por ejemplo
+> 3/s y al segundo siguiente pasa a 4/s y al siguiente 5/s y así, es solo un
+> ejemplo). Al cerrar el inventario, el contador de + en recetas vuelve a 1.
+
+Y en el movil: MODO y ENTRADA con el mismo espacio entre ellos y con USAR y
+SALTAR; las pestanas pisaban la linea; «A todos los botones le pusiste una
+sombra que sobre sale… Preferiría que ya sea sombra o iluminación, estén
+dibujadas solo en el área del propio botón»; y «me gustaría probar con que sea
+solo el icono quien haga el efecto de bajar y el botón lo acompañe con el
+intercambio de luces e iluminación, pero que el propio botón no se mueva de su
+posición».
+
+**Lo que se decidio con el autor** (con capturas, antes del codigo): ATAQUE,
+USAR, SALTAR y CORRER no se mueven; MODO a 10 px de USAR y ENTRADA a 10 de
+SALTAR, corridos **4 px en espejo** (MODO dentro del ancho de USAR, ENTRADA
+dentro del alto de SALTAR), con MODO–ENTRADA medido de esquina a esquina (7,2
+px); encendido, el icono tambien abajo.
+
+**Hecho**: `qty-hold.ts` (el ritmo, con su test), el mantener en
+`inventory-ui.ts`, la vuelta a 1 en `toggle()`, el relieve por dentro y el
+icono que baja (la regla comun al final del CSS; fuera los `scale` de los
+`:active`, que ya no hacian nada), y MODO y ENTRADA con `--modegap` y
+`--modeshift`. El humo lo mide en `stations`, `desktop` y `mobile`; las
+deducciones, en `docs/juicio.md`.
+
+**Sin verificar con dedos**: mantener + o - en el movil (`pointerdown` con el
+dedo); los gestos no lo prueban, por lo mismo de abajo.
+
+## Auditoria al cerrar las correcciones a los iconos (2026-10-17)
+
+**El alcance**: de `ab51f9b` a `47c7cc5`: la auditoria anterior, los iconos a
+multiplo de 24, la regla de `CLAUDE.md` («una pregunta del autor se responde,
+no se ejecuta») y las tres rondas de correcciones. La tanda, entera, en
+`docs/historia.md`.
+
+**Corregido:**
+- **Cuatro colores huerfanos en la paleta** (escape 33): los del fuego y el
+  hondo de la piedra, que solo usaba el horno viejo. Fuera, y un test nuevo
+  exige que cada color lo use algun icono.
+- **`docs/controles.md` mentia en dos frases**: llamaba «mochila de
+  explorador» al icono de INVENTARIO y decia que AUTO SALTO «era una A»,
+  cuando ahora lo vuelve a ser.
+- **CSS muerto**: la letra de 8 px de las categorias, que ya no escriben su
+  nombre.
+- La fila de la paleta en `docs/juicio.md` ya no cuenta los colores.
+
+**Ejecutado**: el escaner y su autoprueba; `npm run shots` y
+`tools/analyze-world.ts`; typecheck y los tests; una mutacion nueva.
+
+**Escapes de la tanda** (fase 6): la pasada `resources` afirmaba algo de la
+fila de receta y no la corri en local antes de la CI (P6); ahora las pasadas
+que se corren salen de buscar los selectores tocados.
+
+**Sin verificar con dedos**: los + y - se pulsan en el movil con un toque
+normal (`click`), pero los gestos no los prueban, porque con E no hay ninguna
+receta apilable.
+
 ## Correcciones a los iconos — HECHA (2026-10-17)
 
 **El pedido del autor, literal** (con dos imagenes de ejemplo: una mochila con
@@ -118,6 +182,9 @@ lo pulsable salvo casillas y anillos.
   es de **102** (era 84), con MODO a **155,5 grados** (era 153) y ENTRADA en
   sus 117. Propuesta al autor.
 - **Aprobada** («Todo va bien. Continúa»).
+- *Luego* (el mismo 2026-10-17, despues de jugar en el movil): el relieve paso
+  todo por dentro, el boton dejo de hundirse (baja solo el icono) y MODO y
+  ENTRADA dejaron el arco; ver «Ajustes despues de jugar en el movil».
 
 **Ronda 3 — HECHA (2026-10-17)**:
 - **Fabricar N**: `tryCraft(..., times)` todo o nada y `craftableTimes` en
