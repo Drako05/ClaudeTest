@@ -404,6 +404,7 @@ export class InventoryUi {
     if (station === this.mode && this.category) return;
     this.mode = station;
     this.cancelHold();
+    this.qtyHold = null;
     this.recipeTitle.textContent = station === Station.Hand ? 'Recetas' : STATION_NAMES[station];
     this.buildRecipes();
   }
