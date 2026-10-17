@@ -150,3 +150,9 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `un redondo pequeno|los dos redondos|no pisar a los redondos` — los botones redondos; desde el 2026-10-17 son cuadrados con relieve. Permitido en: `docs/historia.md`, `docs/pendiente.md`.
 - `tab\.textContent === |t\.textContent === n` — buscar la categoria de las recetas por su texto; desde el 2026-10-17 lleva icono y su nombre va en `data-category`. Permitido en: `docs/historia.md`.
 - `mochila de explorador|la flecha que lo salta sola|cuello alto y abierto en dos picos` — los dibujos de INVENTARIO, AUTO SALTO y Capa que el autor hizo rehacer el 2026-10-17. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `docs/controles.md` (cuenta la mochila de 2026-09-30).
+
+## Los ajustes despues de jugar en el movil (2026-10-17)
+
+- `--arc\b|155,5 grados|arco (de MODO y ENTRADA )?de 102` — MODO y ENTRADA en un arco del mismo radio alrededor del ataque (102 px, MODO a 155,5 grados); desde el 2026-10-17, a 10 px de USAR y de SALTAR, corridos 4 px en espejo (`--modegap`, `--modeshift`). Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `0 3px 0 rgba` — la sombra dura de 3 px que el relieve echaba debajo del boton, por fuera; desde el 2026-10-17 el relieve va todo por dentro. Permitido en: `tools/mutaciones.mjs` (la mutacion la reintroduce), `docs/historia.md`, `docs/pendiente.md`.
+- `scale\(\.9[0-9]\)|baja 2 px y se hunde` — el boton entero que se encogia o bajaba al pulsarlo; desde el 2026-10-17 se queda quieto y baja su icono. Permitido en: `docs/historia.md`, `docs/pendiente.md`.

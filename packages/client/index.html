@@ -56,7 +56,7 @@
       #proj .eye-aim { display: none; }
       #proj.fp .eye-aim { display: inline; }
       #proj.fp .eye-pupil { display: none; }
-      #proj:active { transform: scale(.95); background: rgba(60, 104, 168, .72); }
+      #proj:active { background: rgba(60, 104, 168, .72); }
       /*
         Los mandos del pulgar, segun el boceto del movil del autor: el ATAQUE,
         el mas grande, en la esquina de abajo a la derecha, que es donde cae el
@@ -92,7 +92,6 @@
          `aria-label`. Silueta de un color en pixelart de 24, del color del
          texto (`silhouette-icons.ts`, 2026-10-17). */
       #thumbPad svg, .round svg { display: block; }
-      #thumbPad button:active { transform: scale(.95); }
       #thumbPad button:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
       /* Encendido o pulsado: tiene que verse, porque cambia lo que hace el juego. */
       #thumbPad button.on {
@@ -120,21 +119,23 @@
       /* MODO y ENTRADA, mas pequenos que USAR, entre el ataque, USAR y SALTAR
          (boceto del autor, 2026-10-01: ENTRADA arriba, hacia SALTAR, y MODO
          abajo a la izquierda, encima de USAR). Desde el 2026-10-17 (el autor),
-         **con el mismo hueco entre MODO y USAR, entre ENTRADA y SALTAR y entre
-         ellos dos**, sin mover los demas, que guardan su simetria. Ese hueco
-         es `--modegap`, 10 px, el de USAR y ATAQUE (*deduccion*): MODO justo
-         encima de USAR, alineado a su borde izquierdo, y ENTRADA a su derecha,
-         a la altura con que queda a la misma distancia del ataque y de AUTO
-         SALTO (unos 4 px; con 10 no caben mas). Tamano, mio. */
-      :root { --modeb: 44px; --modegap: 10px; }
+         sin mover los demas, que guardan su simetria:
+         - MODO a `--modegap` (10 px) encima de USAR, y ENTRADA a 10 px a la
+           izquierda de SALTAR;
+         - **en espejo**: lo que MODO se corre a la derecha dentro del ancho
+           de USAR, ENTRADA baja dentro del alto de SALTAR (`--modeshift`);
+         - con 4 px, sus esquinas mas cercanas quedan a 7,2 px en linea recta,
+           para que a la vista se lean igual de cerca que los 10 de los otros
+           (el autor eligio 4, sin decimales). Tamano, mio. */
+      :root { --modeb: 44px; --modegap: 10px; --modeshift: 4px; }
       #modeTouch, #inputMode { width: var(--modeb); height: var(--modeb); }
       #modeTouch {
-        right: calc(12px + var(--atk) + 10px + var(--useb) - var(--modeb) + env(safe-area-inset-right));
+        right: calc(12px + var(--atk) + 10px + var(--useb) - var(--modeb) - var(--modeshift) + env(safe-area-inset-right));
         bottom: calc(10px + var(--useb) + var(--modegap) + env(safe-area-inset-bottom));
       }
       #inputMode {
-        right: calc(12px + var(--atk) + 10px + var(--useb) - 2 * var(--modeb) - var(--modegap) + env(safe-area-inset-right));
-        bottom: calc(10px + var(--atk) + 4.5px + env(safe-area-inset-bottom));
+        right: calc(12px + var(--side) + var(--modegap) + env(safe-area-inset-right));
+        bottom: calc(10px + var(--atk) + 12px + var(--side) - var(--modeb) - var(--modeshift) + env(safe-area-inset-bottom));
       }
       #modeTouch svg, #inputMode svg { width: 24px; height: 24px; }
       /* ENTRADA dice cual esta puesta con su icono: la cruz del centro de la
@@ -332,7 +333,6 @@
         backdrop-filter: blur(6px); touch-action: manipulation;
       }
       #hudToggle svg, #devToggle svg, #statsToggle svg { width: 24px; height: 24px; display: block; }
-      #hudToggle:active, #statsToggle:active, #devToggle:active { transform: scale(.94); }
       #hudToggle:focus-visible, #statsToggle:focus-visible, #devToggle:focus-visible {
         outline: 2px solid #8fc4ff; outline-offset: 3px;
       }
@@ -934,7 +934,6 @@
         border: 1px solid rgba(255,255,255,.14);
         touch-action: manipulation; white-space: nowrap;
       }
-      .devRow button:active { transform: scale(.96); }
       .devRow button:focus-visible { outline: 2px solid #ffc46b; outline-offset: 2px; }
       .devRow button.on {
         background: rgba(255, 196, 107, .22); border-color: rgba(255, 196, 107, .55);

@@ -123,6 +123,14 @@ async function shot(page, name) {
 }
 
 /**
+ * El relieve de un boton, todo por dentro (el autor, 2026-10-17): cada sombra
+ * de su `box-shadow` computado es `inset`; una de fuera sobresale del boton.
+ */
+function reliefInside(shadow) {
+  return shadow !== 'none' && shadow.split(/,(?![^(]*\))/).every((part) => part.includes('inset'));
+}
+
+/**
  * Los iconos en pixelart que se ven y NO miden un multiplo entero de su rejilla
  * de 24 (el autor, 2026-10-17: solo el icono se ajusta; la casilla o el boton
  * se quedan como estan). Fuera de multiplo, sus pixeles salen desiguales.
@@ -821,9 +829,27 @@ async function desktopPass(browser, baseUrl) {
   const shapes = await page.evaluate(() => ['hudToggle', 'statsToggle', 'proj', 'invOpen', 'modeBar'].map((id) => {
     const el = document.getElementById(id);
     const s = getComputedStyle(el);
-    return { id, square: parseFloat(s.borderTopLeftRadius) < el.getBoundingClientRect().width / 2 - 1, relief: s.boxShadow.includes('inset') };
-  }).filter((x) => !(x.square && x.relief)));
-  check(shapes.length === 0, `hay botones redondos o sin relieve: ${JSON.stringify(shapes)}`);
+    return { id, square: parseFloat(s.borderTopLeftRadius) < el.getBoundingClientRect().width / 2 - 1, shadow: s.boxShadow };
+  })).then((all) => all.filter((x) => !(x.square && reliefInside(x.shadow))));
+  check(shapes.length === 0, `hay botones redondos o sin relieve dentro: ${JSON.stringify(shapes)}`);
+  // Pulsado o encendido, el boton no se mueve: baja su icono, 2 px, y el
+  // boton cambia sus luces (el autor, 2026-10-17). Se mira en la categoria
+  // elegida, encendida y ademas pulsada.
+  const pressedSel = '#recipeTabs .slot.on';
+  const pressedAt = await page.locator(pressedSel).boundingBox();
+  await page.mouse.move(pressedAt.x + pressedAt.width / 2, pressedAt.y + pressedAt.height / 2);
+  const pressLook = async () => page.evaluate((sel) => {
+    const el = document.querySelector(sel);
+    const icon = new DOMMatrix(getComputedStyle(el.querySelector('svg')).transform);
+    return { box: getComputedStyle(el).transform, icon: icon.f, shadow: getComputedStyle(el).boxShadow, top: el.getBoundingClientRect().top };
+  }, pressedSel);
+  const litLook = await pressLook();
+  await page.mouse.down();
+  const held = await pressLook();
+  await page.mouse.up();
+  console.log(`  la categoria encendida: icono a ${litLook.icon} px; pulsada, a ${held.icon} px y el boton ${held.box}`);
+  check([litLook, held].every((x) => x.box === 'none' && x.icon === 2 && x.top === pressedAt.y && reliefInside(x.shadow)),
+    `pulsado o encendido, el boton se mueve o su icono no baja 2 px: ${JSON.stringify({ at: pressedAt.y, lit: litLook, held })}`);
   const offPc = await offGridIcons(page);
   check(offPc.length === 0, `hay iconos en pixelart fuera de un multiplo de 24: ${offPc.join(', ')}`);
   // Las casillas: la suma de lo que pintan es lo que hay (las herramientas
@@ -1596,13 +1622,50 @@ async function stationsPass(browser, baseUrl) {
   // alcanza y se para; el resultado dice el total. Y un solo mantener fabrica
   // las 5.
   const most = Math.min(Math.floor(furnace.inventory[7] / 2), furnace.inventory[5]);
+  // Mantenidos, + y - repiten (el autor, 2026-10-17): uno en el acto y 3 por
+  // segundo el primer segundo (el ritmo que crece lo mira
+  // `tests/qty-hold.test.ts`), hasta su tope. Se mira lejos de los pasos
+  // (333, 667, 1000 ms), que el reloj manual va de frame en frame.
+  const holdQty = async (sign) => {
+    const at = await center(`#recipeList .recipe:nth-child(1) .qty button:nth-child(${sign === '+' ? 1 : 2})`);
+    await page.mouse.move(at.x, at.y);
+    await page.mouse.down();
+    const seen = [];
+    for (const ms of [200, 300, 300, 300]) {
+      await elapse(page, ms);
+      seen.push((await qty(1)).shown);
+    }
+    await page.mouse.up();
+    await elapse(page, 100);
+    return seen;
+  };
+  const upHeld = await holdQty('+');
+  const atTop = await qty(1);
+  const downHeld = await holdQty('-');
+  // Un toque, uno: el `click` del puntero no da otro.
+  const tapAt = await center('#recipeList .recipe:nth-child(1) .qty button:nth-child(1)');
+  await page.mouse.click(tapAt.x, tapAt.y);
+  await elapse(page, 100);
+  const tapped = await qty(1);
+  console.log(`  + y - mantenidos: ${upHeld} y ${downHeld}; un toque: ${tapped.shown}`);
+  check(most === 5, `el kit ya no da para 5 lingotes, y las cuentas de abajo son para 5: ${most}`);
+  check(upHeld.join() === '2,3,4,5' && !atTop.more, `mantener + no sube de uno en uno, 3 por segundo, hasta 5: ${upHeld}`);
+  check(downHeld.join() === '4,3,2,1', `mantener - no baja de uno en uno, 3 por segundo, hasta 1: ${downHeld}`);
+  check(tapped.shown === 2, `un toque en + no suma uno: ${tapped.shown}`);
+  // Al cerrar el inventario, la cantidad vuelve a 1 (el autor, 2026-10-17).
+  await page.keyboard.press('Escape');
+  await elapse(page, 400);
+  await play(page);
+  await useClick(page);
+  await elapse(page, 400);
+  check((await state(page)).panelStation === 2, 'USAR mirando el horno no lo volvio a abrir');
   const q0 = await qty(1);
   await press(1, '+', most + 3);
   const qMax = await qty(1);
   await press(1, '-', most - 5);
   const q5 = await qty(1);
   console.log(`  lingote por cantidad: ${JSON.stringify({ q0, most, qMax, q5 })}`);
-  check(!q0.off && q0.shown === 1 && q0.more && !q0.less, `el lingote no arranca en 1 con + habilitado: ${JSON.stringify(q0)}`);
+  check(!q0.off && q0.shown === 1 && q0.more && !q0.less, `el lingote no arranca en 1 con + habilitado (o no volvio a 1 al cerrar): ${JSON.stringify(q0)}`);
   check(qMax.shown === most && !qMax.more && qMax.less, `el + no se para en lo que alcanza (${most}): ${JSON.stringify(qMax)}`);
   check(q5.shown === 5, `con - no se vuelve a 5: ${JSON.stringify(q5)}`);
   await craft(1);
@@ -1822,25 +1885,31 @@ async function mobilePass(browser, baseUrl) {
   check(Math.abs(jump.right - atk.right) < 1 && Math.abs(run.right - atk.right) < 1,
     `correr y saltar no van al borde derecho del ataque: ${run.right} / ${jump.right} / ${atk.right}`);
   check(bar.left >= others.right + 8 && bar.right <= invOpen.left - 8, 'la barra de la mano pisa OTROS o INVENTARIO');
-  // MODO y ENTRADA, mas pequenos que USAR, en un arco alrededor del ataque a
-  // la misma distancia de su centro: ENTRADA arriba, hacia SALTAR, y MODO
-  // abajo a la izquierda, encima de USAR (boceto del autor, 2026-10-01). Son
-  // redondos: se mide la holgura entre circulos, no entre cajas.
+  // MODO y ENTRADA, mas pequenos que USAR, a la izquierda de SALTAR y encima
+  // de USAR, que no se mueven (el autor, 2026-10-17): el mismo espacio
+  // MODO-USAR y ENTRADA-SALTAR, y lo que MODO se corre dentro del ancho de
+  // USAR, ENTRADA se corre dentro del alto de SALTAR (4 px). MODO-ENTRADA se
+  // mide de esquina a esquina, las mas cercanas.
   const mode = await rect('modeTouch');
   const entry = await rect('inputMode');
   const auto = await rect('autoJump');
+  const ctr = (r) => ({ x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2 });
   const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-  const ctr = (r) => ({ x: (r.left + r.right) / 2, y: (r.top + r.bottom) / 2, r: r.width / 2 });
   // La holgura entre dos botones, de caja a caja: desde el 2026-10-17 son
   // cuadrados (el autor), y medirlos como circulos no veia sus esquinas.
   const gapOf = (a, b) => Math.max(b.left - a.right, a.left - b.right, b.top - a.bottom, a.top - b.bottom);
-  const fromAtk = (r) => Math.hypot(ctr(r).x - ctr(atk).x, ctr(r).y - ctr(atk).y);
-  console.log(`  MODO y ENTRADA: a ${fromAtk(mode).toFixed(1)} y ${fromAtk(entry).toFixed(1)} del centro del ataque; holgura minima ` +
-    `${Math.min(...[use, jump, run, atk, auto].flatMap((o) => [gapOf(mode, o), gapOf(entry, o)]), gapOf(mode, entry)).toFixed(1)} px`);
+  const corner = Math.hypot(Math.max(0, entry.left - mode.right), Math.max(0, mode.top - entry.bottom));
+  const shiftX = mode.left - use.left;
+  const shiftY = entry.top - jump.top;
+  console.log(`  MODO y ENTRADA: MODO-USAR ${gapOf(mode, use).toFixed(1)}, ENTRADA-SALTAR ${gapOf(entry, jump).toFixed(1)}, ` +
+    `corridos ${shiftX.toFixed(1)} y ${shiftY.toFixed(1)}, MODO-ENTRADA ${corner.toFixed(1)} de esquina a esquina; holgura minima ` +
+    `${Math.min(...[use, jump, run, atk, auto].flatMap((o) => [gapOf(mode, o), gapOf(entry, o)])).toFixed(1)} px`);
   check(mode.width < use.width && entry.width === mode.width, `MODO y ENTRADA no son pequenos e iguales: ${mode.width} / ${entry.width} / ${use.width}`);
-  check(Math.abs(fromAtk(mode) - fromAtk(entry)) <= 2, `MODO y ENTRADA no estan a la misma distancia del ataque: ${fromAtk(mode)} / ${fromAtk(entry)}`);
-  check(ctr(entry).y < ctr(mode).y && ctr(entry).x > ctr(mode).x && ctr(mode).x < ctr(atk).x && ctr(entry).y < ctr(atk).y,
-    `ENTRADA no va arriba y MODO abajo a la izquierda, sobre el arco del ataque: ${JSON.stringify({ mode, entry })}`);
+  check(Math.abs(gapOf(mode, use) - 10) <= 0.5 && mode.bottom <= use.top && Math.abs(gapOf(entry, jump) - 10) <= 0.5 && entry.right <= jump.left,
+    `MODO no esta a 10 encima de USAR, o ENTRADA a 10 a la izquierda de SALTAR: ${gapOf(mode, use)} / ${gapOf(entry, jump)}`);
+  check(Math.abs(shiftX - 4) <= 0.5 && Math.abs(shiftY - 4) <= 0.5, `MODO y ENTRADA no van corridos 4 px, en espejo: ${shiftX} / ${shiftY}`);
+  check(ctr(entry).y < ctr(mode).y && ctr(entry).x > ctr(mode).x && Math.abs(corner - 7.2) <= 0.5,
+    `ENTRADA no va arriba a la derecha de MODO, a 7,2 de esquina a esquina: ${corner}`);
   for (const [name, o] of [['USAR', use], ['SALTAR', jump], ['CORRER', run], ['ATAQUE', atk], ['AUTO SALTO', auto]]) {
     check(gapOf(mode, o) >= 2 && gapOf(entry, o) >= 2, `MODO o ENTRADA pisan ${name}: ${gapOf(mode, o).toFixed(1)} / ${gapOf(entry, o).toFixed(1)}`);
   }
@@ -1858,12 +1927,12 @@ async function mobilePass(browser, baseUrl) {
   // Los ocho con su icono pintado, tambien los que eran un caracter (», ↑ y A;
   // el autor, 2026-10-17: todos en pixelart de 24 × 24).
   check(labels.every((l) => l.svg), `hay botones sin su icono: ${JSON.stringify(labels.filter((l) => !l.svg))}`);
-  const roundOnes = await page.evaluate(() => ['action', 'use', 'jump', 'run', 'autoJump', 'others', 'invOpen', 'modeTouch', 'inputMode'].filter((id) => {
+  const roundOnes = (await page.evaluate(() => ['action', 'use', 'jump', 'run', 'autoJump', 'others', 'invOpen', 'modeTouch', 'inputMode'].map((id) => {
     const el = document.getElementById(id);
     const s = getComputedStyle(el);
-    return !(parseFloat(s.borderTopLeftRadius) < el.getBoundingClientRect().width / 2 - 1 && s.boxShadow.includes('inset'));
-  }));
-  check(roundOnes.length === 0, `hay botones del movil redondos o sin relieve: ${roundOnes}`);
+    return { id, square: parseFloat(s.borderTopLeftRadius) < el.getBoundingClientRect().width / 2 - 1, shadow: s.boxShadow };
+  }))).filter((x) => !(x.square && reliefInside(x.shadow))).map((x) => x.id);
+  check(roundOnes.length === 0, `hay botones del movil redondos o sin relieve dentro: ${roundOnes}`);
   const offButtons = await offGridIcons(page);
   check(offButtons.length === 0, `hay iconos de boton fuera de un multiplo de 24: ${offButtons.join(', ')}`);
   // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
@@ -1939,6 +2008,13 @@ async function mobilePass(browser, baseUrl) {
   const widths = tabs0.map((t) => t.right - t.left);
   check(Math.abs(tabs0[0].left - panelR.left) < 2 && Math.abs(tabs0[2].right - panelR.right) < 2 && Math.max(...widths) - Math.min(...widths) < 1,
     `las pestanas no reparten el ancho del panel en tres: ${JSON.stringify({ panelR, tabs0 })}`);
+  // Las pestanas no pisan la linea de debajo (el autor, 2026-10-17): ni su
+  // caja ni su relieve, que va todo por dentro.
+  const tabLine = await page.evaluate(() => {
+    const line = document.getElementById('invTabs').getBoundingClientRect().bottom - 1;
+    return Array.from(document.querySelectorAll('#invTabs button')).map((b) => ({ over: b.getBoundingClientRect().bottom - line, shadow: getComputedStyle(b).boxShadow }));
+  });
+  check(tabLine.every((t) => t.over <= 0.5 && reliefInside(t.shadow)), `las pestanas pisan la linea de debajo: ${JSON.stringify(tabLine)}`);
   const pages = [(await state(page)).inventoryPage];
   for (const n of [3, 1, 2]) {
     await page.tap(`#invTabs button:nth-child(${n})`);
