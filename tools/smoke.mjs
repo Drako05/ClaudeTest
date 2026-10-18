@@ -370,26 +370,18 @@ async function orbit(page, dx) {
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 
 /**
- * Gira la mirada hasta apuntar a `(x, y)` del suelo. Lo que gira un pixel de
- * `orbit` se mide la primera vez en cada pagina: depende de la vista.
+ * Gira la mirada hasta apuntar a `(x, y)` del suelo, con el raton capturado:
+ * 0,0025 rad por pixel, la misma cuenta con que apunta la caza (`faunaPass`).
  */
-const turnPerPixel = new WeakMap();
 async function faceTo(page, x, y) {
-  const angleOf = (s) => Math.atan2(s.facing[1], s.facing[0]);
-  if (!turnPerPixel.has(page)) {
-    const a = angleOf(await state(page));
-    await orbit(page, 40);
-    await elapse(page, 60);
-    const turned = Math.atan2(Math.sin(angleOf(await state(page)) - a), Math.cos(angleOf(await state(page)) - a));
-    turnPerPixel.set(page, Math.abs(turned) > 1e-3 ? turned / 40 : 0.005);
-  }
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) {
     const s = await state(page);
     const want = Math.atan2(y - s.y, x - s.x);
-    const off = Math.atan2(Math.sin(want - angleOf(s)), Math.cos(want - angleOf(s)));
-    if (Math.abs(off) < 0.1) return;
-    await orbit(page, off / turnPerPixel.get(page));
-    await elapse(page, 60);
+    const have = Math.atan2(s.aim[1], s.aim[0]);
+    const off = Math.atan2(Math.sin(want - have), Math.cos(want - have));
+    if (Math.abs(off) < 0.08) return;
+    await look(page, off / 0.0025, 0);
+    await elapse(page, 120);
   }
 }
 

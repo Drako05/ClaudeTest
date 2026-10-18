@@ -310,6 +310,9 @@ console.log(`  barra a INVENTARIO: casilla ${stowFrom + 1} ${stowed.item} x${sto
 check(!barStow.inventoryOpen && barStow.slots[stowFrom].item === -1 && barStow.itemsSent.stow === barVoid.itemsSent.stow + 1 &&
   barStow.slots.some((x, i) => i >= 4 && x.item === stowed.item),
   'soltar la barra sobre INVENTARIO no la guardo fuera de la barra');
+// Lo tirado y lo guardado se reponen: lo que sigue (mover, fabricar) los usa.
+await page.evaluate(() => document.querySelector('[data-kit="piedra"]').click());
+await page.waitForTimeout(300);
 // Inventario abierto: de una casilla a otra, y de la rejilla a la barra.
 const invBtn = await center('invOpen');
 await tapReal(invBtn);
