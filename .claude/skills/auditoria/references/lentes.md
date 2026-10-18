@@ -132,6 +132,10 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
    - **CSS pisado por especificidad**: dos reglas para el mismo elemento, una
      con `#id` y otra con `.clase`; la de menos peso tiene propiedades
      muertas.
+   - **CSS pisado por orden** (#36): una regla comun puesta al final para
+     ganar (las esquinas, el estandar de los botones) deja muertas esas
+     mismas propiedades en la regla propia de cada elemento. Se busca cada
+     propiedad de la regla comun en las de sus elementos y se quita alli.
    - Constantes y parametros sin uso: `tsc` no avisa si `noUnused*` esta
      apagado.
 3. No todo lo sin uso sobra. Lo que se deja a proposito se dice en el informe,

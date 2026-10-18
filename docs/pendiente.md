@@ -8,10 +8,10 @@ Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
 indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `bf82a04`, 2026-10-17** (los ajustes despues de
-jugar en el movil, desde `47c7cc5`). La proxima parte de aqui: ver
-`.claude/skills/auditoria/` y «Auditoria al cerrar los ajustes despues de
-jugar en el movil», mas abajo.
+**Ultima auditoria: commit `597b8d4`, 2026-10-18** (el estandar de los
+botones, desde `bf82a04`). La proxima parte de aqui: ver
+`.claude/skills/auditoria/` y «Auditoria al cerrar el estandar de los
+botones», mas abajo.
 
 **Como leerlo.** Desde el 2026-10-10 son tres ficheros, partidos como se partio
 `CLAUDE.md` el 2026-10-02 y por lo mismo: este se lee al empezar cada tanda, y
@@ -32,52 +32,25 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## El estandar de los botones (2026-10-18) — HECHA, falta la auditoria
+## Auditoria al cerrar el estandar de los botones (2026-10-18)
 
-El autor, despues de probar en el movil el + y el - mantenidos («Se siente
-bien»), literal: «note un comportamiento de algunos bonotes que no está
-estandarizado. Los botones de las pestañas dentro de inventario y los botones
-de + y -, no se iluminan al ser presionados. Además, los botones de las
-pestañas no tienen el texto en blanco, que es el color del icono de todos los
-demás botones. Estandariza la construcción para todos los botones de ahora en
-adelante (arte pixelart o texto, color, sombra e iluminación, comportamiento,
-etc.) y arregla los que ya mencionados.»
-
-Sus respuestas: la pestaña elegida, encendida como un boton; el panel de
-desarrollo, con el mismo azul; un solo azul para pulsado y encendido.
-
-**Hecho**: la directriz 6 de `docs/guia-de-arte.md` (el estandar entero);
-`.btn` en todos los botones salvo las casillas, con su regla al final del CSS;
-`press-light.ts`, la luz de pulsar de todos (USAR, SALTAR, MODO y ATAQUE ya no
-se encienden por su cuenta); los textos de los botones en su `<span>`. El humo
-mira cada boton que se ve en PC, en el movil y en el panel de desarrollo
-(`buttonStandard`), que la luz de un toque dure y que el + no se quede
-encendido al apagarse en su tope.
-
----
-
-## Auditoria al cerrar los ajustes despues de jugar en el movil (2026-10-17)
-
-**El alcance**: de `47c7cc5` a `bf82a04`: la auditoria anterior y los ajustes
-(+ y - mantenidos, la vuelta a 1, el relieve por dentro con el icono que baja,
-MODO y ENTRADA). La tanda, entera, en `docs/historia.md`.
+**El alcance**: de `bf82a04` a `597b8d4`: la auditoria anterior y el estandar
+de los botones. La tanda, entera, en `docs/historia.md`.
 
 **Corregido:**
-- **El texto del + y el - pulsados bajaba 1 px, no 2**: miden 26 px de alto
-  fijo, y el texto va centrado en lo que deja el relleno. Ahora 4 px de
-  relleno lo bajan 2; el humo `stations` lo mide, con su mutacion.
-- **Dos filas de `docs/juicio.md` sobre un sitio de MODO que ya no existe**
-  (a 72 px del ataque, el arco de 84). Fuera; queda la del tamano.
-- La historia del arco de 102 y la sombra de fuera lleva su «*Luego*».
+- **CSS muerto que tapaba la regla comun** (escape 36): `.slot.off`, que ya
+  solo llevaban las categorias vacias (son `.btn` y las apaga `.btn.off`), y
+  los `border-radius: 50%` de `#proj`, `#thumbPad button` y `.round`, que
+  pisan las esquinas de 12 px desde los botones cuadrados.
 
 **Ejecutado**: el escaner y su autoprueba; `npm run shots` y
-`tools/analyze-world.ts`; typecheck y los tests; una mutacion nueva.
+`tools/analyze-world.ts`; typecheck y los tests; las pasadas `desktop` y
+`mobile`.
 
-**Escapes de la tanda** (fase 6): el 34 («baja 2 px» medido solo en los
-iconos) y el 35 (filas de juicio buscadas por el valor y no por el nombre).
+**Escapes** (fase 6): el 36, CSS pisado por orden y no por peso, a la lente D.
 
-**Sin verificar con dedos**: mantener + o - en el movil; los gestos no lo
-prueban, porque con E no hay ninguna receta apilable.
+**Sin verificar con dedos**: la luz de pulsar en un movil de verdad (el humo
+la mira con toques simulados).
 
 ---
 
