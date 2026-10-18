@@ -1409,7 +1409,9 @@ async function resourcesPass(browser, baseUrl) {
     check(off.every((o) => o.drawn !== null && o.drawn < 0.02 && Math.abs(o.bob) <= 0.051 && Math.abs(o.size - 0.4) < 1e-6),
       `algun monton no se dibuja donde esta: ${JSON.stringify(off)}`);
     await shot(page, '3d-02c-botin.png');
-    const withBerries = await harvestUntil(page, (s) => s.inventory[2] > 0, 3);
+    // Bayas y fibra: la mata suelta las dos, y se va a por las dos (si solo se
+    // esperaran las bayas, la fibra podia quedarse en el suelo).
+    const withBerries = await harvestUntil(page, (s) => s.inventory[2] > 0 && s.inventory[9] > 0, 3);
     console.log(`  mata en ${berry.node.x},${berry.node.y}: ${withBerries.inventory[2]} bayas`);
     check(withBerries.inventory[2] > 0, 'golpear la mata no dio bayas');
     check(withBerries.hunger < 100, 'el hambre no habia bajado, y con ella llena no se come');
