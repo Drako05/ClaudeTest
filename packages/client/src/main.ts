@@ -1314,7 +1314,6 @@ Object.defineProperty(window, '__verdant', {
         floor: dropFloor(state.world, d.x, d.y),
       })),
       dropsInScene: dropsView.count,
-      dropsDrawn: dropsView.drawnTotal,
       dropsPlaced: dropsView.placed,
       animalsKilled,
       faunaSizes: faunaView.sizes,

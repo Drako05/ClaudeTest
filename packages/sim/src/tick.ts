@@ -222,9 +222,10 @@ export function step(state: GameState, intent: Intent): void {
     // mismo tick golpea ya con ella.
     if (intent.select >= 0) inventory.select(intent.select);
     if (intent.moveFrom >= 0 && intent.moveTo >= 0) inventory.move(intent.moveFrom, intent.moveTo);
+    // Guardar lo de la barra en el resto del inventario (el autor, 2026-10-18).
+    if (intent.stow >= 0) inventory.stow(intent.stow);
     // Tirar lo lanza hacia la mirada (el autor, 2026-10-18), con la mirada
     // de este tick, que ya esta puesta.
-    if (intent.stow >= 0) inventory.stow(intent.stow);
     if (intent.discard >= 0) {
       const thrown = inventory.discard(intent.discard);
       if (thrown) throwFrom(world, entities, playerId, thrown, state.tick);

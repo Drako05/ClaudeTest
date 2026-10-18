@@ -31,7 +31,7 @@ import { GRAVITY } from './jump.js';
 export const DROP_FLOAT = 0.2;
 /** Hasta donde llega el iman, desde el cuerpo (el autor, 2026-10-18: 1 bloque). */
 export const PICKUP_RADIUS = 1;
-/** Lo deprisa que vuela hacia el jugador lo que se recoge, en bloques/s. **Deduccion mia.** */
+/** Lo deprisa que vuela hacia el jugador lo que se recoge, en bloques/s. **El autor lo dio por bueno jugando (2026-10-18).** */
 export const HOMING_SPEED = 8;
 /** A cuanto se funden dos montones iguales posados. **Deduccion mia.** */
 export const MERGE_RADIUS = 0.5;
@@ -41,10 +41,10 @@ export const SCATTER_UP = 3;
 export const SCATTER_REACH = 0.5;
 /**
  * Lo que tarda el botin en dejarse recoger: el medio segundo en que se le ve
- * saltar, que si no el iman se lo llevaria antes de verlo. **Deduccion mia.**
+ * saltar, que si no el iman se lo llevaria antes de verlo. **El autor lo dio por bueno jugando (2026-10-18).**
  */
 export const LOOT_DELAY_TICKS = Math.round(TICK_HZ / 2);
-/** Lo tirado: su velocidad hacia la mirada y su empuje hacia arriba. Cae a unos 2 bloques. **Deduccion mia.** */
+/** Lo tirado: su velocidad hacia la mirada y su empuje hacia arriba. Cae a unos 2 bloques. **El autor lo dio por bueno jugando (2026-10-18).** */
 export const THROW_SPEED = 6;
 export const THROW_UP = 3;
 /** Lo tirado no se deja recoger durante unos 2 s (el autor). */

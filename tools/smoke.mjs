@@ -1384,7 +1384,9 @@ async function resourcesPass(browser, baseUrl) {
     // El botin cae al suelo (el autor, 2026-10-18): un golpe a la mata y,
     // antes de que el iman se lo lleve (medio segundo), se mira. Cada monton
     // flota a 0,2 de su suelo en el nucleo y se dibuja ahi, mirando a la
-    // camara, con su vaiven de ±0,05 (`drops-view.ts`).
+    // camara, de 0,4 y con su vaiven de ±0,05 (`drops-view.ts`). Numeros
+    // escritos a mano, que el humo no importa el juego: son `DROP_FLOAT`,
+    // `DROP_SIZE` y `BOB_HEIGHT`, y si cambian alli, cambian aqui.
     await strike(page);
     await elapse(page, 400);
     const loot = await state(page);

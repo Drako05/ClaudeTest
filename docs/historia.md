@@ -11,6 +11,83 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Los objetos en el suelo (2026-10-18) — HECHA
+
+El autor, literal: «en esta tanda quiero abarcar items arrojables. me refiero a
+que los drops al matar, romper, golpear cosas en el mundo, arrojar items desde
+el inventario, etc. todo botin generado debe ser arrojado como items flotantes
+en el suelo. tendran gravedad pero flotaran a 0.2m de la superficie y miraran
+siempre al jugador (billboard). no diran su nombre, solo sera el items».
+
+Sus respuestas (plan aprobado): se recogen solos al acercarse (iman de ~1,5);
+duran para siempre; con el inventario lleno el golpe termina igual; lo
+fabricado que no cabe cae a los pies; el botin salta y se esparce; un monton
+por tipo, y los iguales se funden; tirar lo lanza hacia la mirada y no se deja
+recoger unos 2 s; y mientras flota, sube y baja suave.
+
+**Hecho**: el nucleo (`drop-store.ts`, `systems/drops.ts`, la emision en
+`gathering.ts` y `tick.ts`), el cliente (`drops-view.ts`), los tests
+(`drops.test.ts` y los que esperaban el botin en el inventario, con
+`tests/ground.ts`), el humo (`collect`, que anda hasta los montones, y la
+comprobacion del botin en el suelo en `resources`) y la documentacion
+(`docs/recoleccion.md`, «Objetos en el suelo»).
+
+En `main` desde `3d7b09d`. **El autor lo jugo** (2026-10-18): tamaño, vaiven,
+velocidad del iman, espera para recoger y distancia al tirar, bien. Pidio,
+literal: «El imán bájalo a 1 bloque»; «La dispersión al generarse. cuando es
+botin de una acción en el mundo, que salga dispersado de 0m a 0.5m del origen
+y desde la mitad de la altura del elemento que la género. Cuando es de una
+receta que no cabe, cae a los pies»; «Al tirar un objeto desde el inventario
+ya no se pide confirmacion»; «si se arrastras desde la hotbar a fuera de las
+casillas, se arroja (también sin confirmar)»; y arrastrar de la barra al boton
+INVENTARIO la guarda en la siguiente casilla disponible fuera de la barra. Sus
+respuestas: el saltito se queda y cae a 0-0,5; al guardar, primero apila y
+luego vacia; tirar desde la barra, en cualquier sitio salvo casillas e
+INVENTARIO.
+
+**Hecho (ajustes)**: `PICKUP_RADIUS = 1`, `SCATTER_REACH`, `sourceOf` en
+`gathering.ts`, `Inventory.stow` con `Intent.stow`, y en `inventory-ui.ts`
+tirar sin dialogo, tirar desde la barra y guardar. Tests en `drops.test.ts` y
+`stow.test.ts`; los gestos lo prueban con el dedo.
+
+En `main` tras las dos tandas en verde en `pruebas` (`066e4b1`). **El autor lo
+jugo otra vez** (2026-10-18): todo bien salvo la dispersion, que seguia cayendo
+casi en el centro, y las ramas de un arbol en pie salian encima de el. Literal:
+«La idea es que los elementos salgan expulsados de su generador con una fuerza
+que los lleve entre 0 y 0.5m del origen». La causa: nacian en el centro de la
+caja, dentro del tronco solido, y se posaban encima. **Hecho**: `scatterLoot`
+los saca por fuera de la caja (`LootSource`, con su media anchura) y cuenta
+los 0-0,5 desde esa cara (*deduccion*, en `docs/juicio.md`); los animales,
+igual desde la suya.
+
+**Cerrada** (2026-10-18): el autor lo dio por bueno jugando («Todo parece
+funcionar bien por el momento»), y la auditoria de cierre, en «Auditoria al
+cerrar los objetos en el suelo».
+
+---
+
+## Auditoria al cerrar el estandar de los botones (2026-10-18)
+
+**El alcance**: de `bf82a04` a `597b8d4`: la auditoria anterior y el estandar
+de los botones. La tanda, entera, en `docs/historia.md`.
+
+**Corregido:**
+- **CSS muerto que tapaba la regla comun** (escape 36): `.slot.off`, que ya
+  solo llevaban las categorias vacias (son `.btn` y las apaga `.btn.off`), y
+  los `border-radius: 50%` de `#proj`, `#thumbPad button` y `.round`, que
+  pisan las esquinas de 12 px desde los botones cuadrados.
+
+**Ejecutado**: el escaner y su autoprueba; `npm run shots` y
+`tools/analyze-world.ts`; typecheck y los tests; las pasadas `desktop` y
+`mobile`.
+
+**Escapes** (fase 6): el 36, CSS pisado por orden y no por peso, a la lente D.
+
+**Sin verificar con dedos**: la luz de pulsar en un movil de verdad (el humo
+la mira con toques simulados).
+
+---
+
 ## El estandar de los botones (2026-10-18) — HECHA
 
 El autor, despues de probar en el movil el + y el - mantenidos («Se siente

@@ -288,6 +288,8 @@ cabe y lo que se tira desde el inventario.
   a 24 × 24, interpolado entre ticks y con su vaiven.
 - Las herramientas no se funden, y tiradas **conservan su desgaste**.
 - Los numeros que no dio el autor son *deduccion* (`docs/juicio.md`): el
-  medio segundo antes de dejarse recoger el botin, las velocidades, la huella,
-  el radio de fundir, el tamaño del icono y su vaiven, y flotar en el agua.
+  salto del botin hacia arriba, la huella, el radio de fundir y flotar en el
+  agua. El medio segundo antes de dejarse recoger el botin, la velocidad del
+  iman, lo tirado y el tamaño del icono y su vaiven los propuse yo y **el autor
+  los dio por buenos jugando** (2026-10-18).
 

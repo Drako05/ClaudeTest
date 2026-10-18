@@ -24,9 +24,9 @@ import type { DropStore } from '@verdant/sim';
 import { itemArt } from './item-icons.js';
 import { CLEAR, PIXEL_GRID } from './pixel-art.js';
 
-/** El lado del icono en el mundo, en bloques. **Deduccion mia.** */
+/** El lado del icono en el mundo, en bloques. **El autor lo dio por bueno jugando (2026-10-18).** */
 export const DROP_SIZE = 0.4;
-/** El vaiven: lo que sube y baja, en bloques, y lo que tarda una vuelta, en s. **Deduccion mia.** */
+/** El vaiven: lo que sube y baja, en bloques, y lo que tarda una vuelta, en s. **El autor lo dio por bueno jugando (2026-10-18).** */
 export const BOB_HEIGHT = 0.05;
 export const BOB_SECONDS = 2;
 
@@ -43,8 +43,6 @@ export class DropsView {
   private readonly materials = new Map<Resource, SpriteMaterial>();
   /** Donde estaba cada monton antes del ultimo tick, para interpolar. */
   private readonly before = new Map<number, { x: number; y: number; z: number }>();
-  /** Montones que se han colocado alguna vez: el humo lo mira crecer. */
-  drawnTotal = 0;
 
   constructor(private readonly scene: Scene) {}
 
@@ -100,7 +98,6 @@ export class DropsView {
         sprite.scale.set(DROP_SIZE, DROP_SIZE, 1);
         this.sprites.set(d.id, sprite);
         this.scene.add(sprite);
-        this.drawnTotal++;
       }
       const from = this.before.get(d.id) ?? d;
       const x = from.x + (d.x - from.x) * alpha;
