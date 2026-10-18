@@ -728,7 +728,9 @@ async function desktopPass(browser, baseUrl) {
   const bush = (await spots(page)).berrySpot;
   check(bush !== null, 'no se encontro ninguna mata que golpear');
   if (bush) await open(page, baseUrl, `&x=${bush.stand.x}&y=${bush.stand.y}`);
-  const gathered = await harvestUntil(page, (s) => sum(s.inventory) > 0);
+  // Hasta tener la fibra tambien: cada cosa cae en su monton, y el primero que
+  // se recoge puede ser la semilla.
+  const gathered = await harvestUntil(page, (s) => sum(s.inventory) > 0 && s.inventory[9] > 0);
   console.log(`  inventario tras recolectar: ${JSON.stringify(gathered.inventory)}`);
   check(sum(gathered.inventory) > 0, 'accionar no recolecto nada');
   check(gathered.debrisDrawn > 0, 'derribar no dibujo ningun escombro');
