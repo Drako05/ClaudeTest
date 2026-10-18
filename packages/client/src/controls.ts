@@ -16,6 +16,7 @@
 
 import { now } from './clock.js';
 import { Gestures, HOLD_MS, STICK_RADIUS } from './gestures.js';
+import { flash } from './press-light.js';
 import type { MouseLook } from './pointer-lock.js';
 
 /** Cuanto aguanta el catalejo tras la ultima pulsacion de + o -, en ms. */
@@ -25,8 +26,6 @@ const ZOOM_HOLD_MS = 800;
  * una muesca de raton la supera siempre y pasa justo una. **Deduccion mia.**
  */
 const WHEEL_STEP = 50;
-/** Lo minimo que se ve encendido un boton tocado (USAR, SALTAR). **Deduccion mia.** */
-const FLASH_MS = 150;
 /** Donde se recuerda el auto salto en el navegador (solo comodidad). */
 const AUTO_JUMP_STORAGE_KEY = 'verdant.autoJump';
 /** Donde se recuerda la ENTRADA (MIRA o TAP) en el navegador (solo comodidad). */
@@ -292,11 +291,9 @@ export class Controls {
       e.preventDefault();
       this.actionQueued = true;
       this.actionHeld = true;
-      el.classList.add('on');
     };
     const release = () => {
       this.actionHeld = false;
-      el.classList.remove('on');
     };
 
     /**
@@ -387,10 +384,7 @@ export class Controls {
   /** TAB: cambia el modo y enciende un instante el boton MODO (propuesta mia). */
   private modeKey(): void {
     this.toggleMode();
-    for (const el of this.modeEls) {
-      el.classList.add('on');
-      setTimeout(() => el.classList.remove('on'), FLASH_MS);
-    }
+    for (const el of this.modeEls) flash(el);
   }
 
   /**
@@ -564,36 +558,19 @@ export class Controls {
   }
 
   /**
-   * Un boton de un solo toque. Mientras el dedo esta puesto se ve encendido,
-   * como el ataque mantenido (pedido del autor), y al soltar se apaga, pero no
-   * antes de `FLASH_MS`: un toque rapido tambien tiene que verse.
+   * Un boton de un solo toque. Su luz, mientras el dedo esta puesto y no menos
+   * de `FLASH_MS`, es la de todos los botones (`press-light.ts`).
    */
   private bindTap(el: HTMLElement | null, run: () => void): void {
     if (!el) return;
-    let since = 0;
-    let timer: ReturnType<typeof setTimeout> | null = null;
     const press = (e: Event) => {
       e.preventDefault();
       run();
-      if (timer !== null) clearTimeout(timer);
-      timer = null;
-      since = performance.now();
-      el.classList.add('on');
-    };
-    const release = () => {
-      if (!el.classList.contains('on') || timer !== null) return;
-      timer = setTimeout(() => {
-        timer = null;
-        el.classList.remove('on');
-      }, Math.max(0, FLASH_MS - (performance.now() - since)));
     };
     el.addEventListener('touchstart', press, { passive: false });
     el.addEventListener('pointerdown', (e) => {
       if ((e as PointerEvent).pointerType !== 'touch') press(e);
     });
-    for (const type of ['touchend', 'touchcancel', 'pointerup', 'pointercancel']) {
-      el.addEventListener(type, release);
-    }
   }
 
   /** Pinta el joystick flotante donde nacio el pulgar, si hay alguno. */

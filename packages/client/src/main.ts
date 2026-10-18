@@ -112,9 +112,12 @@ import {
   writeSeedToLocation,
 } from './start.js';
 import { installButtonIcons } from './silhouette-icons.js';
+import { bindPressLight } from './press-light.js';
 
 /** Los iconos de los botones, en pixelart, antes que nada (`silhouette-icons.ts`). */
 const buttonIcons = installButtonIcons();
+// Todo `.btn` se enciende al pulsarlo, tambien los que se creen luego.
+bindPressLight(document);
 
 /** Radio de chunks que se mallan alrededor del jugador. */
 const RADIUS = 3;

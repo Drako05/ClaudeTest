@@ -156,10 +156,13 @@ uno de sombra de 3 px abajo a la derecha (*deduccion*). **Pulsado, el boton no
 se mueve**: invierte sus luces y **baja solo el icono**, 2 px (el autor: «que
 sea solo el icono quien haga el efecto de bajar y el botón lo acompañe con el
 intercambio de luces»); encendido o abierto, igual, con el icono abajo («Sí, el
-icono abajo»). En los botones de texto (las pestanas, Cancelar y Tirar,
-Reiniciar, el panel de desarrollo, + y -) baja el texto 2 px: pasan 2 px del
-relleno de abajo al de arriba, salvo en + y -, que miden 26 de alto fijo y
-centran el texto en lo que queda, asi que llevan 4 arriba. **Los botones son solo
+icono abajo»); en los de texto baja el texto, que va en su `<span>`. **Desde
+el 2026-10-18 todos se construyen igual** (el autor: «Estandariza la
+construcción para todos los botones de ahora en adelante»): blancos, el mismo
+fondo y el mismo relieve, y **se iluminan al pulsarlos**, no menos de 150 ms,
+con el mismo azul que encendidos; tambien las pestanas, la elegida encendida, y
++ y -. El estandar entero es la directriz 6 de `docs/guia-de-arte.md`; la luz
+de pulsar, `press-light.ts`. **Los botones son solo
 iconos**, sin rotulo (decision del autor, 2026-09-29): una mano abierta en
 USAR, espada y pico cruzados en ATAQUE, una **mochila** en INVENTARIO, mas
 grande que los otros iconos (pedido del autor, 2026-09-30; desde el

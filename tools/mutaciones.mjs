@@ -11,82 +11,64 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los ajustes despues de jugar en el movil (2026-10-17): + y -
- * mantenidos, la vuelta a 1 al cerrar, MODO y ENTRADA, y el relieve por dentro
- * con el icono que baja.
+ * Ronda: el estandar de los botones (2026-10-18): todo lo que se pulsa es un
+ * `.btn`, blanco, que se ilumina al pulsarlo y baja lo de dentro.
  */
 export default [
-  // Mantener + no repite: un paso y nada mas.
+  // Una pestana del movil que no es un `.btn`.
   {
-    nombre: 'ajustes: mantener + no repite',
-    fichero: 'packages/client/src/inventory-ui.ts',
-    de: '    const due = qtySteps(now() - q.since);',
-    a: '    const due = 1;',
-    prueba: 'smoke:stations',
+    nombre: 'botones: una pestana sin el estandar',
+    fichero: 'packages/client/index.html',
+    de: '<button class="btn" type="button" role="tab" data-page="personaje">',
+    a: '<button type="button" role="tab" data-page="personaje">',
+    prueba: 'smoke:mobile',
   },
-  // El ritmo sin crecer: 3 por segundo siempre.
+  // El + y el - sin el estandar.
   {
-    nombre: 'ajustes: el ritmo sin crecer',
-    fichero: 'packages/client/src/qty-hold.ts',
-    de: '  const rate = QTY_FIRST_RATE + s;',
-    a: '  const rate = QTY_FIRST_RATE;',
-    prueba: 'test:tests/qty-hold.test.ts',
-  },
-  // Un toque da dos: el del puntero y el del `click`.
-  {
-    nombre: 'ajustes: un toque da dos',
+    nombre: 'botones: + y - sin el estandar',
     fichero: 'packages/client/src/inventory-ui.ts',
-    de: '          if (e.detail === 0) this.stepTimes(i, step);',
-    a: '          this.stepTimes(i, step);',
-    prueba: 'smoke:stations',
-  },
-  // Al cerrar, cada receta se queda con lo que tenia.
-  {
-    nombre: 'ajustes: no vuelve a 1 al cerrar',
-    fichero: 'packages/client/src/inventory-ui.ts',
-    de: '      this.times.clear();',
+    de: "        b.className = 'btn';",
     a: '',
-    prueba: 'smoke:stations',
-  },
-  // Pulsado, el boton entero baja otra vez.
-  {
-    nombre: 'ajustes: el boton entero baja',
-    fichero: 'packages/client/index.html',
-    de: '        box-shadow: var(--hundido); transform: none;',
-    a: '        box-shadow: var(--hundido); transform: translateY(2px);',
     prueba: 'smoke:desktop',
   },
-  // Pulsado o encendido, el icono se queda arriba.
+  // Las pestanas, otra vez con el texto apagado.
   {
-    nombre: 'ajustes: el icono no baja',
+    nombre: 'botones: el texto de las pestanas, gris',
     fichero: 'packages/client/index.html',
-    de: '        transform: translateY(2px);\n',
-    a: '        transform: none;\n',
+    de: 'text-align: center; touch-action: manipulation;',
+    a: 'text-align: center; touch-action: manipulation; color: rgba(232, 238, 247, .38);',
+    prueba: 'smoke:mobile',
+  },
+  // Encendido ya no se ilumina (la categoria elegida, la pestana elegida).
+  {
+    nombre: 'botones: encendido sin luz',
+    fichero: 'packages/client/index.html',
+    de: '.btn:is(:active, .pressed, .on, .open):not(:disabled, .off) {',
+    a: '.btn:is(:active, .pressed, .open):not(:disabled, .off) {',
     prueba: 'smoke:desktop',
   },
-  // La sombra de fuera, la que sobresalia del boton.
+  // Tocar un boton no lo enciende.
   {
-    nombre: 'ajustes: la sombra de fuera',
-    fichero: 'packages/client/index.html',
-    de: '--relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -3px -3px 0 rgba(0, 0, 0, .45);',
-    a: '--relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -3px -3px 0 rgba(0, 0, 0, .45), 0 3px 0 rgba(0, 0, 0, .5);',
+    nombre: 'botones: el toque sin luz',
+    fichero: 'packages/client/src/press-light.ts',
+    de: "      el.classList.add('pressed');",
+    a: '',
     prueba: 'smoke:mobile',
   },
-  // Auditoria: el texto del + y el - pulsados, con el relleno de antes, que
-  // en un boton de alto fijo solo lo bajaba 1 px.
+  // La luz de un toque se apaga en el acto: un toque rapido no se ve.
   {
-    nombre: 'auditoria: el texto del + baja 1 px',
+    nombre: 'botones: la luz sin sus 150 ms',
+    fichero: 'packages/client/src/press-light.ts',
+    de: 'Math.max(0, FLASH_MS - (performance.now() - press.since))',
+    a: '0',
+    prueba: 'smoke:mobile',
+  },
+  // El texto suelto en su span, sin caja: no baja al pulsar.
+  {
+    nombre: 'botones: el texto no baja',
     fichero: 'packages/client/index.html',
-    de: '.recipe .qty button:enabled:active { padding-top: 4px; }',
-    a: '.recipe .qty button:enabled:active { padding-top: 2px; }',
+    de: '.btn > span { display: inline-block; }',
+    a: '.btn > span { }',
     prueba: 'smoke:stations',
-  },
-  // MODO y ENTRADA sin correrse: alineados al borde de USAR y SALTAR.
-  {
-    nombre: 'ajustes: MODO y ENTRADA sin correrse',
-    fichero: 'packages/client/index.html',
-    de: '--modeshift: 4px',
-    a: '--modeshift: 0px',
-    prueba: 'smoke:mobile',
   },
 ];

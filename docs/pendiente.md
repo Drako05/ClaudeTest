@@ -32,6 +32,30 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
+## El estandar de los botones (2026-10-18) — HECHA, falta la auditoria
+
+El autor, despues de probar en el movil el + y el - mantenidos («Se siente
+bien»), literal: «note un comportamiento de algunos bonotes que no está
+estandarizado. Los botones de las pestañas dentro de inventario y los botones
+de + y -, no se iluminan al ser presionados. Además, los botones de las
+pestañas no tienen el texto en blanco, que es el color del icono de todos los
+demás botones. Estandariza la construcción para todos los botones de ahora en
+adelante (arte pixelart o texto, color, sombra e iluminación, comportamiento,
+etc.) y arregla los que ya mencionados.»
+
+Sus respuestas: la pestaña elegida, encendida como un boton; el panel de
+desarrollo, con el mismo azul; un solo azul para pulsado y encendido.
+
+**Hecho**: la directriz 6 de `docs/guia-de-arte.md` (el estandar entero);
+`.btn` en todos los botones salvo las casillas, con su regla al final del CSS;
+`press-light.ts`, la luz de pulsar de todos (USAR, SALTAR, MODO y ATAQUE ya no
+se encienden por su cuenta); los textos de los botones en su `<span>`. El humo
+mira cada boton que se ve en PC, en el movil y en el panel de desarrollo
+(`buttonStandard`), que la luz de un toque dure y que el + no se quede
+encendido al apagarse en su tope.
+
+---
+
 ## Auditoria al cerrar los ajustes despues de jugar en el movil (2026-10-17)
 
 **El alcance**: de `47c7cc5` a `bf82a04`: la auditoria anterior y los ajustes

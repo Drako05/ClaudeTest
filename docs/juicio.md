@@ -20,6 +20,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 |---|---|---|
 | Botones: **la forma del relieve, por dentro**: un borde de luz de 2 px arriba a la izquierda y uno de sombra de 3 px abajo a la derecha (era, ademas, una sombra dura de 3 px debajo, que sobresalia; retirada por el autor el 2026-10-17); pulsado, encendido o abierto, los bordes se invierten y el icono (o el texto) baja 2 px, el boton quieto. Las esquinas: 12 px, y en proporcion 20 en ATAQUE, 14 en USAR, CORRER y SALTAR y 8 en AUTO SALTO | `docs/controles.md`, los botones | una regla al final del CSS |
 | Botones: **MODO y ENTRADA, con un espacio de 10 px** con USAR, con SALTAR y entre ellos: el de USAR–ATAQUE, que no dio el autor. Lo demas es suyo: el espejo, los 4 px de corrimiento y medir MODO–ENTRADA de esquina a esquina (7,2 px). Lo mas cerca que quedan: ENTRADA a 4,1 px de AUTO SALTO | `docs/controles.md`, MODO y ENTRADA | `--modegap` en el CSS |
+| Botones, el estandar (2026-10-18): **el azul de encendido y pulsado es el de USAR pulsado** (el mas vivo de los dos que habia), y **Tirar deja de ser rojo y Reiniciar de ser azul claro con letra oscura**: «todos los botones» los incluye | `docs/guia-de-arte.md`, directriz 6 | `--btn-lit-bg` y la regla `.btn` del CSS |
 | Recetas: **el ritmo del + y - mantenidos, su ejemplo tal cual**: uno en el acto, 3 el primer segundo, 4 el segundo, 5 el tercero…, a partes iguales dentro de cada segundo y sin tope de ritmo | `docs/recoleccion.md`, fabricar | `qty-hold.ts` |
 | Recetas: **+ y - de 26 px**, apagados tambien en su tope (el + en lo que alcanza, el - en 1); y **la N se queda despues de fabricar**, bajando sola si ya no alcanza | `docs/recoleccion.md`, fabricar | CSS y `inventory-ui.ts` |
 | Recetas: **los diseños de las 6 categorias** (pico y hacha, la mesa de lado, el crisol con la llama, la tunica, el muslo y la espada); los viste en la hoja | `docs/guia-de-arte.md`, directriz 5 | `CATEGORY_ROWS` |
@@ -151,7 +152,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Zona del joystick **sin medir** (antes de que aparezcan los botones tactiles): el cuadrante de antes | Ajustes de la tanda 2, 3.ª ronda | una linea en `gestures.ts` |
 | La **estocada** nace en el punto de pantalla **(0,55; −0,55)** —abajo a la derecha, en coordenadas normalizadas— a la **profundidad de los ojos** (al menos 1 delante de la camara) | Ajustes de la tanda 2, 2.ª ronda | `STAB_SCREEN` en `effects.ts` |
 | Anillos del movil de **80 px** (USAR 64, ATAQUE 96), con un **disco oscuro** detras, **hambre primero** como en PC, a 12 px del borde y 10 entre ellos | Ajustes de la tanda 2, 2.ª ronda | CSS en `index.html` |
-| **TAB** tambien enciende el boton MODO de PC; la luz dura lo que el toque y **al menos 150 ms**, como USAR y SALTAR | Ajustes de la tanda 2, 2.ª ronda | una linea en `controls.ts` |
+| **TAB** tambien enciende el boton MODO de PC, al menos **150 ms**, como un toque | Ajustes de la tanda 2, 2.ª ronda | `flash` en `press-light.ts` |
 | El marco de la **pared** es la cara de cubo tocada: una casilla de ancho y un nivel de alto | Ajustes de la tanda 2 | `overlays.ts` |
 | Lo que no cabe: el golpe **no completa** y el objeto se queda, sin aviso; tirar (soltar fuera del panel y confirmar) lo **hace desaparecer**, hasta que haya objetos en el suelo | Recoleccion y fabricacion | `gathering.ts` / `inventory.ts` |
 | Las **descripciones** de los objetos (una frase cada uno) | Inventario de los bocetos | texto en `inventory-ui.ts` |
@@ -168,7 +169,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El **dibujo nuevo del ataque**: espada con hoja de contorno, guarda y pomo, y pico en media luna; el mango se corta bajo la hoja | Ajustes, 3.ª ronda | SVG en `index.html` |
 | La rueda: **hacia abajo, la siguiente**; **una muesca, una casilla**; un trackpad acumula **50 px** por casilla; da la vuelta | Ajustes, 3.ª ronda | numeros en `controls.ts` |
 | La cruz: **14 px**, blanca con contorno oscuro; se oculta al morir | Ajustes, 3.ª ronda | CSS |
-| USAR y SALTAR encendidos al menos **150 ms** | Ajustes, 3.ª ronda | un numero en `controls.ts` |
+| **Todo boton** pulsado, encendido al menos **150 ms** (eran USAR y SALTAR; desde el 2026-10-18, el estandar de todos) | Ajustes, 3.ª ronda | `FLASH_MS` en `press-light.ts` |
 | El registro de objetos: **3 s** de vida, sube **18 px**, entero el primer 40 % y luego se desvanece; la vieja se va en **0,3 s** al llegar la quinta; letra de **11 px**, ganancias en verde claro y perdidas en rojo claro | Ajustes, 3.ª ronda | numeros en `pickup-feed.ts` y CSS |
 | Sin nada seleccionado, la descripcion queda **vacia**, sin texto de ayuda | Ajustes, 3.ª ronda | una linea |
 | Confirmar al tirar: «¿Tirar N × Objeto?» con **Cancelar** y **Tirar**; tocar fuera cancela; si la casilla cambio entretanto, no se tira nada | Ajustes del inventario | `inventory-ui.ts` |

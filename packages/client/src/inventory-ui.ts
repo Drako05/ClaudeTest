@@ -636,7 +636,7 @@ export class InventoryUi {
     for (let i = 0; i < CATEGORY_SLOTS; i++) {
       const tab = document.createElement('button');
       tab.type = 'button';
-      tab.className = 'slot';
+      tab.className = 'btn slot';
       const cat = categories[i];
       if (cat) {
         // Su icono, monocromo (el autor, 2026-10-17); el nombre, al pasar el
@@ -646,7 +646,7 @@ export class InventoryUi {
         tab.setAttribute('aria-label', cat);
         const art = categoryArt(cat);
         if (art) tab.appendChild(pixelIcon(art, 'catIcon'));
-        else tab.textContent = cat;
+        else tab.appendChild(textSpan(cat));
         tab.addEventListener('click', () => {
           this.category = cat;
           this.buildList();
@@ -688,7 +688,8 @@ export class InventoryUi {
       for (const [label, step] of [['+', 1], ['-', -1]] as const) {
         const b = document.createElement('button');
         b.type = 'button';
-        b.textContent = label;
+        b.className = 'btn';
+        b.appendChild(textSpan(label));
         b.setAttribute('aria-label', step > 0 ? 'Una vez mas' : 'Una vez menos');
         // Mantenido, repite y acelera (el autor, 2026-10-17). El primer paso,
         // en el acto; el teclado (un `click` sin puntero) da uno.
@@ -857,4 +858,14 @@ export class InventoryUi {
     title.textContent = RESOURCE_NAMES[item];
     descEl.append(title, DESCRIPTIONS[item] ?? '');
   }
+}
+
+/**
+ * El texto de un boton va en su propio `<span>` (el estandar de los botones,
+ * 2026-10-18): pulsado, baja lo de dentro, y un texto suelto no se puede mover.
+ */
+function textSpan(text: string): HTMLSpanElement {
+  const span = document.createElement('span');
+  span.textContent = text;
+  return span;
 }

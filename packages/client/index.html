@@ -38,8 +38,6 @@
         -webkit-appearance: none; appearance: none;
         display: flex; align-items: center; justify-content: center;
         width: 44px; height: 44px; padding: 0; border-radius: 50%;
-        color: #e8eef7; background: rgba(8, 14, 28, 0.82);
-        border: 1px solid rgba(140, 190, 255, 0.34);
         backdrop-filter: blur(6px); cursor: pointer;
         touch-action: manipulation;
       }
@@ -56,7 +54,6 @@
       #proj .eye-aim { display: none; }
       #proj.fp .eye-aim { display: inline; }
       #proj.fp .eye-pupil { display: none; }
-      #proj:active { background: rgba(60, 104, 168, .72); }
       /*
         Los mandos del pulgar, segun el boceto del movil del autor: el ATAQUE,
         el mas grande, en la esquina de abajo a la derecha, que es donde cae el
@@ -80,8 +77,6 @@
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         letter-spacing: .08em; text-transform: uppercase;
-        color: #e8eef7; background: rgba(8, 14, 28, 0.82);
-        border: 1px solid rgba(140, 190, 255, 0.34);
         backdrop-filter: blur(6px); cursor: pointer;
         /* `none` y no `manipulation`: el dedo de la accion se arrastra para
            girar la camara, y ningun dedo nacido aqui puede dar permiso al
@@ -93,12 +88,6 @@
          texto (`silhouette-icons.ts`, 2026-10-17). */
       #thumbPad svg, .round svg { display: block; }
       #thumbPad button:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
-      /* Encendido o pulsado: tiene que verse, porque cambia lo que hace el juego. */
-      #thumbPad button.on {
-        background: rgba(60, 104, 168, .86);
-        border-color: rgba(170, 214, 255, .75);
-        color: #f4f9ff;
-      }
       :root { --atk: 96px; --side: 62px; --useb: 64px; }
       #action {
         width: var(--atk); height: var(--atk); font-size: 13px;
@@ -188,12 +177,10 @@
         width: 52px; height: 52px; border-radius: 50%; padding: 0;
         -webkit-appearance: none; appearance: none;
         align-items: center; justify-content: center;
-        overflow: hidden; color: #e8eef7; background: rgba(8, 14, 28, 0.82);
-        border: 1px solid rgba(140, 190, 255, 0.34);
+        overflow: hidden;
         backdrop-filter: blur(6px); cursor: pointer; touch-action: manipulation;
       }
       .round svg { width: 24px; height: 24px; }
-      .round.open { background: rgba(60, 104, 168, .72); }
       body.touch-active .round { display: flex; }
       #others { left: calc(12px + env(safe-area-inset-left)); }
       #invOpen { right: calc(12px + env(safe-area-inset-right)); }
@@ -328,15 +315,12 @@
         width: 44px; height: 44px; border-radius: 12px;
         display: flex; align-items: center; justify-content: center;
         font-size: 22px; line-height: 1; cursor: pointer;
-        color: #e8eef7; background: rgba(8, 14, 28, 0.78);
-        border: 1px solid rgba(140, 190, 255, 0.22);
         backdrop-filter: blur(6px); touch-action: manipulation;
       }
       #hudToggle svg, #devToggle svg, #statsToggle svg { width: 24px; height: 24px; display: block; }
       #hudToggle:focus-visible, #statsToggle:focus-visible, #devToggle:focus-visible {
         outline: 2px solid #8fc4ff; outline-offset: 3px;
       }
-      #hudToggle.open, #statsToggle.open, #devToggle.open { background: rgba(60, 104, 168, .72); }
       /* El de desarrollo es solo del movil (en PC esta F3), y solo con OTROS
          abierto (mas arriba, con la columna). */
       #devToggle { display: none; }
@@ -428,10 +412,6 @@
       #modeBar .mode-precise, #modeTouch .mode-precise { display: none; }
       body.precise #modeBar .mode-sweep, body.precise #modeTouch .mode-sweep { display: none; }
       body.precise #modeBar .mode-precise, body.precise #modeTouch .mode-precise { display: block; }
-      /* MODO se enciende al pulsarlo (pedido del autor), como USAR y SALTAR. */
-      #modeBar.on {
-        background: rgba(60, 104, 168, .86); border-color: rgba(170, 214, 255, .75); color: #f4f9ff;
-      }
       /* La mochila, mas grande que los demas iconos redondos (pedido del autor):
          al doble de su rejilla, que llega justo al borde del redondo. */
       #invOpen svg { width: 48px; height: 48px; }
@@ -600,10 +580,8 @@
       .recipe .qty button {
         -webkit-appearance: none; appearance: none; width: 26px; height: 26px; padding: 0;
         border-radius: 6px; font: 700 16px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        color: #e8eef7; background: rgba(8, 14, 28, 0.82); border: 1px solid rgba(140, 190, 255, 0.34);
         cursor: pointer; touch-action: manipulation;
       }
-      .recipe .qty button:disabled { opacity: .3; cursor: default; }
       /* El icono de cada categoria, a 48 como los objetos. */
       #recipeTabs .slot .catIcon { flex: none; width: 48px; height: 48px; }
       /* Fabricar es mantener pulsado 1 s: la fila se llena de izquierda a
@@ -633,10 +611,8 @@
       #discardAsk button {
         -webkit-appearance: none; appearance: none; margin: 0 6px; padding: 9px 16px;
         border-radius: 8px; font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        color: #e8eef7; background: rgba(60, 104, 168, .5);
-        border: 1px solid rgba(140, 190, 255, 0.34); cursor: pointer; touch-action: manipulation;
+        cursor: pointer; touch-action: manipulation;
       }
-      #discardAsk #discardYes { background: rgba(168, 60, 60, .7); border-color: rgba(255, 160, 160, .5); }
 
       /*
         La barra de la mano: las cuatro primeras casillas, siempre a la vista. En
@@ -711,12 +687,11 @@
         margin: 0 -12px 10px; border-bottom: 1px solid rgba(140, 190, 255, 0.22);
       }
       #invTabs button {
-        -webkit-appearance: none; appearance: none; padding: 14px 0 12px;
-        border: 0; border-bottom: 2px solid transparent; background: none; cursor: pointer;
+        -webkit-appearance: none; appearance: none; padding: 13px 0;
+        cursor: pointer;
         font: 600 16px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        text-align: center; color: rgba(232, 238, 247, .38); touch-action: manipulation;
+        text-align: center; touch-action: manipulation;
       }
-      #invTabs button.on { color: #8fc4ff; border-bottom-color: #8fc4ff; }
       body.touch-active .recipe .ingredients .slot { width: 46px; height: 46px; font-size: 8px; }
 
 
@@ -801,8 +776,7 @@
       #pause span { color: #8fc4ff; }
       #dead p { margin: 0; font-size: 26px; letter-spacing: .1em; color: #ff8080; }
       #dead button {
-        font: inherit; color: #0b1020; background: #8fc4ff; border: 0;
-        padding: 9px 20px; border-radius: 8px; cursor: pointer; font-weight: 700;
+        font: inherit; padding: 9px 20px; border-radius: 8px; cursor: pointer; font-weight: 700;
       }
 
       /* La pista de los gestos, solo con dedos: con teclado la dice la ayuda. */
@@ -930,15 +904,9 @@
       .devRow button {
         flex: 1 1 0; min-width: 0; font: inherit; font-size: 10px;
         padding: 5px 2px; border-radius: 6px; cursor: pointer;
-        color: #e8eef7; background: rgba(255,255,255,.07);
-        border: 1px solid rgba(255,255,255,.14);
         touch-action: manipulation; white-space: nowrap;
       }
       .devRow button:focus-visible { outline: 2px solid #ffc46b; outline-offset: 2px; }
-      .devRow button.on {
-        background: rgba(255, 196, 107, .22); border-color: rgba(255, 196, 107, .55);
-        color: #ffdca6;
-      }
       .devNote { margin: 5px 0 0; font-size: 10px; line-height: 1.4; color: #8b9bb4; }
       /* La leyenda de las cajas, con sus colores de `debug-boxes.ts`. */
       .devNote .boxHit { color: #ff4d4d; }
@@ -958,29 +926,47 @@
       }
 
       /*
-        Todos los botones, cuadrados y con relieve (el autor, 2026-10-17: «darles
-        una pequeña iluminación y sombra para generar la ilusión de relieve que
-        indique "soy un botón que puedes presionar". La ilusión de relieve no
-        debe ir en el dibujo del icono, sino en el botón»). Entra todo lo que se
-        pulsa; no las casillas, que se arrastran, ni los anillos, que indican.
-        Va al final y con los mismos selectores de cada boton, para ganarles.
-
-        La forma del relieve es mia (*deduccion*), y va **solo dentro del boton**
-        (el autor, 2026-10-17: «ya sea sombra o iluminación, estén dibujadas solo
-        en el área del propio botón»): un borde de luz de 2 px arriba a la
-        izquierda y uno de sombra de 3 px abajo a la derecha, que da el grosor.
-        Pulsado, encendido o abierto, **el boton no se mueve**: se invierten sus
-        luces y **baja el icono** 2 px (el autor: «que sea solo el icono quien
-        haga el efecto de bajar»); en los de texto baja el texto.
+        EL BOTON, uno para todos (el autor, 2026-10-18: «Estandariza la
+        construcción para todos los botones de ahora en adelante»; el estandar
+        entero, en `docs/guia-de-arte.md`, «Los botones»). Todo lo que se pulsa
+        lleva `class="btn"`, salvo las casillas, que se arrastran. Aqui va lo que
+        es igual en todos —tinta, fondo, borde, relieve, luz y lo que baja—; cada
+        boton pone solo su tamano, su sitio, sus esquinas y su letra.
+        - Dentro, un icono en pixelart (`<svg data-pixel>`, a multiplo de 24) o
+          un texto en su `<span>`, los dos en la tinta: blanco.
+        - El relieve, solo dentro del boton (el autor, 2026-10-17: «ya sea sombra
+          o iluminación, estén dibujadas solo en el área del propio botón»): luz
+          de 2 px arriba a la izquierda y sombra de 3 abajo a la derecha
+          (*deduccion*).
+        - Pulsado (`:active`, y `.pressed`, que pone `press-light.ts` y dura al
+          menos 150 ms) y encendido o abierto (`.on`, `.open`) se ven igual (el
+          autor: un solo azul): se ilumina, se invierten sus luces y **baja lo de
+          dentro** 2 px; el boton no se mueve (el autor: «que sea solo el icono
+          quien haga el efecto de bajar»).
+        - Apagado (`:disabled`, `.off`): tenue, sin relieve, y no se ilumina.
       */
       :root {
+        --btn-ink: #e8eef7;
+        --btn-bg: rgba(8, 14, 28, .82);
+        --btn-border: rgba(140, 190, 255, .34);
+        --btn-lit-ink: #f4f9ff;
+        --btn-lit-bg: rgba(60, 104, 168, .86);
+        --btn-lit-border: rgba(170, 214, 255, .75);
         --relieve: inset 2px 2px 0 rgba(255, 255, 255, .16), inset -3px -3px 0 rgba(0, 0, 0, .45);
         --hundido: inset 3px 3px 0 rgba(0, 0, 0, .45), inset -2px -2px 0 rgba(255, 255, 255, .1);
       }
-      #proj, #thumbPad button, .round, #hudToggle, #statsToggle, #devToggle,
-      #invTabs button, #recipeTabs .slot, #discardAsk button, #dead button, .devRow button, .recipe .qty button {
-        box-shadow: var(--relieve);
+      .btn {
+        color: var(--btn-ink); background: var(--btn-bg);
+        border: 1px solid var(--btn-border); box-shadow: var(--relieve);
       }
+      /* Un texto suelto no se mueve con `transform`; en su caja, si. */
+      .btn > span { display: inline-block; }
+      .btn:is(:active, .pressed, .on, .open):not(:disabled, .off) {
+        color: var(--btn-lit-ink); background: var(--btn-lit-bg);
+        border-color: var(--btn-lit-border); box-shadow: var(--hundido);
+      }
+      .btn:is(:active, .pressed, .on, .open):not(:disabled, .off) > * { transform: translateY(2px); }
+      .btn:is(:disabled, .off) { opacity: .3; box-shadow: none; cursor: default; }
       /* Las esquinas, las de bioma e informacion (12 px en 44), en proporcion. */
       #proj, #thumbPad button, .round { border-radius: 12px; }
       #thumbPad #action { border-radius: 20px; }
@@ -988,31 +974,6 @@
       #thumbPad #autoJump { border-radius: 8px; }
       #invTabs button { border-radius: 8px; }
       body.touch-active #invTabs { column-gap: 4px; }
-      #recipeTabs .slot.off, .recipe .qty button:disabled { box-shadow: none; }
-      /* Hundido: las luces al reves, y el boton quieto. */
-      #proj:active, #thumbPad button:active, .round:active,
-      #hudToggle:active, #statsToggle:active, #devToggle:active,
-      #invTabs button:active, #recipeTabs .slot:active, #discardAsk button:active, #dead button:active, .devRow button:active,
-      .recipe .qty button:enabled:active,
-      #thumbPad button.on, .round.open, #modeBar.on,
-      #hudToggle.open, #statsToggle.open, #devToggle.open,
-      #invTabs button.on, #recipeTabs .slot.on, .devRow button.on {
-        box-shadow: var(--hundido); transform: none;
-      }
-      /* Lo que baja es el icono: tambien encendido (el autor). */
-      #proj:active > svg, #thumbPad button:active > svg, .round:active > svg,
-      #hudToggle:active > svg, #statsToggle:active > svg, #devToggle:active > svg, #recipeTabs .slot:active > svg,
-      #thumbPad button.on > svg, .round.open > svg, #modeBar.on > svg,
-      #hudToggle.open > svg, #statsToggle.open > svg, #devToggle.open > svg, #recipeTabs .slot.on > svg {
-        transform: translateY(2px);
-      }
-      /* Y en los de texto, el texto: 2 px del relleno de abajo pasan arriba. */
-      #invTabs button:active, #invTabs button.on { padding: 16px 0 10px; }
-      #discardAsk button:active, #dead button:active { padding-top: 11px; padding-bottom: 7px; }
-      .devRow button:active, .devRow button.on { padding-top: 7px; padding-bottom: 3px; }
-      /* + y - miden 26 de alto fijo y su texto va centrado en lo que queda:
-         4 px arriba lo bajan 2. */
-      .recipe .qty button:enabled:active { padding-top: 4px; }
 
     </style>
   </head>
@@ -1027,35 +988,35 @@
            (el autor, 2026-10-17; `silhouette-icons.ts`): cada `data-pixel` se
            rellena al arrancar con su dibujo, y las clases de estado se quedan
            aqui, donde el CSS las alterna. -->
-      <button id="run" type="button" aria-label="Correr" aria-pressed="false">
+      <button class="btn" id="run" type="button" aria-label="Correr" aria-pressed="false">
         <svg data-pixel="run" aria-hidden="true"></svg>
       </button>
-      <button id="jump" type="button" aria-label="Saltar">
+      <button class="btn" id="jump" type="button" aria-label="Saltar">
         <svg data-pixel="jump" aria-hidden="true"></svg>
       </button>
       <!-- AUTO SALTO, montado sobre SALTAR (boceto del autor). Interruptor. -->
-      <button id="autoJump" type="button" aria-label="Auto salto" aria-pressed="false">
+      <button class="btn" id="autoJump" type="button" aria-label="Auto salto" aria-pressed="false">
         <svg data-pixel="autoJump" aria-hidden="true"></svg>
       </button>
       <!-- Una mano abierta. -->
-      <button id="use" type="button" aria-label="Usar">
+      <button class="btn" id="use" type="button" aria-label="Usar">
         <svg data-pixel="use" aria-hidden="true"></svg>
       </button>
       <!-- MODO de golpe, en la diagonal de arriba a la izquierda del ataque y mas
            pequeno que USAR (decision del autor). Los mismos iconos que en PC. -->
-      <button id="modeTouch" class="modeBtn" type="button" aria-pressed="false" aria-label="Modo barrido">
+      <button id="modeTouch" class="btn modeBtn" type="button" aria-pressed="false" aria-label="Modo barrido">
         <svg class="mode-sweep" data-pixel="modeSweep" aria-hidden="true"></svg>
         <svg class="mode-precise" data-pixel="modePrecise" aria-hidden="true"></svg>
       </button>
       <!-- ENTRADA: MIRA (se actua hacia la cruz) o TAP (se actua donde se toca).
            Interruptor, como MODO, y se recuerda (decisiones del autor). -->
-      <button id="inputMode" class="modeBtn" type="button" aria-pressed="false" aria-label="Entrada: mira">
+      <button id="inputMode" class="btn modeBtn" type="button" aria-pressed="false" aria-label="Entrada: mira">
         <svg class="input-aim" data-pixel="inputAim" aria-hidden="true"></svg>
         <!-- Una mano con el indice extendido tocando, y el toque en la punta. -->
         <svg class="input-tap" data-pixel="inputTap" aria-hidden="true"></svg>
       </button>
       <!-- Una espada y un pico cruzados. -->
-      <button id="action" type="button" aria-label="Ataque">
+      <button class="btn" id="action" type="button" aria-label="Ataque">
         <svg data-pixel="action" aria-hidden="true"></svg>
       </button>
     </div>
@@ -1063,7 +1024,7 @@
          cada sistema, y aqui tiene que ir monocromo como el resto de iconos.
          Sus cuatro piezas viven en el mismo SVG y las alternan las clases del
          boton: abierto con su pupila, entornado con `.flat` y la mira con `.fp`. -->
-    <button id="proj" type="button" aria-label="Vista en perspectiva; tocar para ortográfica">
+    <button class="btn" id="proj" type="button" aria-label="Vista en perspectiva; tocar para ortográfica">
       <svg viewBox="0 0 24 24" shape-rendering="crispEdges" aria-hidden="true">
         <g class="eye-open" data-pixel="eyeOpen"></g>
         <g class="eye-pupil" data-pixel="eyePupil"></g>
@@ -1083,7 +1044,7 @@
     </div>
     <!-- El HUD, arriba a la izquierda y cerrado al arrancar. El icono es una
          «i» de informacion, monocroma como el ojo. -->
-    <button id="hudToggle" type="button" aria-expanded="false" aria-controls="hud"
+    <button class="btn" id="hudToggle" type="button" aria-expanded="false" aria-controls="hud"
             aria-label="Mostrar informacion">
       <svg data-pixel="info" aria-hidden="true"></svg>
     <kbd class="btnKey">I</kbd></button>
@@ -1121,9 +1082,9 @@
     <div id="invPanel" hidden>
       <!-- En el movil, una pagina a la vez: se eligen con estas pestanas. -->
       <div id="invTabs" role="tablist">
-        <button type="button" role="tab" data-page="personaje">Personaje</button>
-        <button type="button" role="tab" data-page="inventario" class="on">Inventario</button>
-        <button type="button" role="tab" data-page="recetas">Recetas</button>
+        <button class="btn" type="button" role="tab" data-page="personaje"><span>Personaje</span></button>
+        <button type="button" role="tab" data-page="inventario" class="btn on"><span>Inventario</span></button>
+        <button class="btn" type="button" role="tab" data-page="recetas"><span>Recetas</span></button>
       </div>
       <section class="invPage" data-page="personaje">
         <h2>Personaje</h2>
@@ -1152,7 +1113,7 @@
 
     <!-- Arriba en el movil: OTROS e INVENTARIO. -->
     <!-- Tres barras. -->
-    <button id="others" class="round" type="button" aria-expanded="false" aria-label="Otros">
+    <button id="others" class="btn round" type="button" aria-expanded="false" aria-label="Otros">
       <svg data-pixel="others" aria-hidden="true"></svg>
     </button>
     <!-- La barra de abajo de PC, segun el boceto del autor (2026-09-30): MODO,
@@ -1162,7 +1123,7 @@
          barra y el INVENTARIO van arriba y los anillos no se ven. -->
     <div id="bottomBar">
       <div class="barSide left">
-        <button id="modeBar" class="round modeBtn" type="button" aria-pressed="false" aria-label="Modo barrido">
+        <button id="modeBar" class="btn round modeBtn" type="button" aria-pressed="false" aria-label="Modo barrido">
           <!-- Un tajo curvo (barrido) y una mirilla (preciso): el icono dice el modo. -->
           <svg class="mode-sweep" data-pixel="modeSweep" aria-hidden="true"></svg>
           <svg class="mode-precise" data-pixel="modePrecise" aria-hidden="true"></svg>
@@ -1193,7 +1154,7 @@
       <div class="barSide right">
         <!-- La mochila del hueco Bolso (el autor, 2026-10-17): asa, solapa con
              hebilla, bolsillo delantero y dos laterales. -->
-        <button id="invOpen" class="round" type="button" aria-expanded="false" aria-controls="invPanel" aria-label="Inventario">
+        <button id="invOpen" class="btn round" type="button" aria-expanded="false" aria-controls="invPanel" aria-label="Inventario">
           <svg data-pixel="inventory" aria-hidden="true"></svg>
         <kbd class="btnKey">E</kbd></button>
         <!-- Los botones que vendran (pedido del autor). -->
@@ -1203,16 +1164,16 @@
     <div id="dragGhost"></div>
     <div id="discardAsk" role="alertdialog" aria-labelledby="discardText" hidden>
       <p id="discardText"></p>
-      <button id="discardNo" type="button">Cancelar</button>
-      <button id="discardYes" type="button">Tirar</button>
+      <button class="btn" id="discardNo" type="button"><span>Cancelar</span></button>
+      <button class="btn" id="discardYes" type="button"><span>Tirar</span></button>
     </div>
 
-    <button id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"
+    <button class="btn" id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"
             aria-label="Estado del entorno"><svg data-pixel="biome" aria-hidden="true"></svg><kbd class="btnKey">B</kbd></button>
 
     <!-- El panel de desarrollo en el movil, que no tiene F3: el cuarto de la
          columna de OTROS (pedido del autor, 2026-10-05). Una llave inglesa. -->
-    <button id="devToggle" type="button" aria-expanded="false" aria-label="Desarrollo">
+    <button class="btn" id="devToggle" type="button" aria-expanded="false" aria-label="Desarrollo">
       <svg data-pixel="dev" aria-hidden="true"></svg>
     </button>
 
@@ -1240,7 +1201,7 @@
     </div>
     <div id="dead">
       <p>HAS MUERTO</p>
-      <button id="restart">Reiniciar</button>
+      <button class="btn" id="restart" type="button"><span>Reiniciar</span></button>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
