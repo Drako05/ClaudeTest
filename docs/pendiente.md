@@ -32,6 +32,32 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
+## Los objetos en el suelo (2026-10-18) — en curso
+
+El autor, literal: «en esta tanda quiero abarcar items arrojables. me refiero a
+que los drops al matar, romper, golpear cosas en el mundo, arrojar items desde
+el inventario, etc. todo botin generado debe ser arrojado como items flotantes
+en el suelo. tendran gravedad pero flotaran a 0.2m de la superficie y miraran
+siempre al jugador (billboard). no diran su nombre, solo sera el items».
+
+Sus respuestas (plan aprobado): se recogen solos al acercarse (iman de ~1,5);
+duran para siempre; con el inventario lleno el golpe termina igual; lo
+fabricado que no cabe cae a los pies; el botin salta y se esparce; un monton
+por tipo, y los iguales se funden; tirar lo lanza hacia la mirada y no se deja
+recoger unos 2 s; y mientras flota, sube y baja suave.
+
+**Hecho**: el nucleo (`drop-store.ts`, `systems/drops.ts`, la emision en
+`gathering.ts` y `tick.ts`), el cliente (`drops-view.ts`), los tests
+(`drops.test.ts` y los que esperaban el botin en el inventario, con
+`tests/ground.ts`), el humo (`collect`, que anda hasta los montones, y la
+comprobacion del botin en el suelo en `resources`) y la documentacion
+(`docs/recoleccion.md`, «Objetos en el suelo»).
+
+**Falta**: el visto bueno del autor a la captura (tamaño y vaiven), la CI y
+`main`, y la auditoria.
+
+---
+
 ## Auditoria al cerrar el estandar de los botones (2026-10-18)
 
 **El alcance**: de `bf82a04` a `597b8d4`: la auditoria anterior y el estandar

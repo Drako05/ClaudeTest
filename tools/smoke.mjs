@@ -370,6 +370,52 @@ async function orbit(page, dx) {
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 
 /**
+ * Gira la mirada hasta apuntar a `(x, y)` del suelo. Lo que gira un pixel de
+ * `orbit` se mide la primera vez en cada pagina: depende de la vista.
+ */
+const turnPerPixel = new WeakMap();
+async function faceTo(page, x, y) {
+  const angleOf = (s) => Math.atan2(s.facing[1], s.facing[0]);
+  if (!turnPerPixel.has(page)) {
+    const a = angleOf(await state(page));
+    await orbit(page, 40);
+    await elapse(page, 60);
+    const turned = Math.atan2(Math.sin(angleOf(await state(page)) - a), Math.cos(angleOf(await state(page)) - a));
+    turnPerPixel.set(page, Math.abs(turned) > 1e-3 ? turned / 40 : 0.005);
+  }
+  for (let i = 0; i < 6; i++) {
+    const s = await state(page);
+    const want = Math.atan2(y - s.y, x - s.x);
+    const off = Math.atan2(Math.sin(want - angleOf(s)), Math.cos(want - angleOf(s)));
+    if (Math.abs(off) < 0.1) return;
+    await orbit(page, off / turnPerPixel.get(page));
+    await elapse(page, 60);
+  }
+}
+
+/**
+ * Anda hasta los montones del suelo que hay cerca, para que el iman los
+ * recoja: desde el 2026-10-18 todo botin cae al suelo (el autor). Para en
+ * cuanto se cumple `done`, o cuando no queda nada cerca. Devuelve el estado.
+ */
+async function collect(page, { near = 6, rounds = 10, done = () => false } = {}) {
+  for (let r = 0; r < rounds; r++) {
+    const s = await state(page);
+    if (done(s)) return s;
+    const left = s.drops
+      .map((d) => ({ d, far: Math.hypot(d.x - s.x, d.y - s.y) }))
+      .filter((o) => o.far < near)
+      .sort((p, q) => p.far - q.far);
+    if (left.length === 0) return s;
+    const { d, far } = left[0];
+    await faceTo(page, d.x, d.y);
+    await hold(page, 'KeyW', Math.max(120, Math.min(700, far * 220)));
+    await elapse(page, 500);
+  }
+  return state(page);
+}
+
+/**
  * Anda hasta moverse de verdad, probando direcciones: con agua, arboles y
  * paredes, empenarse en una sola mide el mapa y no el juego.
  */
@@ -411,6 +457,8 @@ async function harvestUntil(page, done, rounds = 8) {
       await strike(page);
       await elapse(page, 260);
     }
+    // Lo que suelta cae al suelo: se va a por ello.
+    await collect(page, { done });
     now = await waitForLoop(page, 20);
     if (done(now)) break;
     if (round % 2 === 1) await orbit(page, 160);
@@ -1336,6 +1384,31 @@ async function resourcesPass(browser, baseUrl) {
   check(berry !== null, 'no se encontro ninguna mata con bayas');
   if (berry) {
     await open(page, baseUrl, `&x=${berry.stand.x}&y=${berry.stand.y}`);
+    // El botin cae al suelo (el autor, 2026-10-18): un golpe a la mata y,
+    // antes de que el iman se lo lleve (medio segundo), se mira. Cada monton
+    // flota a 0,2 de su suelo en el nucleo y se dibuja ahi, mirando a la
+    // camara, con su vaiven de ±0,05 (`drops-view.ts`).
+    await strike(page);
+    await elapse(page, 400);
+    const loot = await state(page);
+    const placedOf = (id) => loot.dropsPlaced.find((p) => p.id === id);
+    const off = loot.drops.map((d) => {
+      const p = placedOf(d.id);
+      return {
+        item: d.item,
+        float: d.z - d.floor,
+        drawn: p ? Math.max(Math.abs(p.x - d.x), Math.abs(p.y - d.y)) : null,
+        bob: p ? p.z - d.z : null,
+        size: p?.size,
+      };
+    });
+    console.log(`  botin de la mata en el suelo: ${JSON.stringify(off.map((o) => ({ ...o, float: +o.float.toFixed(3), bob: o.bob === null ? null : +o.bob.toFixed(3) })))}`);
+    check(loot.drops.length > 0 && loot.inventory[2] === 0, `golpear la mata no dejo su botin en el suelo: ${loot.drops.length} montones, ${loot.inventory[2]} bayas`);
+    check(loot.dropsInScene === loot.drops.length, `no se dibuja cada monton: ${loot.dropsInScene} de ${loot.drops.length}`);
+    check(off.every((o) => Math.abs(o.float - 0.2) < 1e-6), `algun monton no flota a 0,2 de su suelo: ${JSON.stringify(off)}`);
+    check(off.every((o) => o.drawn !== null && o.drawn < 0.02 && Math.abs(o.bob) <= 0.051 && Math.abs(o.size - 0.4) < 1e-6),
+      `algun monton no se dibuja donde esta: ${JSON.stringify(off)}`);
+    await shot(page, '3d-02c-botin.png');
     const withBerries = await harvestUntil(page, (s) => s.inventory[2] > 0, 3);
     console.log(`  mata en ${berry.node.x},${berry.node.y}: ${withBerries.inventory[2]} bayas`);
     check(withBerries.inventory[2] > 0, 'golpear la mata no dio bayas');
@@ -1477,6 +1550,8 @@ async function resourcesPass(browser, baseUrl) {
     await elapse(page, 300);
     const thrown = await state(page);
     check(thrown.itemsSent.discard > made.itemsSent.discard && thrown.inventory[1] === 0, 'confirmar no tiro la piedra');
+    // Tirar la lanza al mundo (el autor, 2026-10-18): ahi esta, entera.
+    check(thrown.drops.some((d) => d.item === 1 && d.count === 2), `tirar no dejo la piedra en el suelo: ${JSON.stringify(thrown.drops)}`);
     // Con el inventario abierto, de la rejilla a la barra de la mano: el pico,
     // a su cuarta casilla.
     if (pickSlot !== 3) {
@@ -1491,11 +1566,14 @@ async function resourcesPass(browser, baseUrl) {
     // Con el pico, golpe a golpe: el hierro pide uno mejor, lo demas sale.
     const iron = mineral.kind.includes('hierro');
     let mined = await state(page);
-    for (let i = 0; i < 10 && ores(mined) === 0; i++) {
+    const oreDropped = (s) => s.drops.some((d) => d.item >= 5 && d.item <= 7);
+    for (let i = 0; i < 10 && ores(mined) === 0 && !oreDropped(mined); i++) {
       await strike(page);
       await elapse(page, 260);
       mined = await state(page);
     }
+    // El mineral cae al suelo: a por el.
+    if (oreDropped(mined)) mined = await collect(page);
     await shot(page, '3d-03-montana.png');
     const pickNow = mined.slots.findIndex((s) => s.item === 11);
     console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickNow]?.wear}, esquirlas ${mined.chipsDrawn}`);
@@ -3145,7 +3223,11 @@ async function faunaPass(browser, baseUrl) {
   console.log(`  caza: especie ${prey.species}, etapa ${prey.stage}, ${prey.maxHealth} PV; muertos ${now.animalsKilled}, ` +
     `carne cruda ${now.inventory[22] ?? 0}, esquirlas ${now.chipsDrawn}, escombros ${now.debrisDrawn}`);
   check(now.animalsKilled === 1, 'golpear a la presa no la mato');
-  check((now.inventory[22] ?? 0) >= 1, 'matar a la presa no dio carne cruda');
+  // Su carne cae al suelo (el autor, 2026-10-18), y se recoge yendo a por ella.
+  check(now.drops.some((d) => d.item === 22), 'matar a la presa no solto carne cruda al suelo');
+  const fed = await collect(page, { done: (s) => (s.inventory[22] ?? 0) >= 1 });
+  console.log(`  carne cruda recogida: ${fed.inventory[22] ?? 0}`);
+  check((fed.inventory[22] ?? 0) >= 1, 'la carne cruda de la presa no se pudo recoger');
   check(!now.fauna.some((a) => a.key === prey.key), 'la presa muerta sigue en el mundo');
   // Un animal no suelta fragmentos, ni golpeado ni al morir: solo su impacto
   // (decision del autor, 2026-10-03). En preciso solo cuenta la presa, asi que

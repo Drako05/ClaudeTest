@@ -49,6 +49,7 @@ import {
   toolStats,
   type Intent,
 } from '@verdant/shared';
+import { groundCount } from './ground.js';
 
 /**
  * La fauna de la primera tanda (plan aprobado por el autor, 2026-10-02): diez
@@ -398,7 +399,8 @@ describe('Fauna: cazar', () => {
       killed = state.lastAnimalHits.some((h) => h.killed);
     }
     expect(killed).toBe(true);
-    for (const b of animalLoot(animal.species, animal.stage)) expect(state.inventory.count(b.item)).toBe(b.count);
+    // Su botin, entero, al suelo (el autor, 2026-10-18).
+    for (const b of animalLoot(animal.species, animal.stage)) expect(groundCount(state.world, b.item)).toBe(b.count);
     expect(state.fauna.has(animal.key)).toBe(false);
     expect(state.world.isFaunaDead(animal.key)).toBe(true);
 
@@ -504,16 +506,16 @@ describe('Fauna: cazar', () => {
     expect(inv.weapon()).toBeNull();
   });
 
-  it('con el inventario lleno el golpe que mataria no completa, y el animal sigue', () => {
+  it('con el inventario lleno el golpe que mata completa igual, y el botin se queda en el suelo', () => {
     const state = createGame(1);
     for (let i = 0; i < 16; i++) state.inventory.add(Resource.Stone, 100);
     const id = someAnimal(state, (a) => state.entities.animal[a]!.species !== Species.Crab);
-    const key = state.entities.animal[id]!.key;
+    const animal = state.entities.animal[id]!;
     state.entities.health[id] = 1;
     step(state, aimAt(state, id));
-    expect(state.lastBlocked).toBe('full');
-    expect(state.world.isFaunaDead(key)).toBe(false);
-    expect(state.fauna.get(key)).toBe(id);
-    expect(state.entities.health[id]).toBe(1);
+    expect(state.lastBlocked).toBeNull();
+    expect(state.world.isFaunaDead(animal.key)).toBe(true);
+    expect(state.fauna.has(animal.key)).toBe(false);
+    for (const b of animalLoot(animal.species, animal.stage)) expect(groundCount(state.world, b.item)).toBe(b.count);
   });
 });

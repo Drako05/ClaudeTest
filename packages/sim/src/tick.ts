@@ -32,6 +32,7 @@ import { toChunkCoord, World } from './world.js';
 import type { Vec3 } from './aim.js';
 import { settleFauna, stepFauna, syncFauna, type FaunaIndex } from './systems/wander.js';
 import { pushBodies } from './systems/push.js';
+import { collectDrops, stepDrops, throwFrom } from './systems/drops.js';
 
 /** Radio de chunks mantenidos cargados alrededor del jugador. */
 export const STREAM_RADIUS_CHUNKS = 3;
@@ -64,7 +65,7 @@ export interface GameState {
    * mirada, o `null`. Efimero: el cliente la deja caer desde ahi.
    */
   lastPlaced: Placed | null;
-  /** Por que el ultimo golpe no hizo algo (inventario lleno, falta pico). Efimero. */
+  /** Por que el ultimo golpe no hizo algo (falta pico, o uno mejor). Efimero. */
   lastBlocked: Blocked | null;
   /** True si en el ultimo tick se rompio la herramienta de la mano. Efimero. */
   lastBroke: boolean;
@@ -221,11 +222,15 @@ export function step(state: GameState, intent: Intent): void {
     // mismo tick golpea ya con ella.
     if (intent.select >= 0) inventory.select(intent.select);
     if (intent.moveFrom >= 0 && intent.moveTo >= 0) inventory.move(intent.moveFrom, intent.moveTo);
-    if (intent.discard >= 0) inventory.discard(intent.discard);
+    // Tirar lo lanza hacia la mirada (el autor, 2026-10-18), con la mirada
+    // de este tick, que ya esta puesta.
+    if (intent.discard >= 0) {
+      const thrown = inventory.discard(intent.discard);
+      if (thrown) throwFrom(world, entities, playerId, thrown, state.tick);
+    }
     if (intent.craft >= 0) {
-      const crafted = craftNear(world, entities, playerId, inventory, intent.craft, intent.craftTimes);
+      const crafted = craftNear(world, entities, playerId, inventory, intent.craft, intent.craftTimes, state.tick);
       if (crafted === 'ok') state.lastCrafted = intent.craft;
-      else if (crafted === 'full') state.lastBlocked = 'full';
     }
 
     if (intent.harvest) {
@@ -264,6 +269,11 @@ export function step(state: GameState, intent: Intent): void {
     }
   }
 
+  // Lo suelto cae, y el jugador recoge lo que tiene cerca: despues de todo lo
+  // que suelta botin, para que salga de este tick con su primer paso dado.
+  stepDrops(world);
+  collectDrops(world, entities, playerId, inventory, state.tick);
+
   streamChunks(state);
   state.tick++;
 }
@@ -296,6 +306,10 @@ export function skipTime(state: GameState, ticks: number): void {
     // caso normal de usar el panel.
     applyVertical(state.world, state.entities, state.playerId, TICK_DT);
     if (!state.survivalFrozen) updateSurvival(state.entities, state.playerId, TICK_DT);
+    // Lo suelto tambien cae y se recoge, como viviendolo quieto: lo que estaba
+    // en el aire se posa, y lo que se dejaba recoger cerca, entra.
+    stepDrops(state.world);
+    collectDrops(state.world, state.entities, state.playerId, state.inventory, state.tick);
     state.tick++;
   }
   // La fauna no se anda tick a tick —un dia saltado serian millones de pasos—:

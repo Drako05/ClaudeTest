@@ -1,0 +1,244 @@
+/**
+ * Los objetos sueltos en el mundo: de donde salen, como caen y como se recogen
+ * (el autor, 2026-10-18: «todo botin generado debe ser arrojado como items
+ * flotantes en el suelo. tendran gravedad pero flotaran a 0.2m de la
+ * superficie»). Los datos, en `drop-store.ts`.
+ *
+ * Del autor: caen con la gravedad y flotan a 0,2 de su suelo; el botin **salta
+ * y se esparce** al salir; lo tirado **se lanza hacia la mirada** y no se deja
+ * recoger unos 2 s; se recogen **solos, al acercarse** (un iman de unos 1,5
+ * bloques) y entra lo que quepa; un monton por tipo, y **dos iguales que se
+ * juntan se funden**; y duran para siempre.
+ *
+ * Todo lo que no es eso es **deduccion mia** (`docs/juicio.md`), y cada numero
+ * lo dice. El azar sale de la semilla y del tick (regla 2), nunca de
+ * `Math.random`.
+ */
+
+import { stackMax, TICK_DT, TICK_HZ, toolStats, type Resource } from '@verdant/shared';
+import { EYE_HEIGHT } from '../aim.js';
+import { PLAYER_HEIGHT, squareFloor } from '../boxes.js';
+import { DROP_HALF, type Drop } from '../drop-store.js';
+import type { EntityStore } from '../entities.js';
+import type { Bundle, Inventory, Thrown } from '../inventory.js';
+import { WATER_SURFACE } from '../relief.js';
+import { hash2DFloat } from '../rng.js';
+import type { World } from '../world.js';
+import { GRAVITY } from './jump.js';
+
+/** A cuanto de su suelo flota un monton posado, en bloques (el autor: 0,2 m). */
+export const DROP_FLOAT = 0.2;
+/** Hasta donde llega el iman, desde el cuerpo (el autor: «aprox. 1,5 bloques»). */
+export const PICKUP_RADIUS = 1.5;
+/** Lo deprisa que vuela hacia el jugador lo que se recoge, en bloques/s. **Deduccion mia.** */
+export const HOMING_SPEED = 8;
+/** A cuanto se funden dos montones iguales posados. **Deduccion mia.** */
+export const MERGE_RADIUS = 0.5;
+/** El salto del botin al salir: hacia arriba, y hacia un lado entre los dos. **Deduccion mia.** */
+export const SCATTER_UP = 3;
+export const SCATTER_SIDE_MIN = 1;
+export const SCATTER_SIDE_MAX = 1.5;
+/**
+ * Lo que tarda el botin en dejarse recoger: el medio segundo en que se le ve
+ * saltar, que si no el iman se lo llevaria antes de verlo. **Deduccion mia.**
+ */
+export const LOOT_DELAY_TICKS = Math.round(TICK_HZ / 2);
+/** Lo tirado: su velocidad hacia la mirada y su empuje hacia arriba. Cae a unos 2 bloques. **Deduccion mia.** */
+export const THROW_SPEED = 6;
+export const THROW_UP = 3;
+/** Lo tirado no se deja recoger durante unos 2 s (el autor). */
+export const THROW_DELAY_TICKS = 2 * TICK_HZ;
+
+/**
+ * El suelo de un monton: el de su huella, terreno o caja solida (`squareFloor`,
+ * como el de un cuerpo), y sobre el agua, su superficie: lo que cae al agua
+ * flota en ella. **Deduccion mia.**
+ */
+export function dropFloor(world: World, x: number, y: number): number {
+  const floor = squareFloor(world, x, y, DROP_HALF);
+  return world.isTerrainSolidAt(x, y) ? Math.max(floor, WATER_SURFACE) : floor;
+}
+
+/** Lo que trae un objeto nuevo al soltarlo: una herramienta, todos sus usos. */
+function freshWear(item: Resource): number {
+  return toolStats(item)?.uses ?? 0;
+}
+
+/**
+ * Suelta un botin desde un punto, con su salto: cada monton, hacia un lado
+ * distinto, sacado de la semilla, del tick y de `salt` (de donde sale).
+ */
+export function scatterLoot(
+  world: World,
+  loot: readonly Bundle[],
+  at: { x: number; y: number; z: number },
+  tick: number,
+  salt: number,
+): void {
+  loot.forEach((b, k) => {
+    if (b.count <= 0) return;
+    const turn = hash2DFloat(world.seed ^ 0x3c6ef372, tick * 16 + k, salt) * Math.PI * 2;
+    const side = SCATTER_SIDE_MIN + hash2DFloat(world.seed ^ 0x1b873593, tick * 16 + k, salt) * (SCATTER_SIDE_MAX - SCATTER_SIDE_MIN);
+    world.drops.add({
+      item: b.item,
+      count: b.count,
+      wear: freshWear(b.item),
+      x: at.x,
+      y: at.y,
+      z: at.z,
+      vx: Math.cos(turn) * side,
+      vy: Math.sin(turn) * side,
+      vz: SCATTER_UP,
+      pickableAt: tick + LOOT_DELAY_TICKS,
+    });
+  });
+}
+
+/**
+ * Lo que no cabe en el inventario, a los pies del jugador (el autor: lo
+ * fabricado que no cabe cae a los pies). Sin salto, y recogible en el acto:
+ * no cabia, asi que el iman no lo coge hasta que haya sitio.
+ */
+export function dropAtFeet(world: World, store: EntityStore, id: number, item: Resource, count: number, tick: number): void {
+  if (count <= 0) return;
+  world.drops.add({
+    item,
+    count,
+    wear: freshWear(item),
+    x: store.x[id],
+    y: store.y[id],
+    z: store.z[id] + 0.5,
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    pickableAt: tick,
+  });
+}
+
+/**
+ * Lanza lo tirado desde los ojos hacia la mirada, en un arco corto (el autor).
+ * Sale un poco por delante de la cara, para no nacer dentro de la cabeza.
+ */
+export function throwFrom(world: World, store: EntityStore, id: number, thrown: Thrown, tick: number): void {
+  const up = Math.max(-1, Math.min(1, store.lookZ[id]));
+  const flat = Math.sqrt(1 - up * up);
+  const dx = store.facingX[id] * flat;
+  const dy = store.facingY[id] * flat;
+  world.drops.add({
+    item: thrown.item,
+    count: thrown.count,
+    wear: thrown.wear,
+    x: store.x[id] + dx * 0.4,
+    y: store.y[id] + dy * 0.4,
+    z: store.z[id] + EYE_HEIGHT - 0.3 + up * 0.4,
+    vx: dx * THROW_SPEED,
+    vy: dy * THROW_SPEED,
+    vz: up * THROW_SPEED + THROW_UP,
+    pickableAt: tick + THROW_DELAY_TICKS,
+  });
+}
+
+/** Un tick de caida de un monton suelto: gravedad, paredes y posarse. */
+function fall(world: World, d: Drop, dt: number): void {
+  d.vz -= GRAVITY * dt;
+  if (d.vx !== 0 || d.vy !== 0) {
+    const nx = d.x + d.vx * dt;
+    const ny = d.y + d.vy * dt;
+    // Contra una pared mas alta que el, se para en seco y cae.
+    if (dropFloor(world, nx, ny) > d.z) {
+      d.vx = 0;
+      d.vy = 0;
+    } else {
+      d.x = nx;
+      d.y = ny;
+    }
+  }
+  d.z += d.vz * dt;
+  const rest = dropFloor(world, d.x, d.y) + DROP_FLOAT;
+  if (d.z <= rest && d.vz <= 0) {
+    d.z = rest;
+    d.vx = 0;
+    d.vy = 0;
+    d.vz = 0;
+    d.resting = true;
+    merge(world, d);
+  }
+}
+
+/**
+ * Un monton que se posa junto a otro igual se funde con el (el autor): el
+ * viejo se queda con todo. Las herramientas no, que cada una lleva su
+ * desgaste.
+ */
+function merge(world: World, d: Drop): void {
+  if (stackMax(d.item) <= 1) return;
+  for (const o of world.drops.values()) {
+    if (o === d || !o.resting || o.homing || o.item !== d.item) continue;
+    if (Math.hypot(o.x - d.x, o.y - d.y) > MERGE_RADIUS || Math.abs(o.z - d.z) > MERGE_RADIUS) continue;
+    o.count += d.count;
+    // Lo recien tirado no se vuelve recogible por caer junto a otro.
+    o.pickableAt = Math.max(o.pickableAt, d.pickableAt);
+    world.drops.remove(d.id);
+    return;
+  }
+}
+
+/** Avanza la caida de todo lo que no esta posado ni volando hacia el jugador. */
+export function stepDrops(world: World, dt: number = TICK_DT): void {
+  if (world.drops.size === 0) return;
+  for (const d of world.drops.values()) {
+    if (!d.resting && !d.homing) fall(world, d, dt);
+  }
+}
+
+/** Lo lejos que esta un punto del cuerpo del jugador: de su eje, entre los pies y la cabeza. */
+function fromBody(store: EntityStore, id: number, x: number, y: number, z: number): number {
+  const feet = store.z[id];
+  const dz = z < feet ? feet - z : z > feet + PLAYER_HEIGHT ? z - feet - PLAYER_HEIGHT : 0;
+  return Math.hypot(x - store.x[id], y - store.y[id], dz);
+}
+
+/**
+ * El iman (el autor: «solo, al acercarse»): lo recogible a `PICKUP_RADIUS` del
+ * cuerpo, del que quepa algo, vuela hacia el pecho a `HOMING_SPEED` y, al
+ * llegar, entra lo que quepa; el resto vuelve a caer y se queda en el suelo.
+ * Si el jugador se aleja o el inventario se llena por el camino, lo suelta.
+ */
+export function collectDrops(world: World, store: EntityStore, id: number, inventory: Inventory, tick: number, dt: number = TICK_DT): void {
+  if (world.drops.size === 0 || !store.alive[id]) return;
+  const chestZ = store.z[id] + PLAYER_HEIGHT / 2;
+  const step = HOMING_SPEED * dt;
+  for (const d of world.drops.values()) {
+    const far = fromBody(store, id, d.x, d.y, d.z);
+    if (!d.homing) {
+      if (tick < d.pickableAt || far > PICKUP_RADIUS || inventory.room(d.item) === 0) continue;
+      d.homing = true;
+      d.resting = false;
+      d.vx = 0;
+      d.vy = 0;
+      d.vz = 0;
+    }
+    if (far > PICKUP_RADIUS * 2 || inventory.room(d.item) === 0) {
+      d.homing = false;
+      continue;
+    }
+    const gx = store.x[id] - d.x;
+    const gy = store.y[id] - d.y;
+    const gz = chestZ - d.z;
+    const gap = Math.hypot(gx, gy, gz);
+    if (gap > step) {
+      d.x += (gx / gap) * step;
+      d.y += (gy / gap) * step;
+      d.z += (gz / gap) * step;
+      continue;
+    }
+    d.count -= inventory.addSome(d.item, d.count, d.wear);
+    if (d.count <= 0) {
+      world.drops.remove(d.id);
+    } else {
+      // No cupo todo: lo que queda cae donde esta.
+      d.homing = false;
+      d.resting = false;
+    }
+  }
+}

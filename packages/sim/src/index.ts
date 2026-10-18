@@ -30,3 +30,5 @@ export * from './systems/gathering.js';
 export * from './fauna.js';
 export * from './systems/wander.js';
 export * from './systems/push.js';
+export * from './drop-store.js';
+export * from './systems/drops.js';

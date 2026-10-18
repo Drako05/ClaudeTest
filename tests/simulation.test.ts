@@ -34,6 +34,7 @@ import {
   TICK_HZ,
   type Intent,
 } from '@verdant/shared';
+import { groundCount } from './ground.js';
 
 function intent(over: Partial<Intent> = {}): Intent {
   return { ...emptyIntent(), ...over };
@@ -564,7 +565,8 @@ describe('Mirada y golpe', () => {
     for (const r of rocks) expect(world.featureAt(r.x, r.y)).toBe(Feature.None);
     expect(world.featureAt(x + 3, y)).toBe(Feature.RockNode);
     const reported = results.reduce((sum, r) => sum + r.amount + r.seeds, 0);
-    expect(inventory.count(Resource.Stone)).toBe(reported);
+    // Todo al suelo (el autor, 2026-10-18), sumado.
+    expect(groundCount(world, Resource.Stone)).toBe(reported);
     // Un uso por golpe que toca algo, alcance a una roca o a tres.
     expect(inventory.wear[0]).toBe(40 - 3);
   });

@@ -60,6 +60,8 @@ import {
   skipTime,
   step,
   toChunkCoord,
+  WATER_SURFACE,
+  dropFloor,
   type GameState,
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
@@ -71,6 +73,7 @@ import { EffectsView } from './effects-view.js';
 import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { FaunaView } from './fauna-view.js';
+import { DropsView } from './drops-view.js';
 import { faunaGallery } from './fauna-gallery.js';
 import { showIconSheet } from './icon-sheet.js';
 import { itemIcon } from './item-icons.js';
@@ -121,8 +124,6 @@ bindPressLight(document);
 
 /** Radio de chunks que se mallan alrededor del jugador. */
 const RADIUS = 3;
-/** Altura del plano de agua, justo bajo el nivel donde empieza la tierra. */
-const WATER_Y = -0.18;
 
 /** Techo de tiempo por frame. Sin esto, una pausa larga de la pestana dispara
  *  cientos de ticks de golpe y el juego se congela intentando ponerse al dia. */
@@ -438,6 +439,8 @@ const billboards = new BillboardSet();
 const stations = new StationSet();
 /** La fauna que anda cerca del jugador (`fauna-view.ts`). */
 const faunaView = new FaunaView(scene);
+/** Los objetos sueltos en el suelo (`drops-view.ts`). */
+const dropsView = new DropsView(scene);
 /** Sin animales dibujados con `?fauna=0` (`start.ts`), para medir sin ellos. */
 const showFauna = faunaShownFromLocation();
 /** Del golpe, solo el barrido con `?efectos=barrido` (`start.ts`), para medirlo solo. */
@@ -683,6 +686,7 @@ function restart(): void {
   overlays.reset();
   debugBoxes.clear();
   faunaView.clear();
+  dropsView.clear();
   state = startGame(seed, false, RADIUS);
   // Un mundo nuevo empieza sin nada: eso no es perder lo que se llevaba.
   feed.clear();
@@ -935,6 +939,7 @@ function runFrame(now: number, draw: boolean): void {
         : null;
     // Lo de antes del tick, para dibujar entre este y el siguiente (`smooth.ts`).
     interp.capture(drawnIds(), state.entities.x, state.entities.y, state.entities.z);
+    dropsView.capture(state.world.drops);
     step(state, intent);
     // La estacion recien puesta cae desde donde la toco la mirada (pedido del
     // autor: todo tiene gravedad). Solo se ve: el nucleo ya la tiene en su sitio.
@@ -1067,7 +1072,7 @@ function runFrame(now: number, draw: boolean): void {
   const px = body.x;
   const py = body.y;
   const ph = body.z;
-  water.position.set(px, WATER_Y, py);
+  water.position.set(px, WATER_SURFACE, py);
 
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -1086,6 +1091,8 @@ function runFrame(now: number, draw: boolean): void {
   // La fauna, cada modelo en sus pies —interpolados, como el jugador— y
   // girado con su rumbo.
   if (showFauna) faunaView.update(state.fauna, state.entities, drawnAt);
+  // Lo suelto, mirando a la camara y con su vaiven.
+  dropsView.update(state.world.drops, alpha, clock.now() / 1000);
   if (player) {
     billboards.moveTo(player, px, ph, py);
     // Desde dentro no se dibuja el cuerpo: en primera persona, y cuando la
@@ -1300,6 +1307,14 @@ Object.defineProperty(window, '__verdant', {
       })),
       faunaInScene: faunaView.count,
       faunaDrawn: faunaView.drawnTotal,
+      // Lo suelto: lo que dice el nucleo y lo que se dibuja.
+      drops: [...state.world.drops.values()].map((d) => ({
+        id: d.id, item: d.item, count: d.count, x: d.x, y: d.y, z: d.z, resting: d.resting,
+        floor: dropFloor(state.world, d.x, d.y),
+      })),
+      dropsInScene: dropsView.count,
+      dropsDrawn: dropsView.drawnTotal,
+      dropsPlaced: dropsView.placed,
       animalsKilled,
       faunaSizes: faunaView.sizes,
       faunaYaws: faunaView.yaws,

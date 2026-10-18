@@ -168,8 +168,9 @@ Que se hace con ello:
 - **Comer** con USAR la asada: llena **35** de hambre *(deduccion)*. Las bayas
   llenan 14, y la carne cocinada tiene unas cinco veces mas calorias por peso,
   rebajado a la mitad. La cruda no se come.
-- **Un botin entra entero o no entra**, como en la recoleccion: si no cabe, el
-  golpe que mataria no completa y el animal sigue con su daño.
+- **Su botin cae al suelo** al morir (el autor, 2026-10-18), con su salto,
+  quepa o no en el inventario: el golpe que lo mata completa siempre
+  (`docs/recoleccion.md`, «Objetos en el suelo»).
 - **Piel, plumas y caparazon esperan su uso** en `AWAITING_USE`. El test de
   «todo recurso tiene destino» solo los deja pasar por estar ahi con su nombre,
   y cae si un objeto de esa lista ya tiene uso (para que la lista no mienta).
@@ -494,7 +495,8 @@ cinco casos de terreno: nada mal tapado ni mal visto.
   - el daño que se olvida al recargar: el del animal y el de un arbol;
   - el impacto, sobre la caja de lo golpeado, uno por objetivo;
   - que lo muerto no vuelve;
-  - que con el inventario lleno el golpe que mataria no completa.
+  - que con el inventario lleno el golpe que mata completa igual, y su botin
+    se queda en el suelo.
 - **`tests/world-laws.test.ts`**: que la fauna no reaparece, y el destino de
   los recursos con su lista de pendientes.
 - **`tests/fauna-body.test.ts`** mide:

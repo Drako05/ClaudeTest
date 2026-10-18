@@ -70,8 +70,9 @@ Decisiones del autor, que no se tocan sin preguntarle:
   (`silhouette-icons.ts`, `CATEGORY_ROWS`), con el nombre al pasar el raton.
 - **No hay avisos en pantalla** (decision del autor, 2026-09-29): ni «necesitas
   un pico», ni «inventario lleno», ni «fabricado». El nucleo sigue dejando
-  `lastBlocked`, pero nadie lo pinta. Fabricar sin sitio se resolvera en otra
-  tanda, con objetos que se tiran al suelo.
+  `lastBlocked`, pero nadie lo pinta. **Fabricar sin sitio fabrica igual**, y
+  lo que no cabe cae a los pies (el autor, 2026-10-18; «Objetos en el suelo»,
+  abajo).
 - **Lo que entra y sale del inventario sale escrito**: «+5 Madera», «-1
   Bayas», **con el icono del objeto entre la cantidad y el nombre** (el autor,
   2026-10-17: icono y texto; la linea mide 26 px para el icono de 24, *deduccion*), en letra pequena debajo del boton INVENTARIO en el movil, subiendo
@@ -111,9 +112,9 @@ Decisiones del autor, que no se tocan sin preguntarle:
 
 Lo que el codigo tiene que respetar:
 
-- **Un botin entra entero o no entra** (`Inventory.fits`): si no cabe, el golpe
-  no completa y el objeto se queda en el mundo, con su dano, para acabarlo en
-  cuanto haya sitio. Nada se reparte a medias ni se pierde.
+- **Todo botin cae al suelo** (el autor, 2026-10-18), y el golpe completa
+  siempre, quepa o no en el inventario: «Objetos en el suelo», abajo. Nada se
+  pierde.
 - **El dano acumulado y las ramas arrancadas viven en `WorkState`**, fuera del
   chunk como el overlay (regla 4). El dano se pierde a los `DAMAGE_DECAY_TICKS`
   sin golpear, y tambien **al descargarse su chunk** (`forgetUnloadedDamage`,
@@ -235,3 +236,43 @@ Para probar sin juntarlo todo a mano, el panel de desarrollo tiene
 **«Materiales de piedra»**: da materiales, no herramientas, para que fabricar
 se pruebe de verdad. El humo lo usa para minar con un pico fabricado desde el
 panel.
+
+## Objetos en el suelo (2026-10-18)
+
+El autor: «todo botin generado debe ser arrojado como items flotantes en el
+suelo. tendran gravedad pero flotaran a 0.2m de la superficie y miraran siempre
+al jugador (billboard). no diran su nombre, solo sera el items». Es todo lo que
+suelta romper, talar, golpear un arbol sin hacha o matar, lo fabricado que no
+cabe y lo que se tira desde el inventario.
+
+**Del autor** (sus respuestas del 2026-10-18):
+- **Se recogen solos, al acercarse**: a 1,5 bloques del cuerpo, lo que se
+  deja recoger vuela al jugador y entra lo que quepa; el resto se queda.
+- **Duran para siempre**: aunque se aleje uno hasta descargar su chunk.
+- **Inventario lleno: el golpe termina igual** y el botin se queda en el suelo.
+- **Lo fabricado que no cabe cae a los pies.**
+- **El botin salta y se esparce** al salir, cada monton hacia su lado, y se
+  posa flotando a 0,2 m de su suelo.
+- **Un monton por tipo de objeto**, con su cantidad, y **dos iguales que se
+  posan juntos se funden**.
+- **Tirar lo lanza hacia la mirada**, en un arco corto, y no se deja recoger
+  durante unos 2 s.
+- **Mientras flota, sube y baja suave**, y mira siempre a la camara. Sin
+  nombre ni numero: solo el icono del objeto, el del inventario.
+
+**Como esta hecho**:
+- El nucleo: `sim/drop-store.ts` (los datos, en el `World`, fuera de los
+  chunks como el overlay) y `sim/systems/drops.ts`. Contiene la caida con la
+  misma gravedad que los cuerpos, el suelo de su huella (`squareFloor`) o la
+  superficie del agua, el iman (`collectDrops`), el salto del botin
+  (`scatterLoot`), lo tirado (`throwFrom`) y lo que no cabe (`dropAtFeet`).
+- Lo que reposa no se simula. Al cambiar una casilla (se tala, se coloca, crece
+  algo) se despierta lo que reposaba en ella, que vuelve a caer.
+- `skipTime` los hace caer y recoger tick a tick, como vivirlo quieto.
+- El cliente: `drops-view.ts`, un `Sprite` por monton con el icono rasterizado
+  a 24 × 24, interpolado entre ticks y con su vaiven.
+- Las herramientas no se funden, y tiradas **conservan su desgaste**.
+- Los numeros que no dio el autor son *deduccion* (`docs/juicio.md`): el
+  medio segundo antes de dejarse recoger el botin, las velocidades, la huella,
+  el radio de fundir, el tamaño del icono y su vaiven, y flotar en el agua.
+

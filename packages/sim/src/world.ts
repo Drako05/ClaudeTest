@@ -45,6 +45,7 @@ import {
 } from '@verdant/shared';
 import { collectBiome, type BiomeStats } from './biome.js';
 import { chunkKey, localCoord, toChunkCoord } from './coords.js';
+import { DropStore } from './drop-store.js';
 import { canClimbTo, topOf, VOXELS_PER_TILE, voxelOf, WATER_HEIGHT } from './relief.js';
 
 /**
@@ -152,6 +153,11 @@ export class World {
    * olvida al retirarla (decision del autor, 2026-10-03).
    */
   private readonly faunaDead = new Set<string>();
+  /**
+   * Los objetos sueltos (`drop-store.ts`): fuera de los chunks, como el resto
+   * del overlay (regla 4), porque duran para siempre (el autor, 2026-10-18).
+   */
+  readonly drops = new DropStore();
   /** Los animales de cada chunk cargado. Cache: `faunaOf` es pura. */
   private readonly faunaCache = new Map<string, Animal[]>();
   /** Estadisticas de bioma memorizadas; se vacian cuando algo cambia. */
@@ -486,6 +492,10 @@ export class World {
       this.saplings.delete(`${wx},${wy}`);
       // Desmontar una estacion se lleva su frente.
       this.facings.delete(`${wx},${wy}`);
+    }
+    // Lo que reposaba ahi, o encima, ya no tiene el mismo suelo.
+    if (this.drops.size > 0) {
+      this.drops.wake(chunk.cx * CHUNK_SIZE + (idx % CHUNK_SIZE), chunk.cy * CHUNK_SIZE + Math.floor(idx / CHUNK_SIZE));
     }
 
     chunk.revision++;

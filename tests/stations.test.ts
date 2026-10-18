@@ -28,6 +28,7 @@ import {
   EQUIP_COUNT,
   type Intent,
 } from '@verdant/shared';
+import { collectAll, groundCount } from './ground.js';
 
 /**
  * La tanda 2 de fabricacion: mesa, horno, metales y ropa. Decisiones del autor
@@ -65,9 +66,13 @@ function use(state: GameState, dx: number, dy: number, down: number): void {
   act(state, { use: true, aimX: dx, aimY: dy, aimZ: Math.sin((-down * Math.PI) / 180) });
 }
 
-/** Un golpe hacia `(dx, dy)` bajando `down` grados. */
+/**
+ * Un golpe hacia `(dx, dy)` bajando `down` grados. Lo que suelta cae al suelo
+ * (el autor, 2026-10-18) y aqui se recoge de golpe: se mide lo que da.
+ */
 function hit(state: GameState, dx: number, dy: number, down: number): void {
   act(state, { harvest: true, aimX: dx, aimY: dy, aimZ: Math.sin((-down * Math.PI) / 180) });
+  collectAll(state.world, state.inventory);
 }
 
 /** Pone una mesa en la mano (casilla 0) y la coloca en la casilla de al lado. */
@@ -273,13 +278,14 @@ describe('Desmontar una estacion', () => {
     expect(state.world.stationFacingAt(tx + 1, ty)).toBeNull();
   });
 
-  it('con el inventario lleno se queda donde esta', () => {
+  it('con el inventario lleno se desmonta igual, y se queda en el suelo', () => {
     const { state, tx, ty } = atSpawn();
     placeWorkbench(state);
     state.inventory.add(Resource.Wood, 100 * START_SLOTS);
-    for (let i = 0; i < 5; i++) hit(state, 1, 0, 30);
-    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.Workbench);
-    expect(state.lastBlocked).toBe('full');
+    for (let i = 0; i < 3; i++) hit(state, 1, 0, 30);
+    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.None);
+    expect(state.lastBlocked).toBeNull();
+    expect(groundCount(state.world, Resource.Workbench)).toBe(1);
   });
 
   it('su hitbox ocupa la casilla entera, con el alto de su estacion', () => {

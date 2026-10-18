@@ -163,3 +163,9 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `rgba\(255, 196, 107, \.22\)|#ffdca6` — la luz naranja de los botones del panel de desarrollo; desde el 2026-10-18, el azul de todos. Permitido en: `docs/historia.md`, `docs/pendiente.md`.
 - `rgba\(168, 60, 60|color: #0b1020; background: #8fc4ff` — Tirar en rojo y Reiniciar en azul claro con letra oscura; desde el 2026-10-18, el estandar. Permitido en: `docs/historia.md`, `docs/pendiente.md`.
 - `padding: 16px 0 10px|padding-top: 11px; padding-bottom: 7px|qty button:enabled:active \{ padding-top` — bajar el texto de un boton pulsado moviendo su relleno; desde el 2026-10-18 el texto va en su `<span>` y baja con el icono. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/escapes.md` (el escape 34 lo cuenta).
+
+## Los objetos en el suelo (2026-10-18)
+
+- `Un botin entra entero o no entra|botin que no cabe deje el objeto en el mundo|el golpe que lo mataria no completa|golpe que mataria no completa|Aun no hay objetos sueltos|Fabricar sin sitio se resolvera` — el botin todo o nada: si no cabia en el inventario, el golpe no completaba; y tirar hacia desaparecer. Desde el 2026-10-18 todo botin cae al suelo y lo tirado se lanza. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `blocked = 'full'|'full' \| 'needPickaxe'|=== 'full'|: 'ok' \| 'missing' \| 'full'` — el aviso del nucleo de inventario lleno, al golpear y al fabricar. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `WATER_Y` — la altura del agua, que vivia solo en el cliente; desde el 2026-10-18 es `WATER_SURFACE`, del nucleo. Permitido en: `docs/historia.md`.

@@ -58,12 +58,13 @@ import {
   type Surface,
   type Vec3,
 } from '../aim.js';
-import { bodyBoxes, BODY_RADIUS, featureBox, objectBase, type OrientedBox } from '../boxes.js';
+import { bodyBoxes, bodyOf, BODY_RADIUS, featureBox, objectBase, type OrientedBox } from '../boxes.js';
 export { STATION_BOXES } from '../boxes.js';
 import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
 import { hash2DFloat } from '../rng.js';
+import { dropAtFeet, scatterLoot } from './drops.js';
 import { facingToward, stationNear } from '../stations.js';
 import { toChunkCoord, type World } from '../world.js';
 
@@ -103,7 +104,7 @@ export interface HarvestResult {
  * Por que un golpe no hizo lo que se esperaba: el inventario no tenia sitio,
  * o hace falta un pico (o uno mejor). Lo cuenta el cliente en un aviso.
  */
-export type Blocked = 'full' | 'needPickaxe' | 'needBetterPickaxe';
+export type Blocked = 'needPickaxe' | 'needBetterPickaxe';
 
 /**
  * El daño acumulado en cada objeto golpeado y las ramas que ya se le han
@@ -330,17 +331,11 @@ function animalsInReach(
 
 /**
  * Un golpe a un animal: le quita el daño de lo que lo golpea (`strikeDamage`):
- * el arma equipada si la hay, y si no lo de la mano. Y, si llega a cero, suelta su botin y muere para siempre.
- * **Un botin entra entero o no entra**, como en la recoleccion: si no cabe, el
- * golpe que lo mataria no completa y el animal sigue con su daño.
+ * el arma equipada si la hay, y si no lo de la mano. Y, si llega a cero, suelta
+ * su botin al suelo (`scatterLoot`) y muere para siempre. Muere quepa o no su
+ * botin en el inventario (el autor, 2026-10-18).
  */
-function hitAnimal(
-  world: World,
-  store: EntityStore,
-  a: number,
-  inventory: Inventory,
-  damage: number,
-): AnimalHit | 'full' {
+function hitAnimal(world: World, store: EntityStore, a: number, damage: number, tick: number): AnimalHit {
   const animal = store.animal[a]!;
   const left = store.health[a] - damage;
   const base = {
@@ -356,10 +351,11 @@ function hitAnimal(
     store.health[a] = left;
     return { ...base, health: left, killed: false };
   }
-  const loot = animalLoot(animal.species, animal.stage);
-  if (!inventory.fits(loot)) return 'full';
-  for (const b of loot) inventory.add(b.item, b.count);
   store.health[a] = 0;
+  // Desde el centro del cuerpo, con la clave del animal por sal: dos muertos en
+  // el mismo tick esparcen distinto.
+  const box = bodyOf(store, a);
+  scatterLoot(world, animalLoot(animal.species, animal.stage), { x: store.x[a], y: store.y[a], z: store.z[a] + box.height / 2 }, tick, a);
   world.killFauna(animal.key);
   return { ...base, health: 0, killed: true };
 }
@@ -419,17 +415,7 @@ export function tryHarvestArea(
     // cliente, y es lo unico que sale de un animal golpeado (decision del
     // autor, 2026-10-03: sin fragmentos).
     swing.impacts.push(at);
-    const hit = hitAnimal(world, store, a, inventory, strikeDamage(beastStats));
-    if (hit === 'full') {
-      swing.blocked = 'full';
-      const animal = store.animal[a]!;
-      swing.animals.push({
-        id: a, key: animal.key, species: animal.species, stage: animal.stage,
-        x: store.x[a], y: store.y[a], z: store.z[a], health: store.health[a], killed: false,
-      });
-    } else {
-      swing.animals.push(hit);
-    }
+    swing.animals.push(hitAnimal(world, store, a, strikeDamage(beastStats), tick));
   }
 
   for (const { x, y, at } of tiles) {
@@ -448,9 +434,8 @@ export function tryHarvestArea(
     if (power === 0) {
       swing.hits.push({ x, y, feature });
       if (lifeKindOf(feature) === LifeKind.Tree) {
-        const branch = tryBranch(world, x, y, inventory, tick, work);
-        if (branch === 'full') swing.blocked = 'full';
-        else if (branch) swing.results.push(branch);
+        const branch = tryBranch(world, x, y, tick, work);
+        if (branch) swing.results.push(branch);
       } else {
         swing.blocked =
           stats?.kind === ToolKind.Pickaxe ? 'needBetterPickaxe' : 'needPickaxe';
@@ -465,15 +450,8 @@ export function tryHarvestArea(
       swing.hits.push({ x, y, feature });
       continue;
     }
-    const result = harvestTile(world, x, y, inventory, tick);
-    if (!result) {
-      swing.hits.push({ x, y, feature });
-      // No cabe: el objeto se queda y su dano tambien, asi el siguiente golpe
-      // lo termina en cuanto haya sitio.
-      work.damage.set(key, { feature, work: need.work, tick, x, y });
-      swing.blocked = 'full';
-      continue;
-    }
+    const result = harvestTile(world, x, y, tick);
+    if (!result) continue;
     work.damage.delete(key);
     work.branches.delete(key);
     swing.results.push(result);
@@ -487,22 +465,16 @@ export function tryHarvestArea(
   return swing;
 }
 
-/** Una rama de un arbol golpeado sin hacha, si le quedan y si cabe. */
-function tryBranch(
-  world: World,
-  x: number,
-  y: number,
-  inventory: Inventory,
-  tick: number,
-  work: WorkState,
-): HarvestResult | 'full' | null {
+/** Una rama de un arbol golpeado sin hacha, si le quedan: cae al suelo. */
+function tryBranch(world: World, x: number, y: number, tick: number, work: WorkState): HarvestResult | null {
   const left = branchesLeft(work, x, y, tick);
   if (left <= 0) return null;
-  if (!inventory.add(Resource.Branch, 1)) return 'full';
+  const feature = world.featureAt(x, y);
+  // Desde la copa baja, a un bloque del suelo del arbol.
+  scatterLoot(world, [{ item: Resource.Branch, count: 1 }], { x: x + 0.5, y: y + 0.5, z: objectBase(world, x, y, feature) + 1 }, tick, x * 7919 + y);
   // La reposicion se cuenta desde el ultimo arranque, con lo que ya se habia
   // repuesto descontado: asi el calculo sigue siendo solo del tiempo.
   work.branches.set(tileKey(x, y), { taken: BRANCHES_PER_TREE - left + 1, tick });
-  const feature = world.featureAt(x, y);
   return {
     feature,
     resource: Resource.Branch,
@@ -520,16 +492,11 @@ function tryBranch(
 
 /**
  * Recolecta un tile concreto de una vez, sin golpes ni herramientas: la
- * primitiva que completa `tryHarvestArea`. Devuelve `null`, sin tocar nada, si
- * no hay nada que recolectar o si el botin no cabe entero.
+ * primitiva que completa `tryHarvestArea`. El botin cae al suelo desde la base
+ * del objeto (`scatterLoot`), quepa o no en el inventario (el autor,
+ * 2026-10-18). Devuelve `null`, sin tocar nada, si no hay nada que recolectar.
  */
-export function harvestTile(
-  world: World,
-  x: number,
-  y: number,
-  inventory: Inventory,
-  tick: number,
-): HarvestResult | null {
+export function harvestTile(world: World, x: number, y: number, tick: number): HarvestResult | null {
   const feature = world.featureAt(x, y);
   const yield_ = harvestOf(feature);
   if (!yield_) return null;
@@ -569,10 +536,10 @@ export function harvestTile(
 
   const loot: Bundle[] = [{ item: yield_.resource, count: amount }, ...extras];
   if (yield_.seed !== null && seeds > 0) loot.push({ item: yield_.seed, count: seeds });
-  if (!inventory.fits(loot)) return null;
-
+  // La base, antes de quitarlo: la de un objeto colocado es la de encima.
+  const base = objectBase(world, x, y, feature);
   world.setFeature(x, y, Feature.None);
-  for (const b of loot) inventory.add(b.item, b.count);
+  scatterLoot(world, loot, { x: x + 0.5, y: y + 0.5, z: base + 0.5 }, tick, x * 7919 + y);
 
   return {
     resource: yield_.resource,
@@ -590,49 +557,45 @@ export function harvestTile(
 }
 
 /**
- * Fabrica una receta si hay materiales, si el resultado cabe y si se esta
- * donde se fabrica. Lo basico, a mano en cualquier sitio; lo mejor, junto a su
+ * Fabrica una receta si hay materiales y si se esta donde se fabrica. Lo basico, a mano en cualquier sitio; lo mejor, junto a su
  * mesa u horno (decisiones del autor). Es instantaneo (propuesta mia; fundir
  * tambien, del plan aprobado).
  *
  * `near` dice si hay una estacion de ese tipo a mano; sin ella, solo valen las
  * recetas de mano. `step` le pasa `stationNear` con la posicion del jugador.
  *
- * `times` la fabrica N veces de golpe, **todo o nada** (el autor, 2026-10-17:
- * un solo mantener fabrica las N): hacen falta N veces los ingredientes y
- * sitio para N veces el resultado.
+ * `times` la fabrica N veces de golpe (el autor, 2026-10-17: un solo
+ * mantener fabrica las N): hacen falta N veces los ingredientes. Lo que no
+ * cabe del resultado va a `spill`, que `craftNear` deja caer a los pies (el
+ * autor, 2026-10-18).
  */
 export function tryCraft(
   inventory: Inventory,
   recipe: number,
   near: (s: Station) => boolean = (s) => s === Station.Hand,
   times = 1,
-): 'ok' | 'missing' | 'full' {
+  spill: (item: Resource, count: number) => void = () => {},
+): 'ok' | 'missing' {
   const r = RECIPES[recipe];
   const n = Math.floor(times);
   if (!r || !near(r.station) || n < 1) return 'missing';
   const inputs = r.inputs.map((input) => ({ item: input.item, count: input.count * n }));
   for (const input of inputs) if (inventory.count(input.item) < input.count) return 'missing';
-  const output = { item: r.output, count: r.count * n };
-  if (!inventory.fits([output], inputs)) return 'full';
   for (const input of inputs) inventory.remove(input.item, input.count);
-  inventory.add(output.item, output.count);
+  const count = r.count * n;
+  spill(r.output, count - inventory.addSome(r.output, count));
   return 'ok';
 }
 
 /**
- * Cuantas veces de golpe alcanza una receta: lo que dan los ingredientes y lo
- * que cabe del resultado. 0 si ni una. El tope del + de la receta (el autor,
- * 2026-10-17: «hasta lo que alcanza»).
+ * Cuantas veces de golpe alcanza una receta: lo que dan los ingredientes. 0
+ * si ni una. El tope del + de la receta (el autor, 2026-10-17: «hasta lo que
+ * alcanza»); el sitio ya no cuenta, que lo que no cabe cae a los pies.
  */
 export function craftableTimes(inventory: Inventory, recipe: number): number {
   const r = RECIPES[recipe];
   if (!r) return 0;
-  let n = Math.min(...r.inputs.map((input) => Math.floor(inventory.count(input.item) / input.count)));
-  const fits = (k: number) =>
-    inventory.fits([{ item: r.output, count: r.count * k }], r.inputs.map((input) => ({ item: input.item, count: input.count * k })));
-  while (n > 0 && !fits(n)) n--;
-  return n;
+  return Math.min(...r.inputs.map((input) => Math.floor(inventory.count(input.item) / input.count)));
 }
 
 /** Que hizo un `use`. */
@@ -763,16 +726,26 @@ export function tryPlace(world: World, store: EntityStore, id: number, inventory
   return { x, y, z: Math.max(at.z, objectBase(world, x, y, feature)) };
 }
 
-/** `tryCraft` con las estaciones que hay alrededor de la entidad. */
+/**
+ * `tryCraft` con las estaciones que hay alrededor de la entidad; lo que no
+ * cabe, a sus pies.
+ */
 export function craftNear(
   world: World,
   store: EntityStore,
   id: number,
   inventory: Inventory,
   recipe: number,
-  times = 1,
-): 'ok' | 'missing' | 'full' {
-  return tryCraft(inventory, recipe, (s) => stationNear(world, eyeOf(store, id), s, (tx, ty) => hitboxAt(world, tx, ty)), times);
+  times: number,
+  tick: number,
+): 'ok' | 'missing' {
+  return tryCraft(
+    inventory,
+    recipe,
+    (s) => stationNear(world, eyeOf(store, id), s, (tx, ty) => hitboxAt(world, tx, ty)),
+    times,
+    (item, count) => dropAtFeet(world, store, id, item, count, tick),
+  );
 }
 
 /**

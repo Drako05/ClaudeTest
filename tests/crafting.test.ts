@@ -22,6 +22,7 @@ import {
   Terrain,
   toolStats,
 } from '@verdant/shared';
+import { collectAll, groundCount } from './ground.js';
 
 /**
  * La tanda 1 de recoleccion y fabricacion, decisiones del autor: trabajo por
@@ -56,6 +57,9 @@ function swing(state: GameState, dx: number, dy: number, down: number) {
   intent.aimY = dy;
   intent.aimZ = Math.sin((-down * Math.PI) / 180);
   step(state, intent);
+  // El botin cae al suelo (el autor, 2026-10-18); aqui se mide lo que da, asi
+  // que se recoge de golpe. Como se recoge, en `drops.test.ts`.
+  collectAll(state.world, state.inventory);
   return { results: state.lastHarvest, blocked: state.lastBlocked, broke: state.lastBroke };
 }
 
@@ -279,14 +283,15 @@ describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {
     expect(state.inventory.count(Resource.Branch)).toBe(3);
   });
 
-  it('con el inventario lleno el golpe no completa y el objeto se queda', () => {
+  it('con el inventario lleno el golpe completa igual, y el botin se queda en el suelo', () => {
     const { state, tx, ty } = atSpawn();
     state.inventory.add(Resource.Wood, 100 * START_SLOTS);
     state.world.setFeature(tx + 1, ty, Feature.MeadowPlant);
     const { results, blocked } = swing(state, 1, 0, 40);
-    expect(results).toHaveLength(0);
-    expect(blocked).toBe('full');
-    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.MeadowPlant);
+    expect(results).toHaveLength(1);
+    expect(blocked).toBeNull();
+    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.None);
+    expect(groundCount(state.world, Resource.Berries)).toBeGreaterThan(0);
   });
 
   it('el dano se pierde si se deja de golpear un rato', () => {
@@ -402,7 +407,7 @@ describe('Usar lo de la mano', () => {
     }
   });
 
-  it('fabricar sin sitio no fabrica, y el nucleo lo deja dicho en lastBlocked', () => {
+  it('fabricar sin sitio fabrica igual, y lo que no cabe cae a los pies', () => {
     const { state } = atSpawn();
     const inv = state.inventory;
     // Materiales de sobra, asi que sus casillas no se vacian al gastarlos, y
@@ -412,15 +417,18 @@ describe('Usar lo de la mano', () => {
     inv.add(Resource.Fiber, 10);
     for (let i = 0; i < 13; i++) inv.add(Resource.StonePickaxe, 1);
     act(state, { craft: AXE });
-    expect(state.lastCrafted).toBe(-1);
-    expect(state.lastBlocked).toBe('full');
-    expect(inv.count(Resource.Branch)).toBe(10);
-    // Con los materiales justos, sus casillas se vacian y si cabe.
-    inv.remove(Resource.Branch, 7);
-    inv.remove(Resource.Stone, 8);
-    inv.remove(Resource.Fiber, 8);
-    act(state, { craft: AXE });
     expect(state.lastCrafted).toBe(AXE);
+    expect(state.lastBlocked).toBeNull();
+    expect(inv.count(Resource.Branch)).toBe(7);
+    expect(inv.count(Resource.StoneAxe)).toBe(0);
+    // A los pies del jugador, entera, y ahi se queda: no cabe.
+    const [axe] = [...state.world.drops.values()];
+    const id = state.playerId;
+    expect(axe.item).toBe(Resource.StoneAxe);
+    expect(axe.wear).toBe(toolStats(Resource.StoneAxe)!.uses);
+    expect(Math.hypot(axe.x - state.entities.x[id], axe.y - state.entities.y[id])).toBeLessThan(0.01);
+    for (let i = 0; i < 60; i++) act(state, {});
+    expect(state.world.drops.size).toBe(1);
   });
 
   it('un golpe que no rompe deja su golpe para las particulas', () => {
