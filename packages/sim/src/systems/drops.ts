@@ -81,35 +81,52 @@ function flightTicks(vz: number, drop: number, dt: number): number {
 }
 
 /**
- * Suelta un botin desde un punto —la mitad de la altura de lo que lo suelta—
- * con su salto: cada monton cae a una distancia al azar de 0 a
- * `SCATTER_REACH` y hacia su lado, sacados de la semilla, del tick y de `salt`
- * (de donde sale). La velocidad se calcula para posarse justo ahi.
+ * Lo que suelta un botin: el centro de su caja, a la mitad de su altura, y la
+ * media anchura de su base cuadrada.
  */
-export function scatterLoot(
-  world: World,
-  loot: readonly Bundle[],
-  at: { x: number; y: number; z: number },
-  tick: number,
-  salt: number,
-): void {
+export interface LootSource {
+  x: number;
+  y: number;
+  z: number;
+  half: number;
+}
+
+/**
+ * Suelta un botin expulsado de lo que lo suelta (el autor, 2026-10-18: «que
+ * los elementos salgan expulsados de su generador con una fuerza que los lleve
+ * entre 0 y 0.5m del origen»). Cada monton sale hacia su lado, a la mitad de
+ * la altura y por fuera de la caja —su huella entera, sin tocarla—, y con su
+ * salto cae a una distancia al azar de 0 a `SCATTER_REACH` de esa cara. El
+ * origen es la cara y no el centro (*deduccion*): un tronco es solido, y el
+ * que naciera dentro se posaria encima. Rumbo y distancia salen de la semilla,
+ * del tick y de `salt`, y la velocidad se calcula para posarse justo ahi.
+ */
+export function scatterLoot(world: World, loot: readonly Bundle[], from: LootSource, tick: number, salt: number): void {
   loot.forEach((b, k) => {
     if (b.count <= 0) return;
     const turn = hash2DFloat(world.seed ^ 0x3c6ef372, tick * 16 + k, salt) * Math.PI * 2;
     const reach = hash2DFloat(world.seed ^ 0x1b873593, tick * 16 + k, salt) * SCATTER_REACH;
-    const tx = at.x + Math.cos(turn) * reach;
-    const ty = at.y + Math.sin(turn) * reach;
-    const time = flightTicks(SCATTER_UP, at.z - (dropFloor(world, tx, ty) + DROP_FLOAT), TICK_DT) * TICK_DT;
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    // Por el rumbo, hasta que la huella del monton deja de pisar la caja.
+    const out = (from.half + DROP_HALF) / Math.max(Math.abs(cos), Math.abs(sin));
+    const x = from.x + cos * out;
+    const y = from.y + sin * out;
+    // Pegado a una pared mas alta, nace encima de ella.
+    const z = Math.max(from.z, dropFloor(world, x, y));
+    const tx = x + cos * reach;
+    const ty = y + sin * reach;
+    const time = flightTicks(SCATTER_UP, z - (dropFloor(world, tx, ty) + DROP_FLOAT), TICK_DT) * TICK_DT;
     const side = reach / time;
     world.drops.add({
       item: b.item,
       count: b.count,
       wear: freshWear(b.item),
-      x: at.x,
-      y: at.y,
-      z: at.z,
-      vx: Math.cos(turn) * side,
-      vy: Math.sin(turn) * side,
+      x,
+      y,
+      z,
+      vx: cos * side,
+      vy: sin * side,
       vz: SCATTER_UP,
       pickableAt: tick + LOOT_DELAY_TICKS,
     });

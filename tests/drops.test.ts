@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createGame,
+  DROP_HALF,
   dropFloor,
   featureBox,
   skipTime,
@@ -56,6 +57,18 @@ function dropAt(state: GameState, item: Resource, count: number, x: number, y: n
   });
 }
 
+/**
+ * Cuanto se alejo un monton de la cara de una caja por la que salio, por su
+ * rumbo desde el centro: negativo si su huella pisa la caja.
+ */
+function beyondBox(d: Drop, box: { x0: number; x1: number; y0: number; y1: number }): number {
+  const dx = d.x - (box.x0 + box.x1) / 2;
+  const dy = d.y - (box.y0 + box.y1) / 2;
+  const r = Math.hypot(dx, dy);
+  const out = ((box.x1 - box.x0) / 2 + DROP_HALF) / (Math.max(Math.abs(dx), Math.abs(dy)) / r);
+  return r - out;
+}
+
 describe('El botin cae al suelo', () => {
   it('talar, coger a mano y golpear un arbol sin hacha sueltan el botin en el suelo, no en el inventario', () => {
     const { state, tx, ty } = atSpawn();
@@ -90,11 +103,26 @@ describe('El botin cae al suelo', () => {
       expect(d.resting).toBe(true);
       // 0,2: el numero del autor, escrito y no leido de la constante.
       expect(d.z).toBeCloseTo(dropFloor(state.world, d.x, d.y) + 0.2, 6);
-      // Cae a no mas de 0,5 del centro de la mata (el autor), escrito.
-      expect(Math.hypot(d.x - (tx + 1.5), d.y - (ty + 0.5))).toBeLessThanOrEqual(0.5 + 1e-9);
+      expect(beyondBox(d, box)).toBeGreaterThanOrEqual(-1e-9);
+      // Cae a no mas de 0,5 de la cara por la que sale (el autor), escrito.
+      expect(beyondBox(d, box)).toBeLessThanOrEqual(0.5 + 1e-9);
     }
     // Cada uno hacia su lado: no todos en el mismo punto.
     expect(new Set(all.map((d) => `${d.x.toFixed(3)},${d.y.toFixed(3)}`)).size).toBe(all.length);
+  });
+
+  it('la rama de un arbol en pie sale de su tronco y cae al suelo, no encima de el', () => {
+    const { state, tx, ty } = atSpawn();
+    state.world.setFeature(tx - 1, ty, Feature.ForestTree);
+    const trunk = featureBox(state.world, tx - 1, ty)!;
+    act(state, { harvest: true, aimX: -1, aimY: 0 });
+    moveTo(state, tx + 8.5, ty + 0.5);
+    act(state, {}, TICK_HZ);
+    const [branch] = drops(state);
+    expect(branch.resting).toBe(true);
+    expect(branch.z).toBeLessThan(trunk.z1);
+    expect(beyondBox(branch, trunk)).toBeGreaterThanOrEqual(-1e-9);
+    expect(beyondBox(branch, trunk)).toBeLessThanOrEqual(0.5 + 1e-9);
   });
 
   it('sobre el agua flota en su superficie', () => {

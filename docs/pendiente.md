@@ -66,13 +66,22 @@ respuestas: el saltito se queda y cae a 0-0,5; al guardar, primero apila y
 luego vacia; tirar desde la barra, en cualquier sitio salvo casillas e
 INVENTARIO.
 
-**Hecho (ajustes)**: `PICKUP_RADIUS = 1`, `SCATTER_REACH`, `midOf` en
+**Hecho (ajustes)**: `PICKUP_RADIUS = 1`, `SCATTER_REACH`, `sourceOf` en
 `gathering.ts`, `Inventory.stow` con `Intent.stow`, y en `inventory-ui.ts`
 tirar sin dialogo, tirar desde la barra y guardar. Tests en `drops.test.ts` y
 `stow.test.ts`; los gestos lo prueban con el dedo.
 
-En `main` tras las dos tandas en verde en `pruebas` (`066e4b1`). **Falta**: que
-el autor lo pruebe jugando, y la auditoria de toda la tanda.
+En `main` tras las dos tandas en verde en `pruebas` (`066e4b1`). **El autor lo
+jugo otra vez** (2026-10-18): todo bien salvo la dispersion, que seguia cayendo
+casi en el centro, y las ramas de un arbol en pie salian encima de el. Literal:
+«La idea es que los elementos salgan expulsados de su generador con una fuerza
+que los lleve entre 0 y 0.5m del origen». La causa: nacian en el centro de la
+caja, dentro del tronco solido, y se posaban encima. **Hecho**: `scatterLoot`
+los saca por fuera de la caja (`LootSource`, con su media anchura) y cuenta
+los 0-0,5 desde esa cara (*deduccion*, en `docs/juicio.md`); los animales,
+igual desde la suya.
+
+**Falta**: que el autor lo pruebe jugando, y la auditoria de toda la tanda.
 
 ---
 
