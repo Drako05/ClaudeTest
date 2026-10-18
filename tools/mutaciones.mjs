@@ -11,60 +11,43 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los ajustes al suelo tras jugar (2026-10-18): el iman a 1, el botin
- * desde media altura y a 0-0,5, tirar sin preguntar, tirar desde la barra y
- * guardar en la mochila.
+ * Ronda: el botin sale expulsado de lo que lo suelta (2026-10-18): por fuera
+ * de su caja, a media altura, y cae a 0-0,5 de esa cara.
  */
 const DROPS = 'packages/sim/src/systems/drops.ts';
-const UI = 'packages/client/src/inventory-ui.ts';
+const GATHERING = 'packages/sim/src/systems/gathering.ts';
 
 export default [
-  // El iman otra vez a 1,5.
+  // Nace en el centro, como antes: dentro del tronco, y se posa encima.
   {
-    nombre: 'suelo2: iman a 1,5',
+    nombre: 'expulsado: nacer en el centro',
     fichero: DROPS,
-    de: 'export const PICKUP_RADIUS = 1;',
-    a: 'export const PICKUP_RADIUS = 1.5;',
+    de: '    const out = (from.half + DROP_HALF) / Math.max(Math.abs(cos), Math.abs(sin));',
+    a: '    const out = 0;',
     prueba: 'test:tests/drops.test.ts',
   },
-  // El botin cae hasta a 1,5 de su origen.
+  // Cae hasta a 1,5 de la cara.
   {
-    nombre: 'suelo2: dispersar de mas',
+    nombre: 'expulsado: dispersar de mas',
     fichero: DROPS,
     de: 'export const SCATTER_REACH = 0.5;',
     a: 'export const SCATTER_REACH = 1.5;',
     prueba: 'test:tests/drops.test.ts',
   },
-  // El botin sale desde la base de lo roto, no de su media altura.
+  // Sale desde la base de lo roto, no de su media altura.
   {
-    nombre: 'suelo2: salir desde la base',
-    fichero: 'packages/sim/src/systems/gathering.ts',
-    de: '  const z = box ? (box.z0 + box.z1) / 2 : objectBase(world, x, y, feature);',
-    a: '  const z = objectBase(world, x, y, feature);',
+    nombre: 'expulsado: salir desde la base',
+    fichero: GATHERING,
+    de: '  return { x: x + 0.5, y: y + 0.5, z: (box.z0 + box.z1) / 2, half: (box.x1 - box.x0) / 2 };',
+    a: '  return { x: x + 0.5, y: y + 0.5, z: box.z0, half: (box.x1 - box.x0) / 2 };',
     prueba: 'test:tests/drops.test.ts',
   },
-  // Guardar no apila: va derecho a la primera vacia.
+  // El animal suelta su botin desde su centro, dentro de su caja.
   {
-    nombre: 'suelo2: guardar sin apilar',
-    fichero: 'packages/sim/src/inventory.ts',
-    de: '      if (!this.isOpen(i) || this.items[i] !== item || this.counts[i] >= max) continue;',
-    a: '      continue;',
-    prueba: 'test:tests/stow.test.ts',
-  },
-  // Soltar la barra al vacio con el inventario cerrado no hace nada, como antes.
-  {
-    nombre: 'suelo2: la barra no tira',
-    fichero: UI,
-    de: '      if (!d.bar && !this.open) return;',
-    a: '      if (!this.open) return;',
-    prueba: 'gestures',
-  },
-  // Soltar la barra sobre INVENTARIO no la guarda.
-  {
-    nombre: 'suelo2: INVENTARIO no guarda',
-    fichero: UI,
-    de: '        this.pending.stow = slot;',
-    a: '',
-    prueba: 'gestures',
+    nombre: 'expulsado: el animal desde el centro',
+    fichero: GATHERING,
+    de: 'z: store.z[a] + box.height / 2, half: box.half };',
+    a: 'z: store.z[a] + box.height / 2, half: 0 };',
+    prueba: 'test:tests/fauna.test.ts',
   },
 ];

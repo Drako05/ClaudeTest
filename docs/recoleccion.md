@@ -257,10 +257,15 @@ cabe y lo que se tira desde el inventario.
 - **Duran para siempre**: aunque se aleje uno hasta descargar su chunk.
 - **Inventario lleno: el golpe termina igual** y el botin se queda en el suelo.
 - **Lo fabricado que no cabe cae a los pies.**
-- **El botin salta y se esparce** al salir (el autor, 2026-10-18, despues de
-  jugarlo): **desde la mitad de la altura** de lo que lo suelta —la de su caja;
-  la de un arbol, su tronco (*deduccion*)— y cae a **entre 0 y 0,5 m** de el,
-  cada monton hacia su lado, flotando a 0,2 m de su suelo. Lo fabricado que no
+- **El botin sale expulsado** de lo que lo suelta (el autor, 2026-10-18,
+  despues de jugarlo dos veces: «que los elementos salgan expulsados de su
+  generador con una fuerza que los lleve entre 0 y 0.5m del origen»): **desde
+  la mitad de su altura** —la de su caja; la de un arbol, su tronco
+  (*deduccion*)—, cada monton hacia su lado y **por fuera de la caja**, y con
+  su salto cae a **entre 0 y 0,5 m de esa cara**, flotando a 0,2 m de su
+  suelo. Que el origen sea la cara y no el centro es *deduccion*: nacer en el
+  centro lo metia en el tronco, que es solido, y la rama se posaba encima del
+  arbol; y la mata soltaba su botin debajo de si misma. Lo fabricado que no
   cabe cae a los pies.
 - **Tirar no pide confirmacion** (el autor, 2026-10-18).
 - **Un monton por tipo de objeto**, con su cantidad, y **dos iguales que se

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BODY_RADIUS,
   bodyOf,
+  DROP_HALF,
   squareFloor,
   terrainUnder,
   animalBoxes,
@@ -512,10 +513,16 @@ describe('Fauna: cazar', () => {
     const id = someAnimal(state, (a) => state.entities.animal[a]!.species !== Species.Crab);
     const animal = state.entities.animal[id]!;
     state.entities.health[id] = 1;
+    const at = { x: state.entities.x[id], y: state.entities.y[id], half: bodyOf(state.entities, id).half };
     step(state, aimAt(state, id));
     expect(state.lastBlocked).toBeNull();
     expect(state.world.isFaunaDead(animal.key)).toBe(true);
     expect(state.fauna.has(animal.key)).toBe(false);
     for (const b of animalLoot(animal.species, animal.stage)) expect(groundCount(state.world, b.item)).toBe(b.count);
+    // Sale expulsado de su caja (el autor, 2026-10-18): ningun monton nace
+    // con la huella dentro de ella.
+    for (const d of state.world.drops.values()) {
+      expect(Math.max(Math.abs(d.x - at.x), Math.abs(d.y - at.y))).toBeGreaterThanOrEqual(at.half + DROP_HALF - 1e-9);
+    }
   });
 });

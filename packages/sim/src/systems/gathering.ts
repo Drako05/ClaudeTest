@@ -64,7 +64,7 @@ import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
 import { hash2DFloat } from '../rng.js';
-import { dropAtFeet, scatterLoot } from './drops.js';
+import { dropAtFeet, scatterLoot, type LootSource } from './drops.js';
 import { facingToward, stationNear } from '../stations.js';
 import { toChunkCoord, type World } from '../world.js';
 
@@ -352,10 +352,11 @@ function hitAnimal(world: World, store: EntityStore, a: number, damage: number, 
     return { ...base, health: left, killed: false };
   }
   store.health[a] = 0;
-  // Desde el centro del cuerpo, con la clave del animal por sal: dos muertos en
-  // el mismo tick esparcen distinto.
+  // Expulsado de su caja, a la mitad de su altura, con la clave del animal por
+  // sal: dos muertos en el mismo tick esparcen distinto.
   const box = bodyOf(store, a);
-  scatterLoot(world, animalLoot(animal.species, animal.stage), { x: store.x[a], y: store.y[a], z: store.z[a] + box.height / 2 }, tick, a);
+  const from = { x: store.x[a], y: store.y[a], z: store.z[a] + box.height / 2, half: box.half };
+  scatterLoot(world, animalLoot(animal.species, animal.stage), from, tick, a);
   world.killFauna(animal.key);
   return { ...base, health: 0, killed: true };
 }
@@ -466,15 +467,15 @@ export function tryHarvestArea(
 }
 
 /**
- * De donde sale el botin de un objeto del mundo: el centro de su casilla, a
- * la mitad de la altura de su caja (el autor, 2026-10-18: «desde la mitad de
+ * De donde sale el botin de un objeto del mundo: su caja, centrada en su
+ * casilla, a la mitad de su altura (el autor, 2026-10-18: «desde la mitad de
  * la altura del elemento»). La de un arbol es la de su tronco, que es su caja
  * (*deduccion*).
  */
-function midOf(world: World, x: number, y: number, feature: Feature): Vec3 {
+function sourceOf(world: World, x: number, y: number, feature: Feature): LootSource {
   const box = featureBox(world, x, y);
-  const z = box ? (box.z0 + box.z1) / 2 : objectBase(world, x, y, feature);
-  return { x: x + 0.5, y: y + 0.5, z };
+  if (!box) return { x: x + 0.5, y: y + 0.5, z: objectBase(world, x, y, feature), half: 0 };
+  return { x: x + 0.5, y: y + 0.5, z: (box.z0 + box.z1) / 2, half: (box.x1 - box.x0) / 2 };
 }
 
 /** Una rama de un arbol golpeado sin hacha, si le quedan: cae al suelo. */
@@ -482,7 +483,7 @@ function tryBranch(world: World, x: number, y: number, tick: number, work: WorkS
   const left = branchesLeft(work, x, y, tick);
   if (left <= 0) return null;
   const feature = world.featureAt(x, y);
-  scatterLoot(world, [{ item: Resource.Branch, count: 1 }], midOf(world, x, y, feature), tick, x * 7919 + y);
+  scatterLoot(world, [{ item: Resource.Branch, count: 1 }], sourceOf(world, x, y, feature), tick, x * 7919 + y);
   // La reposicion se cuenta desde el ultimo arranque, con lo que ya se habia
   // repuesto descontado: asi el calculo sigue siendo solo del tiempo.
   work.branches.set(tileKey(x, y), { taken: BRANCHES_PER_TREE - left + 1, tick });
@@ -503,8 +504,8 @@ function tryBranch(world: World, x: number, y: number, tick: number, work: WorkS
 
 /**
  * Recolecta un tile concreto de una vez, sin golpes ni herramientas: la
- * primitiva que completa `tryHarvestArea`. El botin cae al suelo desde la base
- * del objeto (`scatterLoot`), quepa o no en el inventario (el autor,
+ * primitiva que completa `tryHarvestArea`. El botin sale expulsado del objeto
+ * y cae al suelo (`scatterLoot`), quepa o no en el inventario (el autor,
  * 2026-10-18). Devuelve `null`, sin tocar nada, si no hay nada que recolectar.
  */
 export function harvestTile(world: World, x: number, y: number, tick: number): HarvestResult | null {
@@ -548,7 +549,7 @@ export function harvestTile(world: World, x: number, y: number, tick: number): H
   const loot: Bundle[] = [{ item: yield_.resource, count: amount }, ...extras];
   if (yield_.seed !== null && seeds > 0) loot.push({ item: yield_.seed, count: seeds });
   // Desde la mitad de su altura (el autor, 2026-10-18), leida antes de quitarlo.
-  const from = midOf(world, x, y, feature);
+  const from = sourceOf(world, x, y, feature);
   world.setFeature(x, y, Feature.None);
   scatterLoot(world, loot, from, tick, x * 7919 + y);
 
