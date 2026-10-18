@@ -85,7 +85,7 @@ describe('El botin cae al suelo', () => {
     expect(state.inventory.count(Resource.Branch)).toBe(0);
   });
 
-  it('salta y se esparce, cada monton hacia su lado, y se posa a 0,2 de su suelo', () => {
+  it('sale por fuera de la mata, cada monton hacia su lado, y se posa a 0,2 de su suelo', () => {
     const { state, tx, ty } = atSpawn();
     state.world.setFeature(tx + 1, ty, Feature.MeadowPlant);
     // Sale de la mitad de la altura de la mata (el autor, 2026-10-18).

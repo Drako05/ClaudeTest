@@ -138,6 +138,9 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
      propiedad de la regla comun en las de sus elementos y se quita alli.
    - Constantes y parametros sin uso: `tsc` no avisa si `noUnused*` esta
      apagado.
+   - **Claves de la sonda `__verdant` que nadie lee** (#40): cada clave nueva
+     se busca en `tools/` (`grep -c "\bclave\b" tools/*.mjs`); si nadie la
+     lee, se va con lo que solo existe para ella.
 3. No todo lo sin uso sobra. Lo que se deja a proposito se dice en el informe,
    con su motivo.
 
@@ -173,7 +176,9 @@ miraba `#thumbPad` de 0x0 (#3, #4) y no creaba su carpeta de capturas (#16).
 - **Comentarios sueltos** (#18): al meter un campo o una funcion entre una doc
   y lo que documenta, o al mover lo documentado, la doc se queda encima de
   otra cosa. El escaner los da (dos `/** */` seguidos); la lente mira ademas
-  que cada doc hable de lo que tiene debajo.
+  que cada doc hable de lo que tiene debajo. Y los `//` (#39): al meter una
+  linea nueva en un bloque, se mira que el comentario de encima siga hablando
+  de la linea que tiene justo debajo.
 
 ## F. Documentacion contra documentacion — ¿cuentan todas lo mismo?
 
@@ -240,6 +245,10 @@ el codigo delante.
   Y si una regla mueve lo de dentro de un boton (el icono, el texto), se mide
   lo que de verdad se mueve en **cada clase de boton** que toca: en uno de
   alto fijo, el relleno se reparte y baja la mitad (#34).
+- **Lo que nace en el mundo** (#37): montones, estaciones o cuerpos que la
+  tanda hace aparecer se prueban naciendo junto a, o desde, cada clase de
+  caja: solida (un tronco, una roca) y no solida (una mata). Si nace dentro
+  de una solida, se queda encima o atrapado.
 - **Algo nuevo que se mueve o tapa** (#24): si la tanda mete en la escena algo
   que se mueve por su cuenta o tapa (la fauna), repasa cada medida en pixeles
   (`slash`, la sonda de profundidad, `shots`) y aislala de ello (`?fauna=0`).
@@ -281,5 +290,8 @@ el codigo delante.
 - La CI corre **todas** las pasadas del humo: la matriz de `ci.yml` tiene una
   casilla por pasada de `tools/smoke.mjs` mas los gestos (el escaner lo
   cruza), y el humo sale en rojo si se le pide una pasada que no existe.
+- **Lo que el autor da por bueno jugando** (#38) deja de ser deduccion: sale
+  de «Esperando tu juicio» y su marca «Deduccion mia» del codigo dice que lo
+  aprobo, con fecha.
 - La CI sigue validando lo que dice que valida: el YAML parsea y cada paso
   apunta a un fichero que existe (el escaner mira lo segundo).

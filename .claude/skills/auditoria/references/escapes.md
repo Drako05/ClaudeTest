@@ -478,6 +478,49 @@ Formato:
   (`grep -n "border-radius" index.html`) y quitarla alli.
 - **Donde vive ahora**: lente D, punto 2.
 
+### 37. El botin nacia dentro de un tronco solido y se posaba encima (2026-10-18)
+- **Que paso**: `scatterLoot` soltaba cada monton desde el centro de la caja
+  de lo que lo generaba. Una mata no es solida y pasaba; un tronco si, y la
+  rama, encerrada en el, subia recto y se posaba en lo alto del arbol. Lo vio
+  el autor jugando; los tests y el humo estaban en verde.
+- **Por que se escapo**: el test de la dispersion usaba solo la mata. Nadie
+  pregunto «¿y si lo que lo suelta es solido?».
+- **Que lo habria visto**: lo que la tanda hace **nacer en el mundo**
+  (montones, estaciones, cuerpos) se prueba junto a, o desde, cada clase de
+  caja que hay: solida y no solida.
+- **Donde vive ahora**: lente G, «Lo que nace en el mundo».
+
+### 38. Lo que el autor dio por bueno jugando, aun como deduccion (2026-10-18)
+- **Que paso**: tras jugar, el autor dio por buenos el tamaño del icono, el
+  vaiven, la velocidad del iman, la espera para recoger y la distancia al
+  tirar. Seguian en «Esperando tu juicio» y marcados como «Deduccion mia» en
+  el codigo.
+- **Por que se escapo**: la tanda puso al dia lo que el autor cambio, no lo
+  que aprobo sin cambiar.
+- **Que lo habria visto**: al leer lo que el autor dice tras jugar, separar lo
+  aprobado y sacarlo de `docs/juicio.md` y de las marcas del codigo.
+- **Donde vive ahora**: lente J, ultimo punto.
+
+### 39. Un comentario de linea encima de la linea que no era (2026-10-18)
+- **Que paso**: en `tick.ts`, `inventory.stow` se metio entre el comentario
+  de tirar y el codigo de tirar: el comentario quedo hablando de guardar.
+- **Por que se escapo**: el escaner mira los `/** */` sueltos (categoria 10),
+  no los `//`.
+- **Que lo habria visto**: al leer el diff, mirar la linea que hay justo
+  debajo de cada comentario de linea tocado o desplazado.
+- **Donde vive ahora**: lente E, «Comentarios sueltos».
+
+### 40. Una sonda que nadie lee, con un comentario que dice que si (2026-10-18)
+- **Que paso**: la sonda dropsDrawn y su drawnTotal («el humo lo mira crecer»)
+  no los leia ninguna herramienta: una sonda muerta y una frase falsa.
+- **Por que se escapo**: el escaner da exports sin uso, y una clave de la
+  sonda `__verdant` no es un export.
+- **Que lo habria visto**: buscar cada clave nueva de la sonda en `tools/`.
+  No va al escaner aun: hoy daria siete claves de tandas anteriores
+  (`balanced`, `faunaDrawn`, `faunaGallery`, `lastUsed`, `stationDrops`,
+  `tracked`, `usedLast`) que hay que juzgar una a una primero.
+- **Donde vive ahora**: lente D, punto 2, con la orden.
+
 ## Del proceso del agente
 
 Fallos de como trabaja el agente, no del codigo. Tambien se repiten.

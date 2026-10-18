@@ -8,10 +8,9 @@ Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
 indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `597b8d4`, 2026-10-18** (el estandar de los
-botones, desde `bf82a04`). La proxima parte de aqui: ver
-`.claude/skills/auditoria/` y «Auditoria al cerrar el estandar de los
-botones», mas abajo.
+**Ultima auditoria: commit `dc902a3`, 2026-10-18** (los objetos en el suelo,
+desde `597b8d4`). La proxima parte de aqui: ver `.claude/skills/auditoria/` y
+«Auditoria al cerrar los objetos en el suelo», mas abajo.
 
 **Como leerlo.** Desde el 2026-10-10 son tres ficheros, partidos como se partio
 `CLAUDE.md` el 2026-10-02 y por lo mismo: este se lee al empezar cada tanda, y
@@ -32,78 +31,46 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## Los objetos en el suelo (2026-10-18) — en curso
+## Auditoria al cerrar los objetos en el suelo (2026-10-18)
 
-El autor, literal: «en esta tanda quiero abarcar items arrojables. me refiero a
-que los drops al matar, romper, golpear cosas en el mundo, arrojar items desde
-el inventario, etc. todo botin generado debe ser arrojado como items flotantes
-en el suelo. tendran gravedad pero flotaran a 0.2m de la superficie y miraran
-siempre al jugador (billboard). no diran su nombre, solo sera el items».
-
-Sus respuestas (plan aprobado): se recogen solos al acercarse (iman de ~1,5);
-duran para siempre; con el inventario lleno el golpe termina igual; lo
-fabricado que no cabe cae a los pies; el botin salta y se esparce; un monton
-por tipo, y los iguales se funden; tirar lo lanza hacia la mirada y no se deja
-recoger unos 2 s; y mientras flota, sube y baja suave.
-
-**Hecho**: el nucleo (`drop-store.ts`, `systems/drops.ts`, la emision en
-`gathering.ts` y `tick.ts`), el cliente (`drops-view.ts`), los tests
-(`drops.test.ts` y los que esperaban el botin en el inventario, con
-`tests/ground.ts`), el humo (`collect`, que anda hasta los montones, y la
-comprobacion del botin en el suelo en `resources`) y la documentacion
-(`docs/recoleccion.md`, «Objetos en el suelo»).
-
-En `main` desde `3d7b09d`. **El autor lo jugo** (2026-10-18): tamaño, vaiven,
-velocidad del iman, espera para recoger y distancia al tirar, bien. Pidio,
-literal: «El imán bájalo a 1 bloque»; «La dispersión al generarse. cuando es
-botin de una acción en el mundo, que salga dispersado de 0m a 0.5m del origen
-y desde la mitad de la altura del elemento que la género. Cuando es de una
-receta que no cabe, cae a los pies»; «Al tirar un objeto desde el inventario
-ya no se pide confirmacion»; «si se arrastras desde la hotbar a fuera de las
-casillas, se arroja (también sin confirmar)»; y arrastrar de la barra al boton
-INVENTARIO la guarda en la siguiente casilla disponible fuera de la barra. Sus
-respuestas: el saltito se queda y cae a 0-0,5; al guardar, primero apila y
-luego vacia; tirar desde la barra, en cualquier sitio salvo casillas e
-INVENTARIO.
-
-**Hecho (ajustes)**: `PICKUP_RADIUS = 1`, `SCATTER_REACH`, `sourceOf` en
-`gathering.ts`, `Inventory.stow` con `Intent.stow`, y en `inventory-ui.ts`
-tirar sin dialogo, tirar desde la barra y guardar. Tests en `drops.test.ts` y
-`stow.test.ts`; los gestos lo prueban con el dedo.
-
-En `main` tras las dos tandas en verde en `pruebas` (`066e4b1`). **El autor lo
-jugo otra vez** (2026-10-18): todo bien salvo la dispersion, que seguia cayendo
-casi en el centro, y las ramas de un arbol en pie salian encima de el. Literal:
-«La idea es que los elementos salgan expulsados de su generador con una fuerza
-que los lleve entre 0 y 0.5m del origen». La causa: nacian en el centro de la
-caja, dentro del tronco solido, y se posaban encima. **Hecho**: `scatterLoot`
-los saca por fuera de la caja (`LootSource`, con su media anchura) y cuenta
-los 0-0,5 desde esa cara (*deduccion*, en `docs/juicio.md`); los animales,
-igual desde la suya.
-
-**Falta**: que el autor lo pruebe jugando, y la auditoria de toda la tanda.
-
----
-
-## Auditoria al cerrar el estandar de los botones (2026-10-18)
-
-**El alcance**: de `bf82a04` a `597b8d4`: la auditoria anterior y el estandar
-de los botones. La tanda, entera, en `docs/historia.md`.
+**El alcance**: de `597b8d4` a `dc902a3`: la auditoria anterior y la tanda de
+los objetos en el suelo, con sus dos rondas de ajustes tras jugar. La tanda,
+entera, en `docs/historia.md`.
 
 **Corregido:**
-- **CSS muerto que tapaba la regla comun** (escape 36): `.slot.off`, que ya
-  solo llevaban las categorias vacias (son `.btn` y las apaga `.btn.off`), y
-  los `border-radius: 50%` de `#proj`, `#thumbPad button` y `.round`, que
-  pisan las esquinas de 12 px desde los botones cuadrados.
+- **Lo que el autor dio por bueno jugando seguia como deduccion** (escape 38):
+  la espera de 0,5 s para recoger, la velocidad del iman, lo tirado y el
+  icono de 0,4 con su vaiven salen de `docs/juicio.md`, y el codigo y
+  `docs/recoleccion.md` dicen que los aprobo.
+- **Una sonda muerta con un comentario falso** (escape 40): la de los
+  montones dibujados y su contador («el humo lo mira crecer»); no la leia
+  nadie.
+- **Un comentario sobre la linea que no era** (escape 39): en `tick.ts`, el
+  de tirar quedo encima de guardar.
+- **El humo copia numeros del juego sin decirlo**: el comentario del botin en
+  `resources` nombra ahora `DROP_FLOAT`, `DROP_SIZE` y `BOB_HEIGHT`.
+- **Un test que afirma mas de lo que dice su nombre**: el de la mata se llama
+  ahora «sale por fuera de la mata…», tambien en `docs/leyes.md`.
+
+**Mutado a mano** (cayeron las cinco): el desgaste y el limite de la barra de
+`stow`, lo que no cabe al guardar, flotar sobre el agua y derramar lo
+fabricado que no cabe.
 
 **Ejecutado**: el escaner y su autoprueba; `npm run shots` y
-`tools/analyze-world.ts`; typecheck y los tests; las pasadas `desktop` y
-`mobile`.
+`tools/analyze-world.ts`; typecheck y los tests.
 
-**Escapes** (fase 6): el 36, CSS pisado por orden y no por peso, a la lente D.
+**Dejado a proposito:**
+- **Tirar o guardar arrastrando ya no comprueba que la casilla siga teniendo
+  lo mismo al soltar**: lo hacia el dialogo de confirmar, que el autor
+  retiro. Un arrastre dura un instante; si en medio se come lo de esa
+  casilla, se tira o guarda lo que quede en ella.
+- **Siete claves de la sonda que no lee ninguna herramienta**, de tandas
+  anteriores: `balanced`, `faunaDrawn`, `faunaGallery`, `lastUsed`,
+  `stationDrops`, `tracked` y `usedLast`. Fuera del alcance; para la proxima
+  auditoria (escape 40).
 
-**Sin verificar con dedos**: la luz de pulsar en un movil de verdad (el humo
-la mira con toques simulados).
+**Escapes** (fase 6): del 37 al 40. El 37, el botin dentro del tronco, lo vio
+el autor jugando: a la lente G, «Lo que nace en el mundo».
 
 ---
 
