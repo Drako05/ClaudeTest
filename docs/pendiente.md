@@ -71,8 +71,8 @@ INVENTARIO.
 tirar sin dialogo, tirar desde la barra y guardar. Tests en `drops.test.ts` y
 `stow.test.ts`; los gestos lo prueban con el dedo.
 
-**Falta**: la CI y `main`, que el autor lo pruebe, y la auditoria de toda la
-tanda.
+En `main` tras las dos tandas en verde en `pruebas` (`066e4b1`). **Falta**: que
+el autor lo pruebe jugando, y la auditoria de toda la tanda.
 
 ---
 
