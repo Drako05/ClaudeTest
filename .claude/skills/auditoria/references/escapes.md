@@ -464,6 +464,20 @@ Formato:
   NOMBRE de lo que cambia (`grep -n "MODO" docs/juicio.md`), no por su valor.
 - **Donde vive ahora**: lente F, punto 2.
 
+### 36. Una regla comun al final del CSS deja muertas las de cada boton (2026-10-18)
+- **Que paso**: los botones cuadrados (2026-10-17) pusieron sus esquinas en
+  una regla comun al final del CSS, que gana por ir despues; los
+  `border-radius: 50%` de `#proj`, `#thumbPad button` y `.round` se quedaron
+  sin efecto. Lo mismo con `.slot.off` al pasar las categorias al estandar de
+  los botones. Una auditoria entera paso por encima.
+- **Por que se escapo**: la lente D mira el CSS pisado por especificidad (un
+  `#id` contra una `.clase`), no por orden: dos reglas del mismo peso, la de
+  despues gana entera.
+- **Que lo habria visto**: al meter una regla comun que pisa, buscar cada
+  propiedad suya en las reglas propias de los mismos elementos
+  (`grep -n "border-radius" index.html`) y quitarla alli.
+- **Donde vive ahora**: lente D, punto 2.
+
 ## Del proceso del agente
 
 Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
