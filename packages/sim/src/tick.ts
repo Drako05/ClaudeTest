@@ -224,6 +224,7 @@ export function step(state: GameState, intent: Intent): void {
     if (intent.moveFrom >= 0 && intent.moveTo >= 0) inventory.move(intent.moveFrom, intent.moveTo);
     // Tirar lo lanza hacia la mirada (el autor, 2026-10-18), con la mirada
     // de este tick, que ya esta puesta.
+    if (intent.stow >= 0) inventory.stow(intent.stow);
     if (intent.discard >= 0) {
       const thrown = inventory.discard(intent.discard);
       if (thrown) throwFrom(world, entities, playerId, thrown, state.tick);

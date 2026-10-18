@@ -43,8 +43,13 @@ Decisiones del autor, que no se tocan sin preguntarle:
   **Arrastrar mueve**: el mismo objeto se apila y lo que sobra se queda; uno
   distinto se intercambia (`Inventory.move`). Con el inventario abierto se
   arrastra entre la rejilla y la barra de la mano; **cerrado, dentro de la
-  barra**. **Soltarlo fuera del panel lo tira, previa confirmacion**; desde la
-  barra con el inventario cerrado, soltar al vacio no hace nada.
+  barra**. **Soltarlo fuera del panel lo tira, sin preguntar** (el autor,
+  2026-10-18: «ya no se pide confirmacion»). **Desde la barra**, este el panel
+  abierto o no: **soltarlo en cualquier sitio que no sea una casilla lo tira**,
+  y **soltarlo sobre el boton INVENTARIO lo guarda** fuera de la barra
+  (`Inventory.stow`, `Intent.stow`): primero completa pilas del mismo objeto y
+  lo que sobre va a la primera casilla vacia; lo que no cabe se queda en la
+  barra (el autor: «primero apila, luego vacia»).
 - **Fabricar es mantener pulsado 1 s** el resultado de la receta (1,5 hasta el
   2026-10-17, el autor), con la fila llenandose de izquierda a derecha **hasta
   el borde derecho de los ingredientes** (la fila mide lo que su contenido);
@@ -214,7 +219,7 @@ Lo que el codigo tiene que respetar:
   (decision del autor, 2026-10-01): se escucha en captura y se traga ese dedo
   entero —ni gira la camara, ni ataca, ni pulsa el boton que hubiera debajo—.
   No cuentan como fuera la barra de la mano, que es parte del arrastre, el
-  boton INVENTARIO, que ya alterna, ni el dialogo de tirar (deduccion mia).
+  boton INVENTARIO, que ya alterna (deduccion mia).
   Los gestos lo prueban con toques de verdad.
 - **Con mas de lo que cabe, una barra deslizable** a la derecha de la
   rejilla y de la lista de recetas (pedido del autor, 2026-09-30 en el movil,
@@ -228,9 +233,9 @@ Lo que el codigo tiene que respetar:
   haya muchas ya esta. El humo lo mide en un telefono de 375x640, donde 16
   casillas no caben, y los gestos arrastran el mando con un dedo de verdad.
 - **Arrastrar se prueba con toques de verdad** (`tools/gestures.mjs`): dentro
-  de la barra con el inventario cerrado (y al vacio, sin tirar), de casilla a
-  casilla y de la rejilla a la barra, y mantener una receta 1 s. En PC lo
-  hace el humo con el raton, confirmacion de tirar incluida.
+  de la barra con el inventario cerrado, al vacio (tira) y sobre INVENTARIO
+  (guarda), de casilla a casilla y de la rejilla a la barra, y mantener una
+  receta 1 s. En PC lo hace el humo con el raton, tirar incluido.
 
 Para probar sin juntarlo todo a mano, el panel de desarrollo tiene
 **«Materiales de piedra»**: da materiales, no herramientas, para que fabricar
@@ -246,13 +251,18 @@ suelta romper, talar, golpear un arbol sin hacha o matar, lo fabricado que no
 cabe y lo que se tira desde el inventario.
 
 **Del autor** (sus respuestas del 2026-10-18):
-- **Se recogen solos, al acercarse**: a 1,5 bloques del cuerpo, lo que se
+- **Se recogen solos, al acercarse**: a 1 bloque del cuerpo (1,5 hasta que lo
+  probo el autor, 2026-10-18), lo que se
   deja recoger vuela al jugador y entra lo que quepa; el resto se queda.
 - **Duran para siempre**: aunque se aleje uno hasta descargar su chunk.
 - **Inventario lleno: el golpe termina igual** y el botin se queda en el suelo.
 - **Lo fabricado que no cabe cae a los pies.**
-- **El botin salta y se esparce** al salir, cada monton hacia su lado, y se
-  posa flotando a 0,2 m de su suelo.
+- **El botin salta y se esparce** al salir (el autor, 2026-10-18, despues de
+  jugarlo): **desde la mitad de la altura** de lo que lo suelta —la de su caja;
+  la de un arbol, su tronco (*deduccion*)— y cae a **entre 0 y 0,5 m** de el,
+  cada monton hacia su lado, flotando a 0,2 m de su suelo. Lo fabricado que no
+  cabe cae a los pies.
+- **Tirar no pide confirmacion** (el autor, 2026-10-18).
 - **Un monton por tipo de objeto**, con su cantidad, y **dos iguales que se
   posan juntos se funden**.
 - **Tirar lo lanza hacia la mirada**, en un arco corto, y no se deja recoger

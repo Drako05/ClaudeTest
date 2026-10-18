@@ -11,94 +11,60 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los objetos en el suelo (2026-10-18): todo botin cae al mundo, flota
- * a 0,2, se recoge con un iman, lo tirado se lanza y espera, se funden y duran.
+ * Ronda: los ajustes al suelo tras jugar (2026-10-18): el iman a 1, el botin
+ * desde media altura y a 0-0,5, tirar sin preguntar, tirar desde la barra y
+ * guardar en la mochila.
  */
 const DROPS = 'packages/sim/src/systems/drops.ts';
+const UI = 'packages/client/src/inventory-ui.ts';
 
 export default [
-  // Posados a ras de suelo, no a 0,2.
+  // El iman otra vez a 1,5.
   {
-    nombre: 'suelo: sin flotar',
+    nombre: 'suelo2: iman a 1,5',
     fichero: DROPS,
-    de: 'export const DROP_FLOAT = 0.2;',
-    a: 'export const DROP_FLOAT = 0;',
+    de: 'export const PICKUP_RADIUS = 1;',
+    a: 'export const PICKUP_RADIUS = 1.5;',
     prueba: 'test:tests/drops.test.ts',
   },
-  // El iman sin radio: se lo lleva todo, este donde este.
+  // El botin cae hasta a 1,5 de su origen.
   {
-    nombre: 'suelo: iman sin radio',
+    nombre: 'suelo2: dispersar de mas',
     fichero: DROPS,
-    de: 'if (tick < d.pickableAt || far > PICKUP_RADIUS || inventory.room(d.item) === 0) continue;',
-    a: 'if (tick < d.pickableAt || inventory.room(d.item) === 0) continue;',
+    de: 'export const SCATTER_REACH = 0.5;',
+    a: 'export const SCATTER_REACH = 1.5;',
     prueba: 'test:tests/drops.test.ts',
   },
-  // Lo tirado se deja recoger en el acto.
+  // El botin sale desde la base de lo roto, no de su media altura.
   {
-    nombre: 'suelo: tirar sin espera',
-    fichero: DROPS,
-    de: '    pickableAt: tick + THROW_DELAY_TICKS,',
-    a: '    pickableAt: tick,',
+    nombre: 'suelo2: salir desde la base',
+    fichero: 'packages/sim/src/systems/gathering.ts',
+    de: '  const z = box ? (box.z0 + box.z1) / 2 : objectBase(world, x, y, feature);',
+    a: '  const z = objectBase(world, x, y, feature);',
     prueba: 'test:tests/drops.test.ts',
   },
-  // Lo tirado sale hacia atras.
+  // Guardar no apila: va derecho a la primera vacia.
   {
-    nombre: 'suelo: tirar hacia atras',
-    fichero: DROPS,
-    de: '    vx: dx * THROW_SPEED,',
-    a: '    vx: -dx * THROW_SPEED,',
-    prueba: 'test:tests/drops.test.ts',
+    nombre: 'suelo2: guardar sin apilar',
+    fichero: 'packages/sim/src/inventory.ts',
+    de: '      if (!this.isOpen(i) || this.items[i] !== item || this.counts[i] >= max) continue;',
+    a: '      continue;',
+    prueba: 'test:tests/stow.test.ts',
   },
-  // Tirar una herramienta la arregla.
+  // Soltar la barra al vacio con el inventario cerrado no hace nada, como antes.
   {
-    nombre: 'suelo: tirar arregla',
-    fichero: DROPS,
-    de: '    wear: thrown.wear,',
-    a: '    wear: freshWear(thrown.item),',
-    prueba: 'test:tests/drops.test.ts',
+    nombre: 'suelo2: la barra no tira',
+    fichero: UI,
+    de: '      if (!d.bar && !this.open) return;',
+    a: '      if (!this.open) return;',
+    prueba: 'gestures',
   },
-  // Dos montones iguales no se funden.
+  // Soltar la barra sobre INVENTARIO no la guarda.
   {
-    nombre: 'suelo: sin fundir',
-    fichero: DROPS,
-    de: '  if (stackMax(d.item) <= 1) return;',
-    a: '  return;',
-    prueba: 'test:tests/drops.test.ts',
-  },
-  // Recoger es todo o nada: si no cabe entero, no entra nada.
-  {
-    nombre: 'suelo: recoger todo o nada',
-    fichero: DROPS,
-    de: '    d.count -= inventory.addSome(d.item, d.count, d.wear);',
-    a: '    d.count -= inventory.room(d.item) >= d.count ? inventory.addSome(d.item, d.count, d.wear) : 0;',
-    prueba: 'test:tests/drops.test.ts',
-  },
-  // Saltar el tiempo deja lo que caia colgado en el aire.
-  {
-    nombre: 'suelo: saltar sin caer',
-    fichero: 'packages/sim/src/tick.ts',
-    de: '    stepDrops(state.world);',
+    nombre: 'suelo2: INVENTARIO no guarda',
+    fichero: UI,
+    de: '        this.pending.stow = slot;',
     a: '',
-    prueba: 'test:tests/drops.test.ts',
-  },
-  // Descartar un chunk se lleva lo que habia en el suelo.
-  {
-    nombre: 'suelo: se pierde al alejarse',
-    fichero: 'packages/sim/src/world.ts',
-    de: '        this.faunaCache.delete(key);\n      }\n    }\n  }',
-    a:
-      '        this.faunaCache.delete(key);\n' +
-      '        for (const d of this.drops.values()) {\n' +
-      '          if (toChunkCoord(Math.floor(d.x)) === chunk.cx && toChunkCoord(Math.floor(d.y)) === chunk.cy) this.drops.remove(d.id);\n' +
-      '        }\n      }\n    }\n  }',
-    prueba: 'test:tests/drops.test.ts',
-  },
-  // El icono se dibuja medio bloque por encima de donde esta.
-  {
-    nombre: 'suelo: dibujado fuera de sitio',
-    fichero: 'packages/client/src/drops-view.ts',
-    de: 'sprite.position.set(x, z + DROP_SIZE / 2 + bobOf(t, d.id), y);',
-    a: 'sprite.position.set(x, z + DROP_SIZE + bobOf(t, d.id), y);',
-    prueba: 'smoke:resources',
+    prueba: 'gestures',
   },
 ];

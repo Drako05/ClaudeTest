@@ -5,10 +5,11 @@
  * superficie»). Los datos, en `drop-store.ts`.
  *
  * Del autor: caen con la gravedad y flotan a 0,2 de su suelo; el botin **salta
- * y se esparce** al salir; lo tirado **se lanza hacia la mirada** y no se deja
- * recoger unos 2 s; se recogen **solos, al acercarse** (un iman de unos 1,5
- * bloques) y entra lo que quepa; un monton por tipo, y **dos iguales que se
- * juntan se funden**; y duran para siempre.
+ * y se esparce** al salir, desde la mitad de la altura de lo que lo suelta y a
+ * entre 0 y 0,5 de el; lo tirado **se lanza hacia la mirada** y no se deja
+ * recoger unos 2 s; se recogen **solos, al acercarse** (un iman de 1 bloque) y
+ * entra lo que quepa; un monton por tipo, y **dos iguales que se juntan se
+ * funden**; y duran para siempre.
  *
  * Todo lo que no es eso es **deduccion mia** (`docs/juicio.md`), y cada numero
  * lo dice. El azar sale de la semilla y del tick (regla 2), nunca de
@@ -28,16 +29,16 @@ import { GRAVITY } from './jump.js';
 
 /** A cuanto de su suelo flota un monton posado, en bloques (el autor: 0,2 m). */
 export const DROP_FLOAT = 0.2;
-/** Hasta donde llega el iman, desde el cuerpo (el autor: «aprox. 1,5 bloques»). */
-export const PICKUP_RADIUS = 1.5;
+/** Hasta donde llega el iman, desde el cuerpo (el autor, 2026-10-18: 1 bloque). */
+export const PICKUP_RADIUS = 1;
 /** Lo deprisa que vuela hacia el jugador lo que se recoge, en bloques/s. **Deduccion mia.** */
 export const HOMING_SPEED = 8;
 /** A cuanto se funden dos montones iguales posados. **Deduccion mia.** */
 export const MERGE_RADIUS = 0.5;
-/** El salto del botin al salir: hacia arriba, y hacia un lado entre los dos. **Deduccion mia.** */
+/** El salto del botin al salir, hacia arriba, en bloques/s. **Deduccion mia.** */
 export const SCATTER_UP = 3;
-export const SCATTER_SIDE_MIN = 1;
-export const SCATTER_SIDE_MAX = 1.5;
+/** A cuanto de su origen cae el botin, como mucho: de 0 a 0,5 (el autor). */
+export const SCATTER_REACH = 0.5;
 /**
  * Lo que tarda el botin en dejarse recoger: el medio segundo en que se le ve
  * saltar, que si no el iman se lo llevaria antes de verlo. **Deduccion mia.**
@@ -65,8 +66,25 @@ function freshWear(item: Resource): number {
 }
 
 /**
- * Suelta un botin desde un punto, con su salto: cada monton, hacia un lado
- * distinto, sacado de la semilla, del tick y de `salt` (de donde sale).
+ * Los ticks que tarda en posarse algo que sale hacia arriba a `vz` desde
+ * `drop` por encima de donde se posara, con la misma cuenta que `fall`.
+ */
+function flightTicks(vz: number, drop: number, dt: number): number {
+  let z = drop;
+  let n = 0;
+  do {
+    vz -= GRAVITY * dt;
+    z += vz * dt;
+    n++;
+  } while (!(z <= 0 && vz <= 0) && n < 600);
+  return n;
+}
+
+/**
+ * Suelta un botin desde un punto —la mitad de la altura de lo que lo suelta—
+ * con su salto: cada monton cae a una distancia al azar de 0 a
+ * `SCATTER_REACH` y hacia su lado, sacados de la semilla, del tick y de `salt`
+ * (de donde sale). La velocidad se calcula para posarse justo ahi.
  */
 export function scatterLoot(
   world: World,
@@ -78,7 +96,11 @@ export function scatterLoot(
   loot.forEach((b, k) => {
     if (b.count <= 0) return;
     const turn = hash2DFloat(world.seed ^ 0x3c6ef372, tick * 16 + k, salt) * Math.PI * 2;
-    const side = SCATTER_SIDE_MIN + hash2DFloat(world.seed ^ 0x1b873593, tick * 16 + k, salt) * (SCATTER_SIDE_MAX - SCATTER_SIDE_MIN);
+    const reach = hash2DFloat(world.seed ^ 0x1b873593, tick * 16 + k, salt) * SCATTER_REACH;
+    const tx = at.x + Math.cos(turn) * reach;
+    const ty = at.y + Math.sin(turn) * reach;
+    const time = flightTicks(SCATTER_UP, at.z - (dropFloor(world, tx, ty) + DROP_FLOAT), TICK_DT) * TICK_DT;
+    const side = reach / time;
     world.drops.add({
       item: b.item,
       count: b.count,

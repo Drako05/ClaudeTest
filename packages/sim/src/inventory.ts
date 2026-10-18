@@ -296,6 +296,37 @@ export class Inventory {
   }
 
   /**
+   * Guarda lo de una casilla de la barra en el resto del inventario (el autor,
+   * 2026-10-18: arrastrarla al boton INVENTARIO). Primero completa las pilas
+   * del mismo objeto fuera de la barra, y lo que sobre va a la primera casilla
+   * vacia; lo que no cabe se queda en la barra (el autor: «primero apila,
+   * luego vacia»). Una herramienta va entera, con su desgaste.
+   */
+  stow(slot: number): void {
+    if (slot < 0 || slot >= HOTBAR_SLOTS) return;
+    const item = this.itemAt(slot);
+    if (item === null) return;
+    const max = stackMax(item);
+    let left = this.counts[slot];
+    for (let i = HOTBAR_SLOTS; i < this.size && left > 0; i++) {
+      if (!this.isOpen(i) || this.items[i] !== item || this.counts[i] >= max) continue;
+      const n = Math.min(left, max - this.counts[i]);
+      this.counts[i] += n;
+      left -= n;
+    }
+    for (let i = HOTBAR_SLOTS; i < this.size && left > 0; i++) {
+      if (!this.isOpen(i) || this.items[i] !== EMPTY) continue;
+      const n = Math.min(left, max);
+      this.items[i] = item;
+      this.counts[i] = n;
+      this.wear[i] = this.wear[slot];
+      left -= n;
+    }
+    if (left === 0) this.clear(slot);
+    else this.counts[slot] = left;
+  }
+
+  /**
    * Saca lo de una casilla para tirarlo, y lo devuelve con su desgaste: lo
    * lanza al mundo `tick.ts` (el autor, 2026-10-18). Lo equipado se tira solo
    * si se podria quitar. `null` si no habia nada que tirar.

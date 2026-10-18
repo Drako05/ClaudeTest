@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createGame,
   dropFloor,
-  PICKUP_RADIUS,
+  featureBox,
   skipTime,
   step,
   THROW_DELAY_TICKS,
@@ -75,7 +75,12 @@ describe('El botin cae al suelo', () => {
   it('salta y se esparce, cada monton hacia su lado, y se posa a 0,2 de su suelo', () => {
     const { state, tx, ty } = atSpawn();
     state.world.setFeature(tx + 1, ty, Feature.MeadowPlant);
+    // Sale de la mitad de la altura de la mata (el autor, 2026-10-18).
+    const box = featureBox(state.world, tx + 1, ty)!;
     act(state, { harvest: true, aimX: 1, aimY: 0, aimZ: Math.sin((-40 * Math.PI) / 180) });
+    const born = drops(state);
+    // Un tick despues de salir, a no mas de lo que sube en un tick.
+    for (const d of born) expect(Math.abs(d.z - (box.z0 + box.z1) / 2)).toBeLessThan(0.1);
     // Lejos, para que el iman no se lo lleve mientras cae.
     moveTo(state, tx + 8.5, ty + 0.5);
     act(state, {}, TICK_HZ);
@@ -85,8 +90,8 @@ describe('El botin cae al suelo', () => {
       expect(d.resting).toBe(true);
       // 0,2: el numero del autor, escrito y no leido de la constante.
       expect(d.z).toBeCloseTo(dropFloor(state.world, d.x, d.y) + 0.2, 6);
-      // Salio del centro de la casilla y ya no esta ahi.
-      expect(Math.hypot(d.x - (tx + 1.5), d.y - (ty + 0.5))).toBeGreaterThan(0.05);
+      // Cae a no mas de 0,5 del centro de la mata (el autor), escrito.
+      expect(Math.hypot(d.x - (tx + 1.5), d.y - (ty + 0.5))).toBeLessThanOrEqual(0.5 + 1e-9);
     }
     // Cada uno hacia su lado: no todos en el mismo punto.
     expect(new Set(all.map((d) => `${d.x.toFixed(3)},${d.y.toFixed(3)}`)).size).toBe(all.length);
@@ -114,13 +119,14 @@ describe('El botin cae al suelo', () => {
 });
 
 describe('Recoger', () => {
-  it('el iman: a 1,5 del cuerpo vuela hacia el jugador y entra; mas lejos se queda', () => {
+  it('el iman: a 1 del cuerpo vuela hacia el jugador y entra; mas lejos se queda', () => {
     const { state } = atSpawn();
     const id = state.playerId;
     const x = state.entities.x[id];
     const y = state.entities.y[id];
-    const near = dropAt(state, Resource.Stone, 3, x + PICKUP_RADIUS - 0.2, y);
-    const far = dropAt(state, Resource.Wood, 2, x, y + PICKUP_RADIUS + 0.6);
+    // El iman llega a 1 bloque del cuerpo (el autor, 2026-10-18), escrito.
+    const near = dropAt(state, Resource.Stone, 3, x + 0.9, y);
+    const far = dropAt(state, Resource.Wood, 2, x, y + 1.2);
     act(state, {}, TICK_HZ);
     expect(state.world.drops.get(near.id)).toBeUndefined();
     expect(state.inventory.count(Resource.Stone)).toBe(3);

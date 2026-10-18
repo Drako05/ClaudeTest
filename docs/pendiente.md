@@ -53,8 +53,26 @@ recoger unos 2 s; y mientras flota, sube y baja suave.
 comprobacion del botin en el suelo en `resources`) y la documentacion
 (`docs/recoleccion.md`, «Objetos en el suelo»).
 
-**Falta**: el visto bueno del autor a la captura (tamaño y vaiven), la CI y
-`main`, y la auditoria.
+En `main` desde `3d7b09d`. **El autor lo jugo** (2026-10-18): tamaño, vaiven,
+velocidad del iman, espera para recoger y distancia al tirar, bien. Pidio,
+literal: «El imán bájalo a 1 bloque»; «La dispersión al generarse. cuando es
+botin de una acción en el mundo, que salga dispersado de 0m a 0.5m del origen
+y desde la mitad de la altura del elemento que la género. Cuando es de una
+receta que no cabe, cae a los pies»; «Al tirar un objeto desde el inventario
+ya no se pide confirmacion»; «si se arrastras desde la hotbar a fuera de las
+casillas, se arroja (también sin confirmar)»; y arrastrar de la barra al boton
+INVENTARIO la guarda en la siguiente casilla disponible fuera de la barra. Sus
+respuestas: el saltito se queda y cae a 0-0,5; al guardar, primero apila y
+luego vacia; tirar desde la barra, en cualquier sitio salvo casillas e
+INVENTARIO.
+
+**Hecho (ajustes)**: `PICKUP_RADIUS = 1`, `SCATTER_REACH`, `midOf` en
+`gathering.ts`, `Inventory.stow` con `Intent.stow`, y en `inventory-ui.ts`
+tirar sin dialogo, tirar desde la barra y guardar. Tests en `drops.test.ts` y
+`stow.test.ts`; los gestos lo prueban con el dedo.
+
+**Falta**: la CI y `main`, que el autor lo pruebe, y la auditoria de toda la
+tanda.
 
 ---
 

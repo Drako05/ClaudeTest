@@ -288,7 +288,9 @@ async function dragReal(from, to) {
   await page.waitForTimeout(400);
 }
 const items = (p) => p.slots.map((s) => s.item);
-// Inventario cerrado: dentro de la barra se intercambia; al vacio, nada.
+// Inventario cerrado: dentro de la barra se intercambia; al vacio se tira, sin
+// preguntar; y sobre INVENTARIO se guarda fuera de la barra (el autor,
+// 2026-10-18).
 const barStart = await probe();
 await dragReal(await at('#hotbar .slot:nth-child(1)'), await at('#hotbar .slot:nth-child(3)'));
 const barSwap = await probe();
@@ -297,8 +299,20 @@ check(!barSwap.inventoryOpen && barSwap.slots[2].item === barStart.slots[0].item
   'arrastrar dentro de la barra con el inventario cerrado no intercambio');
 await dragReal(await at('#hotbar .slot:nth-child(1)'), { x: 195, y: 420 });
 const barVoid = await probe();
-check(items(barVoid).join() === items(barSwap).join() && !barVoid.discardAsk && barVoid.itemsSent.discard === barSwap.itemsSent.discard,
-  'soltar la barra al vacio con el inventario cerrado tiro algo o pidio confirmacion');
+console.log(`  barra al vacio: ${items(barSwap).slice(0, 4)} -> ${items(barVoid).slice(0, 4)}, tirados ${barVoid.itemsSent.discard - barSwap.itemsSent.discard}`);
+check(barVoid.slots[0].item === -1 && barVoid.itemsSent.discard === barSwap.itemsSent.discard + 1 && barVoid.drops.some((d) => d.item === barSwap.slots[0].item),
+  'soltar la barra al vacio con el inventario cerrado no la tiro');
+const stowFrom = barVoid.slots.findIndex((x, i) => i < 4 && x.item >= 0);
+await dragReal(await at(`#hotbar .slot:nth-child(${stowFrom + 1})`), await center('invOpen'));
+const barStow = await probe();
+const stowed = barVoid.slots[stowFrom];
+console.log(`  barra a INVENTARIO: casilla ${stowFrom + 1} ${stowed.item} x${stowed.count} -> ${barStow.slots[stowFrom].item}`);
+check(!barStow.inventoryOpen && barStow.slots[stowFrom].item === -1 && barStow.itemsSent.stow === barVoid.itemsSent.stow + 1 &&
+  barStow.slots.some((x, i) => i >= 4 && x.item === stowed.item),
+  'soltar la barra sobre INVENTARIO no la guardo fuera de la barra');
+// Lo tirado y lo guardado se reponen: lo que sigue (mover, fabricar) los usa.
+await page.evaluate(() => document.querySelector('[data-kit="piedra"]').click());
+await page.waitForTimeout(300);
 // Inventario abierto: de una casilla a otra, y de la rejilla a la barra.
 const invBtn = await center('invOpen');
 await tapReal(invBtn);
@@ -456,13 +470,14 @@ const railAt = () => page.evaluate(() => {
 });
 const rail0 = await railAt();
 const moves0 = (await probe()).itemsSent.move;
+const discards0 = (await probe()).itemsSent.discard;
 await dragReal(rail0.thumb, { x: rail0.thumb.x, y: rail0.thumb.y + 200 });
 const rail1 = await railAt();
 const afterRail = await probe();
 console.log(`  barra deslizable: ${rail0.shown ? 'se ve' : 'no se ve'}, deslizado ${rail0.top} -> ${rail1.top.toFixed(0)} de ${rail1.max}`);
 check(rail0.shown && rail0.max > 0, 'con la bolsa la rejilla no desborda o la barra no se ve');
 check(rail1.top > rail0.top + 10, 'arrastrar el mando con el dedo no deslizo la rejilla');
-check(afterRail.itemsSent.move === moves0 && !afterRail.discardAsk, 'arrastrar el mando movio o tiro una casilla');
+check(afterRail.itemsSent.move === moves0 && afterRail.itemsSent.discard === discards0, 'arrastrar el mando movio o tiro una casilla');
 
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();
