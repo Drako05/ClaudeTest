@@ -746,7 +746,10 @@ async function desktopPass(browser, baseUrl) {
   // vida de la linea (3 s) en este navegador lento: con el registro vacio, un
   // observador anota la primera linea que nace y donde esta cuando se mueve.
   // Es la mas vieja, asi que no la desliza ninguna otra: solo se mueve lo que
-  // deriva. Tiene que seguir viva, o no prueba nada.
+  // deriva. Tiene que seguir viva, o no prueba nada. Desde una pagina nueva
+  // delante de la mata: el botin de antes, que el iman va recogiendo monton a
+  // monton, no dejaba vaciarse el registro, y se media una linea vieja.
+  if (bush) await open(page, baseUrl, `&x=${bush.stand.x}&y=${bush.stand.y}`);
   await page.waitForFunction(() => document.getElementById('pickupFeed').children.length === 0, null, { timeout: 8000 })
     .catch(() => {});
   await page.evaluate(() => {
