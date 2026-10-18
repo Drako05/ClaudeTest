@@ -6,9 +6,10 @@
  * recurso, una herramienta con su desgaste. Las cuatro primeras son la barra, y
  * la elegida es lo que se tiene en la mano.
  *
- * Todo lo que entra lo hace de golpe o no entra: `fits` responde antes de
- * tocar nada, para que un botin que no cabe deje el objeto en el mundo en vez
- * de repartirse a medias (propuesta mia del plan: no se pierde nada).
+ * `add` mete de golpe o no mete: `fits` responde antes de tocar nada. Lo que
+ * viene del suelo y lo fabricado entran en lo que quepa (`addSome`), y el resto
+ * se queda en el suelo o cae a los pies (el autor, 2026-10-18: todo botin cae
+ * al suelo).
  *
  * **Los equipables** (2026-10-04): catorce huecos de PERSONAJE (`Equip`), cada
  * uno con su objeto y el desgaste que traia. El **Bolso** abre un tramo fijo
@@ -48,6 +49,13 @@ export function equipSlot(e: Equip): number {
 }
 
 const EMPTY = -1;
+
+/** Lo que sale de una casilla al tirarla: el objeto, cuantos y su desgaste. */
+export interface Thrown {
+  readonly item: Resource;
+  readonly count: number;
+  readonly wear: number;
+}
 
 export interface Bundle {
   item: Resource;
@@ -151,6 +159,28 @@ export class Inventory {
     if (!this.fits([{ item, count }])) return false;
     this.put(item, count);
     return true;
+  }
+
+  /** Cuantas unidades de un objeto caben aun, en pilas a medias y casillas vacias. */
+  room(item: Resource): number {
+    const max = stackMax(item);
+    let n = 0;
+    for (let i = 0; i < this.size; i++) {
+      if (!this.isOpen(i)) continue;
+      if (this.items[i] === EMPTY) n += max;
+      else if (this.items[i] === item) n += Math.max(0, max - this.counts[i]);
+    }
+    return n;
+  }
+
+  /**
+   * Mete lo que quepa de un objeto y devuelve cuantos entraron. `wear`: los
+   * usos de una herramienta que vuelve del suelo, que no se arregla al tirarla.
+   */
+  addSome(item: Resource, count: number, wear?: number): number {
+    const n = Math.min(Math.max(0, count), this.room(item));
+    if (n > 0) this.put(item, n, wear);
+    return n;
   }
 
   /** Saca `count` de un objeto. Devuelve false, sin tocar nada, si no hay. */
@@ -266,19 +296,25 @@ export class Inventory {
   }
 
   /**
-   * Tira lo de una casilla. Aun no hay objetos sueltos: desaparece. Lo
-   * equipado se tira solo si se podria quitar.
+   * Saca lo de una casilla para tirarlo, y lo devuelve con su desgaste: lo
+   * lanza al mundo `tick.ts` (el autor, 2026-10-18). Lo equipado se tira solo
+   * si se podria quitar. `null` si no habia nada que tirar.
    */
-  discard(slot: number): void {
+  discard(slot: number): Thrown | null {
     const e = equipOfSlot(slot);
     if (e !== null) {
-      if (this.canUnequip(e)) {
-        this.worn[e] = null;
-        this.wornWear[e] = 0;
-      }
-      return;
+      const item = this.worn[e];
+      if (item === null || !this.canUnequip(e)) return null;
+      const wear = this.wornWear[e];
+      this.worn[e] = null;
+      this.wornWear[e] = 0;
+      return { item, count: 1, wear };
     }
-    if (this.isOpen(slot)) this.clear(slot);
+    const item = this.itemAt(slot);
+    if (item === null || !this.isOpen(slot)) return null;
+    const thrown = { item, count: this.counts[slot], wear: this.wear[slot] };
+    this.clear(slot);
+    return thrown;
   }
 
   /**
@@ -335,8 +371,11 @@ export class Inventory {
     return c;
   }
 
-  /** Mete sin comprobar antes: primero rellena pilas, luego casillas vacias. */
-  private put(item: Resource, count: number): boolean {
+  /**
+   * Mete sin comprobar antes: primero rellena pilas, luego casillas vacias.
+   * Una herramienta nueva entra con todos sus usos, o con `wear` si se da.
+   */
+  private put(item: Resource, count: number, wear?: number): boolean {
     const max = stackMax(item);
     let left = count;
     for (let i = 0; i < this.size && left > 0; i++) {
@@ -350,7 +389,7 @@ export class Inventory {
       const n = Math.min(left, max);
       this.items[i] = item;
       this.counts[i] = n;
-      this.wear[i] = toolStats(item)?.uses ?? 0;
+      this.wear[i] = wear ?? toolStats(item)?.uses ?? 0;
       left -= n;
     }
     return left === 0;

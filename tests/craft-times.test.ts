@@ -40,10 +40,11 @@ describe('Fabricar varias veces de golpe', () => {
     expect(craftableTimes(inv, ingot)).toBe(0);
   });
 
-  it('el tope tambien es lo que cabe: con la mochila llena, baja de lo que dan los ingredientes', () => {
+  it('el tope es lo que dan los ingredientes; lo que no cabe se derrama', () => {
     // Tres casillas llenas: 99 lingotes, 21 de cobre y 30 de carbon. Los
-    // ingredientes dan para 10, pero solo cabe uno (el que cierra la pila de
-    // 100): ni el cobre ni el carbon se acaban y no liberan casilla.
+    // ingredientes dan para 10, y aunque solo cabe uno (el que cierra la pila
+    // de 100), el tope es 10: lo que no cabe cae a los pies (el autor,
+    // 2026-10-18), por `spill`.
     const full = () => {
       const inv = new Inventory(3);
       inv.add(Resource.CopperIngot, 99);
@@ -51,9 +52,12 @@ describe('Fabricar varias veces de golpe', () => {
       inv.add(Resource.Coal, 30);
       return inv;
     };
-    expect(craftableTimes(full(), ingot)).toBe(1);
-    expect(tryCraft(full(), ingot, anywhere, 1)).toBe('ok');
-    expect(tryCraft(full(), ingot, anywhere, 2)).toBe('full');
+    expect(craftableTimes(full(), ingot)).toBe(10);
+    const spilled: Array<[Resource, number]> = [];
+    const inv = full();
+    expect(tryCraft(inv, ingot, anywhere, 2, (item, n) => spilled.push([item, n]))).toBe('ok');
+    expect(inv.count(Resource.CopperIngot)).toBe(100);
+    expect(spilled).toEqual([[Resource.CopperIngot, 1]]);
   });
 
   it('una sola vez es lo de siempre', () => {

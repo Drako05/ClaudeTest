@@ -54,6 +54,12 @@ export const MAX_HEIGHT = MAX_LEVEL * VOXELS_PER_TILE;
 export const WATER_HEIGHT = -VOXELS_PER_TILE;
 
 /**
+ * La superficie del agua, en bloques: justo bajo el nivel donde empieza la
+ * tierra. La dibuja el cliente y sobre ella flota lo que cae al agua.
+ */
+export const WATER_SURFACE = -0.18;
+
+/**
  * Cuanto levanta un saliente, en bloques de 1.
  *
  * De aqui salen las paredes altas: el campo de elevacion es tan suave que sin

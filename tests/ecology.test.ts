@@ -23,6 +23,7 @@ import {
   maturesInto,
   Resource,
 } from '@verdant/shared';
+import { groundCount } from './ground.js';
 
 /**
  * Los ritmos del ecosistema, medidos sobre la simulacion real.
@@ -178,18 +179,17 @@ describe('El ciclo de la siembra', () => {
   it('recolectar deja entre cero y dos semillas', () => {
     const world = new World(2024);
     world.setNow(0);
-    // Holgado: son 120 arboles y aqui se mide la semilla, no el inventario.
-    const inventory = new Inventory(256);
+    // Lo que suelta cada arbol cae al suelo: se cuenta alli.
     const counts = new Map<number, number>();
     let harvests = 0;
 
     for (let y = -60; y < 60 && harvests < 120; y++) {
       for (let x = -60; x < 60 && harvests < 120; x++) {
         if (lifeKindOf(world.featureAt(x, y)) !== LifeKind.Tree) continue;
-        const before = inventory.count(Resource.TreeSeed);
-        const result = harvestTile(world, x, y, inventory, world.currentTick);
+        const before = groundCount(world, Resource.TreeSeed);
+        const result = harvestTile(world, x, y, world.currentTick);
         expect(result).not.toBeNull();
-        const gained = inventory.count(Resource.TreeSeed) - before;
+        const gained = groundCount(world, Resource.TreeSeed) - before;
         counts.set(gained, (counts.get(gained) ?? 0) + 1);
         harvests++;
       }
@@ -211,9 +211,8 @@ describe('El ciclo de la siembra', () => {
     const cx = tree.x >> 5;
     const cy = tree.y >> 5;
 
-    const inventory = new Inventory();
     const balanced = world.isBiomeBalanced(cx, cy, world.biomeAt(tree.x, tree.y));
-    const result = harvestTile(world, tree.x, tree.y, inventory, 0)!;
+    const result = harvestTile(world, tree.x, tree.y, 0)!;
 
     if (balanced) {
       // 3 de base con un 30 % de bonus.
@@ -243,7 +242,7 @@ describe('El ciclo de la siembra', () => {
 
     // Un brote ni estorba el paso ni se puede recolectar todavia.
     expect(world.isSolidAt(tree.x, tree.y)).toBe(false);
-    expect(harvestTile(world, tree.x, tree.y, inventory, 0)).toBeNull();
+    expect(harvestTile(world, tree.x, tree.y, 0)).toBeNull();
 
     const adult = maturesInto(sapling!);
     world.setNow(MATURATION_TICKS - 1);

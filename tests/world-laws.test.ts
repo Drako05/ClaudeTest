@@ -37,6 +37,7 @@ import {
   toolStats,
   withinEquilibrium,
 } from '@verdant/shared';
+import { groundCount } from './ground.js';
 
 /**
  * Las leyes de "El libro del mundo", convertidas en pruebas.
@@ -735,13 +736,13 @@ describe('Capitulo II: combinar y herramientas', () => {
     const work = new WorkState();
     for (let t = 0; t < 20; t++) tryHarvestArea(state.world, e, id, hands, t, work);
     expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.CopperNode);
-    expect(hands.count(Resource.Copper)).toBe(0);
+    expect(groundCount(state.world, Resource.Copper)).toBe(0);
 
     // Con un pico, sale.
     const pick = new Inventory();
     pick.add(Resource.StonePickaxe, 1);
     for (let t = 0; t < 5; t++) tryHarvestArea(state.world, e, id, pick, 100 + t, work);
     expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.None);
-    expect(pick.count(Resource.Copper)).toBeGreaterThan(0);
+    expect(groundCount(state.world, Resource.Copper)).toBeGreaterThan(0);
   });
 });

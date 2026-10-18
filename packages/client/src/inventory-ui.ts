@@ -459,7 +459,7 @@ export class InventoryUi {
   /**
    * Cada frame, la receta mantenida se carga. No hay avisos en pantalla
    * —«necesitas un pico», «inventario lleno», «fabricado»—: el autor los quito
-   * todos el 2026-09-29. Lo que no cabe se resolvera tirando objetos al suelo.
+   * todos el 2026-09-29. Lo que no cabe cae al suelo (el autor, 2026-10-18).
    */
   frame(): void {
     // Lejos de su estacion, su panel se cierra solo (decision del autor), con
@@ -715,14 +715,15 @@ export class InventoryUi {
   }
 
   /**
-   * Fabricar: mantener pulsado el resultado. Sin ingredientes o sin sitio no
-   * arranca, y sin aviso (decision del autor). Soltar o salirse antes de tiempo
+   * Fabricar: mantener pulsado el resultado. Sin ingredientes no arranca, y
+   * sin aviso (decision del autor); sin sitio si, y lo que no cabe cae a los
+   * pies (el autor, 2026-10-18). Soltar o salirse antes de tiempo
    * lo cancela.
    */
   private bindHold(el: HTMLElement, row: HTMLElement, recipe: number): void {
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      // Sin ingredientes o sin sitio para las N veces, no arranca.
+      // Sin ingredientes para las N veces, no arranca.
       if (craftableTimes(this.current().inventory, recipe) < this.timesOf(recipe)) return;
       this.cancelHold();
       this.hold = { recipe, since: now(), row };
