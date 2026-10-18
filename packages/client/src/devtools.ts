@@ -186,29 +186,29 @@ export class DevTools {
       <div class="devGroup">
         <span class="devLabel">Tiempo <b id="devSpeed">1x</b></span>
         <div class="devRow">
-          <button data-toggle="pause" type="button">Pausa</button>
-          ${SPEEDS.map((v) => `<button data-speed="${v}" type="button">${v}x</button>`).join('')}
+          <button class="btn" data-toggle="pause" type="button"><span>Pausa</span></button>
+          ${SPEEDS.map((v) => `<button class="btn" data-speed="${v}" type="button"><span>${v}x</span></button>`).join('')}
         </div>
         <div class="devRow">
           ${JUMPS.map(
             ([label, ticks]) =>
-              `<button data-jump="${ticks}" data-jump-label="${label}" type="button">${label}</button>`,
+              `<button class="btn" data-jump="${ticks}" data-jump-label="${label}" type="button"><span>${label}</span></button>`,
           ).join('')}
         </div>
         <div class="devRow">
-          <button data-toggle="survival" type="button">Sin hambre</button>
-          <button data-kit="piedra" type="button">Materiales de piedra</button>
-          <button data-kit="metal" type="button">Materiales de metal</button>
-          <button data-kit="cocina" type="button">Materiales de cocina</button>
+          <button class="btn" data-toggle="survival" type="button"><span>Sin hambre</span></button>
+          <button class="btn" data-kit="piedra" type="button"><span>Materiales de piedra</span></button>
+          <button class="btn" data-kit="metal" type="button"><span>Materiales de metal</span></button>
+          <button class="btn" data-kit="cocina" type="button"><span>Materiales de cocina</span></button>
         </div>
         <p class="devNote">Un salto no simula el movimiento de esas horas.</p>
       </div>
       <div class="devGroup">
         <span class="devLabel">Vista</span>
         <div class="devRow">
-          <button data-toggle="chunks" type="button">Bordes de chunk</button>
-          <button data-toggle="biomes" type="button">Bordes de bioma</button>
-          <button data-toggle="boxes" type="button">Cajas</button>
+          <button class="btn" data-toggle="chunks" type="button"><span>Bordes de chunk</span></button>
+          <button class="btn" data-toggle="biomes" type="button"><span>Bordes de bioma</span></button>
+          <button class="btn" data-toggle="boxes" type="button"><span>Cajas</span></button>
         </div>
         <p class="devNote">Cajas: <b class="boxHit">golpe</b>, <b class="boxSolid">choque</b>,
           <b class="boxBoth">las dos</b>.</p>

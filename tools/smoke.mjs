@@ -131,6 +131,67 @@ function reliefInside(shadow) {
 }
 
 /**
+ * El estandar de los botones (el autor, 2026-10-18: «Estandariza la
+ * construcción para todos los botones»), en cada boton que se ve: lo que se
+ * pulsa es `.btn` o una casilla (`.slot`); lleva dentro un icono o un texto en
+ * su `<span>`, en blanco, con su relieve por dentro; encendido o abierto se
+ * ilumina con el azul y baja lo de dentro 2 px, y pulsado (`:active`, forzado
+ * con el protocolo de Chrome) igual. Apagado, ni relieve ni luz. Los colores
+ * van escritos aqui y no leidos del CSS, para que cambiarlos alli se vea.
+ * Devuelve lo que no cumple.
+ */
+async function buttonStandard(page) {
+  const INK = 'rgb(232, 238, 247)';
+  const BG = 'rgba(8, 14, 28, 0.82)';
+  const LIT_INK = 'rgb(244, 249, 255)';
+  const LIT_BG = 'rgba(60, 104, 168, 0.86)';
+  const look = () => page.evaluate(() => Array.from(document.querySelectorAll('button, .btn')).map((el) => {
+    const r = el.getBoundingClientRect();
+    const s = getComputedStyle(el);
+    const kids = Array.from(el.children).filter((k) => getComputedStyle(k).display !== 'none');
+    return {
+      name: el.id || el.dataset.page || el.dataset.category || el.dataset.toggle || el.dataset.kit || el.dataset.speed || el.dataset.jump || el.getAttribute('aria-label') || el.textContent.trim(),
+      shown: r.width > 0 && r.height > 0 && s.visibility !== 'hidden',
+      btn: el.classList.contains('btn'),
+      slot: el.classList.contains('slot'),
+      off: el.disabled || el.classList.contains('off'),
+      lit: el.classList.contains('on') || el.classList.contains('open'),
+      looseText: Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim() !== ''),
+      odd: kids.filter((k) => !['svg', 'SPAN', 'KBD'].includes(k.nodeName)).map((k) => k.nodeName),
+      color: s.color, bg: s.backgroundColor, shadow: s.boxShadow, opacity: Number(s.opacity),
+      down: kids.map((k) => new DOMMatrix(getComputedStyle(k).transform).f),
+    };
+  }));
+  const judge = (b, pressed) => {
+    if (!b.shown) return null;
+    if (!b.btn) return b.slot ? null : 'sin .btn';
+    if (b.looseText || b.odd.length) return `dentro, ni icono ni texto en su span (${b.odd})`;
+    if (b.off) return b.opacity < 0.5 && b.shadow === 'none' ? null : 'apagado con relieve o sin atenuar';
+    const lit = pressed || b.lit;
+    if (lit) return b.color === LIT_INK && b.bg === LIT_BG && b.down.every((d) => d === 2) ? null : `no se ilumina o no baja lo de dentro (${b.color}, ${b.bg}, ${b.down})`;
+    return b.color === INK && b.bg === BG && reliefInside(b.shadow) && b.down.every((d) => d === 0) ? null : `no es blanco sobre su fondo con relieve (${b.color}, ${b.bg})`;
+  };
+  const normal = await look();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('DOM.enable');
+  await cdp.send('CSS.enable');
+  const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+  const { nodeIds } = await cdp.send('DOM.querySelectorAll', { nodeId: root.nodeId, selector: 'button, .btn' });
+  for (const nodeId of nodeIds) await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['active'] });
+  const pressed = await look();
+  for (const nodeId of nodeIds) await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
+  await cdp.detach();
+  const bad = [];
+  normal.forEach((b, i) => {
+    const a = judge(b, false);
+    const p = judge(pressed[i], !b.off);
+    if (a) bad.push(`${b.name}: ${a}`);
+    else if (p) bad.push(`${b.name}, pulsado: ${p}`);
+  });
+  return { seen: normal.filter((b) => b.shown && b.btn).length, bad };
+}
+
+/**
  * Los iconos en pixelart que se ven y NO miden un multiplo entero de su rejilla
  * de 24 (el autor, 2026-10-17: solo el icono se ajusta; la casilla o el boton
  * se quedan como estan). Fuera de multiplo, sus pixeles salen desiguales.
@@ -832,6 +893,9 @@ async function desktopPass(browser, baseUrl) {
     return { id, square: parseFloat(s.borderTopLeftRadius) < el.getBoundingClientRect().width / 2 - 1, shadow: s.boxShadow };
   })).then((all) => all.filter((x) => !(x.square && reliefInside(x.shadow))));
   check(shapes.length === 0, `hay botones redondos o sin relieve dentro: ${JSON.stringify(shapes)}`);
+  const stdPc = await buttonStandard(page);
+  console.log(`  el estandar de los botones, en PC: ${stdPc.seen} botones, ${stdPc.bad.length} fuera`);
+  check(stdPc.seen > 10 && stdPc.bad.length === 0, `hay botones fuera del estandar: ${stdPc.bad.join(' | ')}`);
   // Pulsado o encendido, el boton no se mueve: baja su icono, 2 px, y el
   // boton cambia sus luces (el autor, 2026-10-17). Se mira en la categoria
   // elegida, encendida y ademas pulsada.
@@ -1653,6 +1717,14 @@ async function stationsPass(browser, baseUrl) {
   const upHeld = await holdQty('+');
   const atTop = await qty(1);
   const downHeld = await holdQty('-');
+  // Apagado al llegar a su tope con el raton puesto, el + no se queda con la
+  // luz de pulsado para cuando vuelve a encenderse.
+  await page.waitForTimeout(250);
+  const plusAfter = await page.evaluate(() => {
+    const b = document.querySelector('#recipeList .recipe:nth-child(1) .qty button:nth-child(1)');
+    return { pressed: b.classList.contains('pressed'), bg: getComputedStyle(b).backgroundColor, any: document.querySelectorAll('.pressed').length };
+  });
+  check(!plusAfter.pressed && plusAfter.any === 0 && plusAfter.bg === 'rgba(8, 14, 28, 0.82)', `el + se queda iluminado despues de mantenerlo: ${JSON.stringify(plusAfter)}`);
   // Un toque, uno: el `click` del puntero no da otro.
   const tapAt = await center('#recipeList .recipe:nth-child(1) .qty button:nth-child(1)');
   await page.mouse.click(tapAt.x, tapAt.y);
@@ -1945,6 +2017,8 @@ async function mobilePass(browser, baseUrl) {
     return { id, square: parseFloat(s.borderTopLeftRadius) < el.getBoundingClientRect().width / 2 - 1, shadow: s.boxShadow };
   }))).filter((x) => !(x.square && reliefInside(x.shadow))).map((x) => x.id);
   check(roundOnes.length === 0, `hay botones del movil redondos o sin relieve dentro: ${roundOnes}`);
+  const stdTouch = await buttonStandard(page);
+  check(stdTouch.seen >= 9 && stdTouch.bad.length === 0, `hay botones del movil fuera del estandar: ${stdTouch.bad.join(' | ')}`);
   const offButtons = await offGridIcons(page);
   check(offButtons.length === 0, `hay iconos de boton fuera de un multiplo de 24: ${offButtons.join(', ')}`);
   // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
@@ -2037,6 +2111,19 @@ async function mobilePass(browser, baseUrl) {
     pages.push((await state(page)).inventoryPage);
   }
   console.log(`  paginas del inventario: ${pages.join(' -> ')}`);
+  // Un toque en una pestana la ilumina como a cualquier boton, y no menos de
+  // 150 ms (`press-light.ts`); luego queda la luz de elegida, que es otra.
+  await page.tap('#invTabs button:nth-child(3)');
+  // A los 60 ms de soltar sigue encendida: un toque no la apaga en el acto.
+  await page.waitForTimeout(60);
+  const tabPressed = await page.evaluate(() => document.querySelector('#invTabs button:nth-child(3)').classList.contains('pressed'));
+  await page.waitForTimeout(400);
+  const tabAfter = await page.evaluate(() => document.querySelector('#invTabs button:nth-child(3)').classList.contains('pressed'));
+  check(tabPressed && !tabAfter, `tocar una pestana no la ilumina al tocarla, o no se apaga: ${tabPressed} / ${tabAfter}`);
+  await page.tap('#invTabs button:nth-child(2)');
+  const stdInv = await buttonStandard(page);
+  console.log(`  el estandar de los botones, con el inventario del movil: ${stdInv.seen} botones, ${stdInv.bad.length} fuera`);
+  check(stdInv.bad.length === 0, `hay botones del movil fuera del estandar: ${stdInv.bad.join(' | ')}`);
   // La distribucion de cada pagina (pedido del autor, 2026-09-29): el contenido
   // pegado a las pestanas, la zona de lo seleccionado fija y centrada abajo, a
   // la misma altura en PERSONAJE e INVENTARIO, y nada que deslizar salvo la
@@ -2433,6 +2520,8 @@ async function devToolsPass(browser, baseUrl) {
   const start = await open(page, baseUrl, '&dev=1');
   check(start.dev === true, 'el panel no se activo con ?dev=1');
   check(await page.isVisible('#devPanel'), 'el panel de desarrollo no es visible');
+  const stdDev = await buttonStandard(page);
+  check(stdDev.bad.length === 0, `hay botones del panel de desarrollo fuera del estandar: ${stdDev.bad.join(' | ')}`);
 
   // La hoja de los iconos (`?iconos=1`, la revision de la tanda del
   // 2026-10-17): los 30 objetos, los 14 huecos de PERSONAJE, los 20 botones y

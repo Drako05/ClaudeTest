@@ -205,3 +205,46 @@ que venga. Son **las directrices del autor** para el diseño.
   Los diseños son del agente, y **el autor los aprobo en dos hojas**
   («Aprobados, adelante con la ronda 2», «Aprobados, adelante con la ronda
   3»). Un objeto nuevo necesita su icono: el test falla si falta.
+
+## Directriz 6: un solo boton, para todos los botones
+
+> «Note un comportamiento de algunos bonotes que no está estandarizado. Los
+> botones de las pestañas dentro de inventario y los botones de + y -, no se
+> iluminan al ser presionados. Además, los botones de las pestañas no tienen
+> el texto en blanco, que es el color del icono de todos los demás botones.
+> Estandariza la construcción para todos los botones de ahora en adelante
+> (arte pixelart o texto, color, sombra e iluminación, comportamiento, etc.)
+> y arregla los que ya mencionados.» — el autor, 2026-10-18
+
+- **Del autor** (respuestas del 2026-10-18):
+  - la pestaña elegida (Personaje, Inventario, Recetas) **se ve encendida,
+    como un boton**, sin la raya de debajo;
+  - **los del panel de desarrollo, igual que los del juego**, con el mismo
+    azul;
+  - **un solo azul**: pulsado y encendido se ven igual.
+- **El estandar** (lo que se repite en todos; cada boton pone solo su tamaño,
+  su sitio, sus esquinas y su letra):
+  - todo lo que se pulsa lleva **`class="btn"`**, salvo las casillas, que se
+    arrastran;
+  - **dentro, un icono o un texto**: el icono, en pixelart de un color a
+    multiplo de 24 (directriz 5); el texto, en su `<span>` y en la letra
+    monoespaciada del juego; los dos **en blanco** (`#e8eef7`);
+  - **fondo oscuro con borde azul tenue, y el relieve por dentro** (luz de 2
+    px arriba a la izquierda, sombra de 3 abajo a la derecha);
+  - **pulsado** —mientras el dedo o el raton estan encima, y **no menos de
+    150 ms**, para que un toque rapido se vea— y **encendido o abierto**
+    (CORRER puesto, la mochila abierta, la pestaña elegida): **se ilumina**
+    con el azul, se invierten sus luces y **baja lo de dentro 2 px**; el
+    boton no se mueve;
+  - **apagado** (el + en su tope, una categoria vacia): tenue, sin relieve, y
+    no se ilumina.
+- **Lo que el agente decidio, *por confirmar***: los 150 ms (eran los de USAR
+  y SALTAR); el azul, el de USAR pulsado (el mas vivo de los dos que habia); y
+  que **Tirar deje de ser rojo** y **Reiniciar deje de ser azul claro con
+  letra oscura**, porque «todos los botones» los incluye.
+- **Donde vive**: la regla al final del CSS de `index.html` (`.btn`), la luz
+  de pulsar en `client/src/press-light.ts`, que escucha en el documento y
+  vale sola para los botones que se creen despues, y el humo
+  (`buttonStandard`), que mira cada boton que se ve en PC, en el movil y en
+  el panel de desarrollo y falla si uno no cumple.
+- **Aplicada**: todos los botones del juego (2026-10-18).

@@ -202,15 +202,16 @@ check(tapped.projection === 'perspectiva' && !tapped.fovPanel,
 await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
 
 // USAR y SALTAR se encienden mientras el dedo esta puesto y se apagan al
-// soltar (pedido del autor), con toques de verdad.
+// soltar (pedido del autor), con toques de verdad: la luz de todos los
+// botones, `.pressed` (`press-light.ts`).
 for (const id of ['use', 'jump']) {
   const at = await center(id);
   await real('touchStart', [at]);
   await page.waitForTimeout(80);
-  const lit = await page.evaluate((i) => document.getElementById(i).classList.contains('on'), id);
+  const lit = await page.evaluate((i) => document.getElementById(i).classList.contains('pressed'), id);
   await real('touchEnd', []);
   await page.waitForTimeout(400);
-  const off = await page.evaluate((i) => !document.getElementById(i).classList.contains('on'), id);
+  const off = await page.evaluate((i) => !document.getElementById(i).classList.contains('pressed'), id);
   console.log(`  ${id}: encendido al tocar ${lit}, apagado al soltar ${off}`);
   check(lit && off, `el boton ${id} no se enciende al tocarlo o no se apaga al soltar`);
 }
@@ -219,7 +220,7 @@ for (const id of ['use', 'jump']) {
 const modeBtn = await center('modeTouch');
 const shownIcon = () => page.evaluate(() =>
   getComputedStyle(document.querySelector('#modeTouch .mode-precise')).display !== 'none' ? 'mirilla' : 'tajo');
-const modeLit = () => page.evaluate(() => document.getElementById('modeTouch').classList.contains('on'));
+const modeLit = () => page.evaluate(() => document.getElementById('modeTouch').classList.contains('pressed'));
 const mode0 = await probe();
 const icon0 = await shownIcon();
 // Con el dedo puesto se enciende, y al soltar se apaga (pedido del autor).

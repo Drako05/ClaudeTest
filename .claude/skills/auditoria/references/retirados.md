@@ -156,3 +156,10 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `--arc\b|155,5 grados|arco (de MODO y ENTRADA )?de 102` — MODO y ENTRADA en un arco del mismo radio alrededor del ataque (102 px, MODO a 155,5 grados); desde el 2026-10-17, a 10 px de USAR y de SALTAR, corridos 4 px en espejo (`--modegap`, `--modeshift`). Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
 - `0 3px 0 rgba` — la sombra dura de 3 px que el relieve echaba debajo del boton, por fuera; desde el 2026-10-17 el relieve va todo por dentro. Permitido en: `tools/mutaciones.mjs` (la mutacion la reintroduce), `docs/historia.md`, `docs/pendiente.md`.
 - `scale\(\.9[0-9]\)|baja 2 px y se hunde` — el boton entero que se encogia o bajaba al pulsarlo; desde el 2026-10-17 se queda quieto y baja su icono. Permitido en: `docs/historia.md`, `docs/pendiente.md`.
+
+## El estandar de los botones (2026-10-18)
+
+- `border-bottom-color: #8fc4ff|rgba\(232, 238, 247, \.38\)` — las pestanas del movil con el texto gris y la elegida en azul con raya debajo; desde el 2026-10-18 son botones del estandar, blancas, y la elegida encendida. Permitido en: `tools/mutaciones.mjs` (la mutacion lo reintroduce), `docs/historia.md`, `docs/pendiente.md`.
+- `rgba\(255, 196, 107, \.22\)|#ffdca6` — la luz naranja de los botones del panel de desarrollo; desde el 2026-10-18, el azul de todos. Permitido en: `docs/historia.md`, `docs/pendiente.md`.
+- `rgba\(168, 60, 60|color: #0b1020; background: #8fc4ff` — Tirar en rojo y Reiniciar en azul claro con letra oscura; desde el 2026-10-18, el estandar. Permitido en: `docs/historia.md`, `docs/pendiente.md`.
+- `padding: 16px 0 10px|padding-top: 11px; padding-bottom: 7px|qty button:enabled:active \{ padding-top` — bajar el texto de un boton pulsado moviendo su relleno; desde el 2026-10-18 el texto va en su `<span>` y baja con el icono. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/escapes.md` (el escape 34 lo cuenta).
