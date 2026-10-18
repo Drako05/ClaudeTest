@@ -11,9 +11,9 @@
  *   HUD y el entorno.
  * - **Se arrastra** para mover: el mismo objeto se apila y uno distinto se
  *   intercambia. Con el inventario abierto, entre la rejilla y la barra de la
- *   mano; cerrado, dentro de la barra. **Soltarlo fuera del panel lo tira**,
- *   previa confirmacion, y solo con el panel abierto: desde la barra cerrada,
- *   soltar al vacio no hace nada.
+ *   mano; cerrado, dentro de la barra. **Soltarlo fuera lo tira**, sin
+ *   preguntar; y desde la barra, **soltarlo sobre INVENTARIO lo guarda** fuera
+ *   de ella (el autor, 2026-10-18; `bindDrag`).
  * - **Fabricar es mantener pulsado 1 s** el resultado de la receta (1,5 hasta
  *   el 2026-10-17), y la fila se llena de izquierda a derecha como una barra
  *   de carga. Con **+ y -** (solo en lo apilable) se elige cuantas veces: un
@@ -114,6 +114,8 @@ export interface ItemRequests {
   moveFrom: number;
   moveTo: number;
   discard: number;
+  /** Casilla de la barra que se guarda en el resto del inventario. */
+  stow: number;
 }
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -135,8 +137,6 @@ export class InventoryUi {
   private readonly recipeTabs = byId('recipeTabs');
   private readonly recipeList = byId('recipeList');
   private readonly tabs = byId('invTabs');
-  private readonly discardAsk = byId('discardAsk');
-  private readonly discardText = byId('discardText');
   private readonly others = byId('others');
   private readonly invOpen = byId('invOpen');
   private readonly ghost = byId('dragGhost');
@@ -145,10 +145,6 @@ export class InventoryUi {
   private page: Page = 'inventario';
   /** Casilla cuyo objeto se describe. */
   private picked = -1;
-  /** Lo que espera confirmacion para tirarse. */
-  private asking: { slot: number; item: Resource } | null = null;
-  /** El toque que cerro la confirmacion, que no empieza un arrastre. */
-  private dismissEvent: Event | null = null;
   private drag: {
     slot: number;
     bar: boolean;
@@ -167,12 +163,12 @@ export class InventoryUi {
   private mode: Station = Station.Hand;
 
   /** Peticiones que salieron hacia la `Intent`, para el humo. */
-  readonly sent = { select: 0, craft: 0, move: 0, discard: 0 };
+  readonly sent = { select: 0, craft: 0, move: 0, discard: 0, stow: 0 };
   /** Se llama al abrir o cerrar el inventario. */
   onToggle: ((open: boolean) => void) | null = null;
 
   private static none(): ItemRequests {
-    return { select: -1, craft: -1, craftTimes: 1, moveFrom: -1, moveTo: -1, discard: -1 };
+    return { select: -1, craft: -1, craftTimes: 1, moveFrom: -1, moveTo: -1, discard: -1, stow: -1 };
   }
 
   /** Las veces elegidas para cada receta (por su indice en `RECIPES`). */
@@ -227,18 +223,6 @@ export class InventoryUi {
         this.renderPage();
       });
     }
-    byId('discardYes').addEventListener('click', () => this.answer(true));
-    byId('discardNo').addEventListener('click', () => this.answer(false));
-    // Tocar fuera de la confirmacion la cancela (propuesta mia).
-    document.addEventListener(
-      'pointerdown',
-      (e) => {
-        if (!this.asking || this.discardAsk.contains(e.target as Node | null)) return;
-        this.dismissEvent = e;
-        this.answer(false);
-      },
-      true,
-    );
     this.invOpen.addEventListener('click', () => this.toggle());
     this.others.addEventListener('click', () => this.setOthers(!document.body.classList.contains('others-open')));
     // OTROS se cierra tocando fuera de su fila (propuesta mia).
@@ -302,14 +286,13 @@ export class InventoryUi {
    * la fase de captura del documento, antes que nadie, y se traga ese dedo
    * entero —sus eventos de puntero, de toque y el clic que le sigue— hasta que
    * se levanta. No cuentan como fuera el panel, la barra de la mano (se
-   * arrastra entre las dos), el boton INVENTARIO (ya alterna) y el dialogo de
-   * tirar (deduccion mia).
+   * arrastra entre las dos) y el boton INVENTARIO (ya alterna; deduccion mia).
    */
   private bindTouchOutside(): void {
     let swallowing: number | null = null;
     let swallowClickUntil = 0;
     const inside = (t: EventTarget | null) =>
-      t instanceof Element && !!t.closest('#invPanel, #hotbar, #invOpen, #discardAsk');
+      t instanceof Element && !!t.closest('#invPanel, #hotbar, #invOpen');
     document.addEventListener(
       'pointerdown',
       (e) => {
@@ -377,7 +360,6 @@ export class InventoryUi {
       this.qtyHold = null;
       // Al cerrar, todas las recetas vuelven a 1 (el autor, 2026-10-17).
       this.times.clear();
-      this.answer(false);
     }
     this.onToggle?.(open);
     if (open) this.render(this.current());
@@ -415,36 +397,6 @@ export class InventoryUi {
     this.others.setAttribute('aria-expanded', String(open));
   }
 
-  /** Si hay una confirmacion de tirar a la vista. */
-  get askingDiscard(): boolean {
-    return this.asking !== null;
-  }
-
-  /** Pide confirmacion para tirar lo de esa casilla. */
-  private ask(slot: number): void {
-    const inv = this.current().inventory;
-    const item = inv.itemAt(slot);
-    if (item === null) return;
-    this.asking = { slot, item };
-    this.discardText.textContent =
-      stackMax(item) === 1
-        ? `¿Tirar ${RESOURCE_NAMES[item]}?`
-        : `¿Tirar ${inv.counts[slot]} × ${RESOURCE_NAMES[item]}?`;
-    this.discardAsk.hidden = false;
-  }
-
-  /**
-   * Responde a la confirmacion. Si entretanto la casilla cambio de objeto (se
-   * comio, se movio), no se tira nada: se confirmo tirar OTRA cosa.
-   */
-  private answer(yes: boolean): void {
-    const asked = this.asking;
-    if (!asked) return;
-    this.asking = null;
-    this.discardAsk.hidden = true;
-    if (yes && this.current().inventory.itemAt(asked.slot) === asked.item) this.pending.discard = asked.slot;
-  }
-
   /** Las peticiones pendientes, que se vacian. Las recoge el bucle. */
   take(): ItemRequests {
     const out = this.pending;
@@ -453,6 +405,7 @@ export class InventoryUi {
     if (out.craft >= 0) this.sent.craft++;
     if (out.moveFrom >= 0) this.sent.move++;
     if (out.discard >= 0) this.sent.discard++;
+    if (out.stow >= 0) this.sent.stow++;
     return out;
   }
 
@@ -545,16 +498,20 @@ export class InventoryUi {
 
   /**
    * Arrastrar con raton o dedo. Pasado `DRAG_SLOP`, la casilla se lleva como
-   * una etiqueta que sigue al puntero; al soltar, sobre otra casilla —de la
-   * rejilla o de la barra— la mueve (apila o intercambia); fuera del panel
-   * abierto pide confirmacion para tirarla; y en cualquier otro sitio no hace
-   * nada. Con el inventario cerrado solo esta la barra, y soltar al vacio no
-   * tira. Sin moverse es un toque: en la barra elige la mano, en la rejilla
-   * describe el objeto.
+   * una etiqueta que sigue al puntero. Al soltar (el autor, 2026-10-18):
+   * - sobre otra casilla —de la rejilla o de la barra— la mueve (apila o
+   *   intercambia);
+   * - desde la barra, sobre el boton INVENTARIO, la guarda en el resto del
+   *   inventario (`stow`);
+   * - desde la barra, en cualquier otro sitio, este el panel abierto o no, **la
+   *   tira**, sin preguntar;
+   * - desde el panel, fuera del panel y de la barra, la tira, sin preguntar.
+   * Sin moverse es un toque: en la barra elige la mano, en la rejilla describe
+   * el objeto.
    */
   private bindDrag(el: HTMLElement, slot: number, bar: boolean): void {
     el.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || this.asking || e === this.dismissEvent) return;
+      if (e.button !== 0) return;
       this.drag = { slot, bar, x: e.clientX, y: e.clientY, moving: false, el, over: null };
       try {
         el.setPointerCapture(e.pointerId);
@@ -606,9 +563,13 @@ export class InventoryUi {
         }
         return;
       }
-      if (!this.open) return;
       const under = document.elementFromPoint(e.clientX, e.clientY);
-      if (!under || !(this.panel.contains(under) || this.hotbar.contains(under))) this.ask(slot);
+      if (d.bar && under && this.invOpen.contains(under)) {
+        this.pending.stow = slot;
+        return;
+      }
+      if (!d.bar && !this.open) return;
+      if (!under || !(this.panel.contains(under) || this.hotbar.contains(under))) this.pending.discard = slot;
     };
     el.addEventListener('pointerup', (e) => end(e, false));
     el.addEventListener('pointercancel', (e) => end(e, true));

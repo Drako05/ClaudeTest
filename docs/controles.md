@@ -21,8 +21,8 @@ sin pausar. **TAB cambia el modo de golpe** (barrido o preciso, del autor,
 2026-09-30). **I abre la informacion y B el panel del bioma** (2026-10-02).
 **Cada boton de PC tiene su tecla y la lleva escrita** en su esquina de abajo
 a la izquierda (pedido del autor, 2026-10-02): el ojo P, la informacion I, el
-bioma B, MODO TAB e INVENTARIO E; solo en PC. Los botones de los dialogos
-(«Reiniciar», «Cancelar», «Tirar») no la llevan (deduccion mia). CTRL soltaba
+bioma B, MODO TAB e INVENTARIO E; solo en PC. Reiniciar, el boton del unico
+dialogo, no la lleva (deduccion mia). CTRL soltaba
 el raton para pulsar botones hasta el 2026-10-02, y el autor lo retiro.
 **Clic izquierdo golpea y clic derecho usa** lo que se
 lleva en la mano: una baya se come, una semilla se siembra. **Con el inventario

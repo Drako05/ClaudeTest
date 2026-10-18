@@ -241,7 +241,8 @@ que venga. Son **las directrices del autor** para el diseño.
 - **Lo que el agente decidio, *por confirmar***: los 150 ms (eran los de USAR
   y SALTAR); el azul, el de USAR pulsado (el mas vivo de los dos que habia); y
   que **Tirar deje de ser rojo** y **Reiniciar deje de ser azul claro con
-  letra oscura**, porque «todos los botones» los incluye.
+  letra oscura**, porque «todos los botones» los incluye. (El dialogo de
+  tirar, con su boton Tirar, se retiro ese mismo dia: tirar ya no pregunta.)
 - **Donde vive**: la regla al final del CSS de `index.html` (`.btn`), la luz
   de pulsar en `client/src/press-light.ts`, que escucha en el documento y
   vale sola para los botones que se creen despues, y el humo

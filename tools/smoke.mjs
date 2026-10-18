@@ -1534,24 +1534,14 @@ async function resourcesPass(browser, baseUrl) {
     });
     check(Math.abs(rowEdge.row - rowEdge.ing) < 1, `la fila de la receta no acaba en los ingredientes: ${JSON.stringify(rowEdge)}`);
     check(pickSlot >= 0, 'el pico no llego al inventario');
-    // Tirar: una piedra, arrastrada fuera del panel, pide confirmacion.
-    // Cancelar no tira; aceptar, si.
+    // Tirar: una piedra, arrastrada fuera del panel, se tira en el acto, sin
+    // preguntar (el autor, 2026-10-18).
     const stoneSlot = made.slots.findIndex((s) => s.item === 1);
     const stoneFrom = await center(`#invGrid .slot:nth-child(${stoneSlot + 1})`);
     await drag(stoneFrom, { x: 30, y: 30 });
-    const asked = await state(page);
-    check(asked.discardAsk && (await page.isVisible('#discardAsk')), 'soltar fuera del panel no pidio confirmacion');
-    check(asked.inventory[1] > 0 && asked.itemsSent.discard === made.itemsSent.discard, 'se tiro antes de confirmar');
-    await page.click('#discardNo');
-    await elapse(page, 250);
-    const kept = await state(page);
-    check(!kept.discardAsk && kept.inventory[1] > 0 && kept.itemsSent.discard === made.itemsSent.discard, 'cancelar tiro la piedra');
-    await drag(stoneFrom, { x: 30, y: 30 });
-    console.log(`  confirmar al tirar: «${await page.textContent('#discardText')}»`);
-    await page.click('#discardYes');
-    await elapse(page, 300);
     const thrown = await state(page);
-    check(thrown.itemsSent.discard > made.itemsSent.discard && thrown.inventory[1] === 0, 'confirmar no tiro la piedra');
+    console.log(`  tirar: piedra ${made.inventory[1]} -> ${thrown.inventory[1]}, tiradas ${thrown.itemsSent.discard - made.itemsSent.discard}`);
+    check(thrown.itemsSent.discard === made.itemsSent.discard + 1 && thrown.inventory[1] === 0, 'soltar la piedra fuera del panel no la tiro');
     // Tirar la lanza al mundo (el autor, 2026-10-18): ahi esta, entera.
     check(thrown.drops.some((d) => d.item === 1 && d.count === 2), `tirar no dejo la piedra en el suelo: ${JSON.stringify(thrown.drops)}`);
     // Con el inventario abierto, de la rejilla a la barra de la mano: el pico,

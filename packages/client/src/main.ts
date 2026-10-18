@@ -865,9 +865,10 @@ function runFrame(now: number, draw: boolean): void {
       intent.moveFrom = asked.moveFrom;
       intent.moveTo = asked.moveTo;
       intent.discard = asked.discard;
+      intent.stow = asked.stow;
       asked = null;
     } else {
-      intent.select = intent.craft = intent.moveFrom = intent.moveTo = intent.discard = -1;
+      intent.select = intent.craft = intent.moveFrom = intent.moveTo = intent.discard = intent.stow = -1;
     }
 
     // Mantener el boton repite cuatro veces por segundo, que es la cadencia de
@@ -1395,7 +1396,6 @@ Object.defineProperty(window, '__verdant', {
       inventoryPage: items.currentPage,
       /** Lo que dice el registro de objetos, de la mas vieja a la mas nueva. */
       feed: feed.lines.map((l) => l.text),
-      discardAsk: items.askingDiscard,
       lastUsed: state.lastUsed,
       chunks: state.world.loadedChunkCount,
       tracked: state.world.trackedChunkCount,

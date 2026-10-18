@@ -598,20 +598,6 @@
       #dragGhost .itemIcon { display: block; width: 48px; height: 48px; }
       #invTabs { display: none; }
 
-      /* Tirar pide confirmacion (decision del autor). */
-      #discardAsk {
-        position: fixed; z-index: 25; left: 50%; top: 50%; transform: translate(-50%, -50%);
-        padding: 16px 18px; border-radius: 12px; text-align: center; min-width: 220px;
-        background: rgba(8, 14, 28, 0.96); border: 1px solid rgba(255, 232, 154, 0.45);
-        font-size: 14px; color: #e8eef7;
-      }
-      #discardAsk[hidden] { display: none; }
-      #discardAsk p { margin: 0 0 14px; }
-      #discardAsk button {
-        -webkit-appearance: none; appearance: none; margin: 0 6px; padding: 9px 16px;
-        border-radius: 8px; font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-        cursor: pointer; touch-action: manipulation;
-      }
 
       /*
         La barra de la mano: las cuatro primeras casillas, siempre a la vista. En
@@ -1161,11 +1147,6 @@
       </div>
     </div>
     <div id="dragGhost"></div>
-    <div id="discardAsk" role="alertdialog" aria-labelledby="discardText" hidden>
-      <p id="discardText"></p>
-      <button class="btn" id="discardNo" type="button"><span>Cancelar</span></button>
-      <button class="btn" id="discardYes" type="button"><span>Tirar</span></button>
-    </div>
 
     <button class="btn" id="statsToggle" type="button" aria-expanded="false" aria-controls="statsPanel"
             aria-label="Estado del entorno"><svg data-pixel="biome" aria-hidden="true"></svg><kbd class="btnKey">B</kbd></button>

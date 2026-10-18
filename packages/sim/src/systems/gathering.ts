@@ -465,13 +465,24 @@ export function tryHarvestArea(
   return swing;
 }
 
+/**
+ * De donde sale el botin de un objeto del mundo: el centro de su casilla, a
+ * la mitad de la altura de su caja (el autor, 2026-10-18: «desde la mitad de
+ * la altura del elemento»). La de un arbol es la de su tronco, que es su caja
+ * (*deduccion*).
+ */
+function midOf(world: World, x: number, y: number, feature: Feature): Vec3 {
+  const box = featureBox(world, x, y);
+  const z = box ? (box.z0 + box.z1) / 2 : objectBase(world, x, y, feature);
+  return { x: x + 0.5, y: y + 0.5, z };
+}
+
 /** Una rama de un arbol golpeado sin hacha, si le quedan: cae al suelo. */
 function tryBranch(world: World, x: number, y: number, tick: number, work: WorkState): HarvestResult | null {
   const left = branchesLeft(work, x, y, tick);
   if (left <= 0) return null;
   const feature = world.featureAt(x, y);
-  // Desde la copa baja, a un bloque del suelo del arbol.
-  scatterLoot(world, [{ item: Resource.Branch, count: 1 }], { x: x + 0.5, y: y + 0.5, z: objectBase(world, x, y, feature) + 1 }, tick, x * 7919 + y);
+  scatterLoot(world, [{ item: Resource.Branch, count: 1 }], midOf(world, x, y, feature), tick, x * 7919 + y);
   // La reposicion se cuenta desde el ultimo arranque, con lo que ya se habia
   // repuesto descontado: asi el calculo sigue siendo solo del tiempo.
   work.branches.set(tileKey(x, y), { taken: BRANCHES_PER_TREE - left + 1, tick });
@@ -536,10 +547,10 @@ export function harvestTile(world: World, x: number, y: number, tick: number): H
 
   const loot: Bundle[] = [{ item: yield_.resource, count: amount }, ...extras];
   if (yield_.seed !== null && seeds > 0) loot.push({ item: yield_.seed, count: seeds });
-  // La base, antes de quitarlo: la de un objeto colocado es la de encima.
-  const base = objectBase(world, x, y, feature);
+  // Desde la mitad de su altura (el autor, 2026-10-18), leida antes de quitarlo.
+  const from = midOf(world, x, y, feature);
   world.setFeature(x, y, Feature.None);
-  scatterLoot(world, loot, { x: x + 0.5, y: y + 0.5, z: base + 0.5 }, tick, x * 7919 + y);
+  scatterLoot(world, loot, from, tick, x * 7919 + y);
 
   return {
     resource: yield_.resource,

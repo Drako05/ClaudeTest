@@ -983,6 +983,11 @@ export interface Intent {
   moveTo: number;
   /** Casilla que se tira, o -1. */
   discard: number;
+  /**
+   * Casilla de la barra que se guarda en el resto del inventario (el autor,
+   * 2026-10-18: arrastrarla al boton INVENTARIO), o -1.
+   */
+  stow: number;
 }
 
 export function emptyIntent(): Intent {
@@ -1005,5 +1010,6 @@ export function emptyIntent(): Intent {
     moveFrom: -1,
     moveTo: -1,
     discard: -1,
+    stow: -1,
   };
 }
