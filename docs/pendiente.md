@@ -56,8 +56,14 @@ para otra tanda.» Sus respuestas (seran la directriz 7 de
    arbusto no me convence mucho», con dos referencias (un roble y una mata de
    bayas en pixelart, que el repo no guarda): «El follaje del árbol debería
    ser más unido y entrelazado, no como si fueran varias bolas de hojas una
-   al lado de la otra.» **Rehechos y ensenados otra vez; esperando al
-   autor.**
+   al lado de la otra.» Rehechos. El autor: «El arte del árbol que hiciste
+   está bien. Sin contornos es lo correcto», pero las ramas parecian «la
+   copa y luego le recortaste un par de agujeros»; en su referencia (un
+   arbol de copa alta en pixelart) **las ramas van debajo del follaje, y las
+   que se ven dentro son pequenas, con follaje de fondo o sin estar rodeadas
+   del todo**. Y que el detalle sea «más profesional»: en otra referencia, un
+   arbusto «noob» y uno «pro», **el pro da la ilusion de hojas sueltas**.
+   **Rehechos otra vez y ensenados; esperando al autor.**
 2. El resto en la hoja: los 8 terrenos, el agua (animada o no: el autor, al
    verla), las 6 especies, matas, brotes, rocas y minerales, guijarros, el
    jugador y las estaciones a 24 px.
@@ -79,12 +85,18 @@ saca de formas y los escribe en `packages/client/src/world-art.ts`, donde
   proporciones fijas; la luz del noroeste.
 - La roca de voxeles: 2 × 2 abajo y 3 arriba (le falta la esquina de delante
   a la derecha).
-- **El follaje, rehecho tras las referencias**: la copa es un relieve (la
-  cupula entera y un bulto por mata), con la luz de su pendiente y la sombra
-  que echa cada mata sobre la de abajo a la derecha: una masa, no bolas. Con
-  lobulos en el borde, hojas en punta que asoman, y huecos abajo por los que
-  se ven las ramas. El tronco, en placas de corteza con las raices abiertas.
-  La mata, de hojas pequenas en punta, bayas de 2 × 2 y tres tallos.
+- **El follaje** (`foliage` en el generador): la copa son **masas** (en el
+  roble, la principal, dos que cuelgan a los lados y una en sombra debajo,
+  delante de la horquilla), cada una un relieve (su cupula y un bulto por
+  mata), con la luz de su pendiente, la sombra que echa cada mata sobre la de
+  abajo a la derecha y la parte de abajo de cada masa en sombra. Encima,
+  **hojas sueltas** de 2-4 pixeles, de pie o en diagonal hacia arriba, un
+  tono mas claras que lo de detras y con su sombra debajo; en el borde, sus
+  puntas hacen la silueta.
+- **Las ramas** salen de la horquilla, por debajo de la copa, y suben entre
+  las masas; dentro del follaje solo se ven donde la sombra es honda.
+- El tronco, en placas de corteza con las raices abiertas. La mata, de hojas
+  sueltas, con bayas de 2 × 2 y tres tallos.
 - **Sus colores salen de las referencias**, no de lo que se ve hoy: verdes
   mas hondos y saturados, corteza rojiza. Las referencias llevan **contorno
   oscuro**; los dibujos no, porque el autor eligio «sin contorno».
