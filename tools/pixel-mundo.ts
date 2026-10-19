@@ -22,7 +22,7 @@ import { writeFileSync } from 'node:fs';
 import { Feature, Terrain } from '@verdant/shared';
 import { TREE_TRUNKS } from '@verdant/sim';
 import { TERRAIN_RGB } from '../packages/client/src/art.js';
-import { LOOKS, ROCK_FACES } from '../packages/client/src/palette.js';
+import { ROCK_FACES } from '../packages/client/src/palette.js';
 import { treeShapeOf } from '../packages/client/src/tree-shapes.js';
 
 /** Pixeles de arte por bloque (el autor). Un voxel de 0,5 son 12. */
@@ -56,11 +56,6 @@ function seen(hex: string): RGB {
 /** Cuatro tonos de un material: luz, base, sombra y hondo. */
 function tones(base: RGB): [RGB, RGB, RGB, RGB] {
   return [lift(base, 0.22), base, scale(base, 0.78), scale(base, 0.6)];
-}
-
-/** Cuatro tonos desde los tres de una especie (oscuro, medio, claro). */
-function speciesTones(dark: RGB, mid: RGB, light: RGB): [RGB, RGB, RGB, RGB] {
-  return [light, mid, dark, scale(dark, 0.78)];
 }
 
 // ------------------------------------------------------------------ azar
@@ -170,89 +165,260 @@ function rockTile(seed: number, [light, base, shadow, deep]: string): Grid {
   return g;
 }
 
+/** Una mata de hojas: un bulto de la copa. */
+interface Clump {
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** Una elipse, en pixeles: la copa entera o un hueco. */
+interface Ellipse {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+}
+
 /**
- * Una masa de hojas: bolas sombreadas como esferas con la luz arriba a la
- * izquierda, el borde mordido para que se lea como hojas y no como globos, y
- * cuatro tonos (`light`, `base`, `shadow`, `deep`).
+ * Siembra matas dentro de una elipse, separadas entre si, de mayor a menor:
+ * las grandes hacen el cuerpo y las pequenas rellenan y festonean el borde.
+ * Cada mata cabe entera en la elipse, asi que la silueta son los lobulos de
+ * las matas del borde y no la elipse.
  */
-function leafMass(
+function scatterClumps(rng: () => number, shape: Ellipse, rMin: number, rMax: number): Clump[] {
+  const clumps: Clump[] = [];
+  for (const r of [rMax, (rMin + rMax) / 2, rMin]) {
+    for (let tries = 0; tries < 900; tries++) {
+      const rr = r * (0.85 + rng() * 0.3);
+      const x = shape.x + (rng() * 2 - 1) * shape.rx;
+      const y = shape.y + (rng() * 2 - 1) * shape.ry;
+      const ex = (x - shape.x) / Math.max(1, shape.rx - rr);
+      const ey = (y - shape.y) / Math.max(1, shape.ry - rr);
+      if (ex * ex + ey * ey > 1) continue;
+      if (clumps.some((c) => Math.hypot(c.x - x, c.y - y) < (c.r + rr) * 0.62)) continue;
+      clumps.push({ x, y, r: rr });
+    }
+  }
+  return clumps;
+}
+
+/**
+ * Una copa de hojas como **una sola masa** (el autor, 2026-10-19: «el follaje
+ * debería ser más unido y entrelazado, no como si fueran varias bolas de hojas
+ * una al lado de la otra»), con sus dos referencias.
+ *
+ * Es un relieve: la cupula de la copa entera, y encima un bulto por mata.
+ * La luz de cada pixel sale de la pendiente de ese relieve —arriba a la
+ * izquierda, la de la copa; dentro, la de cada mata—, y cada mata **echa
+ * sombra** sobre lo que tiene debajo a la derecha: son las grietas oscuras
+ * que entrelazan las matas. Los tonos se reparten por proporciones fijas,
+ * con un poco de ruido para que el borde entre tonos se lea como hojas.
+ */
+function foliage(
   g: Grid,
   rng: () => number,
-  blobs: { x: number; y: number; r: number }[],
-  [light, base, shadow, deep]: string,
+  opts: {
+    clumps: Clump[];
+    dome: Ellipse;
+    tones: string;
+    /** Huecos sin hojas por los que se ven las ramas. */
+    holes?: Ellipse[];
+    /** Cuantas hojas en punta asoman del borde, por pixel de borde. */
+    spikes: number;
+    /** Lo que pesa el bulto de cada mata frente a la cupula entera. */
+    bump: number;
+  },
 ): void {
-  const L = [-0.55, -0.65, 0.52];
-  const ln = Math.hypot(L[0]!, L[1]!, L[2]!);
+  const [light, base, shadow, deep] = opts.tones;
   const h = g.length;
   const w = g[0]!.length;
-  const lit: { x: number; y: number; s: number }[] = [];
-  const clumps = new Map<string, number>();
+  const { dome } = opts;
+  const inHole = (x: number, y: number) =>
+    (opts.holes ?? []).some((o) => ((x - o.x) / o.rx) ** 2 + ((y - o.y) / o.ry) ** 2 < 1);
+  // El relieve: NaN fuera de la copa.
+  const z = new Float64Array(w * h).fill(Number.NaN);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      let best: { b: (typeof blobs)[number]; z: number; d: number } | null = null;
-      for (const b of blobs) {
-        const d = Math.hypot(x + 0.5 - b.x, y + 0.5 - b.y);
-        if (d > b.r) continue;
-        // Las bolas de abajo estan delante: las tapan a las de arriba.
-        const z = Math.sqrt(b.r * b.r - d * d) + b.y * 0.35;
-        if (!best || z > best.z) best = { b, z, d };
+      const px = x + 0.5;
+      const py = y + 0.5;
+      if (inHole(px, py)) continue;
+      let top = Number.NaN;
+      for (const c of opts.clumps) {
+        const d = Math.hypot(px - c.x, py - c.y);
+        if (d >= c.r) continue;
+        const ex = (px - dome.x) / dome.rx;
+        const ey = (py - dome.y) / dome.ry;
+        const domeZ = Math.sqrt(Math.max(0, 1 - ex * ex - ey * ey)) * dome.ry;
+        const v = domeZ + Math.sqrt(c.r * c.r - d * d) * opts.bump;
+        if (!(v <= top)) top = v;
       }
-      if (!best) continue;
-      const { b, d } = best;
-      // El mordisco, solo en el borde de fuera de la masa: dentro, otra bola
-      // cubre el pixel y morderlo dejaba agujeros oscuros.
-      const inner = blobs.some((o) => Math.hypot(x + 0.5 - o.x, y + 0.5 - o.y) < o.r - 2.5);
-      if (!inner && d > b.r - 2.2 && rng() < 0.4) continue;
-      const nx = (x + 0.5 - b.x) / b.r;
-      const ny = (y + 0.5 - b.y) / b.r;
-      const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
-      // Racimos de 2 x 2 con su propio tono: hojas, no un degradado liso.
-      const clump = clumps.get(`${x >> 1},${y >> 1}`) ?? clumps.set(`${x >> 1},${y >> 1}`, rng() - 0.5).get(`${x >> 1},${y >> 1}`)!;
-      const s = 0.5 + 0.5 * ((nx * L[0]! + ny * L[1]! + nz * L[2]!) / ln) + clump * 0.34 + (rng() - 0.5) * 0.08;
-      lit.push({ x, y, s });
+      z[y * w + x] = top;
     }
   }
-  // Por proporciones: una cuarta parte de luz, algo mas de base, y lo de
-  // abajo a la derecha en sombra y hondo.
-  const values = lit.map((p) => p.s);
-  const q1 = quantile(values, 0.14);
-  const q2 = quantile(values, 0.42);
-  const q3 = quantile(values, 0.76);
-  for (const { x, y, s } of lit) g[y]![x] = s >= q3 ? light : s >= q2 ? base : s >= q1 ? shadow : deep;
-  // Sin pixeles sueltos en el borde: el mordisco hace hojas, pero un pixel
-  // con menos de dos vecinos se lee como ruido.
-  const mass = new Set(`${light}${base}${shadow}${deep}`);
-  const filled = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && mass.has(g[y]![x]!);
-  for (let pass = 0; pass < 2; pass++) {
-    for (const { x, y } of lit) {
-      if (!filled(x, y)) continue;
-      const n = +filled(x - 1, y) + +filled(x + 1, y) + +filled(x, y - 1) + +filled(x, y + 1);
-      if (n < 2) g[y]![x] = '.';
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? Number.NaN : z[y * w + x]!);
+  // La luz: de arriba a la izquierda y algo de frente.
+  const L = [-0.5, -0.62, 0.6];
+  const ln = Math.hypot(L[0]!, L[1]!, L[2]!);
+  const lit: { x: number; y: number; v: number }[] = [];
+  const clusters = new Map<string, number>();
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const z0 = at(x, y);
+      if (Number.isNaN(z0)) continue;
+      const side = (a: number, b: number) => (Number.isNaN(a) ? (Number.isNaN(b) ? 0 : z0 - b) : Number.isNaN(b) ? a - z0 : (a - b) / 2);
+      const dx = side(at(x + 1, y), at(x - 1, y));
+      const dy = side(at(x, y + 1), at(x, y - 1));
+      const nl = Math.hypot(dx, dy, 1);
+      let v = ((-dx * L[0]! - dy * L[1]! + L[2]!) / nl) / ln;
+      // La sombra que echa lo que tiene arriba a la izquierda.
+      for (let t = 1; t <= 7; t++) {
+        const o = at(Math.round(x - t * 0.8), Math.round(y - t));
+        if (!Number.isNaN(o) && o > z0 + t * 0.45) {
+          v -= 0.7;
+          break;
+        }
+      }
+      // Lo de abajo de la copa recibe menos cielo.
+      v -= Math.max(0, (y + 0.5 - dome.y) / dome.ry) * 0.25;
+      // Racimos de 2 x 2 con su tono, y algo de ruido por pixel: hojas.
+      const key = `${x >> 1},${y >> 1}`;
+      if (!clusters.has(key)) clusters.set(key, rng() - 0.5);
+      v += clusters.get(key)! * 0.2 + (rng() - 0.5) * 0.08;
+      lit.push({ x, y, v });
+    }
+  }
+  const values = lit.map((p) => p.v);
+  const q1 = quantile(values, 0.2);
+  const q2 = quantile(values, 0.46);
+  const q3 = quantile(values, 0.77);
+  for (const { x, y, v } of lit) g[y]![x] = v >= q3 ? light : v >= q2 ? base : v >= q1 ? shadow : deep;
+
+  const leaf = new Set(opts.tones);
+  const filled = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && leaf.has(g[y]![x]!);
+  const neighbours = (x: number, y: number) => +filled(x - 1, y) + +filled(x + 1, y) + +filled(x, y - 1) + +filled(x, y + 1);
+  // El borde, mordido: hojas, no un circulo liso. Y sin pixeles sueltos.
+  for (const { x, y } of lit) if (neighbours(x, y) < 4 && rng() < 0.22) g[y]![x] = '.';
+  for (let pass = 0; pass < 2; pass++) for (const { x, y } of lit) if (filled(x, y) && neighbours(x, y) < 2) g[y]![x] = '.';
+  // Hojas en punta que asoman del borde, hacia fuera de la copa.
+  const edge = lit.filter(({ x, y }) => filled(x, y) && neighbours(x, y) < 4);
+  for (const { x, y } of edge) {
+    if (rng() >= opts.spikes) continue;
+    const ax = x + 0.5 - dome.x;
+    const ay = y + 0.5 - dome.y;
+    const len = Math.hypot(ax, ay) || 1;
+    // En recto, por el eje que mas se aleja: en diagonal, la punta solo toca
+    // por una esquina y se lee como un damero.
+    const sx = Math.abs(ax) >= Math.abs(ay) ? Math.sign(ax) : 0;
+    const sy = Math.abs(ax) >= Math.abs(ay) ? 0 : Math.sign(ay);
+    if (sy > 0 && rng() < 0.7) continue; // abajo, pocas: la copa cuelga
+    const tone = sy < 0 || sx < 0 ? (rng() < 0.5 ? light : base) : shadow;
+    for (let k = 1; k <= 2; k++) {
+      const nx = x + sx * k;
+      const ny = y + sy * k;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h || g[ny]![nx] !== '.') break;
+      g[ny]![nx] = tone;
+      if (rng() < 0.5) break;
     }
   }
 }
 
-/** Un tronco de corteza: luz a la izquierda, vetas verticales, de `wBase` a `wTop` pixeles. */
-function trunk(g: Grid, rng: () => number, cx: number, yBase: number, yTop: number, wBase: number, wTop: number, [light, base, shadow, deep]: string): void {
-  const streaks = new Map<number, number>();
+/**
+ * Un trazo de corteza de `(x0, y0)` a `(x1, y1)`, de `w0` a `w1` pixeles de
+ * grueso: el lado que mira arriba a la izquierda, con luz.
+ */
+function limb(g: Grid, x0: number, y0: number, x1: number, y1: number, w0: number, w1: number, tones: string): void {
+  const [light, base, shadow, deep] = tones;
+  const h = g.length;
+  const w = g[0]!.length;
+  const vx = x1 - x0;
+  const vy = y1 - y0;
+  const l2 = vx * vx + vy * vy;
+  // La normal que mira a la luz.
+  let nx = -vy;
+  let ny = vx;
+  if (nx * -0.6 + ny * -0.8 < 0) {
+    nx = -nx;
+    ny = -ny;
+  }
+  const nl = Math.hypot(nx, ny);
+  for (let y = Math.floor(Math.min(y0, y1) - w0); y <= Math.ceil(Math.max(y0, y1) + w0); y++) {
+    for (let x = Math.floor(Math.min(x0, x1) - w0); x <= Math.ceil(Math.max(x0, x1) + w0); x++) {
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const px = x + 0.5 - x0;
+      const py = y + 0.5 - y0;
+      const t = Math.max(0, Math.min(1, (px * vx + py * vy) / l2));
+      const half = (w0 + (w1 - w0) * t) / 2;
+      const s = ((px - t * vx) * nx + (py - t * vy) * ny) / nl; // + hacia la luz
+      if (Math.hypot(px - t * vx, py - t * vy) > half) continue;
+      const rel = 0.5 - s / (2 * half); // 0 en el lado de la luz
+      g[y]![x] = rel < 0.28 ? light : rel < 0.66 ? base : rel < 0.88 ? shadow : deep;
+    }
+  }
+}
+
+/**
+ * El tronco: del pie, con sus raices abiertas, a `yTop`, estrechando de `wBase`
+ * a `wTop`, en placas de corteza separadas por grietas (hondo), con su canto
+ * de luz arriba a la izquierda.
+ */
+function barkTrunk(g: Grid, rng: () => number, cx: number, yBase: number, yTop: number, wBase: number, wTop: number, tones: string): void {
+  const [light, , , deep] = tones;
+  const tall = yBase - yTop;
+  const flare = (y: number) => {
+    const up = yBase - y;
+    return up < 6 ? (6 - up) ** 1.6 * 0.55 : 0;
+  };
   for (let y = yBase; y >= yTop; y--) {
-    const t = (yBase - y) / Math.max(1, yBase - yTop);
-    const wy = Math.max(2, Math.round(wBase + (wTop - wBase) * t) + (yBase - y < 2 ? 2 : 0));
-    const left = Math.round(cx - wy / 2);
-    for (let i = 0; i < wy; i++) {
-      const rel = (i + 0.5) / wy;
-      let c = rel < 0.25 ? light : rel < 0.62 ? base : rel < 0.86 ? shadow : deep;
-      const key = i;
-      if ((streaks.get(key) ?? 0) > 0) {
-        streaks.set(key, streaks.get(key)! - 1);
-        c = rel < 0.5 ? shadow : deep;
-      } else if (rng() < 0.05 && rel > 0.15) streaks.set(key, 2 + Math.floor(rng() * 4));
-      g[y]![left + i] = c;
+    const t = (yBase - y) / Math.max(1, tall);
+    const half = (wBase + (wTop - wBase) * t) / 2 + flare(y);
+    const left = Math.round(cx - half);
+    const right = Math.round(cx + half);
+    for (let x = left; x < right; x++) {
+      const rel = (x + 0.5 - (cx - half)) / (2 * half);
+      g[y]![x] = rel < 0.24 ? tones[0]! : rel < 0.6 ? tones[1]! : rel < 0.85 ? tones[2]! : tones[3]!;
     }
+  }
+  // Las placas: grietas verticales que se tuercen, y alguna horizontal.
+  const cracks = Math.max(2, Math.round(wBase / 5));
+  for (let k = 0; k < cracks; k++) {
+    let rel = (k + 0.5 + (rng() - 0.5) * 0.5) / cracks;
+    let run = 0;
+    for (let y = yBase - 1; y > yTop + 1; y--) {
+      const t = (yBase - y) / Math.max(1, tall);
+      const half = (wBase + (wTop - wBase) * t) / 2 + flare(y);
+      const x = Math.round(cx - half + rel * 2 * half);
+      if (x > cx - half + 1 && x < cx + half - 1) {
+        g[y]![x] = deep;
+        if (rel > 0.2) g[y]![x - 1] = g[y]![x - 1] === tones[0] ? tones[1]! : g[y]![x - 1]!;
+        if (g[y]![x + 1] !== deep && rng() < 0.5) g[y]![x + 1] = light;
+      }
+      if (++run > 4 + rng() * 6) {
+        run = 0;
+        rel = Math.max(0.12, Math.min(0.88, rel + (rng() < 0.5 ? -1 : 1) / (2 * half)));
+        if (rng() < 0.35) {
+          const len = 2 + Math.floor(rng() * 3);
+          for (let i = 0; i < len; i++) {
+            const xx = x + i;
+            if (xx < cx + half - 1) g[y]![xx] = deep;
+          }
+        }
+      }
+    }
+  }
+  // Las puntas de las raices, en el suelo.
+  for (const side of [-1, 1]) {
+    const half = wBase / 2 + flare(yBase);
+    const x = Math.round(cx + side * (half + 1));
+    if (g[yBase]![x] === '.') g[yBase]![x] = side < 0 ? tones[1]! : tones[2]!;
   }
 }
 
-/** El roble: copa de bolas en cupula, del tamano de su especie, sobre su tronco medio. */
+/**
+ * El roble: una copa en cupula, una sola masa de hojas del tamano de su
+ * especie, con dos huecos abajo por los que se ven las ramas, sobre su tronco
+ * medio de placas y con las raices abiertas.
+ */
 function oak(): Grid {
   const shape = treeShapeOf(Feature.MeadowTree)!;
   const law = TREE_TRUNKS[Feature.MeadowTree]!;
@@ -261,42 +427,70 @@ function oak(): Grid {
   const bare = Math.round(law.bareMean * PX);
   const H = crownH + bare;
   const g = blank(W, H);
-  const rng = mulberry32(0x0a4);
-  trunk(g, rng, W / 2, H - 1, Math.round(crownH * 0.45), Math.round(law.trunkW * PX), 6, 'MNOP');
-  // La cupula: una fila ancha abajo, otra encima y la corona.
-  const blobs: { x: number; y: number; r: number }[] = [];
-  const row = (n: number, y: number, spread: number, r: number) => {
-    for (let i = 0; i < n; i++) {
-      const x = W / 2 + (n === 1 ? 0 : (i / (n - 1) - 0.5) * spread) + (rng() - 0.5) * 4;
-      blobs.push({ x, y: y + (rng() - 0.5) * 4, r: r + (rng() - 0.5) * 3 });
-    }
-  };
-  row(6, crownH * 0.74, W - 26, 12);
-  row(5, crownH * 0.53, W - 30, 13);
-  row(4, crownH * 0.33, W - 44, 12);
-  row(2, crownH * 0.16, W - 70, 11);
-  leafMass(g, rng, blobs, 'IJKL');
+  const rng = mulberry32(0x0a5);
+  const tw = Math.round(law.trunkW * PX);
+  const cx = W / 2;
+  const fork = Math.round(crownH * 0.8);
+  barkTrunk(g, rng, cx, H - 1, fork, tw, tw * 0.7, 'MNOP');
+  // Las ramas: dos grandes que se abren desde la horquilla, y una al centro.
+  const branches: [number, number, number, number, number, number][] = [
+    [cx - 2, fork + 2, cx - W * 0.3, crownH * 0.45, tw * 0.55, 3],
+    [cx + 2, fork + 2, cx + W * 0.28, crownH * 0.42, tw * 0.5, 3],
+    [cx, fork, cx + 1, crownH * 0.35, tw * 0.45, 3],
+  ];
+  for (const [x0, y0, x1, y1, w0, w1] of branches) limb(g, x0, y0, x1, y1, w0, w1, 'MNOP');
+  const dome = { x: cx, y: crownH * 0.5, rx: W / 2 - 0.5, ry: crownH / 2 - 0.5 };
+  // Los huecos, encima de las ramas grandes: por ahi se ven, como en la
+  // referencia del autor.
+  const along = (b: (typeof branches)[number], t: number) => ({ x: b[0] + (b[2] - b[0]) * t, y: b[1] + (b[3] - b[1]) * t });
+  const holes = [
+    { ...along(branches[0]!, 0.45), rx: 9, ry: 5 },
+    { ...along(branches[1]!, 0.5), rx: 8, ry: 4.5 },
+    { x: cx, y: crownH * 0.95, rx: tw * 0.8, ry: 4 },
+  ];
+  foliage(g, rng, {
+    clumps: scatterClumps(rng, dome, 7, 15),
+    dome,
+    tones: 'IJKL',
+    holes,
+    spikes: 0.18,
+    bump: 0.85,
+  });
+  // Las ramas, otra vez donde no quedaron hojas: el hueco las ensena.
+  const under = blank(W, H);
+  for (const [x0, y0, x1, y1, w0, w1] of branches) limb(under, x0, y0, x1, y1, w0, w1, 'MNOP');
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g[y]![x] === '.' && under[y]![x] !== '.') g[y]![x] = under[y]![x]!;
   return g;
 }
 
-/** La mata de la pradera: tres bolas bajas, un tallo y sus bayas. */
+/**
+ * La mata de la pradera: compacta, de hojas pequenas que asoman en punta por
+ * el borde, con sus bayas y tres tallos en el pie.
+ */
 function meadowBush(): Grid {
-  const W = 24;
-  const H = 27;
+  const W = 26;
+  const H = 26;
   const g = blank(W, H);
-  const rng = mulberry32(0xb05);
-  for (let y = H - 3; y < H; y++) g[y]![11] = g[y]![12] = 'W';
-  leafMass(g, rng, [
-    { x: 8, y: 17, r: 8.5 },
-    { x: 16, y: 16, r: 8.5 },
-    { x: 12, y: 10, r: 8.5 },
-  ], 'QRST');
-  // Bayas de 2 x 2, con su brillo arriba a la izquierda, sobre hojas.
-  const spots = [[6, 13], [15, 9], [17, 18], [10, 19], [12, 5]];
-  for (const [x, y] of spots) {
-    if (g[y]![x] === '.' || g[y + 1]![x + 1] === '.') continue;
+  const rng = mulberry32(0xb07);
+  limb(g, 13, H, 13, H - 6, 2.5, 2, 'WWWW');
+  limb(g, 12.5, H - 1, 8, H - 6, 1.6, 1.2, 'WWWW');
+  limb(g, 13.5, H - 1, 18, H - 6, 1.6, 1.2, 'WWWW');
+  const dome = { x: 13, y: 12.5, rx: 11.5, ry: 10.5 };
+  foliage(g, rng, { clumps: scatterClumps(rng, dome, 3, 5), dome, tones: 'QRST', spikes: 0.5, bump: 0.7 });
+  // Bayas de 2 x 2: brillo arriba a la izquierda y sombra abajo a la derecha.
+  const leaf = new Set('QRST');
+  let placed = 0;
+  for (let tries = 0; tries < 400 && placed < 8; tries++) {
+    const x = 4 + Math.floor(rng() * (W - 9));
+    const y = 3 + Math.floor(rng() * (H - 11));
+    const cells = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+    if (!cells.every(([a, b]) => leaf.has(g[b!]![a!]!))) continue;
+    // Separadas: ninguna baya a menos de 3 pixeles.
+    if ([-2, -1, 0, 1, 2, 3].some((d) => [-2, -1, 0, 1, 2, 3].some((e) => 'UVX'.includes(g[y + e]?.[x + d] ?? '.')))) continue;
     g[y]![x] = 'V';
-    g[y]![x + 1] = g[y + 1]![x] = g[y + 1]![x + 1] = 'U';
+    g[y]![x + 1] = g[y + 1]![x] = 'U';
+    g[y + 1]![x + 1] = 'X';
+    placed++;
   }
   return g;
 }
@@ -316,12 +510,12 @@ const ROCK_SHAPE: [number, number, number][] = [
 
 const grass = tones(TERRAIN_RGB[Terrain.Grass].map((v) => v) as RGB);
 const rock = tones(TERRAIN_RGB[Terrain.Rock].map((v) => v) as RGB);
-const oakLook = LOOKS[Feature.MeadowTree]!;
-const bushLook = LOOKS[Feature.MeadowPlant]!;
-const leaf = speciesTones(seen(oakLook.dark), seen(oakLook.mid), seen(oakLook.light));
-const bark = tones(seen(oakLook.trunk));
-const bush = speciesTones(seen(bushLook.dark), seen(bushLook.mid), seen(bushLook.light));
-const fruit = seen(bushLook.fruit!);
+// El roble y la mata, con los colores de las referencias del autor
+// (2026-10-19): verdes mas hondos y saturados que los que se ven hoy, corteza
+// rojiza y bayas rojas (*deduccion*, de sus dos imagenes).
+const leaf = ['#86b94a', '#4f8f38', '#2f6630', '#1c4026'].map(hexToRgb);
+const bark = ['#b5793f', '#8b552c', '#5f3820', '#3b2216'].map(hexToRgb);
+const bush = ['#9bd25a', '#58a63c', '#2f7a33', '#1d4a27'].map(hexToRgb);
 const stone = [seen(ROCK_FACES[2]!), seen(ROCK_FACES[1]!), seen(ROCK_FACES[0]!), scale(seen(ROCK_FACES[0]!), 0.8)] as const;
 
 const PALETTE: [string, RGB, string][] = [
@@ -330,7 +524,8 @@ const PALETTE: [string, RGB, string][] = [
   ['I', leaf[0], 'hoja del roble: luz'], ['J', leaf[1], 'hoja del roble: base'], ['K', leaf[2], 'hoja del roble: sombra'], ['L', leaf[3], 'hoja del roble: hondo'],
   ['M', bark[0], 'corteza del roble: luz'], ['N', bark[1], 'corteza del roble: base'], ['O', bark[2], 'corteza del roble: sombra'], ['P', bark[3], 'corteza del roble: hondo'],
   ['Q', bush[0], 'hoja de la mata: luz'], ['R', bush[1], 'hoja de la mata: base'], ['S', bush[2], 'hoja de la mata: sombra'], ['T', bush[3], 'hoja de la mata: hondo'],
-  ['U', fruit, 'baya: base'], ['V', lift(fruit, 0.45), 'baya: brillo'], ['W', seen(bushLook.trunk), 'tallo de la mata'],
+  ['U', hexToRgb('#c8203a'), 'baya: base'], ['V', hexToRgb('#ff6b6b'), 'baya: brillo'], ['X', hexToRgb('#7d1028'), 'baya: sombra'],
+  ['W', hexToRgb('#6b4024'), 'tallo de la mata'],
   ['a', stone[0], 'piedra: luz'], ['b', stone[1], 'piedra: base'], ['c', stone[2], 'piedra: sombra'], ['d', stone[3], 'piedra: hondo'],
 ];
 
@@ -370,7 +565,7 @@ ${art('GRASS_C', 'Hierba, variante 3.', grassTile(0x6a3))}
 ${art('GRASS_D', 'Hierba, variante 4.', grassTile(0x6a4))}
 ${art('ROCK_GROUND_A', 'Roca del suelo, variante 1.', rockTile(0x7c1, 'EFGH'))}
 ${art('ROCK_GROUND_B', 'Roca del suelo, variante 2.', rockTile(0x7c2, 'EFGH'))}
-${art('OAK', 'El roble: copa en cupula de su especie sobre su tronco medio.', oak())}
+${art('OAK', 'El roble: una sola masa de hojas en cupula, del tamano de su especie, sobre su tronco medio.', oak())}
 ${art('MEADOW_BUSH', 'La mata de la pradera, con sus bayas.', meadowBush())}
 ${art('STONE', 'La piedra de la roca de voxeles: una tesela que casa consigo misma.', rockTile(0x5a1, 'abcd'))}
 /**
