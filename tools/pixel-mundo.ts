@@ -165,14 +165,7 @@ function rockTile(seed: number, [light, base, shadow, deep]: string): Grid {
   return g;
 }
 
-/** Una mata de hojas: un bulto de la copa. */
-interface Clump {
-  x: number;
-  y: number;
-  r: number;
-}
-
-/** Una elipse, en pixeles: la copa entera o un hueco. */
+/** Una elipse, en pixeles. */
 interface Ellipse {
   x: number;
   y: number;
@@ -181,79 +174,112 @@ interface Ellipse {
 }
 
 /**
- * Siembra matas dentro de una elipse, separadas entre si, de mayor a menor:
- * las grandes hacen el cuerpo y las pequenas rellenan y festonean el borde.
- * Cada mata cabe entera en la elipse, asi que la silueta son los lobulos de
- * las matas del borde y no la elipse.
+ * Una masa de follaje: una cupula de la copa. `z` es lo que asoma hacia
+ * delante: las que cuelgan abajo, delante de la principal.
  */
-function scatterClumps(rng: () => number, shape: Ellipse, rMin: number, rMax: number): Clump[] {
+interface Mass extends Ellipse {
+  z: number;
+  /** Cuanto mas oscura que las demas: la de debajo de la copa, en su sombra. */
+  shade?: number;
+}
+
+/** Una mata de hojas dentro de una masa: un bulto de su relieve. */
+interface Clump {
+  x: number;
+  y: number;
+  r: number;
+  mass: number;
+}
+
+/**
+ * Siembra matas dentro de cada masa, separadas entre si, de mayor a menor: las
+ * grandes hacen el cuerpo y las pequenas rellenan y festonean el borde. Cada
+ * mata cabe entera en su masa, asi que la silueta son los lobulos de las matas
+ * del borde y no la elipse.
+ */
+function scatterClumps(rng: () => number, masses: Mass[], rMin: number, rMax: number): Clump[] {
   const clumps: Clump[] = [];
-  for (const r of [rMax, (rMin + rMax) / 2, rMin]) {
-    for (let tries = 0; tries < 900; tries++) {
-      const rr = r * (0.85 + rng() * 0.3);
-      const x = shape.x + (rng() * 2 - 1) * shape.rx;
-      const y = shape.y + (rng() * 2 - 1) * shape.ry;
-      const ex = (x - shape.x) / Math.max(1, shape.rx - rr);
-      const ey = (y - shape.y) / Math.max(1, shape.ry - rr);
-      if (ex * ex + ey * ey > 1) continue;
-      if (clumps.some((c) => Math.hypot(c.x - x, c.y - y) < (c.r + rr) * 0.62)) continue;
-      clumps.push({ x, y, r: rr });
+  masses.forEach((m, mass) => {
+    const top = Math.min(rMax, Math.min(m.rx, m.ry) * 0.75);
+    const low = Math.min(rMin, top);
+    for (const r of [top, (low + top) / 2, low]) {
+      for (let tries = 0; tries < 900; tries++) {
+        const rr = r * (0.85 + rng() * 0.3);
+        const x = m.x + (rng() * 2 - 1) * m.rx;
+        const y = m.y + (rng() * 2 - 1) * m.ry;
+        const ex = (x - m.x) / Math.max(1, m.rx - rr);
+        const ey = (y - m.y) / Math.max(1, m.ry - rr);
+        if (ex * ex + ey * ey > 1) continue;
+        if (clumps.some((c) => c.mass === mass && Math.hypot(c.x - x, c.y - y) < (c.r + rr) * 0.62)) continue;
+        clumps.push({ x, y, r: rr, mass });
+      }
     }
-  }
+    // Lo que no cubrio ninguna, con una pequena: sin huecos dentro de la masa.
+    for (let y = m.y - m.ry; y <= m.y + m.ry; y += 2) {
+      for (let x = m.x - m.rx; x <= m.x + m.rx; x += 2) {
+        const ex = (x - m.x) / Math.max(1, m.rx - low);
+        const ey = (y - m.y) / Math.max(1, m.ry - low);
+        if (ex * ex + ey * ey > 1) continue;
+        if (clumps.some((c) => c.mass === mass && Math.hypot(c.x - x, c.y - y) < c.r - 1)) continue;
+        clumps.push({ x, y, r: low, mass });
+      }
+    }
+  });
   return clumps;
 }
 
 /**
- * Una copa de hojas como **una sola masa** (el autor, 2026-10-19: «el follaje
- * debería ser más unido y entrelazado, no como si fueran varias bolas de hojas
- * una al lado de la otra»), con sus dos referencias.
+ * El follaje, como **una masa de hojas** (el autor, 2026-10-19: «más unido y
+ * entrelazado, no como si fueran varias bolas de hojas una al lado de la
+ * otra», y que el detalle de lo que «da la ilusión de hojas» sea «más HD y
+ * profesional»), con sus referencias.
  *
- * Es un relieve: la cupula de la copa entera, y encima un bulto por mata.
- * La luz de cada pixel sale de la pendiente de ese relieve —arriba a la
- * izquierda, la de la copa; dentro, la de cada mata—, y cada mata **echa
- * sombra** sobre lo que tiene debajo a la derecha: son las grietas oscuras
- * que entrelazan las matas. Los tonos se reparten por proporciones fijas,
- * con un poco de ruido para que el borde entre tonos se lea como hojas.
+ * Dos pasos:
+ * 1. **El volumen.** Un relieve: la cupula de cada masa y encima un bulto por
+ *    mata. La luz sale de la pendiente de ese relieve, cada mata echa sombra
+ *    sobre lo que tiene debajo a la derecha (las grietas que las entrelazan),
+ *    y la parte de abajo de cada masa recibe menos cielo. Los cuatro tonos se
+ *    reparten por proporciones fijas.
+ * 2. **Las hojas.** Encima, hojas sueltas de unos pixeles, cada una un tono mas
+ *    clara que lo que tiene detras y con su sombra debajo, que salen hacia
+ *    fuera desde la base de su masa: en el borde, sus puntas hacen la silueta.
  */
 function foliage(
   g: Grid,
   rng: () => number,
   opts: {
+    masses: Mass[];
     clumps: Clump[];
-    dome: Ellipse;
     tones: string;
-    /** Huecos sin hojas por los que se ven las ramas. */
-    holes?: Ellipse[];
-    /** Cuantas hojas en punta asoman del borde, por pixel de borde. */
-    spikes: number;
-    /** Lo que pesa el bulto de cada mata frente a la cupula entera. */
+    /** Lo que pesa el bulto de cada mata frente a la cupula de su masa. */
     bump: number;
+    /** Hojas por pixel de follaje, y su largo en pixeles. */
+    leaves: number;
+    leafLen: [number, number];
   },
 ): void {
-  const [light, base, shadow, deep] = opts.tones;
+  const tones = opts.tones;
   const h = g.length;
   const w = g[0]!.length;
-  const { dome } = opts;
-  const inHole = (x: number, y: number) =>
-    (opts.holes ?? []).some((o) => ((x - o.x) / o.rx) ** 2 + ((y - o.y) / o.ry) ** 2 < 1);
-  // El relieve: NaN fuera de la copa.
+  // El relieve, y de que masa es cada pixel: NaN y -1 fuera del follaje.
   const z = new Float64Array(w * h).fill(Number.NaN);
+  const owner = new Int32Array(w * h).fill(-1);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const px = x + 0.5;
       const py = y + 0.5;
-      if (inHole(px, py)) continue;
-      let top = Number.NaN;
       for (const c of opts.clumps) {
         const d = Math.hypot(px - c.x, py - c.y);
         if (d >= c.r) continue;
-        const ex = (px - dome.x) / dome.rx;
-        const ey = (py - dome.y) / dome.ry;
-        const domeZ = Math.sqrt(Math.max(0, 1 - ex * ex - ey * ey)) * dome.ry;
-        const v = domeZ + Math.sqrt(c.r * c.r - d * d) * opts.bump;
-        if (!(v <= top)) top = v;
+        const m = opts.masses[c.mass]!;
+        const ex = (px - m.x) / m.rx;
+        const ey = (py - m.y) / m.ry;
+        const v = m.z + Math.sqrt(Math.max(0, 1 - ex * ex - ey * ey)) * m.ry + Math.sqrt(c.r * c.r - d * d) * opts.bump;
+        if (!(v <= z[y * w + x]!)) {
+          z[y * w + x] = v;
+          owner[y * w + x] = c.mass;
+        }
       }
-      z[y * w + x] = top;
     }
   }
   const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? Number.NaN : z[y * w + x]!);
@@ -261,7 +287,6 @@ function foliage(
   const L = [-0.5, -0.62, 0.6];
   const ln = Math.hypot(L[0]!, L[1]!, L[2]!);
   const lit: { x: number; y: number; v: number }[] = [];
-  const clusters = new Map<string, number>();
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const z0 = at(x, y);
@@ -269,56 +294,77 @@ function foliage(
       const side = (a: number, b: number) => (Number.isNaN(a) ? (Number.isNaN(b) ? 0 : z0 - b) : Number.isNaN(b) ? a - z0 : (a - b) / 2);
       const dx = side(at(x + 1, y), at(x - 1, y));
       const dy = side(at(x, y + 1), at(x, y - 1));
-      const nl = Math.hypot(dx, dy, 1);
-      let v = ((-dx * L[0]! - dy * L[1]! + L[2]!) / nl) / ln;
-      // La sombra que echa lo que tiene arriba a la izquierda.
-      for (let t = 1; t <= 7; t++) {
+      let v = ((-dx * L[0]! - dy * L[1]! + L[2]!) / Math.hypot(dx, dy, 1)) / ln;
+      for (let t = 1; t <= 8; t++) {
         const o = at(Math.round(x - t * 0.8), Math.round(y - t));
         if (!Number.isNaN(o) && o > z0 + t * 0.45) {
           v -= 0.7;
           break;
         }
       }
-      // Lo de abajo de la copa recibe menos cielo.
-      v -= Math.max(0, (y + 0.5 - dome.y) / dome.ry) * 0.25;
-      // Racimos de 2 x 2 con su tono, y algo de ruido por pixel: hojas.
-      const key = `${x >> 1},${y >> 1}`;
-      if (!clusters.has(key)) clusters.set(key, rng() - 0.5);
-      v += clusters.get(key)! * 0.2 + (rng() - 0.5) * 0.08;
+      const m = opts.masses[owner[y * w + x]!]!;
+      v -= Math.max(0, (y + 0.5 - m.y) / m.ry) * 0.55 + (m.shade ?? 0);
+      v += (rng() - 0.5) * 0.1;
       lit.push({ x, y, v });
     }
   }
   const values = lit.map((p) => p.v);
-  const q1 = quantile(values, 0.2);
-  const q2 = quantile(values, 0.46);
-  const q3 = quantile(values, 0.77);
-  for (const { x, y, v } of lit) g[y]![x] = v >= q3 ? light : v >= q2 ? base : v >= q1 ? shadow : deep;
+  // Mas oscuro de lo que se quiere: las hojas lo aclaran despues.
+  const q1 = quantile(values, 0.3);
+  const q2 = quantile(values, 0.57);
+  const q3 = quantile(values, 0.85);
+  for (const { x, y, v } of lit) g[y]![x] = tones[v >= q3 ? 0 : v >= q2 ? 1 : v >= q1 ? 2 : 3]!;
 
-  const leaf = new Set(opts.tones);
-  const filled = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && leaf.has(g[y]![x]!);
-  const neighbours = (x: number, y: number) => +filled(x - 1, y) + +filled(x + 1, y) + +filled(x, y - 1) + +filled(x, y + 1);
-  // El borde, mordido: hojas, no un circulo liso. Y sin pixeles sueltos.
-  for (const { x, y } of lit) if (neighbours(x, y) < 4 && rng() < 0.22) g[y]![x] = '.';
-  for (let pass = 0; pass < 2; pass++) for (const { x, y } of lit) if (filled(x, y) && neighbours(x, y) < 2) g[y]![x] = '.';
-  // Hojas en punta que asoman del borde, hacia fuera de la copa.
-  const edge = lit.filter(({ x, y }) => filled(x, y) && neighbours(x, y) < 4);
-  for (const { x, y } of edge) {
-    if (rng() >= opts.spikes) continue;
-    const ax = x + 0.5 - dome.x;
-    const ay = y + 0.5 - dome.y;
-    const len = Math.hypot(ax, ay) || 1;
-    // En recto, por el eje que mas se aleja: en diagonal, la punta solo toca
-    // por una esquina y se lee como un damero.
-    const sx = Math.abs(ax) >= Math.abs(ay) ? Math.sign(ax) : 0;
-    const sy = Math.abs(ax) >= Math.abs(ay) ? 0 : Math.sign(ay);
-    if (sy > 0 && rng() < 0.7) continue; // abajo, pocas: la copa cuelga
-    const tone = sy < 0 || sx < 0 ? (rng() < 0.5 ? light : base) : shadow;
-    for (let k = 1; k <= 2; k++) {
-      const nx = x + sx * k;
-      const ny = y + sy * k;
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h || g[ny]![nx] !== '.') break;
-      g[ny]![nx] = tone;
-      if (rng() < 0.5) break;
+  // Las hojas.
+  const level = (c: string | undefined) => (c === undefined ? -1 : tones.indexOf(c));
+  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h;
+  const count = Math.round(lit.length * opts.leaves);
+  for (let k = 0; k < count; k++) {
+    const p = lit[Math.floor(rng() * lit.length)]!;
+    const here = level(g[p.y]![p.x]);
+    if (here < 0) continue;
+    const m = opts.masses[owner[p.y * w + p.x]!]!;
+    // Hacia fuera desde la base de su masa: arriba, hacia arriba; a los
+    // lados, de lado y algo hacia arriba.
+    let a = Math.atan2(p.y + 0.5 - (m.y + m.ry * 0.7), p.x + 0.5 - m.x) + (rng() - 0.5) * 1.1;
+    // Ninguna cuelga ni se tumba: de pie o en diagonal hacia arriba. Tumbadas
+    // hacian rayas.
+    const up = Math.max(0.6, -Math.sin(a));
+    a = Math.atan2(-up, Math.cos(a));
+    const dx = Math.cos(a);
+    const dy = Math.sin(a);
+    const len = opts.leafLen[0] + Math.floor(rng() * (opts.leafLen[1] - opts.leafLen[0] + 1));
+    const leaf = tones[Math.max(0, here - 1)]!;
+    const under = tones[Math.min(3, here + 1)]!;
+    let prev = '';
+    for (let i = 0; i < len; i++) {
+      const x = Math.round(p.x + dx * i);
+      const y = Math.round(p.y + dy * i);
+      if (!inside(x, y) || `${x},${y}` === prev) continue;
+      prev = `${x},${y}`;
+      if (g[y]![x] === '.') {
+        // Asoma del borde: solo la punta, y solo si toca a lo pintado.
+        if (i < 1 || i > len - 1 || level(g[y - Math.round(dy)]?.[x - Math.round(dx)]) < 0) break;
+        g[y]![x] = leaf;
+        break;
+      }
+      if (level(g[y]![x]) < 0) break;
+      g[y]![x] = leaf;
+      // Su sombra, debajo a la derecha, sobre lo que no es esta hoja.
+      const sx = x + 1;
+      const sy = y + 1;
+      if (inside(sx, sy) && level(g[sy]![sx]) >= 0 && g[sy]![sx] !== leaf && rng() < 0.6) g[sy]![sx] = under;
+    }
+  }
+  // Sin pixeles sueltos: menos de dos vecinos, fuera.
+  const filled = (x: number, y: number) => inside(x, y) && level(g[y]![x]) >= 0;
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (!filled(x, y)) continue;
+        const n = +filled(x - 1, y) + +filled(x + 1, y) + +filled(x, y - 1) + +filled(x, y + 1);
+        if (n === 0) g[y]![x] = '.';
+      }
     }
   }
 }
@@ -415,9 +461,12 @@ function barkTrunk(g: Grid, rng: () => number, cx: number, yBase: number, yTop: 
 }
 
 /**
- * El roble: una copa en cupula, una sola masa de hojas del tamano de su
- * especie, con dos huecos abajo por los que se ven las ramas, sobre su tronco
- * medio de placas y con las raices abiertas.
+ * El roble, como en la referencia del autor: el tronco se abre **por debajo**
+ * de la copa y las ramas suben entre las masas de follaje, contra el cielo,
+ * hasta las dos que cuelgan a los lados; dentro del follaje solo asoman donde
+ * la sombra es honda. La copa entera mide lo de su especie, y en la columna
+ * del tronco empieza justo en su tronco desnudo medio (una masa pequena,
+ * delante de la horquilla).
  */
 function oak(): Grid {
   const shape = treeShapeOf(Feature.MeadowTree)!;
@@ -427,56 +476,53 @@ function oak(): Grid {
   const bare = Math.round(law.bareMean * PX);
   const H = crownH + bare;
   const g = blank(W, H);
-  const rng = mulberry32(0x0a5);
+  const rng = mulberry32(0x0a7);
   const tw = Math.round(law.trunkW * PX);
   const cx = W / 2;
-  const fork = Math.round(crownH * 0.8);
-  barkTrunk(g, rng, cx, H - 1, fork, tw, tw * 0.7, 'MNOP');
-  // Las ramas: dos grandes que se abren desde la horquilla, y una al centro.
+  const masses: Mass[] = [
+    { x: cx, y: crownH * 0.4, rx: W * 0.45, ry: crownH * 0.4, z: 0 },
+    { x: cx - W * 0.29, y: crownH * 0.75, rx: W * 0.21, ry: crownH * 0.21, z: 10 },
+    { x: cx + W * 0.29, y: crownH * 0.73, rx: W * 0.21, ry: crownH * 0.22, z: 10 },
+    { x: cx + 1, y: crownH * 0.85, rx: W * 0.13, ry: crownH * 0.15, z: 4, shade: 0.45 },
+  ];
+  const fork = crownH * 0.92;
+  barkTrunk(g, rng, cx, H - 1, Math.round(fork), tw, tw * 0.75, 'MNOP');
+  // Las ramas: a las dos masas de los lados, el tallo al centro de la
+  // principal, y de cada rama de lado, otra que sube a la principal.
   const branches: [number, number, number, number, number, number][] = [
-    [cx - 2, fork + 2, cx - W * 0.3, crownH * 0.45, tw * 0.55, 3],
-    [cx + 2, fork + 2, cx + W * 0.28, crownH * 0.42, tw * 0.5, 3],
-    [cx, fork, cx + 1, crownH * 0.35, tw * 0.45, 3],
+    [cx - 2, fork, masses[1]!.x + 4, masses[1]!.y - 2, tw * 0.5, 3],
+    [cx + 2, fork, masses[2]!.x - 4, masses[2]!.y - 2, tw * 0.5, 3],
+    [cx, fork, cx + 2, crownH * 0.4, tw * 0.55, 3],
+    [cx - W * 0.16, crownH * 0.86, cx - W * 0.15, crownH * 0.6, 3.5, 2],
+    [cx + W * 0.16, crownH * 0.85, cx + W * 0.18, crownH * 0.6, 3.5, 2],
   ];
   for (const [x0, y0, x1, y1, w0, w1] of branches) limb(g, x0, y0, x1, y1, w0, w1, 'MNOP');
-  const dome = { x: cx, y: crownH * 0.5, rx: W / 2 - 0.5, ry: crownH / 2 - 0.5 };
-  // Los huecos, encima de las ramas grandes: por ahi se ven, como en la
-  // referencia del autor.
-  const along = (b: (typeof branches)[number], t: number) => ({ x: b[0] + (b[2] - b[0]) * t, y: b[1] + (b[3] - b[1]) * t });
-  const holes = [
-    { ...along(branches[0]!, 0.45), rx: 9, ry: 5 },
-    { ...along(branches[1]!, 0.5), rx: 8, ry: 4.5 },
-    { x: cx, y: crownH * 0.95, rx: tw * 0.8, ry: 4 },
-  ];
-  foliage(g, rng, {
-    clumps: scatterClumps(rng, dome, 7, 15),
-    dome,
-    tones: 'IJKL',
-    holes,
-    spikes: 0.18,
-    bump: 0.85,
-  });
-  // Las ramas, otra vez donde no quedaron hojas: el hueco las ensena.
-  const under = blank(W, H);
-  for (const [x0, y0, x1, y1, w0, w1] of branches) limb(under, x0, y0, x1, y1, w0, w1, 'MNOP');
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g[y]![x] === '.' && under[y]![x] !== '.') g[y]![x] = under[y]![x]!;
+  const wood = g.map((r) => [...r]);
+  foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 6, 13), tones: 'IJKL', bump: 0.85, leaves: 0.06, leafLen: [2, 4] });
+  // Lo que asoma de las ramas dentro de la copa: solo en la sombra honda, y
+  // en la sombra de la corteza.
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (g[y]![x] === 'L' && 'MNOP'.includes(wood[y]![x]!) && y < fork) g[y]![x] = wood[y]![x] === 'P' ? 'P' : 'O';
+    }
+  }
   return g;
 }
 
 /**
- * La mata de la pradera: compacta, de hojas pequenas que asoman en punta por
- * el borde, con sus bayas y tres tallos en el pie.
+ * La mata de la pradera: compacta, hecha de hojas sueltas que asoman en punta
+ * por el borde, con sus bayas y tres tallos en el pie.
  */
 function meadowBush(): Grid {
   const W = 26;
   const H = 26;
   const g = blank(W, H);
-  const rng = mulberry32(0xb07);
+  const rng = mulberry32(0xb08);
   limb(g, 13, H, 13, H - 6, 2.5, 2, 'WWWW');
   limb(g, 12.5, H - 1, 8, H - 6, 1.6, 1.2, 'WWWW');
   limb(g, 13.5, H - 1, 18, H - 6, 1.6, 1.2, 'WWWW');
-  const dome = { x: 13, y: 12.5, rx: 11.5, ry: 10.5 };
-  foliage(g, rng, { clumps: scatterClumps(rng, dome, 3, 5), dome, tones: 'QRST', spikes: 0.5, bump: 0.7 });
+  const masses: Mass[] = [{ x: 13, y: 13, rx: 11.5, ry: 10, z: 0 }];
+  foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 3, 5), tones: 'QRST', bump: 0.7, leaves: 0.12, leafLen: [2, 3] });
   // Bayas de 2 x 2: brillo arriba a la izquierda y sombra abajo a la derecha.
   const leaf = new Set('QRST');
   let placed = 0;
