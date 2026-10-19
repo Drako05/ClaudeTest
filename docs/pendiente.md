@@ -8,9 +8,10 @@ Lo permanente del *como* esta en `CLAUDE.md` y en los documentos de `docs/` que
 indexa (desde el 2026-10-02, cada parte del juego en el suyo); las leyes del mundo, en
 `docs/el-libro-del-mundo.md` y `docs/leyes.md`.
 
-**Ultima auditoria: commit `dc902a3`, 2026-10-18** (los objetos en el suelo,
-desde `597b8d4`). La proxima parte de aqui: ver `.claude/skills/auditoria/` y
-«Auditoria al cerrar los objetos en el suelo», mas abajo.
+**Ultima auditoria: commit `78bead8`, 2026-10-19** (el inventario de 5
+columnas, desde `dc902a3`). La proxima parte de aqui: ver
+`.claude/skills/auditoria/` y «Auditoria al cerrar el inventario de 5
+columnas», mas abajo.
 
 **Como leerlo.** Desde el 2026-10-10 son tres ficheros, partidos como se partio
 `CLAUDE.md` el 2026-10-02 y por lo mismo: este se lee al empezar cada tanda, y
@@ -31,97 +32,45 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## Inventario de 5 columnas, menu de una casilla y objetos que caducan (2026-10-19) — en curso
+## Auditoria al cerrar el inventario de 5 columnas (2026-10-19)
 
-El autor, en lo esencial: los objetos del suelo **caducan a los 2 dias de
-juego** desde que se generaron; la rejilla pasa a **5 columnas y 15
-casillas** (3 filas), y la **barra a 5**, su primera fila; en el movil el
-boton **MAS** (OTROS) baja **debajo de INVENTARIO**; elegir una casilla que no
-se ve entera **desliza la rejilla** hasta que se vea; y **un menu de opciones**
-por casilla (una foto: Usar, Dividir, Equipar, Destruir), con clic en PC o
-manteniendo en el movil, a la derecha en las columnas 1-2 y a la izquierda en
-las 3-5, alineado con el borde en la primera o la ultima fila visible.
-
-Sus respuestas: Dividir abre un selector con un area que empieza en 0,
-[-1] [-5] [-10] [0] encima, [+1] [+5] [+10] [1/2] debajo, X a la izquierda y ✓
-a la derecha, y lo separado va a la primera casilla disponible, barra
-incluida (sin ninguna, apagado); Destruir, toda la pila y con confirmacion;
-los botones de MAS, en columna bajo el, a la derecha; el Bolso sigue en 2 y 6;
-al fundirse, el reloj del mas nuevo; la barra del movil, del borde izquierdo a
-INVENTARIO; mantener, 0,3 s.
-
-**Hecho**:
-- en el nucleo, `Drop.born`, `DROP_LIFE_TICKS` y `stepDrops(world, tick)`;
-  `START_SLOTS = 15` y `HOTBAR_SLOTS = 5`; `Inventory.split`, `destroy`,
-  `firstFree` y `takeFrom`; `eatFrom`; y en la `Intent`, `splitFrom` /
-  `splitCount`, `destroy` y `useSlot`;
-- en el cliente, `item-menu.ts` (las opciones, la colocacion, el
-  desplazamiento y el tope de Dividir, puros), el menu y los dos avisos en
-  `inventory-ui.ts` e `index.html`, y el CSS de 5 columnas, la barra del movil
-  y OTROS;
-- tests en `drops.test.ts`, `inventory-actions.test.ts` e
-  `item-menu.test.ts`; el humo (`desktop`, `mobile`) y los gestos.
-
-Las deducciones, en `docs/juicio.md`: el estandar de botones en vez de las
-pildoras blancas de la foto, el menu solo en la rejilla, el tope de Dividir,
-el registro de objetos a la izquierda de MAS y lo demas.
-
-En `main` tras las dos tandas en verde en `pruebas` (`d6ca9d7`). **El autor lo
-jugo** (2026-10-19): bien, salvo tres cosas. Pidio redondear las esquinas de
-los botones nuevos; que tocar fuera cierre el selector de Dividir (y, en su
-respuesta, la confirmacion de Destruir, sin destruir); y que las casillas del
-movil no encojan, con el mismo espacio que PERSONAJE, respondiendo al dedo
-solo en su centro de 48 px para que el resto deslice la rejilla, y la barra
-deslizable centrada en el hueco entre la ultima columna y el borde del panel.
-**Hecho**: esquinas de 8 px, cerrar los avisos tocando fuera, casillas de 60
-con `TOUCH_CORE` (el anillo desliza la rejilla por geometria: dejarlo sin
-eventos no servia, por el ajuste de toque del navegador), la barra en el hueco
-y el panel del movil a 8 px de cada lado.
-
-**Falta**: la CI y `main`, que el autor lo juegue, y la auditoria de la tanda.
-
----
-
-## Auditoria al cerrar los objetos en el suelo (2026-10-18)
-
-**El alcance**: de `597b8d4` a `dc902a3`: la auditoria anterior y la tanda de
-los objetos en el suelo, con sus dos rondas de ajustes tras jugar. La tanda,
-entera, en `docs/historia.md`.
+**El alcance**: de `dc902a3` a `78bead8`: la auditoria anterior y la tanda del
+inventario de 5 columnas, el menu de una casilla y los objetos que caducan,
+con sus ajustes tras jugar. La tanda, entera, en `docs/historia.md`.
 
 **Corregido:**
-- **Lo que el autor dio por bueno jugando seguia como deduccion** (escape 38):
-  la espera de 0,5 s para recoger, la velocidad del iman, lo tirado y el
-  icono de 0,4 con su vaiven salen de `docs/juicio.md`, y el codigo y
-  `docs/recoleccion.md` dicen que los aprobo.
-- **Una sonda muerta con un comentario falso** (escape 40): la de los
-  montones dibujados y su contador («el humo lo mira crecer»); no la leia
-  nadie.
-- **Un comentario sobre la linea que no era** (escape 39): en `tick.ts`, el
-  de tirar quedo encima de guardar.
-- **El humo copia numeros del juego sin decirlo**: el comentario del botin en
-  `resources` nombra ahora `DROP_FLOAT`, `DROP_SIZE` y `BOB_HEIGHT`.
-- **Un test que afirma mas de lo que dice su nombre**: el de la mata se llama
-  ahora «sale por fuera de la mata…», tambien en `docs/leyes.md`.
+- **Numeros viejos**: «22 casillas» en un comentario del humo y en un test, y
+  la barra impresa con 4 casillas en el humo (`slice(0, 4)`); el patron de
+  retirados ahora busca tambien «22 casillas» y «18 casillas».
+- **Una linea que no hacia nada** (escape 42): `split` copiaba el desgaste,
+  que en lo apilable es siempre 0.
+- **Una comprobacion que faltaba**: `takeFrom` sin su tope solo se podia
+  romper desde fuera de comer; tiene ya su test.
+- **Cerrar el panel con el menu abierto** lo cierra, pero no lo probaba nadie:
+  `desktop` lo comprueba.
 
-**Mutado a mano** (cayeron las cinco): el desgaste y el limite de la barra de
-`stow`, lo que no cabe al guardar, flotar sobre el agua y derramar lo
-fabricado que no cabe.
+**Mutado a mano** (cayeron): `firstFree` sin mirar si la casilla esta
+abierta, `eatFrom` con el hambre llena y `takeFrom` sin tope.
 
 **Ejecutado**: el escaner y su autoprueba; `npm run shots` y
-`tools/analyze-world.ts`; typecheck y los tests.
+`tools/analyze-world.ts`; typecheck y los tests; la pasada `desktop`.
 
 **Dejado a proposito:**
-- **Tirar o guardar arrastrando ya no comprueba que la casilla siga teniendo
-  lo mismo al soltar**: lo hacia el dialogo de confirmar, que el autor
-  retiro. Un arrastre dura un instante; si en medio se come lo de esa
-  casilla, se tira o guarda lo que quede en ella.
-- **Siete claves de la sonda que no lee ninguna herramienta**, de tandas
-  anteriores: `balanced`, `faunaDrawn`, `faunaGallery`, `lastUsed`,
-  `stationDrops`, `tracked` y `usedLast`. Fuera del alcance; para la proxima
-  auditoria (escape 40).
+- **Con el menu abierto, deslizar la rejilla con la rueda (en PC, con la
+  mochila puesta) lo deja donde estaba**, separado de su casilla. Es un caso
+  raro, y cerrarlo al deslizar lo cerraria tambien al desplazar hasta la
+  casilla elegida.
+- **«Todo está bien» no saca de `docs/juicio.md` las deducciones de la
+  tanda**: el autor lo dijo de la tanda entera, no de cada numero, asi que
+  siguen esperando su juicio (el estandar del escape 38 es lo aprobado
+  expresamente).
+- Las siete claves de la sonda sin lector de tandas anteriores (escape 40)
+  siguen para otra auditoria.
 
-**Escapes** (fase 6): del 37 al 40. El 37, el botin dentro del tronco, lo vio
-el autor jugando: a la lente G, «Lo que nace en el mundo».
+**Escapes** (fase 6): el 41, el ajuste de toque del navegador, a la lente G;
+el 42, una mutacion que sobrevive porque la linea no hace nada, a la B; y el
+P7, una mutacion a mano que deshizo un arreglo sin commit al restaurar desde
+git.
 
 ---
 

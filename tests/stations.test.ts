@@ -614,7 +614,7 @@ describe('La partida de la tanda 2', () => {
     act(state, { craft: recipeOf(Resource.IronPickaxe) });
     expect(state.lastCrafted).toBe(-1);
 
-    // Ponerse la mochila: 22 casillas. La bolsa ya no cabe a la vez.
+    // Ponerse la mochila: 21 casillas. La bolsa ya no cabe a la vez.
     const slotOf = (item: Resource) => {
       for (let i = 0; i < inv.size; i++) if (inv.itemAt(i) === item) return i;
       return -1;

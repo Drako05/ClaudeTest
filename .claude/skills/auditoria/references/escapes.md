@@ -521,6 +521,31 @@ Formato:
   `tracked`, `usedLast`) que hay que juzgar una a una primero.
 - **Donde vive ahora**: lente D, punto 2, con la orden.
 
+### 41. Una zona «sin eventos» que el navegador da igual a lo de al lado (2026-10-19)
+- **Que paso**: para que el anillo de cada casilla deslizara la rejilla, se le
+  quitaron los eventos (`pointer-events: none` y un area de toque interior).
+  `elementFromPoint` decia «la rejilla», pero el toque de verdad llegaba a la
+  casilla: Chromium acerca el dedo a lo pulsable de al lado (el ajuste de
+  toque), aun con un radio de medio pixel. Lo cazaron los gestos; con un
+  clic de raton o `elementFromPoint` no se habria visto.
+- **Por que se escapo**: se dio por hecho que el toque cae donde dice
+  `elementFromPoint`.
+- **Que lo habria visto**: probar con un toque de verdad (CDP
+  `Input.dispatchTouchEvent`) lo que un dedo hace cerca de algo pulsable, y
+  mirar a que elemento llega el `pointerdown`. Si una zona tiene que hacer otra
+  cosa que lo de al lado, se decide por geometria en el oyente, no quitandole
+  los eventos.
+- **Donde vive ahora**: lente G, «Un dedo cerca de algo pulsable».
+
+### 42. Una mutacion que sobrevive porque la linea no hace nada (2026-10-19)
+- **Que paso**: `split` copiaba el desgaste a la casilla nueva. Solo se divide
+  lo apilable, que no tiene desgaste, y una casilla vacia ya lo tiene a 0: la
+  linea no cambiaba nada, y su mutacion sobrevivia.
+- **Por que se escapo**: no se muto en la tanda.
+- **Que lo habria visto**: ante una mutacion que sobrevive, preguntar antes
+  de escribir otro test si la linea puede cambiar algo; si no puede, se quita.
+- **Donde vive ahora**: lente B, punto 4.
+
 ## Del proceso del agente
 
 Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
@@ -579,3 +604,13 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
   `tools/smoke.mjs` y `tools/gestures.mjs` los selectores de lo que cambio
   (`grep -n "\.recipe" tools/*.mjs`) y se corren todas las que salgan, no las
   que uno cree.
+
+### P7. Una mutacion a mano que deshace un arreglo sin commit (2026-10-19)
+- **Que paso**: en la auditoria se quito una linea de `inventory.ts` y, justo
+  despues, se muto ese mismo fichero a mano con un guion que lo restauraba con
+  `git checkout --`. El arreglo, aun sin commit, se perdio sin aviso; lo cazo
+  `git status` al retomar.
+- **Metodo**: las mutaciones a mano restauran desde una copia del fichero
+  tomada antes de mutar, no desde git; o se hace commit antes de mutar. Y
+  antes del commit de cierre se repasa `git status` contra la lista de
+  correcciones.

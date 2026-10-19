@@ -261,7 +261,6 @@ export class Inventory {
     if (to < 0) return;
     this.items[to] = this.items[slot];
     this.counts[to] = n;
-    this.wear[to] = this.wear[slot];
     this.counts[slot] = count - n;
   }
 
