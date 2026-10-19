@@ -15,24 +15,24 @@ describe('Guardar lo de la barra', () => {
       inv.counts[slot] = count;
     };
     put(0, Resource.Wood, 50); // en la barra
-    put(4, Resource.Stone, 3); // la primera de fuera, ocupada por otra cosa
-    put(5, Resource.Wood, 80); // una pila a medias de lo mismo
+    put(5, Resource.Stone, 3); // la primera de fuera, ocupada por otra cosa
+    put(6, Resource.Wood, 80); // una pila a medias de lo mismo
     inv.stow(0);
     expect(inv.itemAt(0)).toBeNull();
-    expect(inv.counts[5]).toBe(100);
-    // Lo que sobra (30), a la primera vacia de fuera de la barra: la 6.
-    expect(inv.itemAt(6)).toBe(Resource.Wood);
-    expect(inv.counts[6]).toBe(30);
-    expect(inv.counts[4]).toBe(3);
+    expect(inv.counts[6]).toBe(100);
+    // Lo que sobra (30), a la primera vacia de fuera de la barra: la 7.
+    expect(inv.itemAt(7)).toBe(Resource.Wood);
+    expect(inv.counts[7]).toBe(30);
+    expect(inv.counts[5]).toBe(3);
   });
 
   it('lo que no cabe se queda en la barra; sin sitio, nada', () => {
     const inv = new Inventory();
-    inv.add(Resource.Stone, 100 * 16); // todo lleno de piedra, la barra tambien
+    inv.add(Resource.Stone, 100 * 15); // todo lleno de piedra, la barra tambien
     inv.remove(Resource.Stone, 30); // la ultima casilla, a 70
     inv.stow(0);
     expect(inv.counts[0]).toBe(70);
-    expect(inv.counts[15]).toBe(100);
+    expect(inv.counts[14]).toBe(100);
     inv.stow(0);
     expect(inv.counts[0]).toBe(70);
   });
@@ -44,8 +44,8 @@ describe('Guardar lo de la barra', () => {
     inv.add(Resource.Stone, 5); // casilla 1
     inv.stow(0);
     expect(inv.itemAt(0)).toBeNull();
-    expect(inv.itemAt(4)).toBe(Resource.StoneAxe);
-    expect(inv.wear[4]).toBe(7);
+    expect(inv.itemAt(5)).toBe(Resource.StoneAxe);
+    expect(inv.wear[5]).toBe(7);
   });
 
   it('desde una casilla que no es de la barra no hace nada', () => {
@@ -62,6 +62,6 @@ describe('Guardar lo de la barra', () => {
     state.inventory.add(Resource.Stone, 5);
     step(state, { ...emptyIntent(), stow: 0 });
     expect(state.inventory.itemAt(0)).toBeNull();
-    expect(state.inventory.itemAt(4)).toBe(Resource.Stone);
+    expect(state.inventory.itemAt(5)).toBe(Resource.Stone);
   });
 });

@@ -75,7 +75,7 @@ function slotOf(inv: Inventory, item: Resource): number {
 describe('El inventario por casillas', () => {
   it('apila hasta 100, una herramienta por casilla y con sus usos', () => {
     const inv = new Inventory();
-    expect(inv.openSlots()).toBe(16);
+    expect(inv.openSlots()).toBe(15);
     expect(inv.add(Resource.Wood, 205)).toBe(true);
     expect([inv.counts[0], inv.counts[1], inv.counts[2]]).toEqual([100, 100, 5]);
     expect(inv.add(Resource.StoneAxe, 2)).toBe(true);
@@ -94,14 +94,14 @@ describe('El inventario por casillas', () => {
     expect(inv.add(Resource.Wood, 3)).toBe(true);
   });
 
-  it('solo las cuatro primeras son la mano; se intercambian y se tiran', () => {
+  it('solo las cinco primeras son la mano; se intercambian y se tiran', () => {
     const inv = new Inventory();
     inv.add(Resource.Wood, 1);
     inv.add(Resource.Stone, 1);
-    inv.select(6);
+    inv.select(5);
     expect(inv.selected).toBe(0);
-    inv.select(3);
-    expect(inv.selected).toBe(3);
+    inv.select(4);
+    expect(inv.selected).toBe(4);
     inv.swap(0, 5);
     expect(inv.itemAt(5)).toBe(Resource.Wood);
     expect(inv.itemAt(0)).toBeNull();

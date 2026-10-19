@@ -294,21 +294,21 @@ const items = (p) => p.slots.map((s) => s.item);
 const barStart = await probe();
 await dragReal(await at('#hotbar .slot:nth-child(1)'), await at('#hotbar .slot:nth-child(3)'));
 const barSwap = await probe();
-console.log(`  barra con el inventario cerrado: ${items(barStart).slice(0, 4)} -> ${items(barSwap).slice(0, 4)}`);
+console.log(`  barra con el inventario cerrado: ${items(barStart).slice(0, 5)} -> ${items(barSwap).slice(0, 5)}`);
 check(!barSwap.inventoryOpen && barSwap.slots[2].item === barStart.slots[0].item && barSwap.slots[0].item === barStart.slots[2].item,
   'arrastrar dentro de la barra con el inventario cerrado no intercambio');
 await dragReal(await at('#hotbar .slot:nth-child(1)'), { x: 195, y: 420 });
 const barVoid = await probe();
-console.log(`  barra al vacio: ${items(barSwap).slice(0, 4)} -> ${items(barVoid).slice(0, 4)}, tirados ${barVoid.itemsSent.discard - barSwap.itemsSent.discard}`);
+console.log(`  barra al vacio: ${items(barSwap).slice(0, 5)} -> ${items(barVoid).slice(0, 5)}, tirados ${barVoid.itemsSent.discard - barSwap.itemsSent.discard}`);
 check(barVoid.slots[0].item === -1 && barVoid.itemsSent.discard === barSwap.itemsSent.discard + 1 && barVoid.drops.some((d) => d.item === barSwap.slots[0].item),
   'soltar la barra al vacio con el inventario cerrado no la tiro');
-const stowFrom = barVoid.slots.findIndex((x, i) => i < 4 && x.item >= 0);
+const stowFrom = barVoid.slots.findIndex((x, i) => i < 5 && x.item >= 0);
 await dragReal(await at(`#hotbar .slot:nth-child(${stowFrom + 1})`), await center('invOpen'));
 const barStow = await probe();
 const stowed = barVoid.slots[stowFrom];
 console.log(`  barra a INVENTARIO: casilla ${stowFrom + 1} ${stowed.item} x${stowed.count} -> ${barStow.slots[stowFrom].item}`);
 check(!barStow.inventoryOpen && barStow.slots[stowFrom].item === -1 && barStow.itemsSent.stow === barVoid.itemsSent.stow + 1 &&
-  barStow.slots.some((x, i) => i >= 4 && x.item === stowed.item),
+  barStow.slots.some((x, i) => i >= 5 && x.item === stowed.item),
   'soltar la barra sobre INVENTARIO no la guardo fuera de la barra');
 // Lo tirado y lo guardado se reponen: lo que sigue (mover, fabricar) los usa.
 await page.evaluate(() => document.querySelector('[data-kit="piedra"]').click());
@@ -341,6 +341,42 @@ check(afterDrag.itemsSent.move > beforeDrag.itemsSent.move && afterDrag.slots[6]
 await dragReal(await slotAt(7), await at('#hotbar .slot:nth-child(4)'));
 const toBar = await probe();
 check(toBar.slots[3].item === moving, `arrastrar de la rejilla a la barra no movio: ${items(toBar).slice(0, 8)}`);
+// El menu de una casilla con el dedo (el autor, 2026-10-19): mantener 0,3 s lo
+// abre; un toque corto solo describe; tocar otra casilla lo cierra y la elige;
+// y arrastrar tras abrirlo lo cierra y arrastra.
+const menuOf = async () => (await probe()).itemMenu;
+const filled = toBar.slots.findIndex((x, i) => i < 15 && x.item >= 0);
+const otherFilled = toBar.slots.findIndex((x, i) => i < 15 && i !== filled && x.item >= 0);
+const emptyCell = toBar.slots.findIndex((x, i) => i < 15 && x.item < 0);
+await tapReal(await slotAt(filled + 1));
+const shortTap = await menuOf();
+const fillAt = await slotAt(filled + 1);
+await real('touchStart', [fillAt]);
+await page.waitForFunction(() => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
+await real('touchEnd', []);
+await page.waitForTimeout(200);
+const held = await menuOf();
+await tapReal(await slotAt(otherFilled + 1));
+const tappedOut = await menuOf();
+const pickedAfter = await page.evaluate(() => [...document.querySelectorAll('#invGrid .slot')].findIndex((el) => el.classList.contains('picked')));
+console.log(`  menu con el dedo: toque corto ${shortTap.open}, mantener ${held.open} (${held.options}), tocar fuera ${tappedOut.open}, elegida ${pickedAfter + 1}`);
+check(!shortTap.open, 'un toque corto en una casilla abrio el menu');
+check(held.open && held.slot === filled, `mantener la casilla no abrio su menu: ${JSON.stringify(held)}`);
+check(!tappedOut.open && pickedAfter === otherFilled, 'tocar otra casilla no cerro el menu o no la eligio');
+// Mantener, y sin soltar, arrastrar a una casilla vacia: cierra el menu y mueve.
+const dragFrom = await slotAt(otherFilled + 1);
+const dragTo = await slotAt(emptyCell + 1);
+const movesHeld = (await probe()).itemsSent.move;
+await real('touchStart', [dragFrom]);
+await page.waitForFunction(() => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
+const heldOpen = (await menuOf()).open;
+for (let i = 1; i <= 10; i++) await real('touchMove', [{ x: dragFrom.x + ((dragTo.x - dragFrom.x) * i) / 10, y: dragFrom.y + ((dragTo.y - dragFrom.y) * i) / 10 }]);
+const whileDrag = (await menuOf()).open;
+await real('touchEnd', []);
+await page.waitForTimeout(400);
+const heldDrag = await probe();
+check(heldOpen && !whileDrag && heldDrag.itemsSent.move === movesHeld + 1,
+  `mantener y arrastrar no cerro el menu o no movio: abierto ${heldOpen}, arrastrando ${whileDrag}, movimientos ${movesHeld} -> ${heldDrag.itemsSent.move}`);
 // A recetas, con su pestana, y mantener el pico 1 s.
 await tapReal(await at('#invTabs button:nth-child(3)'));
 check((await probe()).inventoryPage === 'recetas', 'la pestana Recetas no cambio de pagina');
@@ -417,7 +453,7 @@ await tapReal(await at('#invTabs button:nth-child(1)'));
 await dragReal(await at('#hotbar .slot:nth-child(2)'), await at('#charGrid [data-slot="1003"]'));
 const belted = await probe();
 console.log(`  bolsa al Bolso: ${JSON.stringify(belted.worn)}, casillas ${belted.openSlots}`);
-check(belted.worn[3] === 20 && belted.openSlots === 18, 'arrastrar la bolsa al Bolso con el dedo no la puso');
+check(belted.worn[3] === 20 && belted.openSlots === 17, 'arrastrar la bolsa al Bolso con el dedo no la puso');
 
 // Con el inventario abierto, un toque fuera de su interfaz lo cierra y nada
 // mas (decisiones del autor, 2026-10-01): ni gira la camara, ni ataca, ni pulsa
@@ -478,6 +514,24 @@ console.log(`  barra deslizable: ${rail0.shown ? 'se ve' : 'no se ve'}, deslizad
 check(rail0.shown && rail0.max > 0, 'con la bolsa la rejilla no desborda o la barra no se ve');
 check(rail1.top > rail0.top + 10, 'arrastrar el mando con el dedo no deslizo la rejilla');
 check(afterRail.itemsSent.move === moves0 && afterRail.itemsSent.discard === discards0, 'arrastrar el mando movio o tiro una casilla');
+// Elegir una casilla que no se ve entera desliza la rejilla hasta que se vea
+// (el autor, 2026-10-19): con la primera fila cortada por arriba, tocar lo que
+// asoma de la casilla 1 la deja entera a la vista.
+const cut = await page.evaluate(() => {
+  const g = document.getElementById('invGrid');
+  g.scrollTop = 20;
+  const c = g.children[0].getBoundingClientRect();
+  return { x: c.x + c.width / 2, y: c.bottom - 8, hidden: g.getBoundingClientRect().top + g.clientTop - c.top };
+});
+await page.waitForTimeout(150);
+await tapReal({ x: cut.x, y: cut.y });
+const shownCell = await page.evaluate(() => {
+  const g = document.getElementById('invGrid');
+  const c = g.children[0].getBoundingClientRect();
+  return { scroll: g.scrollTop, off: g.getBoundingClientRect().top + g.clientTop - c.top, picked: g.children[0].classList.contains('picked') };
+});
+console.log(`  casilla cortada: tapada ${cut.hidden.toFixed(1)} px -> ${shownCell.off.toFixed(1)} px, deslizada a ${shownCell.scroll}`);
+check(cut.hidden > 5 && shownCell.picked && shownCell.off <= 0.5, `elegir la casilla cortada no la dejo entera a la vista: ${JSON.stringify({ cut, shownCell })}`);
 
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();

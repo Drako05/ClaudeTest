@@ -10,7 +10,7 @@ Estaba en `CLAUDE.md` hasta el 2026-10-02 y se mudo aqui **literal** (propuesta 
 un indice de estos documentos).
 
 Las teclas: WASD o flechas andan, **Espacio salta** (decision del autor en la
-fase 2), Shift enciende la carrera, **E abre el inventario**, 1-4 eligen lo
+fase 2), Shift enciende la carrera, **E abre el inventario**, 1-5 eligen lo
 que se lleva en la mano, y tambien la **rueda del raton**, que la recorre (hacia
 abajo, la siguiente; da la vuelta; **una sola casilla encendida, siempre**: cada
 muesca mueve en el acto la luz de la seleccion, sin destello aparte ni espera,
@@ -135,10 +135,15 @@ boton, y un dedo sobre el mundo gira la camara y nada mas.
 reposo; **USAR** a su izquierda, apoyado en su mismo borde de abajo; y
 **CORRER** y **SALTAR** en columna encima del ataque, alineados a su borde
 derecho. Los **anillos de salud y hambre** van abajo a la izquierda.
-Arriba, **OTROS** a la izquierda, la **barra de la mano** en el centro exacto
-(sus casillas encogen en pantallas estrechas para no pisar a OTROS e
-INVENTARIO) e
-**INVENTARIO** a la derecha; OTROS despliega **en columna debajo de el** el
+Arriba, la **barra de la mano**, de 5 casillas, desde el borde izquierdo hasta
+**INVENTARIO**, a la derecha (sus casillas encogen en pantallas estrechas para
+dejarle 10 px), y **OTROS** —el boton MAS, las tres barras— **debajo de
+INVENTARIO** (el autor, 2026-10-19: le deja sitio a la quinta casilla; hasta
+entonces OTROS iba a la izquierda y la barra, centrada entre los dos). Con el
+inventario abierto, el panel lo tapa (*deduccion*: empieza a esa altura). El
+registro de objetos sigue colgando de debajo de INVENTARIO, pero a la
+izquierda de OTROS (*deduccion*: que no lo tape). OTROS despliega **en columna
+debajo de el, pegados a la derecha**, el
 ojo, el HUD, el entorno y, desde el 2026-10-05, el **panel de desarrollo** (una
 llave inglesa; en PC es F3, ver `docs/devtools.md`), y se cierra tocando fuera. **Todos los botones son cuadrados y con relieve** (el autor, 2026-10-17:
 «darles una pequeña iluminación y sombra para generar la ilusión de relieve que

@@ -866,9 +866,14 @@ function runFrame(now: number, draw: boolean): void {
       intent.moveTo = asked.moveTo;
       intent.discard = asked.discard;
       intent.stow = asked.stow;
+      intent.splitFrom = asked.splitFrom;
+      intent.splitCount = asked.splitCount;
+      intent.destroy = asked.destroy;
+      intent.useSlot = asked.useSlot;
       asked = null;
     } else {
       intent.select = intent.craft = intent.moveFrom = intent.moveTo = intent.discard = intent.stow = -1;
+      intent.splitFrom = intent.destroy = intent.useSlot = -1;
     }
 
     // Mantener el boton repite cuatro veces por segundo, que es la cadencia de
@@ -1390,6 +1395,8 @@ Object.defineProperty(window, '__verdant', {
       })),
       selectedSlot: state.inventory.selected,
       itemsSent: { ...items.sent },
+      // El menu de una casilla de la rejilla (el autor, 2026-10-19).
+      itemMenu: items.menuState,
       /** Casillas iluminadas al paso de la rueda, en orden. Acumulado. */
       hotbarPasses: [...items.passes],
       inventoryPage: items.currentPage,

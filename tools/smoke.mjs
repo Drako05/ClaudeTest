@@ -307,7 +307,7 @@ async function useClick(page) {
 /** Pone en la mano la casilla con ese objeto, si esta en la barra. */
 async function toHand(page, item) {
   const slot = (await state(page)).slots.findIndex((s) => s.item === item);
-  if (slot >= 0 && slot < 4) await page.keyboard.press(`Digit${slot + 1}`);
+  if (slot >= 0 && slot < 5) await page.keyboard.press(`Digit${slot + 1}`);
   await elapse(page, 200);
   return slot;
 }
@@ -817,9 +817,9 @@ async function desktopPass(browser, baseUrl) {
   await page.waitForFunction((n) => window.__verdant.hotbarPasses.length >= n, n0 + 3, { timeout: 5000 }).catch(() => {});
   const w2 = await state(page);
   const lit = w2.hotbarPasses.slice(n0);
-  const passed = [(w0.selectedSlot + 1) % 4, w0.selectedSlot, (w0.selectedSlot + 3) % 4];
+  const passed = [(w0.selectedSlot + 1) % 5, w0.selectedSlot, (w0.selectedSlot + 4) % 5];
   console.log(`  rueda: casilla ${w0.selectedSlot + 1} -> ${w1.selectedSlot + 1} -> ${w2.selectedSlot + 1}, iluminadas al pasar ${lit.map((i) => i + 1)}`);
-  check(w1.selectedSlot === (w0.selectedSlot + 1) % 4 && w2.selectedSlot === (w0.selectedSlot + 3) % 4,
+  check(w1.selectedSlot === (w0.selectedSlot + 1) % 5 && w2.selectedSlot === (w0.selectedSlot + 4) % 5,
     'la rueda no recorre la barra de la mano');
   check(lit.join() === passed.join(),
     `la rueda no ilumino las casillas ${passed.map((i) => i + 1)} por las que paso: ${lit.map((i) => i + 1)}`);
@@ -856,7 +856,7 @@ async function desktopPass(browser, baseUrl) {
   // autor, 2026-10-01), aunque su primera fila sean esas casillas.
   const gridLit = await page.evaluate(() => document.querySelectorAll('#invGrid .slot.on').length);
   check(gridLit === 0, `con el inventario abierto la rejilla enciende ${gridLit} casilla(s)`);
-  // Con las 16 casillas caben las cuatro filas: la barra deslizable no sale.
+  // Con las 15 casillas, tres filas en una vista de cuatro: la barra deslizable no sale.
   const railIdle = await page.evaluate(() => {
     const g = document.getElementById('invGrid');
     return { overflows: g.scrollHeight > g.clientHeight + 0.5,
@@ -978,7 +978,8 @@ async function desktopPass(browser, baseUrl) {
   check((await desc()) === '' && (await page.locator('#invGrid .slot.picked').count()) === 0,
     'al abrir el inventario ya habia algo seleccionado');
   const full = nowSlots.findIndex((s) => s.item >= 0);
-  const empty = nowSlots.findIndex((s) => s.item < 0);
+  // La vacia mas lejana de las abiertas: el menu del clic tapa las de al lado.
+  const empty = nowSlots.findLastIndex((s, i) => i < 15 && s.item < 0);
   await page.click(`#invGrid .slot:nth-child(${full + 1})`);
   await page.waitForTimeout(200);
   const shown = await desc();
@@ -986,6 +987,67 @@ async function desktopPass(browser, baseUrl) {
   await page.waitForTimeout(200);
   console.log(`  descripcion: «${shown.slice(0, 30)}…» -> «${await desc()}»`);
   check(shown !== '' && (await desc()) === '', 'tocar una casilla vacia no limpio la descripcion');
+  // El menu de una casilla (el autor, 2026-10-19): en PC sale con el clic, al
+  // lado de la casilla —columnas 1-2 a la derecha, 3-5 a la izquierda— y con
+  // las opciones de su objeto; un clic fuera lo cierra y hace lo suyo. Las
+  // bayas: Usar, Dividir y Destruir.
+  const berrySlot = nowSlots.findIndex((s) => s.item === 2 && s.count >= 2);
+  check(berrySlot >= 0, `no hay una pila de bayas con que probar el menu: ${JSON.stringify(nowSlots)}`);
+  if (berrySlot >= 0) {
+    const cellSel = `#invGrid .slot:nth-child(${berrySlot + 1})`;
+    await page.click(cellSel);
+    await page.waitForTimeout(200);
+    const menu = (await state(page)).itemMenu;
+    const [cellR, menuR] = await page.evaluate((q) => [
+      document.querySelector(q).getBoundingClientRect().toJSON(),
+      document.getElementById('itemMenu').getBoundingClientRect().toJSON(),
+    ], cellSel);
+    const right = berrySlot % 5 < 2;
+    console.log(`  menu de la casilla ${berrySlot + 1}: ${JSON.stringify(menu)}`);
+    check(menu.open && menu.slot === berrySlot && menu.options.join(',') === 'use,split,destroy',
+      `el clic no abrio el menu de las bayas con Usar, Dividir y Destruir: ${JSON.stringify(menu)}`);
+    check(right ? menuR.left >= cellR.right && menu.side === 'right' : menuR.right <= cellR.left && menu.side === 'left',
+      `el menu no sale del lado de su columna: ${JSON.stringify({ menu, cellR, menuR })}`);
+    await page.screenshot({ path: join(SHOTS, '3d-01c-menu.png') });
+    // Un clic en otra casilla cierra el menu y la elige: no se lo traga.
+    await page.click(`#invGrid .slot:nth-child(${empty + 1})`);
+    await page.waitForTimeout(200);
+    const closed = (await state(page)).itemMenu;
+    check(!closed.open && (await desc()) === '', `el clic fuera no cerro el menu o no hizo lo suyo: ${JSON.stringify(closed)}`);
+    // Dividir: el selector empieza en 0; +5 (como mucho la pila menos 1) y
+    // confirmar deja dos pilas, la nueva en la primera casilla libre.
+    const before = (await state(page)).slots;
+    const n = Math.min(5, before[berrySlot].count - 1);
+    const free = before.findIndex((s) => s.item < 0);
+    await page.click(cellSel);
+    await page.waitForTimeout(150);
+    await page.click('#itemMenu [data-option="split"]');
+    await page.waitForTimeout(150);
+    const qty0 = await page.inputValue('#splitQty');
+    await page.click('#splitAsk [data-add="5"]');
+    const qty5 = await page.inputValue('#splitQty');
+    await page.click('#splitYes');
+    await elapse(page, 200);
+    const split = (await state(page)).slots;
+    console.log(`  dividir: ${qty0} -> ${qty5}; casilla ${berrySlot + 1} ${before[berrySlot].count} -> ${split[berrySlot].count}, casilla ${free + 1} ${split[free].count}`);
+    check(qty0 === '0' && qty5 === String(n), `el selector de Dividir no empieza en 0 o +5 no suma: ${qty0}, ${qty5}`);
+    check(split[berrySlot].count === before[berrySlot].count - n && split[free].item === 2 && split[free].count === n,
+      `Dividir no separo ${n} a la primera casilla libre: ${JSON.stringify([split[berrySlot], split[free]])}`);
+    // Destruir: pide confirmar, y hasta entonces no borra nada.
+    await page.click(`#invGrid .slot:nth-child(${free + 1})`);
+    await page.waitForTimeout(150);
+    await page.click('#itemMenu [data-option="destroy"]');
+    await elapse(page, 200);
+    const asked = await state(page);
+    check(asked.itemMenu.asking === 'destroy' && asked.slots[free].count === n && (await page.isVisible('#destroyAsk')),
+      `Destruir no pidio confirmacion o destruyo antes: ${JSON.stringify(asked.itemMenu)}`);
+    const dropsBefore = asked.drops.length;
+    await page.click('#destroyYes');
+    await elapse(page, 200);
+    const gone = await state(page);
+    check(gone.slots[free].item < 0 && gone.drops.length === dropsBefore && !(await page.isVisible('#destroyAsk')),
+      `Destruir no borro la pila o la tiro al suelo: ${JSON.stringify(gone.slots[free])}`);
+  }
   await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
   // Esc lo cierra sin pausar y captura el cursor como E (pedido del autor,
   // 2026-10-02), pero la captura se pide al SOLTAR la tecla: pedida con Esc
@@ -1167,7 +1229,7 @@ async function desktopPass(browser, baseUrl) {
   console.log(`  TAB: preciso ${m0.precise} -> ${m1.precise} -> ${m2.precise}`);
   check(!m0.precise && m1.precise && !m2.precise && icon1 && !(await modeIcon()), 'TAB no alterna el modo de golpe o su icono');
 
-  // La barra de la mano: siempre a la vista, y las teclas 1-4 eligen casilla.
+  // La barra de la mano: siempre a la vista, y las teclas 1-5 eligen casilla.
   check(await page.isVisible('#hotbar'), 'la barra de la mano no se ve en PC');
   const beforeSelect = await state(page);
   await page.keyboard.press('Digit3');
@@ -1653,7 +1715,7 @@ async function stationsPass(browser, baseUrl) {
   /** A la cuarta casilla de la barra y a la mano, si no estaba en la barra. */
   const toBar = async (item) => {
     const slot = (await state(page)).slots.findIndex((x) => x.item === item);
-    if (slot >= 4) await drag(await center(`#invGrid .slot:nth-child(${slot + 1})`), await center('#hotbar .slot:nth-child(4)'));
+    if (slot >= 5) await drag(await center(`#invGrid .slot:nth-child(${slot + 1})`), await center('#hotbar .slot:nth-child(4)'));
   };
 
   // Con E, las recetas de mano: mesa y horno, sin fundir ni ropa.
@@ -1923,9 +1985,9 @@ async function stationsPass(browser, baseUrl) {
     const dressed = await state(page);
     const shown = await page.evaluate(() => Array.from(document.querySelectorAll('#invGrid .slot')).filter((el) => !el.hidden).length);
     console.log(`  mochila puesta: ${dressed.worn}, casillas ${dressed.openSlots}, a la vista ${shown}`);
-    check(dressed.worn[3] === 21 && dressed.openSlots === 22, `la mochila no se equipo: ${JSON.stringify(dressed.worn)}, ${dressed.openSlots}`);
+    check(dressed.worn[3] === 21 && dressed.openSlots === 21, `la mochila no se equipo: ${JSON.stringify(dressed.worn)}, ${dressed.openSlots}`);
     check(!(await bagIcon()), 'el icono del Bolso sigue a la vista con la mochila puesta');
-    check(shown === 22, `la rejilla no ensena las casillas de la mochila: ${shown}`);
+    check(shown === 21, `la rejilla no ensena las casillas de la mochila: ${shown}`);
     check(dressed.feed.every((t) => !t.includes('Mochila') || t.startsWith('+')), `equiparse la anoto como perdida: ${dressed.feed}`);
     await shot(page, '3d-11-panel-mesa.png');
 
@@ -2003,8 +2065,9 @@ async function mobilePass(browser, baseUrl) {
   // El movil no entra en el raton capturado: ni modo raton ni pausa.
   check(!spawn.mouseMode && !spawn.paused && !(await page.isVisible('#pause')), 'el movil arranco en pausa');
   check(await page.evaluate(() => document.body.classList.contains('touch-active')), 'el body no entro en modo tactil');
-  // El boceto del autor: arriba OTROS, la barra e INVENTARIO; abajo USAR y el
-  // ATAQUE, con CORRER y SALTAR encima. Ni COMER ni SEMBRAR.
+  // El boceto del autor: arriba la barra e INVENTARIO, con OTROS (el boton
+  // MAS) debajo de INVENTARIO (el autor, 2026-10-19); abajo USAR y el ATAQUE,
+  // con CORRER y SALTAR encima. Ni COMER ni SEMBRAR.
   for (const id of ['#action', '#jump', '#run', '#use', '#others', '#invOpen', '#modeTouch', '#inputMode']) {
     check(await page.isVisible(id), `el boton ${id} no se ve en el movil`);
   }
@@ -2024,7 +2087,10 @@ async function mobilePass(browser, baseUrl) {
     `tocar la casilla 2 de la barra no la eligio (${tapped.selectedSlot})`);
   const bar = await page.evaluate(() => document.getElementById('hotbar').getBoundingClientRect().toJSON());
   check(bar.top < 100 && bar.left >= 0 && bar.right <= 390, `la barra del movil no cabe arriba: ${JSON.stringify(bar)}`);
-  check(Math.abs((bar.left + bar.right) / 2 - 390 / 2) <= 1, `la barra del movil no esta centrada: ${JSON.stringify(bar)}`);
+  // Cinco casillas, desde el borde izquierdo hasta INVENTARIO (el autor, 2026-10-19).
+  const barSlots = await page.locator('#hotbar .slot').count();
+  check(barSlots === 5, `la barra del movil no tiene 5 casillas: ${barSlots}`);
+  check(bar.left <= 12 + 1, `la barra del movil no sale del borde izquierdo: ${JSON.stringify(bar)}`);
   // El racimo cabe en la pantalla, y los anillos de salud y hambre van abajo a
   // la izquierda.
   const rect = (id) => page.evaluate((i) => document.getElementById(i).getBoundingClientRect().toJSON(), id);
@@ -2037,7 +2103,7 @@ async function mobilePass(browser, baseUrl) {
   check(jump.bottom <= atk.top && run.bottom <= jump.top, 'correr y saltar no estan en columna encima del ataque');
   check(Math.abs(jump.right - atk.right) < 1 && Math.abs(run.right - atk.right) < 1,
     `correr y saltar no van al borde derecho del ataque: ${run.right} / ${jump.right} / ${atk.right}`);
-  check(bar.left >= others.right + 8 && bar.right <= invOpen.left - 8, 'la barra de la mano pisa OTROS o INVENTARIO');
+  check(bar.right <= invOpen.left - 8 && bar.right >= invOpen.left - 20, `la barra de la mano no llega hasta INVENTARIO o lo pisa: ${bar.right} / ${invOpen.left}`);
   // MODO y ENTRADA, mas pequenos que USAR, a la izquierda de SALTAR y encima
   // de USAR, que no se mueven (el autor, 2026-10-17): el mismo espacio
   // MODO-USAR y ENTRADA-SALTAR, y lo que MODO se corre dentro del ancho de
@@ -2090,11 +2156,12 @@ async function mobilePass(browser, baseUrl) {
   check(stdTouch.seen >= 9 && stdTouch.bad.length === 0, `hay botones del movil fuera del estandar: ${stdTouch.bad.join(' | ')}`);
   const offButtons = await offGridIcons(page);
   check(offButtons.length === 0, `hay iconos de boton fuera de un multiplo de 24: ${offButtons.join(', ')}`);
-  // La cruz tambien en el movil, y el registro colgando de INVENTARIO.
+  // La cruz tambien en el movil, y el registro colgando de debajo de
+  // INVENTARIO, a la izquierda de OTROS, que desde el 2026-10-19 esta ahi.
   check(await page.isVisible('#crosshair'), 'la cruz no se ve en el movil');
   const feedR = await rect('pickupFeed');
-  check(feedR.top >= invOpen.bottom && feedR.top - invOpen.bottom < 16 && Math.abs(feedR.right - invOpen.right) < 1,
-    `el registro no va justo debajo de INVENTARIO: ${JSON.stringify(feedR)}`);
+  check(feedR.top >= invOpen.bottom && feedR.top - invOpen.bottom < 16 && Math.abs(feedR.right - (others.left - 8)) < 1,
+    `el registro no va debajo de INVENTARIO, a la izquierda de OTROS: ${JSON.stringify(feedR)}`);
   // Los anillos: uno al lado del otro en la esquina de abajo a la izquierda,
   // apoyados en el borde de abajo de ATAQUE y USAR, de tamano entre los dos, y
   // sin pisar USAR (decisiones del autor, 2026-09-30).
@@ -2104,7 +2171,9 @@ async function mobilePass(browser, baseUrl) {
   check(hungerR.width > use.width && hungerR.width < atk.width, `los anillos no miden entre USAR y ATAQUE: ${hungerR.width}`);
   check(healthR.right <= use.left && !overlap(healthR, mode), 'los anillos pisan USAR o MODO');
   check((await page.locator('#vitals').count()) === 0, 'siguen las barras de salud y hambre');
-  check(others.left < 40 && others.top < 40 && invOpen.right > 350 && invOpen.top < 40, 'OTROS o INVENTARIO no estan arriba en las esquinas');
+  check(invOpen.right > 350 && invOpen.top < 40, 'INVENTARIO no esta arriba a la derecha');
+  check(Math.abs(others.right - invOpen.right) < 1 && others.top >= invOpen.bottom && others.top - invOpen.bottom <= 12,
+    `OTROS no esta debajo de INVENTARIO: ${JSON.stringify([others, invOpen])}`);
 
   // OTROS despliega el ojo, el HUD y el entorno. La pista de los gestos vive
   // en el HUD.
@@ -2240,7 +2309,7 @@ async function mobilePass(browser, baseUrl) {
   check(pages.join() === 'inventario,recetas,personaje,inventario', `las pestanas no recorren las paginas: ${pages}`);
   // La barra deslizable (pedido del autor, 2026-09-30): se ve siempre que la
   // rejilla tenga mas casillas de las que caben, y solo entonces. Aqui caben;
-  // en un telefono mas bajo (375x640) no, y la barra sale al lado.
+  // en un telefono mas bajo (375x600) no, y la barra sale al lado.
   const railOf = () => page.evaluate(() => {
     const g = document.getElementById('invGrid');
     const rail = g.parentElement.querySelector('.rail');
@@ -2253,13 +2322,15 @@ async function mobilePass(browser, baseUrl) {
     };
   });
   const railTall = await railOf();
-  await page.setViewportSize({ width: 375, height: 640 });
+  // Un telefono bajo: desde el 2026-10-19 las 15 casillas caben en 375x640,
+  // asi que se mira en 375x600, donde no caben.
+  await page.setViewportSize({ width: 375, height: 600 });
   await page.waitForTimeout(300);
   const railShort = await railOf();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(300);
   console.log(`  barra deslizable: 390x844 ${railTall.overflows ? 'desborda' : 'cabe'} (${railTall.shown ? 'se ve' : 'no se ve'}), ` +
-    `375x640 ${railShort.overflows ? 'desborda' : 'cabe'} (${railShort.shown ? 'se ve' : 'no se ve'}, mando ${railShort.thumb.height.toFixed(0)} de ${railShort.rail.height.toFixed(0)})`);
+    `375x600 ${railShort.overflows ? 'desborda' : 'cabe'} (${railShort.shown ? 'se ve' : 'no se ve'}, mando ${railShort.thumb.height.toFixed(0)} de ${railShort.rail.height.toFixed(0)})`);
   check(!railTall.overflows && !railTall.shown, `con las casillas a la vista, la barra no deberia verse: ${JSON.stringify(railTall)}`);
   check(railShort.overflows && railShort.shown, `con mas casillas de las que caben, no se ve la barra: ${JSON.stringify(railShort)}`);
   check(railShort.thumb.height > 0 && railShort.thumb.height < railShort.rail.height - 1,

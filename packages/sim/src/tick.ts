@@ -18,6 +18,7 @@ import {
   forgetUnloadedDamage,
   tryHarvestArea,
   tryUse,
+  eatFrom,
   WorkState,
   type Blocked,
   type HarvestResult,
@@ -230,6 +231,11 @@ export function step(state: GameState, intent: Intent): void {
       const thrown = inventory.discard(intent.discard);
       if (thrown) throwFrom(world, entities, playerId, thrown, state.tick);
     }
+    // Las opciones de una casilla (el autor, 2026-10-19): dividir la pila a la
+    // primera casilla libre, destruirla, o comer de ella.
+    if (intent.splitFrom >= 0) inventory.split(intent.splitFrom, intent.splitCount);
+    if (intent.destroy >= 0) inventory.destroy(intent.destroy);
+    if (intent.useSlot >= 0) state.lastUsed = eatFrom(entities, playerId, inventory, intent.useSlot) ? 'ate' : null;
     if (intent.craft >= 0) {
       const crafted = craftNear(world, entities, playerId, inventory, intent.craft, intent.craftTimes, state.tick);
       if (crafted === 'ok') state.lastCrafted = intent.craft;
@@ -273,7 +279,7 @@ export function step(state: GameState, intent: Intent): void {
 
   // Lo suelto cae, y el jugador recoge lo que tiene cerca: despues de todo lo
   // que suelta botin, para que salga de este tick con su primer paso dado.
-  stepDrops(world);
+  stepDrops(world, state.tick);
   collectDrops(world, entities, playerId, inventory, state.tick);
 
   streamChunks(state);
@@ -310,7 +316,7 @@ export function skipTime(state: GameState, ticks: number): void {
     if (!state.survivalFrozen) updateSurvival(state.entities, state.playerId, TICK_DT);
     // Lo suelto tambien cae y se recoge, como viviendolo quieto: lo que estaba
     // en el aire se posa, y lo que se dejaba recoger cerca, entra.
-    stepDrops(state.world);
+    stepDrops(state.world, state.tick);
     collectDrops(state.world, state.entities, state.playerId, state.inventory, state.tick);
     state.tick++;
   }

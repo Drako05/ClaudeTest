@@ -8,7 +8,7 @@
  * regla no se comprueba jugando con dos pulgares en un headless.
  *
  * Las teclas son las de siempre: WASD o flechas para andar, Espacio salta,
- * Shift enciende y apaga la carrera, E abre el inventario, 1-4 eligen la
+ * Shift enciende y apaga la carrera, E abre el inventario, 1-5 eligen la
  * mano, como la rueda del raton, R empieza un mundo nuevo, + y - acercan y
  * alejan, y P cambia de proyeccion. Clic izquierdo golpea y clic derecho usa
  * lo de la mano.

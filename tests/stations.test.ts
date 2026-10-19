@@ -444,7 +444,7 @@ describe('Los equipables', () => {
     const inv = new Inventory();
     inv.add(Resource.FiberBag, 1);
     inv.add(Resource.FrameBackpack, 1);
-    expect(inv.openSlots()).toBe(16);
+    expect(inv.openSlots()).toBe(15);
     // En ningun otro hueco: ni en el Cinturon, donde iba la bolsa, ni en el Arma.
     for (let e = 0 as Equip; e < EQUIP_COUNT; e++) {
       if (e === Equip.Bag) continue;
@@ -453,12 +453,12 @@ describe('Los equipables', () => {
     }
     inv.move(0, BAG);
     expect(inv.worn[Equip.Bag]).toBe(Resource.FiberBag);
-    expect(inv.openSlots()).toBe(18);
-    // La mochila sobre la bolsa las intercambia (con el tramo vacio): 22, no 24.
+    expect(inv.openSlots()).toBe(17);
+    // La mochila sobre la bolsa las intercambia (con el tramo vacio): 21, no 23.
     inv.move(1, BAG);
     expect(inv.worn[Equip.Bag]).toBe(Resource.FrameBackpack);
     expect(inv.itemAt(1)).toBe(Resource.FiberBag);
-    expect(inv.openSlots()).toBe(22);
+    expect(inv.openSlots()).toBe(21);
     // Lo puesto cuenta en los totales, no en lo que se gasta.
     expect(inv.totals()[Resource.FrameBackpack]).toBe(1);
     expect(inv.count(Resource.FrameBackpack)).toBe(0);
@@ -507,7 +507,7 @@ describe('Los equipables', () => {
     inv.move(BAG, 4);
     expect(inv.worn[Equip.Bag]).toBeNull();
     expect(inv.itemAt(4)).toBe(Resource.FrameBackpack);
-    expect(inv.openSlots()).toBe(16);
+    expect(inv.openSlots()).toBe(15);
   });
 
   it('en el Arma solo entran armas, y conservan su desgaste al ponerlas y quitarlas', () => {
@@ -620,7 +620,7 @@ describe('La partida de la tanda 2', () => {
       return -1;
     };
     act(state, { moveFrom: slotOf(Resource.FrameBackpack), moveTo: equipSlot(Equip.Bag) });
-    expect(inv.openSlots()).toBe(22);
+    expect(inv.openSlots()).toBe(21);
 
     // Y con el pico de cobre, hierro.
     toHand(Resource.CopperPickaxe);

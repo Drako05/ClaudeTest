@@ -988,6 +988,15 @@ export interface Intent {
    * 2026-10-18: arrastrarla al boton INVENTARIO), o -1.
    */
   stow: number;
+  /**
+   * El menu de una casilla (el autor, 2026-10-19): «Dividir» separa
+   * `splitCount` de la pila de `splitFrom` a la primera casilla libre;
+   * «Destruir» borra la pila de `destroy`; «Usar» come de `useSlot`. -1 sin usar.
+   */
+  splitFrom: number;
+  splitCount: number;
+  destroy: number;
+  useSlot: number;
 }
 
 export function emptyIntent(): Intent {
@@ -1011,5 +1020,9 @@ export function emptyIntent(): Intent {
     moveTo: -1,
     discard: -1,
     stow: -1,
+    splitFrom: -1,
+    splitCount: 0,
+    destroy: -1,
+    useSlot: -1,
   };
 }

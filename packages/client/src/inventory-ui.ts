@@ -14,6 +14,11 @@
  *   mano; cerrado, dentro de la barra. **Soltarlo fuera lo tira**, sin
  *   preguntar; y desde la barra, **soltarlo sobre INVENTARIO lo guarda** fuera
  *   de ella (el autor, 2026-10-18; `bindDrag`).
+ * - **Las opciones de una casilla** (el autor, 2026-10-19): con clic en PC o
+ *   manteniendo 0,3 s en el movil, al lado de la casilla de la rejilla, Usar,
+ *   Dividir, Equipar y Destruir, las que toquen (`item-menu.ts`). Dividir pide
+ *   la cantidad y Destruir, confirmacion. Elegir una casilla que no se ve
+ *   entera desliza la rejilla hasta que se vea.
  * - **Fabricar es mantener pulsado 1 s** el resultado de la receta (1,5 hasta
  *   el 2026-10-17), y la fila se llena de izquierda a derecha como una barra
  *   de carga. Con **+ y -** (solo en lo apilable) se elige cuantas veces: un
@@ -41,6 +46,7 @@
 import { craftableTimes, equipSlot, EYE_HEIGHT, HOTBAR_SLOTS, hitboxAt, stationNear, type GameState } from '@verdant/sim';
 import {
   type Equip,
+  equipOf,
   EQUIP_COUNT,
   EQUIP_NAMES,
   RECIPES,
@@ -55,6 +61,7 @@ import { makePlayerArt } from './art.js';
 import { now } from './clock.js';
 import { equipIcon } from './equip-icons.js';
 import { itemIcon } from './item-icons.js';
+import { clampSplit, MENU_HOLD_MS, OPTION_LABELS, optionsFor, placeMenu, scrollToShow, type ItemOption } from './item-menu.js';
 import { pixelIcon } from './pixel-art.js';
 import { categoryArt } from './silhouette-icons.js';
 import { ScrollRail } from './scroll-rail-view.js';
@@ -116,6 +123,13 @@ export interface ItemRequests {
   discard: number;
   /** Casilla de la barra que se guarda en el resto del inventario. */
   stow: number;
+  /** Dividir: de que casilla y cuantos. */
+  splitFrom: number;
+  splitCount: number;
+  /** Destruir la pila de esa casilla. */
+  destroy: number;
+  /** Comer de esa casilla. */
+  useSlot: number;
 }
 
 function byId<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -140,6 +154,15 @@ export class InventoryUi {
   private readonly others = byId('others');
   private readonly invOpen = byId('invOpen');
   private readonly ghost = byId('dragGhost');
+  private readonly menu = byId('itemMenu');
+  private readonly splitAsk = byId('splitAsk');
+  private readonly splitQty = byId<HTMLInputElement>('splitQty');
+  private readonly destroyAsk = byId('destroyAsk');
+  private readonly destroyText = byId('destroyText');
+  /** La casilla cuyo menu esta abierto, con el objeto que tenia al abrirlo. */
+  private menuFor: { slot: number; item: Resource } | null = null;
+  /** La casilla que espera la cantidad de Dividir, o la confirmacion de Destruir. */
+  private asking: { slot: number; item: Resource; kind: 'split' | 'destroy' } | null = null;
 
   private pending: ItemRequests = InventoryUi.none();
   private page: Page = 'inventario';
@@ -153,6 +176,10 @@ export class InventoryUi {
     moving: boolean;
     el: HTMLElement;
     over: HTMLElement | null;
+    /** El toque largo del movil, que abre el menu (`MENU_HOLD_MS`). */
+    timer: number;
+    /** Ya abrio el menu manteniendo: soltar no hace nada mas. */
+    held: boolean;
   } | null = null;
   private hold: { recipe: number; since: number; row: HTMLElement } | null = null;
   /** El + o - mantenido: repite, cada vez mas deprisa (`qtySteps`). */
@@ -163,12 +190,24 @@ export class InventoryUi {
   private mode: Station = Station.Hand;
 
   /** Peticiones que salieron hacia la `Intent`, para el humo. */
-  readonly sent = { select: 0, craft: 0, move: 0, discard: 0, stow: 0 };
+  readonly sent = { select: 0, craft: 0, move: 0, discard: 0, stow: 0, split: 0, destroy: 0, use: 0 };
   /** Se llama al abrir o cerrar el inventario. */
   onToggle: ((open: boolean) => void) | null = null;
 
   private static none(): ItemRequests {
-    return { select: -1, craft: -1, craftTimes: 1, moveFrom: -1, moveTo: -1, discard: -1, stow: -1 };
+    return {
+      select: -1,
+      craft: -1,
+      craftTimes: 1,
+      moveFrom: -1,
+      moveTo: -1,
+      discard: -1,
+      stow: -1,
+      splitFrom: -1,
+      splitCount: 0,
+      destroy: -1,
+      useSlot: -1,
+    };
   }
 
   /** Las veces elegidas para cada receta (por su indice en `RECIPES`). */
@@ -236,6 +275,8 @@ export class InventoryUi {
       },
       true,
     );
+
+    this.bindMenu();
 
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
@@ -356,6 +397,8 @@ export class InventoryUi {
     this.invOpen.classList.toggle('open', open);
     this.invOpen.setAttribute('aria-expanded', String(open));
     if (!open) {
+      this.closeMenu();
+      this.closeAsk();
       this.cancelHold();
       this.qtyHold = null;
       // Al cerrar, todas las recetas vuelven a 1 (el autor, 2026-10-17).
@@ -406,6 +449,9 @@ export class InventoryUi {
     if (out.moveFrom >= 0) this.sent.move++;
     if (out.discard >= 0) this.sent.discard++;
     if (out.stow >= 0) this.sent.stow++;
+    if (out.splitFrom >= 0) this.sent.split++;
+    if (out.destroy >= 0) this.sent.destroy++;
+    if (out.useSlot >= 0) this.sent.use++;
     return out;
   }
 
@@ -510,9 +556,21 @@ export class InventoryUi {
    * el objeto.
    */
   private bindDrag(el: HTMLElement, slot: number, bar: boolean): void {
+    const grid = el.dataset.grid === '1';
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      this.drag = { slot, bar, x: e.clientX, y: e.clientY, moving: false, el, over: null };
+      const d = { slot, bar, x: e.clientX, y: e.clientY, moving: false, el, over: null, timer: 0, held: false };
+      this.drag = d;
+      // En el movil, mantener una casilla de la rejilla abre su menu (el autor:
+      // 0,3 s); soltar antes es un toque, que la describe.
+      if (grid && e.pointerType === 'touch') {
+        d.timer = window.setTimeout(() => {
+          if (this.drag !== d || d.moving) return;
+          d.held = true;
+          this.pick(slot);
+          this.openMenu(slot);
+        }, MENU_HOLD_MS);
+      }
       try {
         el.setPointerCapture(e.pointerId);
       } catch {
@@ -524,9 +582,12 @@ export class InventoryUi {
       if (!d || d.el !== el) return;
       if (!d.moving) {
         if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < DRAG_SLOP) return;
+        window.clearTimeout(d.timer);
         const item = this.current().inventory.itemAt(slot);
         if (item === null) return;
         d.moving = true;
+        // Arrastrar cierra el menu (el autor).
+        this.closeMenu();
         el.classList.add('dragging');
         this.ghost.replaceChildren(itemIcon(item));
         this.ghost.style.display = 'block';
@@ -544,13 +605,16 @@ export class InventoryUi {
       const d = this.drag;
       if (!d || d.el !== el) return;
       this.drag = null;
+      window.clearTimeout(d.timer);
       el.classList.remove('dragging');
       d.over?.classList.remove('drop');
       this.ghost.style.display = 'none';
       if (!d.moving) {
-        if (cancelled) return;
+        if (cancelled || d.held) return;
         if (d.bar) this.pending.select = slot;
         else this.pick(slot);
+        // En PC, el clic en una casilla de la rejilla abre ademas su menu (el autor).
+        if (grid && e.pointerType !== 'touch') this.openMenu(slot);
         return;
       }
       if (cancelled) return;
@@ -582,9 +646,171 @@ export class InventoryUi {
     return el.dataset.grid === '1' || el.dataset.bar === '1' || el.dataset.equip === '1' ? el : null;
   }
 
+  /**
+   * Elige la casilla que se describe. Si es de la rejilla y no se ve entera
+   * —la rejilla quedo deslizada a medias—, la desliza lo justo para que se vea
+   * (el autor, 2026-10-19).
+   */
   private pick(slot: number): void {
     this.picked = slot;
+    const cell = this.grid.children[slot] as HTMLElement | undefined;
+    if (cell && this.grid.contains(cell)) {
+      this.grid.scrollTop += scrollToShow(cell.getBoundingClientRect(), this.gridView());
+    }
     this.render(this.current());
+  }
+
+  /** Lo que se ve de la rejilla: su caja sin el borde. */
+  private gridView(): { left: number; top: number; right: number; bottom: number } {
+    const r = this.grid.getBoundingClientRect();
+    const top = r.top + this.grid.clientTop;
+    const left = r.left + this.grid.clientLeft;
+    return { left, top, right: left + this.grid.clientWidth, bottom: top + this.grid.clientHeight };
+  }
+
+  // ------------------------------------------------------------ el menu de una casilla
+
+  /** Los botones de los avisos de Dividir y Destruir, y cerrar el menu tocando fuera. */
+  private bindMenu(): void {
+    // Tocar fuera del menu lo cierra, y ese toque sigue su curso (el autor):
+    // en captura, sin tragarlo.
+    document.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (this.menu.hidden) return;
+        const t = e.target as Node | null;
+        if (t && this.menu.contains(t)) return;
+        this.closeMenu();
+      },
+      true,
+    );
+    for (const b of Array.from(this.splitAsk.querySelectorAll<HTMLButtonElement>('[data-add], [data-set]'))) {
+      b.addEventListener('click', () => {
+        const stack = this.askedStack();
+        const now = clampSplit(Number(this.splitQty.value), stack);
+        const next = b.dataset.set === 'zero' ? 0 : b.dataset.set === 'half' ? Math.floor(stack / 2) : now + Number(b.dataset.add);
+        this.splitQty.value = String(clampSplit(next, stack));
+      });
+    }
+    // Lo escrito se ciñe a lo que se puede separar al salir del campo.
+    this.splitQty.addEventListener('change', () => {
+      this.splitQty.value = String(clampSplit(Number(this.splitQty.value), this.askedStack()));
+    });
+    byId('splitNo').addEventListener('click', () => this.closeAsk());
+    byId('splitYes').addEventListener('click', () => {
+      const a = this.asking;
+      const n = clampSplit(Number(this.splitQty.value), this.askedStack());
+      if (a && n > 0 && this.stillHolds(a.slot, a.item)) {
+        this.pending.splitFrom = a.slot;
+        this.pending.splitCount = n;
+      }
+      this.closeAsk();
+    });
+    byId('destroyNo').addEventListener('click', () => this.closeAsk());
+    byId('destroyYes').addEventListener('click', () => {
+      const a = this.asking;
+      // Si entretanto la casilla cambio de objeto, no se destruye: se confirmo destruir OTRA cosa.
+      if (a && this.stillHolds(a.slot, a.item)) this.pending.destroy = a.slot;
+      this.closeAsk();
+    });
+  }
+
+  /** La pila de la casilla del aviso abierto, o 0. */
+  private askedStack(): number {
+    const a = this.asking;
+    return a && this.stillHolds(a.slot, a.item) ? this.current().inventory.counts[a.slot] : 0;
+  }
+
+  private stillHolds(slot: number, item: Resource): boolean {
+    return this.current().inventory.itemAt(slot) === item;
+  }
+
+  /** Abre el menu de una casilla de la rejilla, con las opciones de su objeto, al lado de ella. */
+  private openMenu(slot: number): void {
+    const inv = this.current().inventory;
+    const item = inv.itemAt(slot);
+    if (item === null || !this.open) return;
+    this.closeAsk();
+    this.menuFor = { slot, item };
+    this.menu.replaceChildren();
+    for (const option of optionsFor(item)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn';
+      b.dataset.option = option;
+      const label = document.createElement('span');
+      label.textContent = OPTION_LABELS[option];
+      b.appendChild(label);
+      // Dividir sin casilla libre, o con una pila de 1, sale apagado (el autor; lo segundo, *deduccion*).
+      if (option === 'split' && (inv.firstFree() < 0 || inv.counts[slot] < 2)) {
+        b.classList.add('off');
+        b.disabled = true;
+      }
+      b.addEventListener('click', () => this.choose(option));
+      this.menu.appendChild(b);
+    }
+    this.menu.hidden = false;
+    this.placeMenuAt(slot);
+  }
+
+  /** Coloca el menu al lado de su casilla (`placeMenu`), en coordenadas del panel. */
+  private placeMenuAt(slot: number): void {
+    const cell = (this.grid.children[slot] as HTMLElement).getBoundingClientRect();
+    const box = this.menu.getBoundingClientRect();
+    const at = placeMenu(slot, cell, this.gridView(), { width: box.width, height: box.height });
+    const panel = this.panel.getBoundingClientRect();
+    this.menu.style.left = `${(at.left - panel.left - this.panel.clientLeft).toFixed(1)}px`;
+    this.menu.style.top = `${(at.top - panel.top - this.panel.clientTop).toFixed(1)}px`;
+    this.menu.dataset.side = at.side;
+    this.menu.dataset.align = at.align;
+  }
+
+  private closeMenu(): void {
+    this.menuFor = null;
+    this.menu.hidden = true;
+  }
+
+  private closeAsk(): void {
+    this.asking = null;
+    this.splitAsk.hidden = true;
+    this.destroyAsk.hidden = true;
+  }
+
+  /** Lo que hace cada opcion: Usar y Equipar en el acto; Dividir y Destruir preguntan. */
+  private choose(option: ItemOption): void {
+    const m = this.menuFor;
+    this.closeMenu();
+    if (!m || !this.stillHolds(m.slot, m.item)) return;
+    if (option === 'use') this.pending.useSlot = m.slot;
+    else if (option === 'equip') {
+      const e = equipOf(m.item);
+      if (e !== null) {
+        this.pending.moveFrom = m.slot;
+        this.pending.moveTo = equipSlot(e);
+      }
+    } else if (option === 'split') {
+      this.asking = { ...m, kind: 'split' };
+      this.splitQty.value = '0';
+      this.splitAsk.hidden = false;
+    } else {
+      this.asking = { ...m, kind: 'destroy' };
+      const count = this.current().inventory.counts[m.slot];
+      this.destroyText.textContent =
+        stackMax(m.item) === 1 ? `¿Destruir ${RESOURCE_NAMES[m.item]}?` : `¿Destruir ${count} × ${RESOURCE_NAMES[m.item]}?`;
+      this.destroyAsk.hidden = false;
+    }
+  }
+
+  /** Lo que el humo mira del menu: si esta abierto, de que casilla, sus opciones y como se coloco. */
+  get menuState(): { open: boolean; slot: number; options: string[]; side: string; align: string; asking: string | null } {
+    return {
+      open: !this.menu.hidden,
+      slot: this.menuFor?.slot ?? -1,
+      options: Array.from(this.menu.children).map((b) => (b as HTMLElement).dataset.option ?? ''),
+      side: this.menu.dataset.side ?? '',
+      align: this.menu.dataset.align ?? '',
+      asking: this.asking?.kind ?? null,
+    };
   }
 
   // ------------------------------------------------------------ recetas
@@ -706,6 +932,8 @@ export class InventoryUi {
 
   /** Muestra la pagina elegida e ilumina su pestana; las pestanas no se mueven. */
   private renderPage(): void {
+    this.closeMenu();
+    this.closeAsk();
     for (const section of Array.from(this.panel.querySelectorAll<HTMLElement>('.invPage'))) {
       section.classList.toggle('current', section.dataset.page === this.page);
     }

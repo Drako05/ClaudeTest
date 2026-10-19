@@ -3,8 +3,9 @@
  * bolso anade casillas).
  *
  * Cada casilla guarda UN tipo de objeto hasta su tope (`stackMax`): cien de un
- * recurso, una herramienta con su desgaste. Las cuatro primeras son la barra, y
- * la elegida es lo que se tiene en la mano.
+ * recurso, una herramienta con su desgaste. Las cinco primeras —la primera fila
+ * de la rejilla, de 5 columnas— son la barra, y la elegida es lo que se tiene
+ * en la mano (el autor, 2026-10-19).
  *
  * `add` mete de golpe o no mete: `fits` responde antes de tocar nada. Lo que
  * viene del suelo y lo fabricado entran en lo que quepa (`addSome`), y el resto
@@ -32,10 +33,10 @@ import {
   type Resource,
 } from '@verdant/shared';
 
-/** Casillas con que se empieza: 16, decision del autor. */
-export const START_SLOTS = 16;
-/** Las primeras casillas forman la barra de la mano. */
-export const HOTBAR_SLOTS = 4;
+/** Casillas con que se empieza: 15, tres filas de 5 (el autor, 2026-10-19). */
+export const START_SLOTS = 15;
+/** Las primeras casillas forman la barra de la mano: la primera fila, 5 (el autor, 2026-10-19). */
+export const HOTBAR_SLOTS = 5;
 /**
  * Indices de los huecos de PERSONAJE para arrastrar (`Intent.moveFrom`/`moveTo`,
  * `discard`): `EQUIP_BASE + Equip`, lejos de cualquier casilla para que no se
@@ -105,7 +106,7 @@ export class Inventory {
     return slot < this.base + bagCapacity(this.worn[Equip.Bag]);
   }
 
-  /** Cuantas casillas hay abiertas: 16, 18 o 22. */
+  /** Cuantas casillas hay abiertas: 15, 17 o 21. */
   openSlots(): number {
     return this.base + bagCapacity(this.worn[Equip.Bag]);
   }
@@ -239,6 +240,46 @@ export class Inventory {
     if (this.items[slot] === EMPTY) return;
     this.counts[slot]--;
     if (this.counts[slot] <= 0) this.clear(slot);
+  }
+
+  /** La primera casilla vacia y abierta, barra incluida, o -1 si no hay ninguna. */
+  firstFree(): number {
+    for (let i = 0; i < this.size; i++) if (this.items[i] === EMPTY && this.isOpen(i)) return i;
+    return -1;
+  }
+
+  /**
+   * Separa `n` de una pila a la primera casilla libre, barra incluida (el
+   * autor, 2026-10-19: «Dividir»). Entre 1 y la pila menos 1 —separarla entera
+   * seria moverla (*deduccion*)—; sin casilla libre, o fuera de eso, nada.
+   */
+  split(slot: number, n: number): void {
+    if (!this.isOpen(slot) || this.items[slot] === EMPTY) return;
+    const count = this.counts[slot];
+    if (!Number.isInteger(n) || n < 1 || n >= count) return;
+    const to = this.firstFree();
+    if (to < 0) return;
+    this.items[to] = this.items[slot];
+    this.counts[to] = n;
+    this.wear[to] = this.wear[slot];
+    this.counts[slot] = count - n;
+  }
+
+  /**
+   * Destruye la pila entera de una casilla: desaparece, sin caer al suelo (el
+   * autor, 2026-10-19). Lo equipado no se destruye desde aqui.
+   */
+  destroy(slot: number): void {
+    if (!this.isOpen(slot) || this.items[slot] === EMPTY) return;
+    this.clear(slot);
+  }
+
+  /** Saca `count` de una casilla concreta; false, sin tocar nada, si no hay tantos. */
+  takeFrom(slot: number, count: number): boolean {
+    if (!this.isOpen(slot) || this.items[slot] === EMPTY || this.counts[slot] < count) return false;
+    this.counts[slot] -= count;
+    if (this.counts[slot] === 0) this.clear(slot);
+    return true;
   }
 
   select(slot: number): void {
