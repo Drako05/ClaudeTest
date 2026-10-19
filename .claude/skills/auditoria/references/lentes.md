@@ -50,6 +50,9 @@ que nadie toco es justo lo que ninguna tanda mira.
    despues. Si no cae, **no comprueba nada**.
 3. Si mutar es caro, al menos razona: ¿con que estado del juego saldria
    `false`? Si no encuentras ninguno, es una comprobacion de adorno.
+4. **Una mutacion que sobrevive puede ser codigo que no hace nada** (#42):
+   antes de escribir otro test, se mira si algun estado del juego hace que
+   la linea cambie algo. Si ninguno, se quita la linea.
 
 **Patrones conocidos**:
 - `isVisible` sobre un contenedor de 0x0, que siempre es «no visible», de
@@ -249,6 +252,11 @@ el codigo delante.
   tanda hace aparecer se prueban naciendo junto a, o desde, cada clase de
   caja: solida (un tronco, una roca) y no solida (una mata). Si nace dentro
   de una solida, se queda encima o atrapado.
+- **Un dedo cerca de algo pulsable** (#41): el navegador acerca el toque a
+  lo pulsable de al lado (el ajuste de toque), asi que una zona sin eventos
+  junto a un boton no es «no pulsable». Se prueba con un toque de verdad (CDP)
+  y se mira a que elemento llega el `pointerdown`; si la zona tiene que hacer
+  otra cosa, se decide por geometria en el oyente.
 - **Algo nuevo que se mueve o tapa** (#24): si la tanda mete en la escena algo
   que se mueve por su cuenta o tapa (la fauna), repasa cada medida en pixeles
   (`slash`, la sonda de profundidad, `shots`) y aislala de ello (`?fauna=0`).

@@ -11,51 +11,24 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: los ajustes tras jugar el inventario de 5 (2026-10-19): esquinas,
- * cerrar los avisos tocando fuera y el centro de 48 de las casillas del movil.
+ * Ronda: la auditoria al cerrar el inventario de 5 y el menu (2026-10-19):
+ * las comprobaciones que la tanda no veia caer.
  */
-const UI = 'packages/client/src/inventory-ui.ts';
-const HTML = 'packages/client/index.html';
-
 export default [
-  // Los botones del menu y de los avisos, sin esquinas.
+  // Cerrar el panel deja el menu de la casilla abierto.
   {
-    nombre: 'tanda5b: sin esquinas',
-    fichero: HTML,
-    de: '      #itemMenu .btn, .invAsk .btn { border-radius: 8px; }',
-    a: '',
+    nombre: 'auditoria5: cerrar sin el menu',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: '      this.closeMenu();\n      this.closeAsk();\n      this.cancelHold();',
+    a: '      this.cancelHold();',
     prueba: 'smoke:desktop',
   },
-  // Tocar fuera no cierra los avisos.
+  // Sacar de una casilla mas de lo que tiene.
   {
-    nombre: 'tanda5b: avisos sin cerrar fuera',
-    fichero: UI,
-    de: '        if (t && (this.splitAsk.contains(t) || this.destroyAsk.contains(t))) return;\n        this.closeAsk();',
-    a: '        if (t && (this.splitAsk.contains(t) || this.destroyAsk.contains(t))) return;',
-    prueba: 'smoke:desktop',
-  },
-  // Toda la casilla responde al dedo: el anillo ya no desliza.
-  {
-    nombre: 'tanda5b: area de toque entera',
-    fichero: 'packages/client/src/item-menu.ts',
-    de: 'export const TOUCH_CORE = 48;',
-    a: 'export const TOUCH_CORE = 60;',
-    prueba: 'gestures',
-  },
-  // La barra, pegada a la rejilla como antes.
-  {
-    nombre: 'tanda5b: barra pegada',
-    fichero: HTML,
-    de: '        left: calc(100% + var(--gridgap) / 2 - var(--railw) / 2);',
-    a: '',
-    prueba: 'smoke:mobile',
-  },
-  // Las casillas de la rejilla del movil, encogidas como antes.
-  {
-    nombre: 'tanda5b: casillas encogidas',
-    fichero: HTML,
-    de: '      body.touch-active #invGrid .slot { width: var(--eq); height: var(--eq); }',
-    a: '      body.touch-active #invGrid .slot { width: 54px; height: 54px; }',
-    prueba: 'smoke:mobile',
+    nombre: 'auditoria5: sacar sin tope',
+    fichero: 'packages/sim/src/inventory.ts',
+    de: '    if (!this.isOpen(slot) || this.items[slot] === EMPTY || this.counts[slot] < count) return false;',
+    a: '    if (!this.isOpen(slot) || this.items[slot] === EMPTY) return false;',
+    prueba: 'test:tests/inventory-actions.test.ts',
   },
 ];

@@ -1072,6 +1072,17 @@ async function desktopPass(browser, baseUrl) {
     const gone = await state(page);
     check(gone.slots[free].item < 0 && gone.drops.length === dropsBefore && !(await page.isVisible('#destroyAsk')),
       `Destruir no borro la pila o la tiro al suelo: ${JSON.stringify(gone.slots[free])}`);
+    // Cerrar el panel con el menu abierto lo cierra: al volver no sigue ahi.
+    await page.click(cellSel);
+    await page.waitForTimeout(150);
+    const openBefore = (await state(page)).itemMenu.open;
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(200);
+    await page.keyboard.press('KeyE');
+    await page.waitForTimeout(200);
+    const reopened = await state(page);
+    check(openBefore && reopened.inventoryOpen && !reopened.itemMenu.open && !(await page.isVisible('#itemMenu')),
+      `cerrar el panel no cerro el menu de la casilla: ${JSON.stringify(reopened.itemMenu)}`);
   }
   await page.screenshot({ path: join(SHOTS, '3d-01b-inventario.png') });
   // Esc lo cierra sin pausar y captura el cursor como E (pedido del autor,
@@ -1635,7 +1646,7 @@ async function resourcesPass(browser, baseUrl) {
     if (pickSlot !== 3) {
       await drag(await center(`#invGrid .slot:nth-child(${pickSlot + 1})`), await center('#hotbar .slot:nth-child(4)'));
       const toBar = await state(page);
-      check(toBar.slots[3].item === 11, `arrastrar a la barra no movio el pico: ${JSON.stringify(toBar.slots.slice(0, 4))}`);
+      check(toBar.slots[3].item === 11, `arrastrar a la barra no movio el pico: ${JSON.stringify(toBar.slots.slice(0, 5))}`);
     }
     await shot(page, '3d-03b-inventario-fabricar.png');
     await page.keyboard.press('KeyE');
@@ -2001,7 +2012,7 @@ async function stationsPass(browser, baseUrl) {
 
   // La mochila, arrastrada al Bolso (el 4.o de PERSONAJE, `Equip.Bag`; su
   // indice de arrastre es `EQUIP_BASE + Equip.Bag` = 1003, que este JS suelto
-  // no puede importar): 22 casillas, y su icono se oculta.
+  // no puede importar): 21 casillas, y su icono se oculta.
   const bag = made.slots.findIndex((x) => x.item === 21);
   if (bag >= 0) {
     const bagIcon = () => page.evaluate(() => !!document.querySelector('#charGrid [data-slot="1003"] svg.equipIcon'));

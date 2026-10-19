@@ -99,6 +99,17 @@ describe('Usar', () => {
   });
 });
 
+describe('Sacar de una casilla', () => {
+  it('saca de esa casilla lo pedido; si no hay tantos, nada', () => {
+    const inv = new Inventory();
+    inv.add(Resource.Stone, 3);
+    expect(inv.takeFrom(0, 5)).toBe(false);
+    expect(inv.counts[0]).toBe(3);
+    expect(inv.takeFrom(0, 3)).toBe(true);
+    expect(inv.itemAt(0)).toBeNull();
+  });
+});
+
 describe('Equipar', () => {
   it('es mover a su hueco de PERSONAJE, con la regla del Bolso', () => {
     const state = createGame(12345);
