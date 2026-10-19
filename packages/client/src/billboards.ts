@@ -2,11 +2,10 @@
  * Los objetos del mundo: las features como **aspas de dos laminas**, el jugador
  * como sprite que mira a la camara.
  *
- * **El arte no se rehace.** `makeFeatureArt` y `makePlayerArt` (`art.ts`) ya
- * dibujan cada especie a un canvas, asi que ese mismo canvas se sube como
- * textura. Lo que en un HD-2D suele ser el gasto grande —el pipeline de arte—
- * aqui ya estaba escrito, porque el arte de este proyecto es codigo y no
- * ficheros de un artista.
+ * **El arte es pixelart** (el autor, 2026-10-19; guia de arte, directriz 7):
+ * los dibujos de `world-art.ts`, pasados a lienzo por `world-sprites.ts` y
+ * subidos como textura, a 24 pixeles por bloque. Las rocas y los minerales no
+ * son aspas sino voxeles (`rock-mesh.ts`), por decision del autor.
  *
  * **Por que las features dejaron de ser billboards.** Un sprite se reorienta a
  * la camara en cada frame, y con la camara libre eso delata que son cromos: los
@@ -21,17 +20,7 @@
  * un billboard, que es lo que menos miente.
  */
 
-import {
-  BufferAttribute,
-  BufferGeometry,
-  CanvasTexture,
-  DoubleSide,
-  Mesh,
-  MeshBasicMaterial,
-  NearestFilter,
-  Sprite,
-  type Texture,
-} from 'three';
+import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial, Sprite, type Texture } from 'three';
 import { Feature } from '@verdant/shared';
 import {
   BODY_RADIUS,
@@ -44,10 +33,11 @@ import {
   trunkWidthFor,
   TRUNK_BUCKETS,
 } from '@verdant/sim';
-import { LOOKS } from './palette.js';
-import { makeFeatureArt, makePlayerArt, type FeatureArt } from './art.js';
+import { rockMesh } from './rock-mesh.js';
 import { TREE_SHAPES, treeShapeOf } from './tree-shapes.js';
 import { bodySpriteMaterial } from './sprite-depth.js';
+import { CROWNS, ROCK_SHAPE, STONES, WORLD_PX } from './world-art.js';
+import { artCanvas, BARK, featureSprite, pixelTexture, playerArt, treeSprite, type SpriteArt } from './world-sprites.js';
 
 /** Las especies de arbol adulto, las que tienen forma propia. */
 const TREES = Object.keys(TREE_SHAPES).map(Number) as Feature[];
@@ -124,61 +114,30 @@ export function flatGeometry(w: number): BufferGeometry {
   return geometry;
 }
 
-/** Pixeles de arte por unidad de mundo: un tile de 32 px es una casilla. */
-const PX_PER_TILE = 32;
-
 /**
- * Cuanto mide lo vivo frente a un bloque.
+ * Cuanto mide un pixel de arte en el mundo: **24 pixeles por bloque, en todo**
+ * (el autor, 2026-10-19: «caras de 24x24 en bloques (voxeles 12x12). Esa debe
+ * ser la medida para todo elemento del juego»). Sustituye a la escala de antes
+ * —`BASE = 2,3` para lo que se apoya en el suelo y `ARBOL = 2,6` para los
+ * arboles, sobre un arte de 32 pixeles por casilla redibujado a 2,6 veces—,
+ * que daba a cada objeto un pixel de otro tamano.
  *
- * El arte nacio para el isometrico con el jugador midiendo **0,78 bloques** y un
- * arbol 1,22, y el autor lo comparo con Minecraft: alli mides poco menos de dos
- * bloques y un arbol pasa de tres. Los dos factores que hacen falta para llegar
- * ahi salen **casi iguales**, 2,3 y 2,6, y eso es el diagnostico entero: la
- * relacion entre jugador y arbol ya era la buena y lo que sobraba era el bloque.
- *
- * Por eso sube TODO lo que se apoya en el suelo con el mismo `BASE`, que
- * conserva intactas las proporciones que el autor ya dio por buenas —una roca
- * sigue siendo vez y media el jugador, un arbusto le llega al pecho— y cambia
- * solo su tamano frente al terreno. Los arboles llevan su pizca de mas.
- *
- *   jugador 0,78 -> 1,79   arbusto 0,47 -> 1,08
- *   arbol   1,22 -> 3,17   roca    1,25 -> 2,88   brote 0,66 -> 1,52
- *
- * Despues el tronco de los arboles se alargo aparte, de 2 a 5 bloques: eso no
- * es escala, es dibujo (ver `trunk.ts`).
- *
- * **Nada de esto llega a `packages/sim`.** El salto, `STEP_UP` y la colision van
- * en unidades de mundo y no saben lo que mide un sprite. Es arte, no fisica.
+ * Los tamanos en el mundo **no cambian**: los dibujos de `world-art.ts` se
+ * hicieron a la medida de lo que ya median (el jugador, 1,92; una mata, 1,1;
+ * un brote, 0,88; la copa de cada especie, la de su tabla). **Nada de esto
+ * llega a `packages/sim`**: el salto, `STEP_UP` y la colision van en unidades
+ * de mundo y no saben lo que mide un dibujo. Es arte, no fisica.
  */
-const BASE = 2.3;
-const ARBOL = 2.6;
+const UNITS = 1 / WORLD_PX;
 
-/**
- * Densidad a la que se redibuja el arte.
- *
- * Igualada al factor mas grande: asi el sprite se agranda pero **su pixel sigue
- * midiendo lo mismo en pantalla**, que es la diferencia entre un 2D-HD y un
- * estirado. El jugador pasa de 24 pixeles de alto a unos 62. Cuesta lienzos mas
- * grandes una sola vez, al arrancar.
- */
-const DETAIL = ARBOL;
+/** Arbol adulto: tiene copa dibujada. */
+const isTree = (feature: Feature): boolean => CROWNS[feature] !== undefined;
 
-/** Cuanto crece esta especie. Solo los arboles se salen de `BASE`. */
-function scaleOf(feature: Feature): number {
-  const look = LOOKS[feature];
-  // `form` distingue arbol de arbusto; roca, minerales y brotes no tienen look y
-  // se quedan en la base, que es justo lo que conserva su tamano relativo.
-  return look && look.form !== 'bush' ? ARBOL : BASE;
-}
+/** Roca o mineral: van en voxeles, no en aspa. */
+const isRock = (feature: Feature): boolean => STONES[feature] !== undefined;
 
-/** Arbol adulto: tiene look y no es arbusto. Los brotes no tienen look. */
-function isTree(feature: Feature): boolean {
-  const look = LOOKS[feature];
-  return !!look && look.form !== 'bush';
-}
-
-/** Pixeles de arte (a `detail = 1`) que mide un bloque de un arbol. */
-const TREE_PX_PER_BLOCK = PX_PER_TILE / ARBOL;
+/** Lo que mide de alto la roca de voxeles, en bloques. */
+const ROCK_HEIGHT = (Math.max(...ROCK_SHAPE.map((v) => v[2])) + 1) * 0.5;
 
 interface Billboard {
   readonly texture: Texture;
@@ -195,11 +154,11 @@ interface Billboard {
   readonly crownW: number;
   /** Grosor del tronco a media altura del tramo desnudo, en bloques. */
   readonly trunkW: number;
-  /** Pixeles de tronco por dentro de la copa con aire justo encima. Ver `trunkPeek`. */
+  /** Pixeles del tallo por dentro de la copa con aire justo encima. Ver `trunkPeek`. */
   readonly peek: number;
   /**
    * Geometria y material del aspa, UNO por especie y compartidos por todas sus
-   * instancias. Antes cada sprite se creaba su propio material.
+   * instancias.
    *
    * Nulos para el jugador, que sigue siendo un billboard.
    */
@@ -207,205 +166,166 @@ interface Billboard {
   readonly material: MeshBasicMaterial | null;
 }
 
+/** Los pixeles de un lienzo, o null si no se pueden leer. */
+function pixels(art: SpriteArt): Uint8ClampedArray | null {
+  const ctx = art.canvas.getContext('2d');
+  if (!ctx) return null;
+  try {
+    return ctx.getImageData(0, 0, art.canvas.width, art.canvas.height).data;
+  } catch {
+    // Lienzo contaminado o sin contexto legible: mejor 0 que un numero inventado.
+    return null;
+  }
+}
+
 /**
  * Cuanto se eleva el dibujo sobre su punto de apoyo, en unidades de mundo.
  *
  * Se mide buscando el pixel con tinta mas alto, no por el lienzo ni por el
- * ancla: un arbol ocupa 39 px de un lienzo de 58 y lo que queda por encima del
- * ancla es la cota superior, no la altura. Es lo unico que permite afirmar «el jugador mide 1,8
- * bloques» con un numero en vez de con una captura.
+ * ancla. Es lo unico que permite afirmar «el jugador mide 1,9 bloques» con un
+ * numero en vez de con una captura.
  */
-function inkHeight(art: FeatureArt, unitsPerPixel: number): number {
-  const ctx = art.canvas.getContext('2d');
-  if (!ctx) return 0;
+function inkHeight(art: SpriteArt): number {
+  const data = pixels(art);
+  if (!data) return 0;
   const { width, height } = art.canvas;
   const foot = art.anchorY * height;
-  let data: Uint8ClampedArray;
-  try {
-    data = ctx.getImageData(0, 0, width, height).data;
-  } catch {
-    // Lienzo contaminado o sin contexto legible: mejor 0 que un numero inventado.
-    return 0;
-  }
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      if (data[(y * width + x) * 4 + 3] > 8) return Math.max(0, (foot - y) * unitsPerPixel);
+      if (data[(y * width + x) * 4 + 3]! > 8) return Math.max(0, (foot - y) * UNITS);
     }
   }
   return 0;
 }
 
+/** Un comprobador de «es corteza»: cualquiera de sus cuatro tonos (`BARK`), o null. */
+function barkPixels(
+  art: SpriteArt,
+  bark: readonly string[],
+): { data: Uint8ClampedArray; width: number; height: number; isBark: (x: number, y: number) => boolean } | null {
+  const data = pixels(art);
+  if (!data) return null;
+  const { width, height } = art.canvas;
+  const want = bark.map((c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)));
+  const isBark = (x: number, y: number): boolean => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return false;
+    const i = (y * width + x) * 4;
+    return data[i + 3]! > 200 && want.some((w) => w.every((c, k) => Math.abs(data[i + k]! - c) <= 3));
+  };
+  return { data, width, height, isBark };
+}
+
 /**
- * Cuanto tronco se ve desnudo, en unidades de mundo: la tirada de pixeles del
- * color del tronco en la columna del pie, desde el suelo hacia arriba.
+ * Cuanto tronco se ve desnudo, en unidades de mundo: la tirada de corteza en
+ * la columna del pie, desde el suelo hacia arriba.
  *
  * La copa se pinta encima del tronco, asi que la tirada termina justo donde
  * empieza el follaje. Es la medida que dice si el jugador ve por debajo, sacada
  * del dibujo y no de la cuenta que lo produjo.
  */
-function bareHeight(art: FeatureArt, trunk: string, unitsPerPixel: number): number {
-  const ctx = art.canvas.getContext('2d');
-  if (!ctx) return 0;
-  const { width, height } = art.canvas;
-  const want = [1, 3, 5].map((i) => parseInt(trunk.slice(i, i + 2), 16));
-  let data: Uint8ClampedArray;
-  try {
-    data = ctx.getImageData(0, 0, width, height).data;
-  } catch {
-    return 0;
-  }
-  const x = Math.floor(art.anchorX * width);
-  const foot = art.anchorY * height;
-  const isTrunk = (y: number): boolean => {
-    const i = (y * width + x) * 4;
-    return data[i + 3] > 200 && want.every((c, k) => Math.abs(data[i + k] - c) <= 3);
-  };
-  // El pie cae a mitad de pixel —el lienzo redondea su alto al alza y el ancla
-  // es una fraccion del alto logico—, y esa fila mezcla tronco y sombra. Asi que
-  // se busca el tronco unas filas por encima y se mide desde el pie de verdad
-  // hasta donde acaba. Sin esto, un lienzo mas alto medio el tronco en cero.
-  let y = Math.floor(foot);
-  while (y > foot - 4 && y >= 0 && !isTrunk(y)) y--;
-  if (y < 0 || !isTrunk(y)) return 0;
-  while (y > 0 && isTrunk(y - 1)) y--;
-  return (foot - y) * unitsPerPixel;
+function bareHeight(art: SpriteArt, bark: readonly string[]): number {
+  const px = barkPixels(art, bark);
+  if (!px) return 0;
+  const x = Math.floor(art.anchorX * px.width);
+  const foot = art.anchorY * px.height;
+  let y = Math.ceil(foot) - 1;
+  if (!px.isBark(x, y)) return 0;
+  while (y > 0 && px.isBark(x, y - 1)) y--;
+  return (foot - y) * UNITS;
 }
 
 /**
  * Ancho de la copa en unidades de mundo: la caja de tinta de las filas que
- * quedan por encima del tronco desnudo (`bareRows` filas del lienzo sobre el
- * pie). Asi el tronco y la sombra pintada del pie no cuentan.
+ * quedan por encima del tronco desnudo (`bareRows` filas sobre el pie).
  */
-function crownWidth(art: FeatureArt, bareRows: number, unitsPerPixel: number): number {
-  const ctx = art.canvas.getContext('2d');
-  if (!ctx) return 0;
+function crownWidth(art: SpriteArt, bareRows: number): number {
+  const data = pixels(art);
+  if (!data) return 0;
   const { width, height } = art.canvas;
-  let data: Uint8ClampedArray;
-  try {
-    data = ctx.getImageData(0, 0, width, height).data;
-  } catch {
-    return 0;
-  }
   const bottom = Math.floor(art.anchorY * height - bareRows);
   let left = width;
   let right = -1;
   for (let y = 0; y < bottom; y++) {
     for (let x = 0; x < width; x++) {
-      if (data[(y * width + x) * 4 + 3] <= 8) continue;
+      if (data[(y * width + x) * 4 + 3]! <= 8) continue;
       left = Math.min(left, x);
       right = Math.max(right, x);
     }
   }
-  return right < left ? 0 : (right - left + 1) * unitsPerPixel;
-}
-
-/** Pixeles del lienzo y un comprobador de «es color de tronco», o null. */
-function trunkPixels(
-  art: FeatureArt,
-  trunk: string,
-): { data: Uint8ClampedArray; width: number; height: number; isTrunk: (x: number, y: number) => boolean } | null {
-  const ctx = art.canvas.getContext('2d');
-  if (!ctx) return null;
-  const { width, height } = art.canvas;
-  let data: Uint8ClampedArray;
-  try {
-    data = ctx.getImageData(0, 0, width, height).data;
-  } catch {
-    return null;
-  }
-  const want = [1, 3, 5].map((i) => parseInt(trunk.slice(i, i + 2), 16));
-  const isTrunk = (x: number, y: number): boolean => {
-    const i = (y * width + x) * 4;
-    return data[i + 3] > 200 && want.every((c, k) => Math.abs(data[i + k] - c) <= 3);
-  };
-  return { data, width, height, isTrunk };
+  return right < left ? 0 : (right - left + 1) * UNITS;
 }
 
 /**
- * Grosor del tronco a `rowsUp` filas sobre el pie: la tirada de color de tronco
- * que cruza la columna del centro, en unidades de mundo.
+ * Grosor del tronco a `rowsUp` filas sobre el pie: la tirada de corteza que
+ * cruza la columna del centro, en unidades de mundo.
  */
-function trunkWidth(art: FeatureArt, trunk: string, rowsUp: number, unitsPerPixel: number): number {
-  const px = trunkPixels(art, trunk);
+function trunkWidth(art: SpriteArt, bark: readonly string[], rowsUp: number): number {
+  const px = barkPixels(art, bark);
   if (!px) return 0;
   const y = Math.round(art.anchorY * px.height - rowsUp);
   const cx = Math.floor(art.anchorX * px.width);
-  if (!px.isTrunk(cx, y)) return 0;
+  if (!px.isBark(cx, y)) return 0;
   let left = cx;
   let right = cx;
-  while (left > 0 && px.isTrunk(left - 1, y)) left--;
-  while (right < px.width - 1 && px.isTrunk(right + 1, y)) right++;
-  return (right - left + 1) * unitsPerPixel;
+  while (px.isBark(left - 1, y)) left--;
+  while (px.isBark(right + 1, y)) right++;
+  return (right - left + 1) * UNITS;
 }
 
 /**
- * Cuanto asoma el canto del tronco: pixeles de tronco POR DENTRO de la copa (por
- * encima de su borde bajo) con aire justo encima. Un tronco que acaba en punta
- * tapada da cero; el rectangulo de antes, cuyo canto de arriba salia por los
- * lados del cono, no. Los huecos del alerce no cuentan: por ellos se ve el
- * tronco de lado, pero encima de cada pixel sigue habiendo tronco o follaje.
+ * Cuanto asoma el canto del tallo: pixeles de corteza POR DENTRO de la copa
+ * (por encima de su borde bajo) y en las columnas del tallo, con aire justo
+ * encima. Un tronco que acaba en punta tapada da cero; el rectangulo de antes,
+ * cuyo canto de arriba salia por los lados del cono, no. Solo el tallo: las
+ * ramas del roble y del cerezo se ven contra el cielo a proposito, como en la
+ * referencia del autor (2026-10-19), y su canto de arriba no es un fallo.
  */
-function trunkPeek(art: FeatureArt, trunk: string, bareRows: number): number {
-  const px = trunkPixels(art, trunk);
+function trunkPeek(art: SpriteArt, bark: readonly string[], bareRows: number, stemHalf: number): number {
+  const px = barkPixels(art, bark);
   if (!px) return 0;
   const bottom = Math.floor(art.anchorY * px.height - bareRows);
+  const cx = art.anchorX * px.width;
   let count = 0;
   for (let y = 1; y < bottom; y++) {
-    for (let x = 0; x < px.width; x++) {
-      if (px.isTrunk(x, y) && px.data[((y - 1) * px.width + x) * 4 + 3] <= 8) count++;
+    for (let x = Math.floor(cx - stemHalf); x < Math.ceil(cx + stemHalf); x++) {
+      if (px.isBark(x, y) && px.data[((y - 1) * px.width + x) * 4 + 3]! <= 8) count++;
     }
   }
   return count;
 }
 
-function fromArt(
-  art: FeatureArt | null,
-  scale: number,
-  cross: boolean,
-  trunk?: string,
-): Billboard | null {
+function fromArt(art: SpriteArt | null, cross: boolean, tree?: { bark: readonly string[]; stemHalf: number }): Billboard | null {
   if (!art) return null;
-  const texture = new CanvasTexture(art.canvas);
-  // Sin filtrado: el arte es de pixeles y suavizarlo lo emborrona, que es
-  // justo lo que separa un 2D-HD de un 3D con texturas pobres.
-  texture.magFilter = NearestFilter;
-  texture.minFilter = NearestFilter;
-  texture.generateMipmaps = false;
-  // Se divide tambien por `DETAIL` porque el lienzo viene con esa densidad de
-  // mas: sin eso el sprite crecería dos veces, una por resolucion y otra por
-  // escala. Lo que manda el tamano de mundo es `scale`, y solo `scale`.
-  const w = (art.canvas.width / (PX_PER_TILE * DETAIL)) * scale;
-  const h = (art.canvas.height / (PX_PER_TILE * DETAIL)) * scale;
+  const texture = pixelTexture(art.canvas, true);
+  const w = art.canvas.width * UNITS;
+  const h = art.canvas.height * UNITS;
   // Un sprite de three.js se centra en su caja, pero el arte se apoya en su
   // ancla. `anchorY` va de arriba abajo del lienzo, asi que desde el BORDE DE
   // ABAJO el punto de apoyo esta a `(1 - anchorY) * h`. Para que ese punto caiga
   // en el suelo hay que subir el centro `h / 2 - eso`.
   const above = art.anchorY * h;
   const below = h - above;
-  const units = scale / (PX_PER_TILE * DETAIL);
-  const bare = trunk ? bareHeight(art, trunk, units) : 0;
+  const bare = tree ? bareHeight(art, tree.bark) : 0;
   return {
     texture,
     w,
     h,
     lift: below,
-    visible: inkHeight(art, scale / (PX_PER_TILE * DETAIL)),
+    visible: inkHeight(art),
     bare,
-    crownW: trunk ? crownWidth(art, bare / units, units) : 0,
-    trunkW: trunk ? trunkWidth(art, trunk, bare / units / 2, units) : 0,
-    peek: trunk ? trunkPeek(art, trunk, bare / units) : 0,
+    crownW: tree ? crownWidth(art, bare / UNITS) : 0,
+    trunkW: tree ? trunkWidth(art, tree.bark, bare / UNITS / 2) : 0,
+    peek: tree ? trunkPeek(art, tree.bark, bare / UNITS, tree.stemHalf) : 0,
     geometry: cross ? crossGeometry(w, above, below) : null,
-    // Basic y no Lambert: el arte ya lleva su luz horneada desde el noroeste y
-    // el sprite tampoco se iluminaba, asi que asi el ASPECTO no cambia y solo
-    // cambia la orientacion. Con Lambert, las dos laminas de una misma aspa se
-    // iluminarian distinto y el dibujo se ensuciaria.
+    // Basic y no Lambert: el arte ya lleva su luz horneada desde el noroeste.
+    // Con Lambert, las dos laminas de una misma aspa se iluminarian distinto y
+    // el dibujo se ensuciaria.
     //
     // Y se recorta por alfa en vez de mezclar: dos laminas que se cruzan se
     // atraviesan, y con `transparent` a secas el orden entre ellas es una
     // loteria. Recortando, cada fragmento se pinta o se descarta, escribe
-    // profundidad y el orden deja de importar. El umbral va por ENCIMA del 26 %
-    // con que el arte pinta su sombra, a proposito: conservarla con el material
-    // opaco la pintaria negra maciza. La sombra buena va aparte y tumbada.
+    // profundidad y el orden deja de importar. El pixelart no tiene pixeles a
+    // medias: o hay tinta o no.
     material: cross
       ? new MeshBasicMaterial({
           map: texture,
@@ -426,24 +346,40 @@ export class BillboardSet {
    * dibujan la primera vez que hacen falta; como mucho 6 especies x 13 alturas.
    */
   private readonly trees = new Map<number, Billboard | null>();
+  /** Las rocas de voxeles: una geometria por giro, un material por piedra. */
+  private readonly rockShapes: BufferGeometry[] = [0, 1, 2, 3].map((turn) => {
+    const mesh = rockMesh(ROCK_SHAPE, turn);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(mesh.positions, 3));
+    geometry.setAttribute('uv', new BufferAttribute(mesh.uvs, 2));
+    geometry.setAttribute('color', new BufferAttribute(mesh.colors, 3));
+    geometry.setIndex(new BufferAttribute(mesh.indices, 1));
+    return geometry;
+  });
+  private readonly rockMaterials = new Map<Feature, MeshBasicMaterial>();
   private readonly player: Billboard | null;
   /** Tronco desnudo de los arboles colocados, MEDIDO del dibujo. */
   private readonly placed = { n: 0, min: Infinity, max: 0, sum: 0 };
+  /** Rocas y minerales puestos en voxeles, para el humo. Acumulado. */
+  rocks = 0;
 
   constructor() {
     for (const feature of Object.values(Feature)) {
       if (typeof feature !== 'number' || feature === Feature.None) continue;
+      if (isRock(feature)) {
+        // Su piedra, con la luz de cada cara horneada en los vertices.
+        const stone = STONES[feature]!;
+        this.rockMaterials.set(feature, new MeshBasicMaterial({ map: pixelTexture(artCanvas(stone), true), vertexColors: true }));
+        continue;
+      }
       // Un arbol se dibuja siempre con su tronco; el de referencia, con el del
-      // centro de la normal. Su ancho es el de todas sus alturas: el lienzo lo
-      // decide la copa.
-      let art = isTree(feature)
-        ? this.tree(feature, meanBucket(feature))
-        : fromArt(makeFeatureArt(feature, DETAIL), scaleOf(feature), true);
+      // centro de la normal.
+      let art = isTree(feature) ? this.tree(feature, meanBucket(feature)) : fromArt(featureSprite(feature), true);
       // Los guijarros van tumbados, y sin sombra: ya estan en el suelo.
       if (art && feature === Feature.Pebbles) art = { ...art, geometry: flatGeometry(art.w) };
       if (art) this.byFeature.set(feature, art);
     }
-    this.player = fromArt(makePlayerArt(DETAIL), BASE, false);
+    this.player = fromArt(playerArt(), false);
   }
 
   /** El arte de ese arbol con ese escalon de tronco (ver `trunk.ts`). */
@@ -452,18 +388,18 @@ export class BillboardSet {
     let art = this.trees.get(key);
     if (art === undefined) {
       const trunk = treeTrunkOf(feature);
+      const crown = CROWNS[feature];
       const bareBlocks = bucketBlocks(bucket);
-      const bare = bareBlocks * TREE_PX_PER_BLOCK;
-      const width = (trunk ? trunkWidthFor(trunk, bareBlocks) : 0) * TREE_PX_PER_BLOCK;
-      art = fromArt(
-        makeFeatureArt(feature, DETAIL, { bare, width, pxPerBlock: TREE_PX_PER_BLOCK }),
-        ARBOL,
-        true,
-        LOOKS[feature]?.trunk,
-      );
-      this.trees.set(key, art);
+      const width = trunk ? trunkWidthFor(trunk, bareBlocks) : 0;
+      art =
+        crown &&
+        fromArt(treeSprite(feature, bareBlocks, width), true, {
+          bark: [...BARK].map((ch) => crown.palette[ch]!).filter(Boolean),
+          stemHalf: crown.trunkW / 2,
+        });
+      this.trees.set(key, art ?? null);
     }
-    return art;
+    return art ?? null;
   }
 
   /**
@@ -477,7 +413,8 @@ export class BillboardSet {
   }
 
   /**
-   * Lo que mide cada cosa en BLOQUES, medido del dibujo y no del lienzo.
+   * Lo que mide cada cosa en BLOQUES, medido del dibujo y no del lienzo (la
+   * roca, de sus voxeles).
    *
    * Se expone para poder afirmar las proporciones con numeros en vez de con una
    * captura, que es lo unico que distingue «mide 1,8» de «parece que mide 1,8».
@@ -486,15 +423,14 @@ export class BillboardSet {
     const out: Record<string, number> = {};
     if (this.player) out.jugador = this.player.visible;
     const sample: Array<[string, Feature]> = [
-      ['arbol', Feature.ForestTree],
       ['arbusto', Feature.ForestPlant],
       ['brote', Feature.ForestTreeSapling],
-      ['roca', Feature.RockNode],
     ];
     for (const [name, feature] of sample) {
       const art = this.byFeature.get(feature);
       if (art) out[name] = art.visible;
     }
+    out.roca = ROCK_HEIGHT;
     // El arbol, con el tronco del centro de su normal; y los extremos del tronco
     // desnudo de todas las especies, medidos.
     const middle = this.tree(Feature.ForestTree, meanBucket(Feature.ForestTree));
@@ -529,7 +465,7 @@ export class BillboardSet {
     rango: [number, number];
     /** Grosor del tronco medido a media altura del tramo desnudo. */
     grosor: number;
-    /** Pixeles de tronco con aire encima por dentro de la copa: su canto asomando. */
+    /** Pixeles del tallo con aire encima por dentro de la copa: su canto asomando. */
     asoma: number;
   }> {
     const out = [];
@@ -556,17 +492,27 @@ export class BillboardSet {
   }
 
   /**
-   * Un aspa nueva para esa feature, ya apoyada en el suelo.
+   * Un objeto nuevo para esa feature, ya apoyado en el suelo: un aspa, o la
+   * roca de voxeles.
    *
-   * Cada una lleva **su propio giro**, para que el bosque no se vea alineado a
+   * Cada uno lleva **su propio giro**, para que el bosque no se vea alineado a
    * la rejilla. Sale de `hash2DFloat` y no de `Math.random`, y eso no es
    * purismo: los chunks se descartan y se regeneran constantemente, asi que con
    * azar vivo los arboles girarian solos al alejarte y volver. Un cuarto de
-   * vuelta basta, porque el aspa se repite cada 90 grados.
+   * vuelta basta, porque el aspa se repite cada 90 grados; la roca gira en
+   * cuartos de vuelta enteros, para seguir en la rejilla.
    */
   spawn(feature: Feature, wx: number, height: number, wy: number, seed: number): Mesh | null {
     const tx = Math.floor(wx);
     const ty = Math.floor(wy);
+    const turn = hash2DFloat(seed, tx, ty);
+    const rock = this.rockMaterials.get(feature);
+    if (rock) {
+      const mesh = new Mesh(this.rockShapes[Math.min(3, Math.floor(turn * 4))]!, rock);
+      mesh.position.set(wx, height, wy);
+      this.rocks++;
+      return mesh;
+    }
     // Los arboles, ademas, llevan su propia altura de tronco, que tambien es de
     // la casilla por la misma razon que el giro. Sale del nucleo, que la usa de
     // hitbox: el tronco que se ve es el que se golpea.
@@ -582,12 +528,13 @@ export class BillboardSet {
     }
     const mesh = new Mesh(art.geometry, art.material);
     mesh.position.set(wx, height, wy);
-    mesh.rotation.y = hash2DFloat(seed, tx, ty) * (Math.PI / 2);
+    mesh.rotation.y = turn * (Math.PI / 2);
     return mesh;
   }
 
-  /** Cuanto mide de ancho lo que se apoya en un tile, para su sombra. */
+  /** Cuanto mide de ancho lo que se apoya en un tile, para su sombra. La roca ocupa su casilla. */
   widthOf(feature: Feature): number {
+    if (isRock(feature)) return 1;
     return this.byFeature.get(feature)?.w ?? 0;
   }
 
@@ -608,7 +555,7 @@ export class BillboardSet {
  * `userData.visible` lleva lo que mide su dibujo, el alto de su caja.
  */
 export function playerSprite(): Sprite | null {
-  const art = fromArt(makePlayerArt(DETAIL), BASE, false);
+  const art = fromArt(playerArt(), false);
   if (!art) return null;
   const sprite = place(art, 0, 0, 0);
   sprite.userData.visible = art.visible;

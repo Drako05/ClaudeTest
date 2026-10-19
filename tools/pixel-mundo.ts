@@ -17,8 +17,7 @@
 import { writeFileSync } from 'node:fs';
 import { Feature, Terrain } from '@verdant/shared';
 import { mulberry32, TREE_TRUNKS } from '@verdant/sim';
-import { TERRAIN_RGB } from '../packages/client/src/art.js';
-import { LOOKS, MINERAL_FACES, ROCK_FACES, STATION_FACES } from '../packages/client/src/palette.js';
+import { LOOKS, MINERAL_FACES, ROCK_FACES, STATION_FACES, TERRAIN_RGB } from '../packages/client/src/palette.js';
 import {
   blank,
   foliage,
@@ -112,9 +111,13 @@ function pal(...pairs: [string, readonly string[]][]): Record<string, string> {
   return out;
 }
 
-/** El dibujo como literal, con solo los colores que usa: una paleta sin sobrantes. */
-function lit(a: Art, extra = ''): string {
-  const seen = new Set(a.grid.flat());
+/**
+ * El dibujo como literal, con solo los colores que usa: una paleta sin
+ * sobrantes. `keep`, letras que se quedan aunque el dibujo no las use: la
+ * corteza de una copa, con la que el juego pinta el tronco desnudo debajo.
+ */
+function lit(a: Art, extra = '', keep = ''): string {
+  const seen = new Set([...a.grid.flat(), ...keep]);
   const palette = Object.fromEntries(Object.entries(a.palette).filter(([k]) => seen.has(k)));
   return `{\n    rows: [\n${toRows(a.grid).map((r) => `      '${r}',`).join('\n')}\n    ],\n    palette: ${JSON.stringify(palette)},${extra}\n  }`;
 }
@@ -296,9 +299,9 @@ function broadleaf(feature: Feature, seed: number, leaf: string[], bark: string[
   const cx = W / 2;
   const masses: Mass[] = flat
     ? [
-        { x: cx, y: H * 0.42, rx: W * 0.44, ry: H * 0.42, z: 0 },
-        { x: cx - W * 0.3, y: H * 0.66, rx: W * 0.2, ry: H * 0.28, z: 10 },
-        { x: cx + W * 0.3, y: H * 0.64, rx: W * 0.2, ry: H * 0.28, z: 10 },
+        { x: cx, y: H * 0.5, rx: W * 0.44, ry: H * 0.5, z: 0 },
+        { x: cx - W * 0.3, y: H * 0.64, rx: W * 0.2, ry: H * 0.3, z: 10 },
+        { x: cx + W * 0.3, y: H * 0.62, rx: W * 0.2, ry: H * 0.3, z: 10 },
       ]
     : [
         { x: cx, y: H * 0.49, rx: W * 0.4, ry: H * 0.49, z: 0 },
@@ -320,9 +323,14 @@ function broadleaf(feature: Feature, seed: number, leaf: string[], bark: string[
   const wood = g.map((r) => [...r]);
   foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 6, 13), tones: 'abcd', bump: 0.85, leaves: 0.018 });
   // Lo que asoma de las ramas dentro de la copa: solo en la sombra honda, y en
-  // la sombra de la corteza.
+  // la sombra de la corteza. El tallo del centro no: es el tronco que sigue
+  // dentro de la copa, y asomando alargaria el tronco desnudo que se ve (y que
+  // el humo mide).
   for (let y = 0; y < fork; y++) {
-    for (let x = 0; x < W; x++) if (g[y]![x] === 'd' && 'efgh'.includes(wood[y]![x]!)) g[y]![x] = wood[y]![x] === 'h' ? 'h' : 'g';
+    for (let x = 0; x < W; x++) {
+      if (Math.abs(x + 0.5 - cx) <= tw / 2 + 1) continue;
+      if (g[y]![x] === 'd' && 'efgh'.includes(wood[y]![x]!)) g[y]![x] = wood[y]![x] === 'h' ? 'h' : 'g';
+    }
   }
   return { grid: g, palette: pal(['abcd', leaf], ['efgh', bark]), trunkX: cx, trunkW: tw };
 }
@@ -348,7 +356,14 @@ function conifer(feature: Feature, seed: number, leaf: string[], bark: string[])
   const step = bodyH / (shape.tiers + 1 - 2 * shape.open);
   const tierH = step * (2 - 2 * shape.open);
   const tipRise = Math.floor(shape.tiers / 2) * step + tierH * 0.6;
-  limb(g, cx, H, cx, H - tipRise, tw, 2, 'efgh');
+  // Recto hasta la base del piso donde acaba, y dentro de ese piso, estrecha
+  // hasta la punta: estrechando en los huecos del alerce, cada escalon dejaria
+  // un pixel de corteza con aire encima (el canto que el humo no deja asomar),
+  // y recto hasta arriba, el piso de la punta, mas estrecho que el, lo dejaria
+  // ver por los lados.
+  const tipBase = Math.floor(shape.tiers / 2) * step;
+  limb(g, cx, H, cx, H - tipBase, tw, tw, 'efgh');
+  limb(g, cx, H - tipBase, cx, H - tipRise, tw, 2, 'efgh');
   const masses: Mass[] = [];
   for (let i = 0; i < shape.tiers; i++) {
     const rise = i * step;
@@ -699,8 +714,8 @@ const stones: [Feature, string, Art][] = [
 const bench = workbench();
 const oven = furnace();
 
-const byFeature = (list: [Feature, string, Art][], extra?: (a: Art) => string) =>
-  list.map(([f, name, a]) => `  // ${name}\n  [Feature.${Feature[f]}]: ${lit(a, extra ? extra(a) : '')},`).join('\n');
+const byFeature = (list: [Feature, string, Art][], extra?: (a: Art) => string, keep = '') =>
+  list.map(([f, name, a]) => `  // ${name}\n  [Feature.${Feature[f]}]: ${lit(a, extra ? extra(a) : '', keep)},`).join('\n');
 
 const out = `/**
  * El pixelart del mundo (el autor, 2026-10-19; guia de arte, directriz 7): a
@@ -744,11 +759,11 @@ ${terrain.map(([t, name, arts]) => `  // ${name}\n  [Terrain.${Terrain[t]}]: [\n
 };
 
 /** La superficie del agua. */
-export const WATER_SURFACE: WorldArt = ${lit(waterSurface(groundTones([47, 110, 168])))};
+export const WATER_ART: WorldArt = ${lit(waterSurface(groundTones([47, 110, 168])))};
 
 /** Las copas de los seis arboles. */
 export const CROWNS: Readonly<Partial<Record<Feature, CrownArt>>> = {
-${byFeature(trees, (a) => `\n    trunkX: ${(a as TreeArt).trunkX},\n    trunkW: ${(a as TreeArt).trunkW},`)}
+${byFeature(trees, (a) => `\n    trunkX: ${(a as TreeArt).trunkX},\n    trunkW: ${(a as TreeArt).trunkW},`, 'efgh')}
 };
 
 /** Las seis matas, con sus frutos. */

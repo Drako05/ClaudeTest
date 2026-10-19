@@ -7,10 +7,11 @@
  * que su hitbox (`STATION_BOXES` del nucleo), asi que lo que se ve es lo que
  * estorba y lo que se golpea, como el tronco de los arboles.
  *
- * Las caras se pintan en un lienzo con los colores de `palette.ts`, los mismos
- * de sus escombros, y van en `MeshBasicMaterial` como las aspas: la luz no la
- * pone la escena sino el dibujo, que la lleva horneada desde el noroeste —las
- * caras oeste y norte mas claras que las otras dos—.
+ * Las caras son pixelart a 24 pixeles por bloque, como todo el mundo (el
+ * autor, 2026-10-19: «Esto implica rehacer las estaciones»): las de
+ * `STATION_ART` en `world-art.ts`. Van en `MeshBasicMaterial` como las aspas:
+ * la luz no la pone la escena sino el dibujo, que la lleva horneada desde el
+ * noroeste —las caras oeste y norte mas claras que las otras dos—.
  *
  * El frente —la boca del horno, las herramientas de la mesa— mira **hacia quien
  * la puso** (pedido del autor, 2026-10-02). Lo guarda el nucleo al colocarla
@@ -20,22 +21,13 @@
  * casilla, como el giro de las aspas.
  */
 
-import {
-  BoxGeometry,
-  CanvasTexture,
-  Mesh,
-  MeshBasicMaterial,
-  NearestFilter,
-  type Material,
-  type Texture,
-} from 'three';
+import { BoxGeometry, Mesh, MeshBasicMaterial, type Material, type Texture } from 'three';
 import { now } from './clock.js';
 import { Feature, Station, stationOfFeature } from '@verdant/shared';
 import { GRAVITY, hash2DFloat, STATION_BOXES, type Placed, type World } from '@verdant/sim';
-import { STATION_FACES } from './palette.js';
+import { STATION_ART } from './world-art.js';
+import { artCanvas, pixelTexture } from './world-sprites.js';
 
-/** Pixeles por bloque de las caras. El arte es de pixeles, como el resto. */
-const PX = 32;
 /** Brillo de cada cara horneado en el dibujo: arriba, oeste y norte, este y sur. */
 const LIGHT = { top: 1, lit: 0.95, shade: 0.74, bottom: 0.5 };
 /**
@@ -47,111 +39,6 @@ const FACE_LIGHT = [LIGHT.shade, LIGHT.lit, LIGHT.top, LIGHT.bottom, LIGHT.shade
  * nucleo (+z de three.js), 1 = +x, 2 = -y, 3 = -x, como `facingToward`. */
 const SIDES = [4, 0, 5, 1];
 
-type Painter = (ctx: CanvasRenderingContext2D, w: number, h: number, faces: readonly string[]) => void;
-
-function texture(w: number, h: number, faces: readonly string[], paint: Painter): Texture | null {
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  paint(ctx, w, h, faces);
-  const t = new CanvasTexture(canvas);
-  t.magFilter = NearestFilter;
-  t.minFilter = NearestFilter;
-  t.generateMipmaps = false;
-  return t;
-}
-
-function rect(ctx: CanvasRenderingContext2D, color: string, x: number, y: number, w: number, h: number): void {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, w, h);
-}
-
-// ------------------------------------------------------------------ la mesa
-
-/** Tablas de madera: vetas horizontales cada 8 px. */
-const planks: Painter = (ctx, w, h, [dark, mid, light]) => {
-  rect(ctx, mid, 0, 0, w, h);
-  for (let y = 0; y < h; y += 8) {
-    rect(ctx, dark, 0, y + 7, w, 1);
-    rect(ctx, light, 0, y, w, 1);
-  }
-};
-
-/** El tablero visto desde arriba: tablas, un marco y la cuadricula de trabajo. */
-const benchTop: Painter = (ctx, w, h, faces) => {
-  planks(ctx, w, h, faces);
-  const [dark, , light] = faces;
-  rect(ctx, dark, 0, 0, w, 2);
-  rect(ctx, dark, 0, h - 2, w, 2);
-  rect(ctx, dark, 0, 0, 2, h);
-  rect(ctx, dark, w - 2, 0, 2, h);
-  for (let i = 0; i <= 3; i++) {
-    rect(ctx, dark, 7 + i * 6, 7, 1, 19);
-    rect(ctx, dark, 7, 7 + i * 6, 19, 1);
-  }
-  rect(ctx, light, 8, 8, 5, 5);
-};
-
-/** Un costado: el canto del tablero arriba y dos patas con un travesano. */
-const benchSide: Painter = (ctx, w, h, [dark, mid, light]) => {
-  rect(ctx, '#2a1c10', 0, 0, w, h);
-  rect(ctx, mid, 0, 0, w, 7);
-  rect(ctx, light, 0, 0, w, 2);
-  rect(ctx, dark, 0, 6, w, 1);
-  rect(ctx, mid, 2, 7, 5, h - 7);
-  rect(ctx, mid, w - 7, 7, 5, h - 7);
-  rect(ctx, light, 2, 7, 1, h - 7);
-  rect(ctx, light, w - 7, 7, 1, h - 7);
-  rect(ctx, dark, 7, h - 9, w - 14, 3);
-};
-
-/** El frente: el costado con una sierra y un martillo colgados. */
-const benchFront: Painter = (ctx, w, h, faces) => {
-  benchSide(ctx, w, h, faces);
-  const [dark, , light, metal] = faces;
-  // La sierra: hoja con dientes y mango.
-  rect(ctx, metal, 9, 10, 9, 4);
-  for (let x = 9; x < 18; x += 2) rect(ctx, '#8d9299', x, 14, 1, 1);
-  rect(ctx, dark, 18, 9, 3, 6);
-  // El martillo: cabeza y mango.
-  rect(ctx, light, 23, 11, 2, 9);
-  rect(ctx, metal, 21, 9, 6, 3);
-};
-
-// ------------------------------------------------------------------ el horno
-
-/** Piedra en hiladas de ladrillos, de 8 px de alto y desplazadas cada fila. */
-const bricks: Painter = (ctx, w, h, [dark, mid, light]) => {
-  rect(ctx, dark, 0, 0, w, h);
-  for (let row = 0, y = 0; y < h; row++, y += 8) {
-    for (let x = row % 2 ? -8 : 0; x < w; x += 16) {
-      rect(ctx, mid, x + 1, y + 1, 14, 6);
-      rect(ctx, light, x + 1, y + 1, 14, 1);
-    }
-  }
-};
-
-/** Arriba: piedra y el hueco del tiro en medio. */
-const furnaceTop: Painter = (ctx, w, h, faces) => {
-  bricks(ctx, w, h, faces);
-  rect(ctx, '#1d1d22', 11, 11, 10, 10);
-  rect(ctx, faces[3], 13, 13, 6, 6);
-};
-
-/** El frente: la boca, con la brasa dentro. */
-const furnaceFront: Painter = (ctx, w, h, faces) => {
-  bricks(ctx, w, h, faces);
-  const [dark, , light, ember] = faces;
-  const top = h - 26;
-  rect(ctx, light, 7, top - 2, w - 14, 2);
-  rect(ctx, '#18181c', 8, top, w - 16, 20);
-  rect(ctx, dark, 8, top, w - 16, 3);
-  rect(ctx, ember, 10, top + 14, w - 20, 4);
-  rect(ctx, '#ffd36a', 13, top + 15, 6, 2);
-};
-
 // ------------------------------------------------------------------ el conjunto
 
 interface Kind {
@@ -160,11 +47,6 @@ interface Kind {
   /** Los seis materiales de la caja para cada giro del frente. */
   readonly byTurn: Material[][];
 }
-
-const PAINTERS: Record<Station.Workbench | Station.Furnace, { top: Painter; side: Painter; front: Painter }> = {
-  [Station.Workbench]: { top: benchTop, side: benchSide, front: benchFront },
-  [Station.Furnace]: { top: furnaceTop, side: bricks, front: furnaceFront },
-};
 
 /** Las estaciones dibujadas una vez; cada casilla lleva una malla que las comparte. */
 export class StationSet {
@@ -185,14 +67,10 @@ export class StationSet {
   constructor() {
     for (const feature of [Feature.Workbench, Feature.Furnace]) {
       const station = stationOfFeature(feature) as Station.Workbench | Station.Furnace;
-      const faces = STATION_FACES[feature];
-      if (!faces) continue;
+      const art = STATION_ART[feature];
+      if (!art) continue;
       const { height } = STATION_BOXES[station];
-      const paint = PAINTERS[station];
-      const top = texture(PX, PX, faces, paint.top);
-      const side = texture(PX, Math.round(PX * height), faces, paint.side);
-      const front = texture(PX, Math.round(PX * height), faces, paint.front);
-      if (!top || !side || !front) continue;
+      const [top, side, front] = [art.top, art.side, art.front].map((face) => pixelTexture(artCanvas(face), true)) as [Texture, Texture, Texture];
       const material = (map: Texture, k: number) => {
         const m = new MeshBasicMaterial({ map });
         m.color.setScalar(k);

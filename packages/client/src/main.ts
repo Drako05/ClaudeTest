@@ -27,6 +27,7 @@ import {
   WebGLRenderer,
   DoubleSide,
   MeshBasicMaterial,
+  RepeatWrapping,
 } from 'three';
 import {
   blocksBody,
@@ -70,7 +71,6 @@ import { cameraClearance, rayHit } from './camera-collision.js';
 import { flattestRoll, rollFor, TapSequencer } from './tap-input.js';
 import { debrisPalette } from './palette.js';
 import { EffectsView } from './effects-view.js';
-import { TERRAIN_RGB, shadeStepAt, SHADE_STEPS } from './art.js';
 import { BillboardSet } from './billboards.js';
 import { FaunaView } from './fauna-view.js';
 import { DropsView } from './drops-view.js';
@@ -83,7 +83,9 @@ import { StationSet } from './stations-view.js';
 import { buildShadows, type ShadowSpot } from './shadows.js';
 import { HIDE_PLAYER_BELOW, OrbitCamera, type Projection } from './camera.js';
 import { Controls } from './controls.js';
-import { chunkMesh, columnTopFor } from './terrain-mesh.js';
+import { chunkMesh, columnTopFor, terrainVariant, type TerrainTile } from './terrain-mesh.js';
+import { WATER_ART } from './world-art.js';
+import { artCanvas, pixelTexture, terrainAtlas } from './world-sprites.js';
 import { FovPanel } from './fov-panel.js';
 import { InventoryUi } from './inventory-ui.js';
 import { MouseLook } from './pointer-lock.js';
@@ -452,21 +454,38 @@ if (player) scene.add(player);
 
 // El agua, un plano translucido a la altura del nivel del mar. El fondo marino
 // ya lo dibuja la malla, asi que se ve la profundidad por transparencia.
+// En pixelart (el autor, 2026-10-19): su tesela, a 24 pixeles por bloque y
+// repetida alineada con el mundo; el plano sigue al jugador y la textura se
+// corre con el (`waterAt`), asi que las olas no se mueven al andar.
+const WATER_SPAN = CHUNK_SIZE * (RADIUS * 2 + 3);
+const waterMap = pixelTexture(artCanvas(WATER_ART), true);
+waterMap.wrapS = waterMap.wrapT = RepeatWrapping;
+waterMap.repeat.set(WATER_SPAN, WATER_SPAN);
 const water = new Mesh(
   new PlaneGeometry(1, 1),
-  new MeshBasicMaterial({ color: 0x2f6ea8, transparent: true, opacity: 0.72, side: DoubleSide }),
+  new MeshBasicMaterial({ map: waterMap, transparent: true, opacity: 0.72, side: DoubleSide }),
 );
 water.rotation.x = -Math.PI / 2;
-water.scale.set(CHUNK_SIZE * (RADIUS * 2 + 3), CHUNK_SIZE * (RADIUS * 2 + 3), 1);
+water.scale.set(WATER_SPAN, WATER_SPAN, 1);
 scene.add(water);
 
-/** El color de un tile: la paleta del juego con su misma franja de brillo. */
-function colorOf(terrain: Terrain, wx: number, wy: number): readonly [number, number, number] {
-  const rgb = TERRAIN_RGB[terrain] ?? TERRAIN_RGB[3 as Terrain];
-  // La franja de brillo es la de `art.ts`, para que el mundo se vea el mismo.
-  const k = 0.9 + (shadeStepAt(seed, wx, wy) / (SHADE_STEPS - 1)) * 0.2;
-  return [(rgb[0] / 255) * k, (rgb[1] / 255) * k, (rgb[2] / 255) * k];
+/** El agua, centrada en `px, py` y con su tesela pegada a la rejilla del mundo. */
+function waterAt(px: number, py: number): void {
+  water.position.set(px, WATER_SURFACE, py);
+  // El plano tumbado lleva su `u` al este y su `v` al norte (-z).
+  const frac = (n: number) => n - Math.floor(n);
+  waterMap.offset.set(frac(px - WATER_SPAN / 2), frac(-py - WATER_SPAN / 2));
 }
+
+/**
+ * El suelo en pixelart (el autor, 2026-10-19): todas las teselas en un atlas,
+ * un material para todos los chunks. Cada casilla toma la de su suelo en la
+ * variante que le toque (`terrainVariant`).
+ */
+const atlas = terrainAtlas();
+const terrainMaterial = new MeshLambertMaterial({ map: pixelTexture(atlas.canvas, false), vertexColors: true });
+const tileOf: TerrainTile = (terrain, wx, wy) =>
+  atlas.rect(terrain, terrainVariant(seed, wx, wy, atlas.variants(terrain)));
 
 /**
  * El punto del mundo que se ve en `at` de la pantalla de PRIMERA PERSONA
@@ -582,14 +601,15 @@ let triangles = 0;
 
 function buildChunk(cx: number, cy: number): ChunkView {
   const chunk = state.world.getChunk(cx, cy);
-  const data = chunkMesh(state.world, chunk, colorOf);
+  const data = chunkMesh(state.world, chunk, tileOf);
 
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
   geometry.setAttribute('color', new BufferAttribute(data.colors, 3));
+  geometry.setAttribute('uv', new BufferAttribute(data.uvs, 2));
   geometry.setIndex(new BufferAttribute(data.indices, 1));
   geometry.computeVertexNormals();
-  const mesh = new Mesh(geometry, new MeshLambertMaterial({ vertexColors: true }));
+  const mesh = new Mesh(geometry, terrainMaterial);
   scene.add(mesh);
 
   // Las features, leidas del mundo EFECTIVO y no del potencial del generador:
@@ -660,8 +680,8 @@ function syncChunks(): void {
 
 function dispose(key: string, view: ChunkView): void {
   scene.remove(view.mesh);
+  // El material del suelo es uno para todos los chunks: no se libera.
   view.mesh.geometry.dispose();
-  (view.mesh.material as MeshLambertMaterial).dispose();
   // Los aspas comparten geometria y material con las demas de su especie, asi
   // que se quitan de la escena pero NO se liberan: siguen en uso. Las sombras
   // si, que son propias del chunk.
@@ -1082,7 +1102,7 @@ function runFrame(now: number, draw: boolean): void {
   const px = body.x;
   const py = body.y;
   const ph = body.z;
-  water.position.set(px, WATER_SURFACE, py);
+  waterAt(px, py);
 
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -1277,6 +1297,8 @@ Object.defineProperty(window, '__verdant', {
       slashesDrawn: effectsView.slashesDrawn,
       debrisDrawn: effectsView.debrisDrawn,
       chipsDrawn: effectsView.chipsDrawn,
+      /** Rocas y minerales puestos en voxeles (`billboards.ts`), acumulado. */
+      rocksDrawn: billboards.rocks,
       /** Impactos trazados, acumulado de fotogramas. Ver `EffectsView`. */
       impactsDrawn: effectsView.impactsDrawn,
       effects: effects.tally,

@@ -20,7 +20,7 @@ import {
   STATION_ART,
   STONES,
   TERRAIN_TILES,
-  WATER_SURFACE,
+  WATER_ART,
   WORLD_PX,
   type WorldArt,
 } from './world-art.js';
@@ -69,7 +69,7 @@ function water(cols: number, rows: number): HTMLCanvasElement {
   const canvas = ground(TERRAIN_TILES[Terrain.Water], cols, rows);
   const ctx = canvas.getContext('2d')!;
   ctx.globalAlpha = WATER_OPACITY;
-  const surface = artCanvas(WATER_SURFACE);
+  const surface = artCanvas(WATER_ART);
   for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) ctx.drawImage(surface, x * WORLD_PX, y * WORLD_PX);
   return canvas;
 }
@@ -253,7 +253,7 @@ export function showWorldSheet(): number {
     terrains.map((t) => figure(TERRAIN_NAMES[t]!, zoom(ground(TERRAIN_TILES[t], 6, 3), 2))),
   );
   count += group(sheet, 'Agua: la superficie ×3, los fondos ×3, y el agua sobre su fondo (×2)', [
-    figure('Superficie', zoom(artCanvas(WATER_SURFACE), 3)),
+    figure('Superficie', zoom(artCanvas(WATER_ART), 3)),
     figure('Fondos (agua, agua honda)', ...[Terrain.Water, Terrain.DeepWater].flatMap((t) => TERRAIN_TILES[t].map((v) => zoom(artCanvas(v), 3)))),
     figure('El agua', zoom(water(6, 3), 2)),
   ]);

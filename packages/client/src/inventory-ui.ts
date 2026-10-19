@@ -57,10 +57,10 @@ import {
   stackMax,
   toolStats,
 } from '@verdant/shared';
-import { makePlayerArt } from './art.js';
 import { now } from './clock.js';
 import { equipIcon } from './equip-icons.js';
 import { itemIcon } from './item-icons.js';
+import { playerArt } from './world-sprites.js';
 import {
   clampSplit,
   inCore,
@@ -1007,10 +1007,12 @@ export class InventoryUi {
   private drawCharacter(): void {
     const canvas = byId<HTMLCanvasElement>('charArt');
     const ctx = canvas.getContext('2d');
-    const art = makePlayerArt(4);
-    if (!ctx || !art) return;
+    const art = playerArt();
+    if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
-    const scale = Math.min(canvas.width / art.canvas.width, canvas.height / art.canvas.height) * 0.9;
+    // A un multiplo entero de su rejilla, como todo el pixelart (guia de
+    // arte, directriz 5): si no, sus pixeles saldrian desiguales.
+    const scale = Math.max(1, Math.floor(Math.min(canvas.width / art.canvas.width, canvas.height / art.canvas.height) * 0.9));
     const w = art.canvas.width * scale;
     const h = art.canvas.height * scale;
     ctx.drawImage(art.canvas, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);

@@ -15,7 +15,8 @@ import {
   CHIPS_PER_HIT,
   desaturate,
 } from '../packages/client/src/effects.js';
-import { debrisPalette, LOOKS, ROCK_FACES } from '../packages/client/src/palette.js';
+import { debrisPalette, LOOKS } from '../packages/client/src/palette.js';
+import { BUSHES, STONES } from '../packages/client/src/world-art.js';
 
 describe('La estocada del modo preciso', () => {
   it('va recta de un extremo al otro: del borde de la pantalla a lo golpeado', () => {
@@ -311,13 +312,14 @@ describe('Un efecto nace y se ve, por lento que vaya el fotograma', () => {
 });
 
 describe('La paleta sale del mismo sitio que el dibujo', () => {
-  it('la roca suelta sus tres caras', () => {
-    expect(debrisPalette(Feature.RockNode)).toHaveLength(ROCK_FACES.length);
+  it('la roca suelta los tonos de su piedra, todos y ninguno mas', () => {
+    const stone = new Set(Object.values(STONES[Feature.RockNode]!.palette).map((c) => Number.parseInt(c.slice(1), 16)));
+    expect(new Set(debrisPalette(Feature.RockNode))).toEqual(stone);
   });
 
   it('un arbusto con fruto suelta tambien el color del fruto', () => {
-    const look = LOOKS[Feature.ForestPlant]!;
-    const fruit = Number.parseInt(look.fruit!.slice(1), 16);
+    // La `j` de una mata es la base de su fruto (`tools/pixel-mundo.ts`).
+    const fruit = Number.parseInt(BUSHES[Feature.ForestPlant]!.palette.j!.slice(1), 16);
     expect(debrisPalette(Feature.ForestPlant)).toContain(fruit);
   });
 
