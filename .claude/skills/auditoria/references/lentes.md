@@ -257,6 +257,10 @@ el codigo delante.
   junto a un boton no es «no pulsable». Se prueba con un toque de verdad (CDP)
   y se mira a que elemento llega el `pointerdown`; si la zona tiene que hacer
   otra cosa, se decide por geometria en el oyente.
+- **Un plazo que decide un gesto** (#43): mantener o doble toque medidos
+  con `setTimeout` fallan con la pagina ocupada: el plazo corre antes de
+  atender el soltar. Se mide con el `timeStamp` de los eventos y se prueba
+  soltando con una hora anterior al plazo, enviada despues.
 - **Algo nuevo que se mueve o tapa** (#24): si la tanda mete en la escena algo
   que se mueve por su cuenta o tapa (la fauna), repasa cada medida en pixeles
   (`slash`, la sonda de profundidad, `shots`) y aislala de ello (`?fauna=0`).

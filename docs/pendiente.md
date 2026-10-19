@@ -75,7 +75,12 @@ git.
 **Despues del cierre**: la CI de `main` cayo en `desktop`: la comprobacion
 nueva de cerrar y reabrir con E dejaba una captura del cursor a medias que la
 prueba de Esc veia como pausa. Ahora se hace sin pedir la captura y comprueba
-que no queda ni pausa ni captura; es el escape P8.
+que no queda ni pausa ni captura; es el escape P8. Y al probarlo, la CI de
+`pruebas` cayo en los gestos: **un toque corto en una casilla abria el menu si
+la pagina iba ocupada**, porque el plazo de 0,3 s corria antes de atender el
+soltar. Eso le pasaria igual a un movil lento: ahora se mide por la hora de los
+eventos, y los gestos lo comprueban con un soltar de 0,1 s que llega a los 0,6
+(su mutacion cae). Es el escape 43.
 
 ---
 

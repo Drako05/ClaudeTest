@@ -64,6 +64,10 @@ Decisiones del autor, que no se tocan sin preguntarle:
   - **Se cierra** al arrastrar, al tocar en otro sitio —y ese toque hace lo
     suyo—, al cerrar el panel o al cambiar de pagina. Un toque corto en el
     movil solo describe, como siempre.
+  - **Los 0,3 s se miden por la hora de los eventos** (apoyar y soltar), no
+    por cuando corre el plazo: con la pagina ocupada, el plazo corria antes de
+    atender un soltar que habia llegado a tiempo, y un toque abria el menu (la
+    CI del 2026-10-19). Si al soltar no llego a 0,3 s, era un toque.
   - **Usar** come de esa casilla (`Intent.useSlot`, `eatFrom`), con las reglas
     de comer: con el hambre llena, nada. **Equipar** es moverla a su hueco de
     PERSONAJE, con la regla del Bolso.
