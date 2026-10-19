@@ -32,6 +32,49 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
+## EN CURSO: el mundo en pixelart HD (2026-10-19)
+
+**Empieza aqui.** El autor: «adaptemos el arte del terreno y los elementos
+(árboles, rocas, minerales, plantas...) al pixelart HD. Los animales quedan
+para otra tanda.» Sus respuestas (seran la directriz 7 de
+`docs/guia-de-arte.md`):
+- «Caras de 24x24 en bloques (voxeles 12x12). Esa debe ser la medida para
+  todo elemento del juego. Esto implica rehacer las estaciones.»
+- Las paredes del terreno, del **mismo material, mas oscuro**.
+- **Sin contorno** en los elementos del mundo.
+- Entran tambien **el agua, la mesa y el horno, el jugador, y los escombros y
+  esquirlas**.
+- **Rocas y minerales, bloques de voxeles** de forma irregular, no laminas.
+- El suelo, **3-4 variantes por casilla** elegidas con la semilla, **sin** el
+  ±10 % de brillo de hoy.
+- Las **sombras, difuminadas como hoy**.
+
+**El plan, por rondas, cada una ensenada antes de seguir** (como los iconos):
+1. **Muestra de estilo** en la hoja `?mundo=1` (`world-sheet.ts`): hierba (4
+   variantes) y roca (2) con su pared, el roble, la mata de la pradera y la
+   roca de voxeles. **Ensenada el 2026-10-19; esperando al autor.**
+2. El resto en la hoja: los 8 terrenos, el agua (animada o no: el autor, al
+   verla), las 6 especies, matas, brotes, rocas y minerales, guijarros, el
+   jugador y las estaciones a 24 px.
+3. Al juego: un ayudante de rejilla a textura en sRGB, el terreno con UV y un
+   atlas, los objetos a 24 px exactos (sin la cadena `BASE`/`ARBOL`/`DETAIL`)
+   y del mismo tamano en el mundo, rocas de voxeles, estaciones con `PX = 24`.
+4. Verificar, documentos, CI y auditoria.
+
+**Como se hacen los dibujos**: `tools/pixel-mundo.ts` (`npx vite-node`) los
+saca de formas y los escribe en `packages/client/src/world-art.ts`, donde
+**se retocan a mano**; volver a correrlo pisa los retoques.
+
+**Deducciones de la ronda 1, para el autor:**
+- Los colores son **los que se ven hoy**: el suelo, su hexadecimal (medido en
+  una captura: la hierba `#588c48` sale 92,136,84); los objetos, el de
+  `palette.ts` aclarado como lo aclara three.js, porque sus texturas no llevan
+  espacio de color y las toma por lineales.
+- Cuatro tonos por material (luz, base, sombra, hondo) repartidos por
+  proporciones fijas; la luz del noroeste.
+- La roca de voxeles: 2 × 2 abajo y 3 arriba (le falta la esquina de delante
+  a la derecha).
+
 ## Auditoria al cerrar el inventario de 5 columnas (2026-10-19)
 
 **El alcance**: de `dc902a3` a `78bead8`: la auditoria anterior y la tanda del

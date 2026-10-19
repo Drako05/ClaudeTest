@@ -556,6 +556,17 @@
       #iconSheet .buttonTone .sheetIcon { color: #e8eef7; }
       #iconSheet .sheetIcon.big { width: 96px; height: 96px; }
       #iconSheet figcaption { text-align: center; min-height: 2.4em; }
+      /* La hoja del pixelart del mundo (`?mundo=1`, `world-sheet.ts`): lienzos
+         de pixeles enteros, sin suavizar. */
+      #worldSheet {
+        position: fixed; inset: 0; z-index: 100; overflow: auto; padding: 16px 20px;
+        background: #121826; color: #e8eef7; font: 600 11px/1.2 ui-monospace, Menlo, Consolas, monospace;
+      }
+      #worldSheet h2 { margin: 14px 0 10px; font-size: 14px; }
+      #worldSheet .worldGrid { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+      #worldSheet figure { margin: 0; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; max-width: 100%; }
+      #worldSheet figcaption { flex-basis: 100%; }
+      #worldSheet .worldArt { image-rendering: pixelated; max-width: 100%; }
       #charArt {
         grid-column: 2 / 4; grid-row: 1 / 4; width: 100%; height: 100%; border-radius: 8px;
         border: 1px solid rgba(140, 190, 255, 0.22); image-rendering: pixelated;

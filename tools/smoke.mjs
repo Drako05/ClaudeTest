@@ -2727,6 +2727,24 @@ async function devToolsPass(browser, baseUrl) {
   await sheet.close();
   console.log(`  hoja de iconos: ${JSON.stringify(sheetIcons)}`);
   check(sheetIcons[0] === 70 && sheetIcons[1] === 70 && sheetIcons[2], `la hoja de iconos no tiene los 70: ${JSON.stringify(sheetIcons)}`);
+  // La hoja del pixelart del mundo (`?mundo=1`, la tanda del 2026-10-19):
+  // cada lienzo pintado, ninguno en blanco.
+  const world = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  await world.goto(`${baseUrl}/?seed=${SEED}&mundo=1`, { waitUntil: 'load' });
+  await world.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+  const worldSheet = await world.evaluate(() => {
+    const canvases = [...document.querySelectorAll('#worldSheet .worldArt')];
+    const blank = canvases.filter((c) => {
+      const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return false;
+      return true;
+    }).length;
+    return { drawings: window.__verdant.worldSheet, canvases: canvases.length, blank };
+  });
+  await world.close();
+  console.log(`  hoja del mundo: ${JSON.stringify(worldSheet)}`);
+  check(worldSheet.drawings > 0 && worldSheet.canvases > worldSheet.drawings && worldSheet.blank === 0,
+    `la hoja del mundo no pinta sus dibujos: ${JSON.stringify(worldSheet)}`);
 
   // Bordes de chunk y de bioma.
   await page.click('[data-toggle="chunks"]');
