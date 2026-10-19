@@ -11,13 +11,13 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: el mundo en pixelart, ronda 1 (2026-10-19): la hoja `?mundo=1`.
+ * Ronda: el mundo en pixelart, ronda 2 (2026-10-19): la hoja `?mundo=1`, entera.
  */
 export default [
   // La hoja del mundo sin pintar sus rejillas: lienzos en blanco.
   {
-    nombre: 'pixelart1: hoja sin pintar',
-    fichero: 'packages/client/src/world-sheet.ts',
+    nombre: 'pixelart2: hoja sin pintar',
+    fichero: 'packages/client/src/world-sprites.ts',
     de: '      ctx.fillStyle = color;\n      ctx.fillRect(x, y, 1, 1);',
     a: '      ctx.fillStyle = color;',
     prueba: 'smoke:devTools',

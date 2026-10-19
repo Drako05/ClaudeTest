@@ -3,26 +3,33 @@
  * del terreno y los elementos al pixelart HD», con caras de 24 × 24 por bloque
  * y voxeles de 12 × 12; guia de arte, directriz 7).
  *
- * Saca las rejillas de formas (manchas de ruido, bolas de hojas sombreadas,
- * vetas) y las escribe en `packages/client/src/world-art.ts`, que es lo que
- * usa el juego. **Despues se retocan a mano, pixel a pixel, en ese fichero**:
- * volver a correr esto pisa los retoques. Vive en el repo, y no en el
- * contenedor como el de los iconos, para que no muera con la sesion.
+ * Saca las rejillas de formas con el pincel de `packages/client/src/pixel-paint.ts`
+ * y las escribe en `packages/client/src/world-art.ts`, que es lo que usa el
+ * juego. **Despues se retocan a mano, pixel a pixel, en ese fichero**: volver a
+ * correr esto pisa los retoques. Vive en el repo, y no en el contenedor como el
+ * de los iconos, para que no muera con la sesion.
  *
  *   npx vite-node tools/pixel-mundo.ts
  *
  * Determinista: cada dibujo sale de su propia semilla.
- *
- * Ronda 1 (muestra de estilo, para que el autor apruebe el estilo antes de
- * dibujar todo): hierba y roca con dos variantes, el roble, la mata de la
- * pradera y la roca de voxeles.
  */
 
 import { writeFileSync } from 'node:fs';
 import { Feature, Terrain } from '@verdant/shared';
-import { TREE_TRUNKS } from '@verdant/sim';
+import { mulberry32, TREE_TRUNKS } from '@verdant/sim';
 import { TERRAIN_RGB } from '../packages/client/src/art.js';
-import { ROCK_FACES } from '../packages/client/src/palette.js';
+import { LOOKS, MINERAL_FACES, ROCK_FACES, STATION_FACES } from '../packages/client/src/palette.js';
+import {
+  blank,
+  foliage,
+  limb,
+  periodicNoise,
+  quantile,
+  scatterClumps,
+  toRows,
+  type Grid,
+  type Mass,
+} from '../packages/client/src/pixel-paint.js';
 import { treeShapeOf } from '../packages/client/src/tree-shapes.js';
 
 /** Pixeles de arte por bloque (el autor). Un voxel de 0,5 son 12. */
@@ -33,111 +40,119 @@ const PX = 24;
 type RGB = [number, number, number];
 
 const hexToRgb = (h: string): RGB => [1, 3, 5].map((i) => Number.parseInt(h.slice(i, i + 2), 16)) as RGB;
-const rgbToHex = (c: RGB): string =>
+const hex = (c: RGB): string =>
   `#${c.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
 const scale = (c: RGB, k: number): RGB => [c[0] * k, c[1] * k, c[2] * k];
 /** Hacia el blanco: las luces de un material. */
 const lift = (c: RGB, k: number): RGB => [c[0] + (255 - c[0]) * k, c[1] + (255 - c[1]) * k, c[2] + (255 - c[2]) * k];
 
-/**
- * El color que se VE de un objeto hoy. Sus texturas no llevan espacio de color,
- * asi que three.js las toma por lineales y las aclara al pintar: lo que el
- * autor ve no es el hexadecimal de `palette.ts` sino este. La hoja ensena lo
- * que se ve, y en el juego estas texturas iran ya en sRGB (ronda 3). El suelo,
- * medido en una captura, se ve casi con su hexadecimal: no pasa por aqui.
- */
-function seen(hex: string): RGB {
-  return hexToRgb(hex).map((v) => {
-    const l = v / 255;
-    return (l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055) * 255;
-  }) as RGB;
+/** Cuatro tonos de un suelo: luz, base, sombra y hondo. Su base es el color que se ve hoy. */
+function groundTones(base: RGB): string[] {
+  return [lift(base, 0.22), base, scale(base, 0.78), scale(base, 0.6)].map(hex);
 }
 
-/** Cuatro tonos de un material: luz, base, sombra y hondo. */
-function tones(base: RGB): [RGB, RGB, RGB, RGB] {
-  return [lift(base, 0.22), base, scale(base, 0.78), scale(base, 0.6)];
+function toHsl([r, g, b]: RGB): [number, number, number] {
+  const R = r / 255;
+  const G = g / 255;
+  const B = b / 255;
+  const max = Math.max(R, G, B);
+  const min = Math.min(R, G, B);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  const h = max === R ? (G - B) / d + (G < B ? 6 : 0) : max === G ? (B - R) / d + 2 : (R - G) / d + 4;
+  return [h * 60, s, l];
 }
 
-// ------------------------------------------------------------------ azar
-
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+function fromHsl(h: number, s: number, l: number): RGB {
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0) * 255, f(8) * 255, f(4) * 255];
 }
 
-/** Ruido de valor periodico: una tesela que casa consigo misma por los cuatro lados. */
-function periodicNoise(rng: () => number, size: number, cell: number): (x: number, y: number) => number {
-  const n = size / cell;
-  const lattice = Array.from({ length: n * n }, () => rng());
-  const at = (i: number, j: number) => lattice[((j % n) + n) % n * n + ((i % n) + n) % n]!;
-  const smooth = (t: number) => t * t * (3 - 2 * t);
-  return (x, y) => {
-    const fx = x / cell;
-    const fy = y / cell;
-    const i = Math.floor(fx);
-    const j = Math.floor(fy);
-    const u = smooth(fx - i);
-    const v = smooth(fy - j);
-    const a = at(i, j) + (at(i + 1, j) - at(i, j)) * u;
-    const b = at(i, j + 1) + (at(i + 1, j + 1) - at(i, j + 1)) * u;
-    return a + (b - a) * v;
-  };
+/** Gira un tono hacia otro por el camino corto, `deg` grados como mucho. */
+function towards(h: number, target: number, deg: number): number {
+  const d = ((target - h + 540) % 360) - 180;
+  return (h + Math.sign(d) * Math.min(Math.abs(d), deg) + 360) % 360;
 }
-
-// ------------------------------------------------------------------ rejillas
-
-type Grid = string[][];
 
 /**
- * El valor por debajo del cual queda la fraccion `q` de los valores: los tonos
- * se reparten por proporciones fijas y no por umbrales, que con cada ruido
- * daban una tesela casi toda de un tono.
+ * Cuatro tonos de un material vivo desde su color de `palette.ts`, como en las
+ * referencias del autor: algo mas saturado, la luz hacia el amarillo y las
+ * sombras hacia el azul (*deduccion*, la regla habitual del pixelart).
  */
-function quantile(values: number[], q: number): number {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))]!;
+function ramp(color: string): string[] {
+  const [h, s0, l] = toHsl(hexToRgb(color));
+  const s = Math.min(1, s0 * 1.25);
+  return [
+    fromHsl(towards(h, 60, 12), s, Math.min(0.85, l + 0.13)),
+    fromHsl(h, s, l),
+    fromHsl(towards(h, 230, 10), s * 0.95, Math.max(0.06, l - 0.1)),
+    fromHsl(towards(h, 230, 20), s * 0.9, Math.max(0.04, l - 0.19)),
+  ].map(hex);
 }
 
-const blank = (w: number, h: number, ch = '.'): Grid => Array.from({ length: h }, () => Array(w).fill(ch));
-const rows = (g: Grid): string[] => g.map((r) => r.join(''));
+/** Tres tonos de un fruto: brillo, base y sombra. */
+const fruitTones = (color: string): string[] => [hex(lift(hexToRgb(color), 0.45)), color, hex(scale(hexToRgb(color), 0.6))];
 
-/** Una tesela de suelo: base, manchas de ruido, y lo propio de cada material. */
-function grassTile(seed: number): Grid {
+// ------------------------------------------------------------------ salida
+
+interface Art {
+  grid: Grid;
+  /** Cada letra del dibujo, su color. */
+  palette: Record<string, string>;
+}
+
+/** Junta tonos en una paleta: la letra `i` de cada par es el color `i`. */
+function pal(...pairs: [string, readonly string[]][]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [letters, colors] of pairs) [...letters].forEach((ch, i) => (out[ch] = colors[i]!));
+  return out;
+}
+
+/** El dibujo como literal, con solo los colores que usa: una paleta sin sobrantes. */
+function lit(a: Art, extra = ''): string {
+  const seen = new Set(a.grid.flat());
+  const palette = Object.fromEntries(Object.entries(a.palette).filter(([k]) => seen.has(k)));
+  return `{\n    rows: [\n${toRows(a.grid).map((r) => `      '${r}',`).join('\n')}\n    ],\n    palette: ${JSON.stringify(palette)},${extra}\n  }`;
+}
+
+// ------------------------------------------------------------------ suelo
+
+const wrap = (n: number) => ((n % PX) + PX) % PX;
+
+/** Hierba: base, manchas de ruido, y briznas de luz con su sombra. */
+function grassTile(seed: number, tones: string[]): Art {
   const rng = mulberry32(seed);
   const noise = periodicNoise(rng, PX, 4);
-  const g = blank(PX, PX, 'B');
+  const g = blank(PX, PX, 'b');
   const all: number[] = [];
   for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(noise(x, y));
   const low = quantile(all, 0.16);
-  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) if (noise(x, y) < low) g[y]![x] = 'C';
-  // Briznas: dos pixeles de luz con su sombra debajo, a la derecha (luz del noroeste).
-  const w = (x: number) => ((x % PX) + PX) % PX;
+  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) if (noise(x, y) < low) g[y]![x] = 'c';
   for (let k = 0; k < 34; k++) {
     const x = Math.floor(rng() * PX);
     const y = Math.floor(rng() * PX);
-    g[w(y)]![x] = 'A';
-    g[w(y + 1)]![x] = 'A';
-    if (rng() < 0.6) g[w(y + 2)]![w(x + 1)] = 'C';
+    g[wrap(y)]![x] = 'a';
+    g[wrap(y + 1)]![x] = 'a';
+    if (rng() < 0.6) g[wrap(y + 2)]![wrap(x + 1)] = 'c';
   }
   for (let k = 0; k < 7; k++) {
     const x = Math.floor(rng() * PX);
     const y = Math.floor(rng() * PX);
-    if (g[y]![x] === 'C') g[y]![x] = 'D';
+    if (g[y]![x] === 'c') g[y]![x] = 'd';
   }
-  return g;
+  return { grid: g, palette: pal(['abcd', tones]) };
 }
 
-function rockTile(seed: number, [light, base, shadow, deep]: string): Grid {
+/** Piedra: manchas de dos ruidos y grietas cortas con su canto de luz. */
+function stoneGrid(seed: number): Grid {
   const rng = mulberry32(seed);
   const noise = periodicNoise(rng, PX, 6);
   const fine = periodicNoise(rng, PX, 3);
-  const g = blank(PX, PX, base);
+  const g = blank(PX, PX, 'b');
   const v = (x: number, y: number) => noise(x, y) * 0.75 + fine(x, y) * 0.25;
   const all: number[] = [];
   for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(v(x, y));
@@ -145,19 +160,17 @@ function rockTile(seed: number, [light, base, shadow, deep]: string): Grid {
   const lo = quantile(all, 0.24);
   for (let y = 0; y < PX; y++) {
     for (let x = 0; x < PX; x++) {
-      if (v(x, y) >= hi) g[y]![x] = light;
-      else if (v(x, y) < lo) g[y]![x] = shadow;
+      if (v(x, y) >= hi) g[y]![x] = 'a';
+      else if (v(x, y) < lo) g[y]![x] = 'c';
     }
   }
-  // Grietas: un paseo corto de hondo, con un pixel de luz encima a la izquierda.
-  const w = (v: number) => ((v % PX) + PX) % PX;
   for (let k = 0; k < 3; k++) {
     let x = Math.floor(rng() * PX);
     let y = Math.floor(rng() * PX);
-    g[w(y - 1)]![w(x - 1)] = light;
+    g[wrap(y - 1)]![wrap(x - 1)] = 'a';
     const len = 4 + Math.floor(rng() * 5);
     for (let s = 0; s < len; s++) {
-      g[w(y)]![w(x)] = deep;
+      g[wrap(y)]![wrap(x)] = 'd';
       x += rng() < 0.6 ? 1 : 0;
       y += rng() < 0.5 ? 1 : rng() < 0.5 ? -1 : 0;
     }
@@ -165,418 +178,529 @@ function rockTile(seed: number, [light, base, shadow, deep]: string): Grid {
   return g;
 }
 
-/** Una elipse, en pixeles. */
-interface Ellipse {
-  x: number;
-  y: number;
-  rx: number;
-  ry: number;
-}
-
 /**
- * Una masa de follaje: una cupula de la copa. `z` es lo que asoma hacia
- * delante: las que cuelgan abajo, delante de la principal.
+ * Un suelo de grano: base, manchas suaves de sombra y de luz, granos sueltos
+ * y ondas (la arena, la nieve, el fondo del agua).
  */
-interface Mass extends Ellipse {
-  z: number;
-  /** Cuanto mas oscura que las demas: la de debajo de la copa, en su sombra. */
-  shade?: number;
-}
-
-/** Una mata de hojas dentro de una masa: un bulto de su relieve. */
-interface Clump {
-  x: number;
-  y: number;
-  r: number;
-  mass: number;
-}
-
-/**
- * Siembra matas dentro de cada masa, separadas entre si, de mayor a menor: las
- * grandes hacen el cuerpo y las pequenas rellenan y festonean el borde. Cada
- * mata cabe entera en su masa, asi que la silueta son los lobulos de las matas
- * del borde y no la elipse.
- */
-function scatterClumps(rng: () => number, masses: Mass[], rMin: number, rMax: number): Clump[] {
-  const clumps: Clump[] = [];
-  masses.forEach((m, mass) => {
-    const top = Math.min(rMax, Math.min(m.rx, m.ry) * 0.75);
-    const low = Math.min(rMin, top);
-    for (const r of [top, (low + top) / 2, low]) {
-      for (let tries = 0; tries < 900; tries++) {
-        const rr = r * (0.85 + rng() * 0.3);
-        const x = m.x + (rng() * 2 - 1) * m.rx;
-        const y = m.y + (rng() * 2 - 1) * m.ry;
-        const ex = (x - m.x) / Math.max(1, m.rx - rr);
-        const ey = (y - m.y) / Math.max(1, m.ry - rr);
-        if (ex * ex + ey * ey > 1) continue;
-        if (clumps.some((c) => c.mass === mass && Math.hypot(c.x - x, c.y - y) < (c.r + rr) * 0.62)) continue;
-        clumps.push({ x, y, r: rr, mass });
-      }
-    }
-    // Lo que no cubrio ninguna, con una pequena: sin huecos dentro de la masa.
-    for (let y = m.y - m.ry; y <= m.y + m.ry; y += 2) {
-      for (let x = m.x - m.rx; x <= m.x + m.rx; x += 2) {
-        const ex = (x - m.x) / Math.max(1, m.rx - low);
-        const ey = (y - m.y) / Math.max(1, m.ry - low);
-        if (ex * ex + ey * ey > 1) continue;
-        if (clumps.some((c) => c.mass === mass && Math.hypot(c.x - x, c.y - y) < c.r - 1)) continue;
-        clumps.push({ x, y, r: low, mass });
-      }
-    }
-  });
-  return clumps;
-}
-
-/**
- * El follaje, como **una masa de hojas** (el autor, 2026-10-19: «más unido y
- * entrelazado, no como si fueran varias bolas de hojas una al lado de la
- * otra», y que el detalle de lo que «da la ilusión de hojas» sea «más HD y
- * profesional»), con sus referencias.
- *
- * Dos pasos:
- * 1. **El volumen.** Un relieve: la cupula de cada masa y encima un bulto por
- *    mata. La luz sale de la pendiente de ese relieve, cada mata echa sombra
- *    sobre lo que tiene debajo a la derecha (las grietas que las entrelazan),
- *    y la parte de abajo de cada masa recibe menos cielo. Los cuatro tonos se
- *    reparten por proporciones fijas.
- * 2. **Las hojas.** Encima, hojas sueltas de unos pixeles, cada una un tono mas
- *    clara que lo que tiene detras y con su sombra debajo, que salen hacia
- *    fuera desde la base de su masa: en el borde, sus puntas hacen la silueta.
- */
-function foliage(
-  g: Grid,
-  rng: () => number,
-  opts: {
-    masses: Mass[];
-    clumps: Clump[];
-    tones: string;
-    /** Lo que pesa el bulto de cada mata frente a la cupula de su masa. */
-    bump: number;
-    /** Hojas por pixel de follaje, y su largo en pixeles. */
-    leaves: number;
-    leafLen: [number, number];
-  },
-): void {
-  const tones = opts.tones;
-  const h = g.length;
-  const w = g[0]!.length;
-  // El relieve, y de que masa es cada pixel: NaN y -1 fuera del follaje.
-  const z = new Float64Array(w * h).fill(Number.NaN);
-  const owner = new Int32Array(w * h).fill(-1);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const px = x + 0.5;
-      const py = y + 0.5;
-      for (const c of opts.clumps) {
-        const d = Math.hypot(px - c.x, py - c.y);
-        if (d >= c.r) continue;
-        const m = opts.masses[c.mass]!;
-        const ex = (px - m.x) / m.rx;
-        const ey = (py - m.y) / m.ry;
-        const v = m.z + Math.sqrt(Math.max(0, 1 - ex * ex - ey * ey)) * m.ry + Math.sqrt(c.r * c.r - d * d) * opts.bump;
-        if (!(v <= z[y * w + x]!)) {
-          z[y * w + x] = v;
-          owner[y * w + x] = c.mass;
-        }
-      }
+function grainTile(seed: number, tones: string[], opts: { ripples: number; grains: number; patch: number }): Art {
+  const rng = mulberry32(seed);
+  const noise = periodicNoise(rng, PX, 6);
+  const g = blank(PX, PX, 'b');
+  const all: number[] = [];
+  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(noise(x, y));
+  const lo = quantile(all, opts.patch);
+  const hi = quantile(all, 1 - opts.patch * 0.6);
+  for (let y = 0; y < PX; y++) {
+    for (let x = 0; x < PX; x++) {
+      if (noise(x, y) < lo) g[y]![x] = 'c';
+      else if (noise(x, y) >= hi) g[y]![x] = 'a';
     }
   }
-  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? Number.NaN : z[y * w + x]!);
-  // La luz: de arriba a la izquierda y algo de frente.
-  const L = [-0.5, -0.62, 0.6];
-  const ln = Math.hypot(L[0]!, L[1]!, L[2]!);
-  const lit: { x: number; y: number; v: number }[] = [];
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const z0 = at(x, y);
-      if (Number.isNaN(z0)) continue;
-      const side = (a: number, b: number) => (Number.isNaN(a) ? (Number.isNaN(b) ? 0 : z0 - b) : Number.isNaN(b) ? a - z0 : (a - b) / 2);
-      const dx = side(at(x + 1, y), at(x - 1, y));
-      const dy = side(at(x, y + 1), at(x, y - 1));
-      let v = ((-dx * L[0]! - dy * L[1]! + L[2]!) / Math.hypot(dx, dy, 1)) / ln;
-      for (let t = 1; t <= 8; t++) {
-        const o = at(Math.round(x - t * 0.8), Math.round(y - t));
-        if (!Number.isNaN(o) && o > z0 + t * 0.45) {
-          v -= 0.7;
-          break;
-        }
-      }
-      const m = opts.masses[owner[y * w + x]!]!;
-      v -= Math.max(0, (y + 0.5 - m.y) / m.ry) * 0.55 + (m.shade ?? 0);
-      v += (rng() - 0.5) * 0.1;
-      lit.push({ x, y, v });
-    }
-  }
-  const values = lit.map((p) => p.v);
-  // Mas oscuro de lo que se quiere: las hojas lo aclaran despues.
-  const q1 = quantile(values, 0.3);
-  const q2 = quantile(values, 0.57);
-  const q3 = quantile(values, 0.85);
-  for (const { x, y, v } of lit) g[y]![x] = tones[v >= q3 ? 0 : v >= q2 ? 1 : v >= q1 ? 2 : 3]!;
-
-  // Las hojas.
-  const level = (c: string | undefined) => (c === undefined ? -1 : tones.indexOf(c));
-  const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h;
-  const count = Math.round(lit.length * opts.leaves);
-  for (let k = 0; k < count; k++) {
-    const p = lit[Math.floor(rng() * lit.length)]!;
-    const here = level(g[p.y]![p.x]);
-    if (here < 0) continue;
-    const m = opts.masses[owner[p.y * w + p.x]!]!;
-    // Hacia fuera desde la base de su masa: arriba, hacia arriba; a los
-    // lados, de lado y algo hacia arriba.
-    let a = Math.atan2(p.y + 0.5 - (m.y + m.ry * 0.7), p.x + 0.5 - m.x) + (rng() - 0.5) * 1.1;
-    // Ninguna cuelga ni se tumba: de pie o en diagonal hacia arriba. Tumbadas
-    // hacian rayas.
-    const up = Math.max(0.6, -Math.sin(a));
-    a = Math.atan2(-up, Math.cos(a));
-    const dx = Math.cos(a);
-    const dy = Math.sin(a);
-    const len = opts.leafLen[0] + Math.floor(rng() * (opts.leafLen[1] - opts.leafLen[0] + 1));
-    const leaf = tones[Math.max(0, here - 1)]!;
-    const under = tones[Math.min(3, here + 1)]!;
-    let prev = '';
+  for (let k = 0; k < opts.ripples; k++) {
+    const y0 = Math.floor(rng() * PX);
+    const x0 = Math.floor(rng() * PX);
+    const len = 6 + Math.floor(rng() * 6);
     for (let i = 0; i < len; i++) {
-      const x = Math.round(p.x + dx * i);
-      const y = Math.round(p.y + dy * i);
-      if (!inside(x, y) || `${x},${y}` === prev) continue;
-      prev = `${x},${y}`;
-      if (g[y]![x] === '.') {
-        // Asoma del borde: solo la punta, y solo si toca a lo pintado.
-        if (i < 1 || i > len - 1 || level(g[y - Math.round(dy)]?.[x - Math.round(dx)]) < 0) break;
-        g[y]![x] = leaf;
-        break;
-      }
-      if (level(g[y]![x]) < 0) break;
-      g[y]![x] = leaf;
-      // Su sombra, debajo a la derecha, sobre lo que no es esta hoja.
-      const sx = x + 1;
-      const sy = y + 1;
-      if (inside(sx, sy) && level(g[sy]![sx]) >= 0 && g[sy]![sx] !== leaf && rng() < 0.6) g[sy]![sx] = under;
+      const y = wrap(y0 + Math.round(Math.sin(i / 2.2) * 0.8));
+      g[y]![wrap(x0 + i)] = 'a';
+      g[wrap(y + 1)]![wrap(x0 + i)] = 'c';
     }
   }
-  // Sin pixeles sueltos: menos de dos vecinos, fuera.
-  const filled = (x: number, y: number) => inside(x, y) && level(g[y]![x]) >= 0;
-  for (let pass = 0; pass < 2; pass++) {
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        if (!filled(x, y)) continue;
-        const n = +filled(x - 1, y) + +filled(x + 1, y) + +filled(x, y - 1) + +filled(x, y + 1);
-        if (n === 0) g[y]![x] = '.';
-      }
+  for (let k = 0; k < opts.grains; k++) {
+    const x = Math.floor(rng() * PX);
+    const y = Math.floor(rng() * PX);
+    g[y]![x] = rng() < 0.5 ? 'a' : 'd';
+  }
+  return { grid: g, palette: pal(['abcd', tones]) };
+}
+
+/** El suelo del bosque: verde oscuro con musgo, y pinocha caida. */
+function forestFloor(seed: number, tones: string[], litter: string[]): Art {
+  const art = grassTile(seed, tones);
+  const rng = mulberry32(seed ^ 0x51);
+  for (let k = 0; k < 9; k++) {
+    const x = Math.floor(rng() * PX);
+    const y = Math.floor(rng() * PX);
+    const dir = rng() < 0.5 ? 1 : -1;
+    art.grid[y]![x] = 'e';
+    art.grid[wrap(y + 1)]![wrap(x + dir)] = 'f';
+  }
+  art.palette = { ...art.palette, ...pal(['ef', litter]) };
+  return art;
+}
+
+/** La tundra: pardo verdoso, con manchas de musgo y matas de hierba rala. */
+function tundraTile(seed: number, tones: string[], moss: string[]): Art {
+  const art = grainTile(seed, tones, { ripples: 0, grains: 10, patch: 0.18 });
+  const rng = mulberry32(seed ^ 0x77);
+  const noise = periodicNoise(rng, PX, 8);
+  const all: number[] = [];
+  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(noise(x, y));
+  const hi = quantile(all, 0.9);
+  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) if (noise(x, y) >= hi) art.grid[y]![x] = rng() < 0.7 ? 'e' : 'f';
+  for (let k = 0; k < 6; k++) {
+    const x = Math.floor(rng() * PX);
+    const y = Math.floor(rng() * PX);
+    art.grid[y]![x] = 'a';
+    art.grid[wrap(y - 1)]![x] = 'a';
+    art.grid[wrap(y + 1)]![wrap(x + 1)] = 'd';
+  }
+  art.palette = { ...art.palette, ...pal(['ef', moss]) };
+  return art;
+}
+
+/** La superficie del agua: crestas de ola de luz con su sombra debajo. */
+function waterSurface(tones: string[]): Art {
+  const rng = mulberry32(0xa9a);
+  const noise = periodicNoise(rng, PX, 8);
+  const g = blank(PX, PX, 'b');
+  const all: number[] = [];
+  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(noise(x, y));
+  const lo = quantile(all, 0.3);
+  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) if (noise(x, y) < lo) g[y]![x] = 'c';
+  for (let k = 0; k < 9; k++) {
+    const x0 = Math.floor(rng() * PX);
+    const y0 = Math.floor(rng() * PX);
+    const len = 3 + Math.floor(rng() * 4);
+    for (let i = 0; i < len; i++) {
+      g[y0]![wrap(x0 + i)] = i === 0 || i === len - 1 ? 'b' : 'a';
+      if (i > 0 && i < len - 1) g[wrap(y0 + 1)]![wrap(x0 + i)] = 'd';
     }
   }
+  return { grid: g, palette: pal(['abcd', tones]) };
+}
+
+// ------------------------------------------------------------------ arboles
+
+interface TreeArt extends Art {
+  /** Donde el tronco sale de la copa por abajo: su centro y su grosor, en pixeles. */
+  trunkX: number;
+  trunkW: number;
 }
 
 /**
- * Un trazo de corteza de `(x0, y0)` a `(x1, y1)`, de `w0` a `w1` pixeles de
- * grueso: el lado que mira arriba a la izquierda, con luz.
+ * Una copa de frondoso (el roble, el cerezo), como en la referencia del autor:
+ * la masa principal arriba y dos que cuelgan a los lados; el tronco se abre
+ * **por debajo** de la principal y las ramas suben entre las masas; dentro del
+ * follaje solo asoman donde la sombra es honda. `flat` aplana y ensancha (la
+ * sombrilla del cerezo).
  */
-function limb(g: Grid, x0: number, y0: number, x1: number, y1: number, w0: number, w1: number, tones: string): void {
-  const [light, base, shadow, deep] = tones;
-  const h = g.length;
-  const w = g[0]!.length;
-  const vx = x1 - x0;
-  const vy = y1 - y0;
-  const l2 = vx * vx + vy * vy;
-  // La normal que mira a la luz.
-  let nx = -vy;
-  let ny = vx;
-  if (nx * -0.6 + ny * -0.8 < 0) {
-    nx = -nx;
-    ny = -ny;
-  }
-  const nl = Math.hypot(nx, ny);
-  for (let y = Math.floor(Math.min(y0, y1) - w0); y <= Math.ceil(Math.max(y0, y1) + w0); y++) {
-    for (let x = Math.floor(Math.min(x0, x1) - w0); x <= Math.ceil(Math.max(x0, x1) + w0); x++) {
-      if (x < 0 || y < 0 || x >= w || y >= h) continue;
-      const px = x + 0.5 - x0;
-      const py = y + 0.5 - y0;
-      const t = Math.max(0, Math.min(1, (px * vx + py * vy) / l2));
-      const half = (w0 + (w1 - w0) * t) / 2;
-      const s = ((px - t * vx) * nx + (py - t * vy) * ny) / nl; // + hacia la luz
-      if (Math.hypot(px - t * vx, py - t * vy) > half) continue;
-      const rel = 0.5 - s / (2 * half); // 0 en el lado de la luz
-      g[y]![x] = rel < 0.28 ? light : rel < 0.66 ? base : rel < 0.88 ? shadow : deep;
-    }
-  }
-}
-
-/**
- * El tronco: del pie, con sus raices abiertas, a `yTop`, estrechando de `wBase`
- * a `wTop`, en placas de corteza separadas por grietas (hondo), con su canto
- * de luz arriba a la izquierda.
- */
-function barkTrunk(g: Grid, rng: () => number, cx: number, yBase: number, yTop: number, wBase: number, wTop: number, tones: string): void {
-  const [light, , , deep] = tones;
-  const tall = yBase - yTop;
-  const flare = (y: number) => {
-    const up = yBase - y;
-    return up < 6 ? (6 - up) ** 1.6 * 0.55 : 0;
-  };
-  for (let y = yBase; y >= yTop; y--) {
-    const t = (yBase - y) / Math.max(1, tall);
-    const half = (wBase + (wTop - wBase) * t) / 2 + flare(y);
-    const left = Math.round(cx - half);
-    const right = Math.round(cx + half);
-    for (let x = left; x < right; x++) {
-      const rel = (x + 0.5 - (cx - half)) / (2 * half);
-      g[y]![x] = rel < 0.24 ? tones[0]! : rel < 0.6 ? tones[1]! : rel < 0.85 ? tones[2]! : tones[3]!;
-    }
-  }
-  // Las placas: grietas verticales que se tuercen, y alguna horizontal.
-  const cracks = Math.max(2, Math.round(wBase / 5));
-  for (let k = 0; k < cracks; k++) {
-    let rel = (k + 0.5 + (rng() - 0.5) * 0.5) / cracks;
-    let run = 0;
-    for (let y = yBase - 1; y > yTop + 1; y--) {
-      const t = (yBase - y) / Math.max(1, tall);
-      const half = (wBase + (wTop - wBase) * t) / 2 + flare(y);
-      const x = Math.round(cx - half + rel * 2 * half);
-      if (x > cx - half + 1 && x < cx + half - 1) {
-        g[y]![x] = deep;
-        if (rel > 0.2) g[y]![x - 1] = g[y]![x - 1] === tones[0] ? tones[1]! : g[y]![x - 1]!;
-        if (g[y]![x + 1] !== deep && rng() < 0.5) g[y]![x + 1] = light;
-      }
-      if (++run > 4 + rng() * 6) {
-        run = 0;
-        rel = Math.max(0.12, Math.min(0.88, rel + (rng() < 0.5 ? -1 : 1) / (2 * half)));
-        if (rng() < 0.35) {
-          const len = 2 + Math.floor(rng() * 3);
-          for (let i = 0; i < len; i++) {
-            const xx = x + i;
-            if (xx < cx + half - 1) g[y]![xx] = deep;
-          }
-        }
-      }
-    }
-  }
-  // Las puntas de las raices, en el suelo.
-  for (const side of [-1, 1]) {
-    const half = wBase / 2 + flare(yBase);
-    const x = Math.round(cx + side * (half + 1));
-    if (g[yBase]![x] === '.') g[yBase]![x] = side < 0 ? tones[1]! : tones[2]!;
-  }
-}
-
-/**
- * El roble, como en la referencia del autor: el tronco se abre **por debajo**
- * de la copa y las ramas suben entre las masas de follaje, contra el cielo,
- * hasta las dos que cuelgan a los lados; dentro del follaje solo asoman donde
- * la sombra es honda. La copa entera mide lo de su especie, y en la columna
- * del tronco empieza justo en su tronco desnudo medio (una masa pequena,
- * delante de la horquilla).
- */
-function oak(): Grid {
-  const shape = treeShapeOf(Feature.MeadowTree)!;
-  const law = TREE_TRUNKS[Feature.MeadowTree]!;
+function broadleaf(feature: Feature, seed: number, leaf: string[], bark: string[], flat: boolean): TreeArt {
+  const shape = treeShapeOf(feature)!;
+  const law = TREE_TRUNKS[feature]!;
   const W = Math.round(shape.crownW * PX);
-  const crownH = Math.round(shape.crownH * PX);
-  const bare = Math.round(law.bareMean * PX);
-  const H = crownH + bare;
+  const H = Math.round(shape.crownH * PX);
   const g = blank(W, H);
-  const rng = mulberry32(0x0a7);
+  const rng = mulberry32(seed);
   const tw = Math.round(law.trunkW * PX);
   const cx = W / 2;
-  const masses: Mass[] = [
-    { x: cx, y: crownH * 0.4, rx: W * 0.45, ry: crownH * 0.4, z: 0 },
-    { x: cx - W * 0.29, y: crownH * 0.75, rx: W * 0.21, ry: crownH * 0.21, z: 10 },
-    { x: cx + W * 0.29, y: crownH * 0.73, rx: W * 0.21, ry: crownH * 0.22, z: 10 },
-    { x: cx + 1, y: crownH * 0.85, rx: W * 0.13, ry: crownH * 0.15, z: 4, shade: 0.45 },
-  ];
-  const fork = crownH * 0.92;
-  barkTrunk(g, rng, cx, H - 1, Math.round(fork), tw, tw * 0.75, 'MNOP');
-  // Las ramas: a las dos masas de los lados, el tallo al centro de la
-  // principal, y de cada rama de lado, otra que sube a la principal.
+  const masses: Mass[] = flat
+    ? [
+        { x: cx, y: H * 0.42, rx: W * 0.44, ry: H * 0.42, z: 0 },
+        { x: cx - W * 0.3, y: H * 0.66, rx: W * 0.2, ry: H * 0.28, z: 10 },
+        { x: cx + W * 0.3, y: H * 0.64, rx: W * 0.2, ry: H * 0.28, z: 10 },
+      ]
+    : [
+        { x: cx, y: H * 0.49, rx: W * 0.4, ry: H * 0.49, z: 0 },
+        { x: cx - W * 0.29, y: H * 0.72, rx: W * 0.21, ry: H * 0.22, z: 10 },
+        { x: cx + W * 0.29, y: H * 0.7, rx: W * 0.21, ry: H * 0.23, z: 10 },
+      ];
+  // La horquilla, bajo la sombra de la masa principal.
+  const fork = H * 0.94;
+  // El tronco sigue por debajo de la copa: aqui, sin raices (las pone el juego al pintarlo).
+  limb(g, cx, H, cx, fork, tw, tw * 0.75, 'efgh');
   const branches: [number, number, number, number, number, number][] = [
     [cx - 2, fork, masses[1]!.x + 4, masses[1]!.y - 2, tw * 0.5, 3],
     [cx + 2, fork, masses[2]!.x - 4, masses[2]!.y - 2, tw * 0.5, 3],
-    [cx, fork, cx + 2, crownH * 0.4, tw * 0.55, 3],
-    [cx - W * 0.16, crownH * 0.86, cx - W * 0.15, crownH * 0.6, 3.5, 2],
-    [cx + W * 0.16, crownH * 0.85, cx + W * 0.18, crownH * 0.6, 3.5, 2],
+    [cx, fork, cx + 2, H * 0.4, tw * 0.55, 3],
+    [cx - W * 0.17, H * 0.85, cx - W * 0.14, H * 0.6, 4, 2],
+    [cx + W * 0.17, H * 0.84, cx + W * 0.17, H * 0.6, 4, 2],
   ];
-  for (const [x0, y0, x1, y1, w0, w1] of branches) limb(g, x0, y0, x1, y1, w0, w1, 'MNOP');
+  for (const [x0, y0, x1, y1, w0, w1] of branches) limb(g, x0, y0, x1, y1, w0, w1, 'efgh');
   const wood = g.map((r) => [...r]);
-  foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 6, 13), tones: 'IJKL', bump: 0.85, leaves: 0.06, leafLen: [2, 4] });
-  // Lo que asoma de las ramas dentro de la copa: solo en la sombra honda, y
-  // en la sombra de la corteza.
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      if (g[y]![x] === 'L' && 'MNOP'.includes(wood[y]![x]!) && y < fork) g[y]![x] = wood[y]![x] === 'P' ? 'P' : 'O';
-    }
+  foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 6, 13), tones: 'abcd', bump: 0.85, leaves: 0.018 });
+  // Lo que asoma de las ramas dentro de la copa: solo en la sombra honda, y en
+  // la sombra de la corteza.
+  for (let y = 0; y < fork; y++) {
+    for (let x = 0; x < W; x++) if (g[y]![x] === 'd' && 'efgh'.includes(wood[y]![x]!)) g[y]![x] = wood[y]![x] === 'h' ? 'h' : 'g';
   }
-  return g;
+  return { grid: g, palette: pal(['abcd', leaf], ['efgh', bark]), trunkX: cx, trunkW: tw };
 }
 
 /**
- * La mata de la pradera: compacta, hecha de hojas sueltas que asoman en punta
- * por el borde, con sus bayas y tres tallos en el pie.
+ * Una copa de conifera: sus pisos, de abajo arriba, cada uno sobre el de
+ * debajo, con el tronco por dentro hasta media altura de un piso (como el
+ * dibujo de antes, para que la punta quede tapada tambien en el alerce, que
+ * deja hueco entre pisos). La picea negra estrecha mas despacio y remata con
+ * su punta engrosada: tres pisos cortos que cierran en punta.
  */
-function meadowBush(): Grid {
+function conifer(feature: Feature, seed: number, leaf: string[], bark: string[]): TreeArt {
+  const shape = treeShapeOf(feature)!;
+  const law = TREE_TRUNKS[feature]!;
+  const W = Math.round(shape.crownW * PX);
+  const H = Math.round(shape.crownH * PX);
+  const g = blank(W, H);
+  const rng = mulberry32(seed);
+  const tw = Math.max(3, Math.round(law.trunkW * PX));
+  const cx = W / 2;
+  const spire = shape.silhouette === 'spire';
+  const bodyH = spire ? H * 0.72 : H;
+  const step = bodyH / (shape.tiers + 1 - 2 * shape.open);
+  const tierH = step * (2 - 2 * shape.open);
+  const tipRise = Math.floor(shape.tiers / 2) * step + tierH * 0.6;
+  limb(g, cx, H, cx, H - tipRise, tw, 2, 'efgh');
+  const masses: Mass[] = [];
+  for (let i = 0; i < shape.tiers; i++) {
+    const rise = i * step;
+    const taper = spire ? 1 - 0.6 * (rise / bodyH) : 1 - rise / bodyH;
+    masses.push({ x: cx, y: H - rise - tierH / 2, rx: (W / 2) * taper, ry: tierH / 2, z: i * 3, tier: true });
+  }
+  if (spire) {
+    const club = (H * 0.38) / 4;
+    for (let k = 0; k < 3; k++) {
+      masses.push({ x: cx, y: H - H * 0.62 - k * club - club, rx: W * [0.26, 0.21, 0.14][k]!, ry: club, z: (shape.tiers + k) * 3, tier: true });
+    }
+  }
+  foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 3, 6), tones: 'abcd', bump: 0.6, leaves: 0.02 });
+  return { grid: g, palette: pal(['abcd', leaf], ['efgh', bark]), trunkX: cx, trunkW: tw };
+}
+
+// ------------------------------------------------------------------ matas y brotes
+
+/**
+ * Una mata: compacta, de hojas sueltas que asoman en punta por el borde, con
+ * sus frutos de 2 × 2 y tres tallos de corteza en el pie.
+ */
+function bush(seed: number, leaf: string[], fruit: string[] | null, bark: string[]): Art {
   const W = 26;
   const H = 26;
   const g = blank(W, H);
-  const rng = mulberry32(0xb08);
-  limb(g, 13, H, 13, H - 6, 2.5, 2, 'WWWW');
-  limb(g, 12.5, H - 1, 8, H - 6, 1.6, 1.2, 'WWWW');
-  limb(g, 13.5, H - 1, 18, H - 6, 1.6, 1.2, 'WWWW');
+  const rng = mulberry32(seed);
+  limb(g, 13, H, 13, H - 7, 2.4, 2, 'efgh');
+  limb(g, 12, H - 1, 6, H - 6, 1.8, 1.4, 'efgh');
+  limb(g, 14, H - 1, 20, H - 6, 1.8, 1.4, 'efgh');
   const masses: Mass[] = [{ x: 13, y: 13, rx: 11.5, ry: 10, z: 0 }];
-  foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 3, 5), tones: 'QRST', bump: 0.7, leaves: 0.12, leafLen: [2, 3] });
-  // Bayas de 2 x 2: brillo arriba a la izquierda y sombra abajo a la derecha.
-  const leaf = new Set('QRST');
-  let placed = 0;
-  for (let tries = 0; tries < 400 && placed < 8; tries++) {
-    const x = 4 + Math.floor(rng() * (W - 9));
-    const y = 3 + Math.floor(rng() * (H - 11));
-    const cells = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
-    if (!cells.every(([a, b]) => leaf.has(g[b!]![a!]!))) continue;
-    // Separadas: ninguna baya a menos de 3 pixeles.
-    if ([-2, -1, 0, 1, 2, 3].some((d) => [-2, -1, 0, 1, 2, 3].some((e) => 'UVX'.includes(g[y + e]?.[x + d] ?? '.')))) continue;
-    g[y]![x] = 'V';
-    g[y]![x + 1] = g[y + 1]![x] = 'U';
-    g[y + 1]![x + 1] = 'X';
-    placed++;
+  foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 3, 5), tones: 'abcd', bump: 0.7, leaves: 0.04 });
+  if (fruit) {
+    let placed = 0;
+    for (let tries = 0; tries < 400 && placed < 8; tries++) {
+      const x = 4 + Math.floor(rng() * (W - 9));
+      const y = 3 + Math.floor(rng() * (H - 11));
+      const cells = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]];
+      if (!cells.every(([a, b]) => 'abcd'.includes(g[b!]![a!]!))) continue;
+      // Separados: ninguno a menos de 3 pixeles de otro.
+      if ([-2, -1, 0, 1, 2, 3].some((d) => [-2, -1, 0, 1, 2, 3].some((e) => 'ijk'.includes(g[y + e]?.[x + d] ?? '.')))) continue;
+      g[y]![x] = 'i';
+      g[y]![x + 1] = g[y + 1]![x] = 'j';
+      g[y + 1]![x + 1] = 'k';
+      placed++;
+    }
   }
-  return g;
+  return { grid: g, palette: pal(['abcd', leaf], ['efgh', bark], ['ijk', fruit ?? []]) };
+}
+
+/**
+ * Un brote: un tallo fino y unas pocas hojas de su especie adulta. El de
+ * conifera, tres pisitos; el de frondoso, una matita en la punta; el de mata,
+ * una matita baja.
+ */
+function sapling(seed: number, leaf: string[], bark: string[], kind: 'conifer' | 'broadleaf' | 'bush'): Art {
+  const rng = mulberry32(seed);
+  if (kind === 'bush') {
+    const g = blank(14, 14);
+    limb(g, 7, 14, 7, 9, 1.6, 1.4, 'efgh');
+    const masses: Mass[] = [{ x: 7, y: 7, rx: 6, ry: 5, z: 0 }];
+    foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 2, 3), tones: 'abcd', bump: 0.7, leaves: 0.05 });
+    return { grid: g, palette: pal(['abcd', leaf], ['efgh', bark]) };
+  }
+  const g = blank(12, 21);
+  limb(g, 6, 21, 6, 6, 2, 1.4, 'efgh');
+  const masses: Mass[] =
+    kind === 'conifer'
+      ? [0, 1, 2].map((i) => ({ x: 6, y: 14 - i * 4.5, rx: 5.5 - i * 1.5, ry: 3.5, z: i * 3, tier: true }))
+      : [{ x: 6, y: 6, rx: 5.5, ry: 5.5, z: 0 }];
+  foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 2, 3), tones: 'abcd', bump: 0.7, leaves: 0.05 });
+  return { grid: g, palette: pal(['abcd', leaf], ['efgh', bark]) };
+}
+
+// ------------------------------------------------------------------ piedra
+
+/** La piedra de la roca de voxeles; un mineral, con sus vetas encima. */
+function stone(seed: number, tones: string[], ore: string[] | null): Art {
+  const g = stoneGrid(seed);
+  if (ore) {
+    const rng = mulberry32(seed ^ 0x0e);
+    for (let k = 0; k < 6; k++) {
+      const x = Math.floor(rng() * PX);
+      const y = Math.floor(rng() * PX);
+      const cells = [[0, 0], [1, 0], [0, 1], [1, 1], [2, 1], [1, 2]].filter(() => rng() < 0.75);
+      for (const [dx, dy] of cells) g[wrap(y + dy!)]![wrap(x + dx!)] = 'j';
+      g[wrap(y)]![wrap(x)] = 'i';
+      g[wrap(y + 2)]![wrap(x + 2)] = 'k';
+    }
+  }
+  return { grid: g, palette: pal(['abcd', tones], ['ijk', ore ?? []]) };
+}
+
+/** Los guijarros, vistos desde arriba: tres piedras redondeadas, con la luz arriba a la izquierda. */
+function pebbles(tones: string[]): Art {
+  const g = blank(14, 14);
+  const stones = [
+    [4.5, 5, 2.8, 2.4],
+    [9.8, 6.5, 2.4, 2],
+    [6.5, 10.2, 2, 1.8],
+  ];
+  for (const [cx, cy, rx, ry] of stones) {
+    for (let y = 0; y < 14; y++) {
+      for (let x = 0; x < 14; x++) {
+        const ex = (x + 0.5 - cx!) / rx!;
+        const ey = (y + 0.5 - cy!) / ry!;
+        const d = ex * ex + ey * ey;
+        if (d > 1) continue;
+        const v = -ex * 0.55 - ey * 0.6 + Math.sqrt(1 - d) * 0.6;
+        g[y]![x] = v > 0.55 ? 'a' : v > 0.15 ? 'b' : v > -0.25 ? 'c' : 'd';
+      }
+    }
+  }
+  return { grid: g, palette: pal(['abcd', tones]) };
 }
 
 /**
  * La roca de voxeles (el autor: «bloque de voxeles», 2026-10-19): voxeles de
- * 0,5 con la textura de la piedra, alineada con el mundo como la del suelo.
- * Abajo, los cuatro; arriba, tres: le falta la esquina de delante a la derecha,
- * para que no sea un cubo. Cada voxel es [este, sur, arriba] en medios bloques.
+ * 0,5 con la textura de su piedra. Abajo, los cuatro; arriba, tres: le falta
+ * una esquina, para que no sea un cubo. Cada voxel es [este, sur, arriba] en
+ * medios bloques.
  */
 const ROCK_SHAPE: [number, number, number][] = [
   [0, 0, 0], [1, 0, 0], [0, 1, 0], [1, 1, 0],
   [0, 0, 1], [1, 0, 1], [0, 1, 1],
 ];
 
-// ------------------------------------------------------------------ paleta y salida
+// ------------------------------------------------------------------ el jugador
 
-const grass = tones(TERRAIN_RGB[Terrain.Grass].map((v) => v) as RGB);
-const rock = tones(TERRAIN_RGB[Terrain.Rock].map((v) => v) as RGB);
-// El roble y la mata, con los colores de las referencias del autor
-// (2026-10-19): verdes mas hondos y saturados que los que se ven hoy, corteza
-// rojiza y bayas rojas (*deduccion*, de sus dos imagenes).
-const leaf = ['#86b94a', '#4f8f38', '#2f6630', '#1c4026'].map(hexToRgb);
-const bark = ['#b5793f', '#8b552c', '#5f3820', '#3b2216'].map(hexToRgb);
-const bush = ['#9bd25a', '#58a63c', '#2f7a33', '#1d4a27'].map(hexToRgb);
-const stone = [seen(ROCK_FACES[2]!), seen(ROCK_FACES[1]!), seen(ROCK_FACES[0]!), scale(seen(ROCK_FACES[0]!), 0.8)] as const;
+/** Un rectangulo con su luz de izquierda a derecha, de los cuatro tonos `t`. */
+function shadedRect(g: Grid, x0: number, y0: number, x1: number, y1: number, t: string): void {
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const rel = (x - x0 + 0.5) / (x1 - x0 + 1) + (y === y0 ? -0.15 : 0);
+      g[y]![x] = t[rel < 0.3 ? 0 : rel < 0.65 ? 1 : rel < 0.88 ? 2 : 3]!;
+    }
+  }
+}
 
-const PALETTE: [string, RGB, string][] = [
-  ['A', grass[0], 'hierba: luz'], ['B', grass[1], 'hierba: base'], ['C', grass[2], 'hierba: sombra'], ['D', grass[3], 'hierba: hondo'],
-  ['E', rock[0], 'roca del suelo: luz'], ['F', rock[1], 'roca del suelo: base'], ['G', rock[2], 'roca del suelo: sombra'], ['H', rock[3], 'roca del suelo: hondo'],
-  ['I', leaf[0], 'hoja del roble: luz'], ['J', leaf[1], 'hoja del roble: base'], ['K', leaf[2], 'hoja del roble: sombra'], ['L', leaf[3], 'hoja del roble: hondo'],
-  ['M', bark[0], 'corteza del roble: luz'], ['N', bark[1], 'corteza del roble: base'], ['O', bark[2], 'corteza del roble: sombra'], ['P', bark[3], 'corteza del roble: hondo'],
-  ['Q', bush[0], 'hoja de la mata: luz'], ['R', bush[1], 'hoja de la mata: base'], ['S', bush[2], 'hoja de la mata: sombra'], ['T', bush[3], 'hoja de la mata: hondo'],
-  ['U', hexToRgb('#c8203a'), 'baya: base'], ['V', hexToRgb('#ff6b6b'), 'baya: brillo'], ['X', hexToRgb('#7d1028'), 'baya: sombra'],
-  ['W', hexToRgb('#6b4024'), 'tallo de la mata'],
-  ['a', stone[0], 'piedra: luz'], ['b', stone[1], 'piedra: base'], ['c', stone[2], 'piedra: sombra'], ['d', stone[3], 'piedra: hondo'],
+/**
+ * El jugador, de frente: 1,93 bloques de alto (46 pixeles), un aventurero con
+ * los colores de siempre: tunica azul, calzas pardas, botas de cuero y el pelo
+ * castano. Es un sprite, no un aspa (decision del autor).
+ */
+function player(): Art {
+  const g = blank(18, 46);
+  // Calzas y botas.
+  shadedRect(g, 4, 31, 8, 40, 'ijkl');
+  shadedRect(g, 10, 31, 14, 40, 'ijkl');
+  shadedRect(g, 3, 41, 8, 45, 'mnop');
+  shadedRect(g, 10, 41, 15, 45, 'mnop');
+  // La tunica, con su cinturon y la hebilla.
+  shadedRect(g, 3, 14, 14, 31, 'efgh');
+  for (let x = 3; x <= 14; x++) g[25]![x] = 'p';
+  g[25]![8] = g[25]![9] = 'w';
+  // Las mangas y las manos.
+  shadedRect(g, 1, 15, 2, 27, 'efgh');
+  shadedRect(g, 15, 15, 16, 27, 'efgh');
+  shadedRect(g, 1, 28, 2, 29, 'qrst');
+  shadedRect(g, 15, 28, 16, 29, 'qrst');
+  // El cuello, la cabeza y el pelo.
+  shadedRect(g, 7, 12, 10, 13, 'qrst');
+  for (let y = 1; y <= 12; y++) {
+    for (let x = 3; x <= 14; x++) {
+      const ex = (x + 0.5 - 9) / 6;
+      const ey = (y + 0.5 - 7) / 6;
+      if (ex * ex + ey * ey > 1) continue;
+      const rel = (x - 3) / 12;
+      const hair = y <= 4 || ((x <= 4 || x >= 13) && y <= 9);
+      g[y]![x] = hair ? (y <= 2 ? 'u' : rel < 0.6 ? 'v' : 'y') : 'qrst'[rel < 0.3 ? 0 : rel < 0.65 ? 1 : rel < 0.88 ? 2 : 3]!;
+    }
+  }
+  // Los ojos.
+  g[8]![7] = g[8]![11] = 'z';
+  return {
+    grid: g,
+    palette: pal(
+      ['efgh', ramp('#3a5480')],
+      ['ijkl', ramp('#6b5038')],
+      ['mnop', ramp('#4a3424')],
+      ['qrst', ['#ffe6c4', '#f2d0a4', '#d4a87c', '#a87c58']],
+      ['uvy', ramp('#8c5a3c').slice(0, 3)],
+      ['w', ['#e8c060']],
+      ['z', ['#2a1d14']],
+    ),
+  };
+}
+
+// ------------------------------------------------------------------ estaciones
+
+const fill = (g: Grid, c: string, x: number, y: number, w: number, h: number) => {
+  for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (g[j]?.[i] !== undefined) g[j]![i] = c;
+};
+
+/** Tablas de madera: vetas horizontales cada 6 pixeles, con su luz arriba y su sombra abajo. */
+function planks(g: Grid): void {
+  const w = g[0]!.length;
+  fill(g, 'b', 0, 0, w, g.length);
+  for (let y = 0; y < g.length; y += 6) {
+    fill(g, 'a', 0, y, w, 1);
+    fill(g, 'c', 0, y + 5, w, 1);
+    fill(g, 'd', ((y / 6) % 2) * 12 + 5, y + 1, 1, 4);
+  }
+}
+
+/** La mesa de trabajo, a 24 pixeles por bloque: el tablero, el costado y el frente con sus herramientas. */
+function workbench(): { top: Art; side: Art; front: Art } {
+  const palette = pal(['abcd', ramp(STATION_FACES[Feature.Workbench]![1]!)], ['e', ['#24170c']], ['mno', ['#e4e8ec', '#b8bec6', '#7e858e']]);
+  const top = blank(PX, PX);
+  planks(top);
+  fill(top, 'd', 0, 0, PX, 1);
+  fill(top, 'd', 0, PX - 1, PX, 1);
+  fill(top, 'd', 0, 0, 1, PX);
+  fill(top, 'd', PX - 1, 0, 1, PX);
+  for (const v of [5, 10, 14, 19]) {
+    fill(top, 'c', v, 5, 1, 15);
+    fill(top, 'c', 5, v, 15, 1);
+  }
+  fill(top, 'a', 6, 6, 4, 4);
+  const side = blank(PX, PX, 'e');
+  fill(side, 'b', 0, 0, PX, 5);
+  fill(side, 'a', 0, 0, PX, 1);
+  fill(side, 'd', 0, 4, PX, 1);
+  for (const x of [2, 18]) {
+    fill(side, 'b', x, 5, 4, PX - 5);
+    fill(side, 'a', x, 5, 1, PX - 5);
+    fill(side, 'c', x + 3, 5, 1, PX - 5);
+  }
+  fill(side, 'c', 6, 17, 12, 2);
+  fill(side, 'd', 6, 19, 12, 1);
+  const front = side.map((r) => [...r]);
+  // La sierra: hoja con dientes y mango; el martillo: cabeza y mango.
+  fill(front, 'n', 7, 7, 7, 3);
+  fill(front, 'm', 7, 7, 7, 1);
+  for (let x = 7; x < 14; x += 2) fill(front, 'o', x, 10, 1, 1);
+  fill(front, 'c', 14, 6, 2, 5);
+  fill(front, 'b', 17, 8, 2, 7);
+  fill(front, 'n', 15, 6, 5, 2);
+  fill(front, 'm', 15, 6, 5, 1);
+  return { top: { grid: top, palette }, side: { grid: side, palette }, front: { grid: front, palette } };
+}
+
+/** Piedra en hiladas de ladrillos de 6 de alto, desplazados cada fila, con su llaga honda. */
+function bricks(g: Grid): void {
+  const w = g[0]!.length;
+  fill(g, 'd', 0, 0, w, g.length);
+  for (let row = 0, y = 0; y < g.length; row++, y += 6) {
+    for (let x = row % 2 ? -6 : 0; x < w; x += 12) {
+      fill(g, 'b', x + 1, y + 1, 11, 4);
+      fill(g, 'a', x + 1, y + 1, 11, 1);
+      fill(g, 'c', x + 1, y + 4, 11, 1);
+    }
+  }
+}
+
+/** El horno, a 24 pixeles por bloque y 1,25 de alto: arriba el tiro; delante, la boca con la brasa. */
+function furnace(): { top: Art; side: Art; front: Art } {
+  const palette = pal(['abcd', ramp(STATION_FACES[Feature.Furnace]![1]!)], ['e', ['#16161a']], ['ijk', ['#ffd36a', '#ff8a2a', '#b84a14']]);
+  const tall = Math.round(PX * 1.25);
+  const top = blank(PX, PX);
+  bricks(top);
+  fill(top, 'e', 8, 8, 8, 8);
+  fill(top, 'j', 10, 10, 4, 4);
+  fill(top, 'i', 11, 11, 2, 2);
+  const side = blank(PX, tall);
+  bricks(side);
+  const front = blank(PX, tall);
+  bricks(front);
+  const mouth = tall - 19;
+  fill(front, 'a', 5, mouth - 2, 14, 1);
+  fill(front, 'e', 6, mouth, 12, 15);
+  fill(front, 'd', 6, mouth, 12, 2);
+  fill(front, 'k', 7, mouth + 10, 10, 4);
+  fill(front, 'j', 8, mouth + 10, 8, 3);
+  fill(front, 'i', 10, mouth + 11, 4, 2);
+  return { top: { grid: top, palette }, side: { grid: side, palette }, front: { grid: front, palette } };
+}
+
+// ------------------------------------------------------------------ todo
+
+const T = (t: Terrain) => groundTones(TERRAIN_RGB[t] as RGB);
+const snow = TERRAIN_RGB[Terrain.Snow] as RGB;
+const SNOW = [lift(snow, 0.5), snow, scale(snow, 0.92), scale(snow, 0.84)].map(hex);
+const terrain: [Terrain, string, Art[]][] = [
+  [Terrain.Grass, 'Hierba', [0x6a1, 0x6a2, 0x6a3, 0x6a4].map((s) => grassTile(s, T(Terrain.Grass)))],
+  [Terrain.Forest, 'Bosque', [0xf01, 0xf02, 0xf03].map((s) => forestFloor(s, T(Terrain.Forest), ['#5e4a2c', '#3e301c']))],
+  [Terrain.Sand, 'Arena', [0x5a1, 0x5a2, 0x5a3].map((s) => grainTile(s, T(Terrain.Sand), { ripples: 2, grains: 14, patch: 0.15 }))],
+  [Terrain.Rock, 'Roca', [0x7c1, 0x7c2, 0x7c3].map((s) => ({ grid: stoneGrid(s), palette: pal(['abcd', T(Terrain.Rock)]) }))],
+  // La nieve, con sombras suaves: con las del resto del suelo se leia gris.
+  [Terrain.Snow, 'Nieve', [0x5e1, 0x5e2, 0x5e3].map((s) => grainTile(s, SNOW, { ripples: 1, grains: 8, patch: 0.2 }))],
+  [Terrain.Tundra, 'Tundra', [0x7d1, 0x7d2, 0x7d3].map((s) => tundraTile(s, T(Terrain.Tundra), ['#6f7448', '#585c38']))],
+  [Terrain.Water, 'Fondo del agua', [0xb01, 0xb02, 0xb03].map((s) => grainTile(s, T(Terrain.Water), { ripples: 2, grains: 8, patch: 0.2 }))],
+  [Terrain.DeepWater, 'Fondo del agua honda', [0xd01, 0xd02, 0xd03].map((s) => grainTile(s, T(Terrain.DeepWater), { ripples: 1, grains: 6, patch: 0.25 }))],
 ];
 
-const art = (name: string, doc: string, g: Grid) =>
-  `/** ${doc} */\nexport const ${name}: WorldArt = {\n  rows: [\n${rows(g).map((r) => `    '${r}',`).join('\n')}\n  ],\n};\n`;
+const look = (f: Feature) => LOOKS[f]!;
+// El roble y la mata de la pradera, con los colores de las referencias del
+// autor (2026-10-19); lo demas vivo, con `ramp` desde el suyo.
+const OAK_LEAF = ['#86b94a', '#4f8f38', '#2f6630', '#1c4026'];
+const OAK_BARK = ['#b5793f', '#8b552c', '#5f3820', '#3b2216'];
+const MEADOW_BUSH_LEAF = ['#9bd25a', '#58a63c', '#2f7a33', '#1d4a27'];
+const leafOf = (f: Feature) => (f === Feature.MeadowTree ? OAK_LEAF : f === Feature.MeadowPlant ? MEADOW_BUSH_LEAF : ramp(look(f).mid));
+const barkOf = (f: Feature) => (f === Feature.MeadowTree ? OAK_BARK : ramp(look(f).trunk));
+
+const trees: [Feature, string, TreeArt][] = [
+  [Feature.MeadowTree, 'Roble', broadleaf(Feature.MeadowTree, 0x0a7, leafOf(Feature.MeadowTree), barkOf(Feature.MeadowTree), false)],
+  [Feature.MeadowTreeRare, 'Cerezo', broadleaf(Feature.MeadowTreeRare, 0xc3e, leafOf(Feature.MeadowTreeRare), barkOf(Feature.MeadowTreeRare), true)],
+  [Feature.ForestTree, 'Picea comun', conifer(Feature.ForestTree, 0x91c, leafOf(Feature.ForestTree), barkOf(Feature.ForestTree))],
+  [Feature.ForestTreeRare, 'Alerce', conifer(Feature.ForestTreeRare, 0xa1e, leafOf(Feature.ForestTreeRare), barkOf(Feature.ForestTreeRare))],
+  [Feature.TundraTree, 'Picea negra', conifer(Feature.TundraTree, 0xb1a, leafOf(Feature.TundraTree), barkOf(Feature.TundraTree))],
+  [Feature.TundraTreeRare, 'Picea azul', conifer(Feature.TundraTreeRare, 0xb1e, leafOf(Feature.TundraTreeRare), barkOf(Feature.TundraTreeRare))],
+];
+
+const bushes: [Feature, string, Art][] = (
+  [
+    [Feature.MeadowPlant, 'Mata de la pradera', 0xb08],
+    [Feature.MeadowPlantRare, 'Mata de la pradera, rara', 0xb09],
+    [Feature.ForestPlant, 'Mata del bosque', 0xb0a],
+    [Feature.ForestPlantRare, 'Mata del bosque, rara', 0xb0b],
+    [Feature.TundraPlant, 'Mata de la tundra', 0xb0c],
+    [Feature.TundraPlantRare, 'Mata de la tundra, rara', 0xb0d],
+  ] as const
+).map(([f, name, seed]) => {
+  const fruit = look(f).fruit;
+  return [f, name, bush(seed, leafOf(f), fruit ? fruitTones(fruit) : null, OAK_BARK)];
+});
+
+const saplings: [Feature, string, Art][] = (
+  [
+    [Feature.MeadowTreeSapling, 'Brote de roble', Feature.MeadowTree, 'broadleaf'],
+    [Feature.ForestTreeSapling, 'Brote de picea', Feature.ForestTree, 'conifer'],
+    [Feature.TundraTreeSapling, 'Brote de picea negra', Feature.TundraTree, 'conifer'],
+    [Feature.MeadowPlantSapling, 'Brote de mata (pradera)', Feature.MeadowPlant, 'bush'],
+    [Feature.ForestPlantSapling, 'Brote de mata (bosque)', Feature.ForestPlant, 'bush'],
+    [Feature.TundraPlantSapling, 'Brote de mata (tundra)', Feature.TundraPlant, 'bush'],
+  ] as const
+).map(([f, name, adult, kind], i) => [f, name, sapling(0x5b0 + i, leafOf(adult), kind === 'conifer' ? barkOf(adult) : OAK_BARK, kind)]);
+
+/** La piedra de la roca y los minerales: la del suelo de roca, que se ve en el mundo. */
+const STONE_TONES = groundTones(hexToRgb(ROCK_FACES[1]!));
+const stones: [Feature, string, Art][] = [
+  [Feature.RockNode, 'Roca', stone(0x5a1, STONE_TONES, null)],
+  [Feature.CoalNode, 'Carbon', stone(0x5a2, STONE_TONES, ['#55555f', '#2b2b31', '#141418'])],
+  [Feature.IronNode, 'Hierro', stone(0x5a3, STONE_TONES, [...MINERAL_FACES[Feature.IronNode]!].reverse())],
+  [Feature.CopperNode, 'Cobre', stone(0x5a4, STONE_TONES, [...MINERAL_FACES[Feature.CopperNode]!].reverse())],
+];
+
+const bench = workbench();
+const oven = furnace();
+
+const byFeature = (list: [Feature, string, Art][], extra?: (a: Art) => string) =>
+  list.map(([f, name, a]) => `  // ${name}\n  [Feature.${Feature[f]}]: ${lit(a, extra ? extra(a) : '')},`).join('\n');
 
 const out = `/**
  * El pixelart del mundo (el autor, 2026-10-19; guia de arte, directriz 7): a
@@ -586,40 +710,88 @@ const out = `/**
  * **Lo genero \`tools/pixel-mundo.ts\` y se retoca aqui a mano**, pixel a pixel.
  * Volver a correr el generador pisa los retoques.
  *
- * Ronda 1, la muestra de estilo: hierba y roca con dos variantes, el roble, la
- * mata de la pradera y la roca de voxeles. Los colores son los que se VEN hoy
- * en el juego (*deduccion*): el suelo, su hexadecimal; los objetos, el de
- * \`palette.ts\` aclarado como lo aclara three.js al pintar.
+ * Cada dibujo lleva su paleta: una fila de caracteres por fila de pixeles, \`.\`
+ * transparente y cada letra un color. Los colores: el suelo, los que se ven
+ * hoy; el roble y la mata de la pradera, los de las referencias del autor; lo
+ * demas vivo, desde \`palette.ts\` con algo mas de saturacion, la luz hacia el
+ * amarillo y la sombra hacia el azul (*deduccion*).
  */
 
-/** Una rejilla: filas de caracteres, \`.\` transparente, cada letra un color de \`WORLD_PALETTE\`. */
+import { Feature, Terrain } from '@verdant/shared';
+
+/** Un dibujo: sus filas y su paleta. */
 export interface WorldArt {
   readonly rows: readonly string[];
+  readonly palette: Readonly<Record<string, string>>;
+}
+
+/**
+ * Una copa de arbol. El tronco desnudo se pinta debajo en el juego, porque
+ * tiene trece largos: sale de la copa por abajo en \`trunkX\`, con \`trunkW\`
+ * pixeles de grueso, y su corteza son las letras \`efgh\` de la paleta.
+ */
+export interface CrownArt extends WorldArt {
+  readonly trunkX: number;
+  readonly trunkW: number;
 }
 
 /** Pixeles de arte por cara de bloque (el autor). */
 export const WORLD_PX = ${PX};
 
-/** La paleta del mundo, por material, de luz a hondo. */
-export const WORLD_PALETTE: Readonly<Record<string, string>> = {
-${PALETTE.map(([k, c, doc]) => `  ${k}: '${rgbToHex(c)}', // ${doc}`).join('\n')}
+/** Las variantes de cada suelo: el juego elige una por casilla, con la semilla. */
+export const TERRAIN_TILES: Readonly<Record<Terrain, readonly WorldArt[]>> = {
+${terrain.map(([t, name, arts]) => `  // ${name}\n  [Terrain.${Terrain[t]}]: [\n${arts.map((a) => `  ${lit(a)},`).join('\n')}\n  ],`).join('\n')}
 };
 
-${art('GRASS_A', 'Hierba, variante 1.', grassTile(0x6a1))}
-${art('GRASS_B', 'Hierba, variante 2.', grassTile(0x6a2))}
-${art('GRASS_C', 'Hierba, variante 3.', grassTile(0x6a3))}
-${art('GRASS_D', 'Hierba, variante 4.', grassTile(0x6a4))}
-${art('ROCK_GROUND_A', 'Roca del suelo, variante 1.', rockTile(0x7c1, 'EFGH'))}
-${art('ROCK_GROUND_B', 'Roca del suelo, variante 2.', rockTile(0x7c2, 'EFGH'))}
-${art('OAK', 'El roble: una sola masa de hojas en cupula, del tamano de su especie, sobre su tronco medio.', oak())}
-${art('MEADOW_BUSH', 'La mata de la pradera, con sus bayas.', meadowBush())}
-${art('STONE', 'La piedra de la roca de voxeles: una tesela que casa consigo misma.', rockTile(0x5a1, 'abcd'))}
+/** La superficie del agua. */
+export const WATER_SURFACE: WorldArt = ${lit(waterSurface(groundTones([47, 110, 168])))};
+
+/** Las copas de los seis arboles. */
+export const CROWNS: Readonly<Partial<Record<Feature, CrownArt>>> = {
+${byFeature(trees, (a) => `\n    trunkX: ${(a as TreeArt).trunkX},\n    trunkW: ${(a as TreeArt).trunkW},`)}
+};
+
+/** Las seis matas, con sus frutos. */
+export const BUSHES: Readonly<Partial<Record<Feature, WorldArt>>> = {
+${byFeature(bushes)}
+};
+
+/** Los seis brotes. */
+export const SAPLINGS: Readonly<Partial<Record<Feature, WorldArt>>> = {
+${byFeature(saplings)}
+};
+
+/** La piedra de la roca y la de los tres minerales, con sus vetas: teselas que casan consigo mismas. */
+export const STONES: Readonly<Partial<Record<Feature, WorldArt>>> = {
+${byFeature(stones)}
+};
+
 /**
  * La forma de la roca de voxeles: [este, sur, arriba], en medios bloques. Abajo,
- * los cuatro; arriba, tres: le falta la esquina de delante a la derecha
- * (*deduccion*: el autor pidio «forma irregular, no un cubo perfecto»).
+ * los cuatro; arriba, tres: le falta una esquina (*deduccion*: el autor pidio
+ * «forma irregular, no un cubo perfecto»).
  */
 export const ROCK_SHAPE: readonly (readonly [number, number, number])[] = ${JSON.stringify(ROCK_SHAPE)};
+
+/** Los guijarros, vistos desde arriba. */
+export const PEBBLES: WorldArt = ${lit(pebbles(STONE_TONES))};
+
+/** El jugador, de frente. */
+export const PLAYER: WorldArt = ${lit(player())};
+
+/** Las caras de las estaciones, a 24 pixeles por bloque. */
+export const STATION_ART: Readonly<Partial<Record<Feature, { top: WorldArt; side: WorldArt; front: WorldArt }>>> = {
+  [Feature.Workbench]: {
+    top: ${lit(bench.top)},
+    side: ${lit(bench.side)},
+    front: ${lit(bench.front)},
+  },
+  [Feature.Furnace]: {
+    top: ${lit(oven.top)},
+    side: ${lit(oven.side)},
+    front: ${lit(oven.front)},
+  },
+};
 `;
 
 writeFileSync(new URL('../packages/client/src/world-art.ts', import.meta.url), out);

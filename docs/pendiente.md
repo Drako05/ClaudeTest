@@ -63,10 +63,32 @@ para otra tanda.» Sus respuestas (seran la directriz 7 de
    que se ven dentro son pequenas, con follaje de fondo o sin estar rodeadas
    del todo**. Y que el detalle sea «más profesional»: en otra referencia, un
    arbusto «noob» y uno «pro», **el pro da la ilusion de hojas sueltas**.
-   **Rehechos otra vez y ensenados; esperando al autor.**
+   Rehechos otra vez. El autor: las ramas «aparecen no tener textura», lo que
+   cubre la union de las ramas parece «musgo más que hojas», y las hojas
+   «tienen cierta forma, no son solo líneas de color»; los tallos de la mata,
+   planos. Y: **«Hagamos un último intento y aplícalo tal cual como te salga.
+   No vamos a gastar más tiempo en eso, ya habrán otras tandas para
+   perfeccionar los dibujos.»** Hecho el ultimo intento (corteza en ramas y
+   tallos, la horquilla bajo la sombra de la masa principal, hojas con forma
+   en abanicos): **la ronda 1 queda cerrada con eso**.
 2. El resto en la hoja: los 8 terrenos, el agua (animada o no: el autor, al
    verla), las 6 especies, matas, brotes, rocas y minerales, guijarros, el
-   jugador y las estaciones a 24 px.
+   jugador y las estaciones a 24 px. **Hecha y ensenada el 2026-10-19;
+   esperando al autor.** Lo nuevo:
+   - el pincel se mudo a `client/src/pixel-paint.ts` (puro), porque el juego
+     pinta con `barkTrunk` el tronco desnudo de cada arbol (13 largos);
+     `world-sprites.ts` compone copa y tronco (`treeArt`) y pasa un dibujo a
+     lienzo (`artCanvas`);
+   - cada dibujo lleva **su paleta**, como los iconos: con todos los
+     materiales, las letras de una paleta comun no alcanzan;
+   - las copas de conifera son **pisos** (`Mass.tier`): triangulos de puntas
+     caidas y borde dentado, cada uno sobre el de debajo;
+   - los minerales son la **piedra de la roca con vetas** de su mineral, no
+     una roca entera de su color (*deduccion*);
+   - los colores de lo vivo salen de `palette.ts` con algo mas de saturacion,
+     la luz hacia el amarillo y la sombra hacia el azul (*deduccion*); la
+     nieve, con sombras mas suaves que el resto del suelo;
+   - el agua, **quieta** de momento: si se anima, lo decide el autor.
 3. Al juego: un ayudante de rejilla a textura en sRGB, el terreno con UV y un
    atlas, los objetos a 24 px exactos (sin la cadena `BASE`/`ARBOL`/`DETAIL`)
    y del mismo tamano en el mundo, rocas de voxeles, estaciones con `PX = 24`.
@@ -97,6 +119,9 @@ saca de formas y los escribe en `packages/client/src/world-art.ts`, donde
   las masas; dentro del follaje solo se ven donde la sombra es honda.
 - El tronco, en placas de corteza con las raices abiertas. La mata, de hojas
   sueltas, con bayas de 2 × 2 y tres tallos.
+- **Las hojas tienen forma** (`LEAVES` en el generador): tres dibujos de 3-4
+  pixeles (de pie, a la izquierda, a la derecha), con canto de luz, cuerpo y
+  sombra, en abanicos de dos o tres hacia fuera de su masa.
 - **Sus colores salen de las referencias**, no de lo que se ve hoy: verdes
   mas hondos y saturados, corteza rojiza. Las referencias llevan **contorno
   oscuro**; los dibujos no, porque el autor eligio «sin contorno».
