@@ -514,6 +514,27 @@ console.log(`  barra deslizable: ${rail0.shown ? 'se ve' : 'no se ve'}, deslizad
 check(rail0.shown && rail0.max > 0, 'con la bolsa la rejilla no desborda o la barra no se ve');
 check(rail1.top > rail0.top + 10, 'arrastrar el mando con el dedo no deslizo la rejilla');
 check(afterRail.itemsSent.move === moves0 && afterRail.itemsSent.discard === discards0, 'arrastrar el mando movio o tiro una casilla');
+// Cada casilla responde solo en su centro de 48 de 60 (el autor, 2026-10-19):
+// un dedo que empieza en el anillo, a 3 px del borde, desliza la rejilla y no
+// arrastra la casilla.
+const ring = await page.evaluate(() => {
+  const g = document.getElementById('invGrid');
+  g.scrollTop = 0;
+  const c = g.children[5].getBoundingClientRect();
+  return { x: c.left + 3, y: c.top + c.height / 2 };
+});
+await page.waitForTimeout(150);
+const ringBefore = await probe();
+await real('touchStart', [ring]);
+for (let i = 1; i <= 12; i++) await real('touchMove', [{ x: ring.x, y: ring.y - i * 10 }]);
+await real('touchEnd', []);
+await page.waitForTimeout(400);
+const ringScroll = await page.evaluate(() => document.getElementById('invGrid').scrollTop);
+const ringAfter = await probe();
+console.log(`  dedo en el anillo: deslizado 0 -> ${ringScroll}, movimientos ${ringBefore.itemsSent.move} -> ${ringAfter.itemsSent.move}`);
+check(ringScroll > 10, 'un dedo en el anillo de una casilla no deslizo la rejilla');
+check(ringAfter.itemsSent.move === ringBefore.itemsSent.move && ringAfter.itemsSent.discard === ringBefore.itemsSent.discard,
+  'un dedo en el anillo de una casilla la arrastro o la tiro');
 // Elegir una casilla que no se ve entera desliza la rejilla hasta que se vea
 // (el autor, 2026-10-19): con la primera fila cortada por arriba, tocar lo que
 // asoma de la casilla 1 la deja entera a la vista.

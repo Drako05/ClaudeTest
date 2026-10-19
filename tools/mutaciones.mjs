@@ -11,101 +11,51 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: objetos que caducan, el inventario de 5 columnas y el menu de una
- * casilla (2026-10-19).
+ * Ronda: los ajustes tras jugar el inventario de 5 (2026-10-19): esquinas,
+ * cerrar los avisos tocando fuera y el centro de 48 de las casillas del movil.
  */
-const DROPS = 'packages/sim/src/systems/drops.ts';
-const INV = 'packages/sim/src/inventory.ts';
-const MENU = 'packages/client/src/item-menu.ts';
 const UI = 'packages/client/src/inventory-ui.ts';
+const HTML = 'packages/client/index.html';
 
 export default [
-  // Los objetos no caducan.
+  // Los botones del menu y de los avisos, sin esquinas.
   {
-    nombre: 'tanda5: no caducar',
-    fichero: DROPS,
-    de: '    if (tick - d.born >= DROP_LIFE_TICKS) {',
-    a: '    if (false) {',
-    prueba: 'test:tests/drops.test.ts',
-  },
-  // Al fundirse se queda el reloj del viejo.
-  {
-    nombre: 'tanda5: fundir con el reloj viejo',
-    fichero: DROPS,
-    de: '    o.born = Math.max(o.born, d.born);',
+    nombre: 'tanda5b: sin esquinas',
+    fichero: HTML,
+    de: '      #itemMenu .btn, .invAsk .btn { border-radius: 8px; }',
     a: '',
-    prueba: 'test:tests/drops.test.ts',
-  },
-  // Dividir deja separar la pila entera, o mas.
-  {
-    nombre: 'tanda5: dividir sin cenir',
-    fichero: INV,
-    de: '    if (!Number.isInteger(n) || n < 1 || n >= count) return;',
-    a: '    if (n < 1) return;',
-    prueba: 'test:tests/inventory-actions.test.ts',
-  },
-  // Usar come de la ultima casilla con el objeto, no de la elegida.
-  {
-    nombre: 'tanda5: comer de la ultima',
-    fichero: 'packages/sim/src/systems/gathering.ts',
-    de: '  if (!inventory.takeFrom(slot, BERRIES_PER_MEAL)) return false;',
-    a: '  inventory.remove(item, BERRIES_PER_MEAL);',
-    prueba: 'test:tests/inventory-actions.test.ts',
-  },
-  // El menu sale siempre a la derecha.
-  {
-    nombre: 'tanda5: menu siempre a la derecha',
-    fichero: MENU,
-    de: "  const side = slot % GRID_COLUMNS < 2 ? 'right' : 'left';",
-    a: "  const side = 'right';",
-    prueba: 'test:tests/item-menu.test.ts',
-  },
-  // En la primera fila visible no se alinea con el borde de arriba.
-  {
-    nombre: 'tanda5: sin alinear arriba',
-    fichero: MENU,
-    de: "  if (firstRow) align = 'top';",
-    a: "  if (false) align = 'top';",
-    prueba: 'test:tests/item-menu.test.ts',
-  },
-  // Mantener la casilla no abre el menu (a efectos de la prueba, nunca).
-  {
-    nombre: 'tanda5: mantener sin abrir',
-    fichero: UI,
-    de: '        }, MENU_HOLD_MS);',
-    a: '        }, MENU_HOLD_MS * 100);',
-    prueba: 'gestures',
-  },
-  // El toque que cierra el menu se lo traga: no elige la otra casilla.
-  {
-    nombre: 'tanda5: tragar el toque de fuera',
-    fichero: UI,
-    de: '        if (t && this.menu.contains(t)) return;\n        this.closeMenu();',
-    a: '        if (t && this.menu.contains(t)) return;\n        this.closeMenu();\n        e.stopImmediatePropagation();',
-    prueba: 'gestures',
-  },
-  // Elegir una casilla cortada no desliza la rejilla.
-  {
-    nombre: 'tanda5: no desplazar',
-    fichero: UI,
-    de: '      this.grid.scrollTop += scrollToShow(cell.getBoundingClientRect(), this.gridView());',
-    a: '',
-    prueba: 'gestures',
-  },
-  // Destruir no pide confirmacion: destruye en el acto.
-  {
-    nombre: 'tanda5: destruir sin confirmar',
-    fichero: UI,
-    de: '      this.destroyAsk.hidden = false;',
-    a: '      this.pending.destroy = m.slot;',
     prueba: 'smoke:desktop',
   },
-  // OTROS vuelve arriba a la izquierda.
+  // Tocar fuera no cierra los avisos.
   {
-    nombre: 'tanda5: OTROS donde estaba',
-    fichero: 'packages/client/index.html',
-    de: '      #others { right: calc(12px + env(safe-area-inset-right)); top: calc(74px + env(safe-area-inset-top)); }',
-    a: '      #others { left: calc(12px + env(safe-area-inset-left)); }',
+    nombre: 'tanda5b: avisos sin cerrar fuera',
+    fichero: UI,
+    de: '        if (t && (this.splitAsk.contains(t) || this.destroyAsk.contains(t))) return;\n        this.closeAsk();',
+    a: '        if (t && (this.splitAsk.contains(t) || this.destroyAsk.contains(t))) return;',
+    prueba: 'smoke:desktop',
+  },
+  // Toda la casilla responde al dedo: el anillo ya no desliza.
+  {
+    nombre: 'tanda5b: area de toque entera',
+    fichero: 'packages/client/src/item-menu.ts',
+    de: 'export const TOUCH_CORE = 48;',
+    a: 'export const TOUCH_CORE = 60;',
+    prueba: 'gestures',
+  },
+  // La barra, pegada a la rejilla como antes.
+  {
+    nombre: 'tanda5b: barra pegada',
+    fichero: HTML,
+    de: '        left: calc(100% + var(--gridgap) / 2 - var(--railw) / 2);',
+    a: '',
+    prueba: 'smoke:mobile',
+  },
+  // Las casillas de la rejilla del movil, encogidas como antes.
+  {
+    nombre: 'tanda5b: casillas encogidas',
+    fichero: HTML,
+    de: '      body.touch-active #invGrid .slot { width: var(--eq); height: var(--eq); }',
+    a: '      body.touch-active #invGrid .slot { width: 54px; height: 54px; }',
     prueba: 'smoke:mobile',
   },
 ];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Resource } from '@verdant/shared';
-import { clampSplit, optionsFor, placeMenu, scrollToShow, type Box } from '../packages/client/src/item-menu.js';
+import { clampSplit, inCore, optionsFor, placeMenu, scrollToShow, type Box } from '../packages/client/src/item-menu.js';
 
 /**
  * El menu de una casilla (el autor, 2026-10-19): que opciones salen y donde.
@@ -81,6 +81,18 @@ describe('Desplazar hasta la casilla elegida', () => {
     // La quinta fila, cortada por abajo.
     const low = cellAt(20);
     expect(scrollToShow(low, view)).toBe(low.bottom - view.bottom);
+  });
+});
+
+describe('El centro de la casilla, en el movil', () => {
+  it('responde un cuadrado centrado de 48 de 60 (el autor): el anillo de 6 px, no', () => {
+    const cell: Box = { left: 0, top: 0, right: 60, bottom: 60 };
+    expect(inCore(30, 30, cell, 48)).toBe(true);
+    expect(inCore(6, 6, cell, 48)).toBe(true);
+    expect(inCore(54, 30, cell, 48)).toBe(true);
+    expect(inCore(5, 30, cell, 48)).toBe(false);
+    expect(inCore(30, 55, cell, 48)).toBe(false);
+    expect(inCore(3, 3, cell, 48)).toBe(false);
   });
 });
 

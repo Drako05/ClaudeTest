@@ -1009,6 +1009,9 @@ async function desktopPass(browser, baseUrl) {
     check(right ? menuR.left >= cellR.right && menu.side === 'right' : menuR.right <= cellR.left && menu.side === 'left',
       `el menu no sale del lado de su columna: ${JSON.stringify({ menu, cellR, menuR })}`);
     await page.screenshot({ path: join(SHOTS, '3d-01c-menu.png') });
+    // Con las esquinas de los botones con texto (el autor, 2026-10-19).
+    const radius = await page.evaluate(() => getComputedStyle(document.querySelector('#itemMenu .btn')).borderTopLeftRadius);
+    check(radius === '8px', `los botones del menu no tienen las esquinas redondeadas: ${radius}`);
     // Un clic en otra casilla cierra el menu y la elige: no se lo traga.
     await page.click(`#invGrid .slot:nth-child(${empty + 1})`);
     await page.waitForTimeout(200);
@@ -1033,6 +1036,28 @@ async function desktopPass(browser, baseUrl) {
     check(qty0 === '0' && qty5 === String(n), `el selector de Dividir no empieza en 0 o +5 no suma: ${qty0}, ${qty5}`);
     check(split[berrySlot].count === before[berrySlot].count - n && split[free].item === 2 && split[free].count === n,
       `Dividir no separo ${n} a la primera casilla libre: ${JSON.stringify([split[berrySlot], split[free]])}`);
+    // Tocar fuera cierra los dos avisos sin dividir ni destruir (el autor,
+    // 2026-10-19).
+    const outside = async (option, box) => {
+      await page.click(`#invGrid .slot:nth-child(${free + 1})`);
+      await page.waitForTimeout(150);
+      await page.click(`#itemMenu [data-option="${option}"]`);
+      await page.waitForTimeout(150);
+      const open = await page.isVisible(box);
+      await page.click('.invPage[data-page="personaje"] h2');
+      await elapse(page, 200);
+      return { open, after: await page.isVisible(box), asking: (await state(page)).itemMenu.asking };
+    };
+    const splitOut = await outside('split', '#splitAsk');
+    const destroyOut = await outside('destroy', '#destroyAsk');
+    const untouched = (await state(page)).slots;
+    console.log(`  tocar fuera: Dividir ${JSON.stringify(splitOut)}, Destruir ${JSON.stringify(destroyOut)}`);
+    check(splitOut.open && !splitOut.after && destroyOut.open && !destroyOut.after && destroyOut.asking === null,
+      `tocar fuera no cerro el selector de Dividir o la confirmacion de Destruir: ${JSON.stringify([splitOut, destroyOut])}`);
+    check(untouched[free].count === n && untouched[berrySlot].count === split[berrySlot].count,
+      `tocar fuera de un aviso dividio o destruyo: ${JSON.stringify([untouched[berrySlot], untouched[free]])}`);
+    const radiusAsk = await page.evaluate(() => getComputedStyle(document.querySelector('#destroyYes')).borderTopLeftRadius);
+    check(radiusAsk === '8px', `los botones de los avisos no tienen las esquinas redondeadas: ${radiusAsk}`);
     // Destruir: pide confirmar, y hasta entonces no borra nada.
     await page.click(`#invGrid .slot:nth-child(${free + 1})`);
     await page.waitForTimeout(150);
@@ -2309,7 +2334,7 @@ async function mobilePass(browser, baseUrl) {
   check(pages.join() === 'inventario,recetas,personaje,inventario', `las pestanas no recorren las paginas: ${pages}`);
   // La barra deslizable (pedido del autor, 2026-09-30): se ve siempre que la
   // rejilla tenga mas casillas de las que caben, y solo entonces. Aqui caben;
-  // en un telefono mas bajo (375x600) no, y la barra sale al lado.
+  // en un telefono mas bajo (375x640) no, y la barra sale al lado.
   const railOf = () => page.evaluate(() => {
     const g = document.getElementById('invGrid');
     const rail = g.parentElement.querySelector('.rail');
@@ -2322,21 +2347,28 @@ async function mobilePass(browser, baseUrl) {
     };
   });
   const railTall = await railOf();
-  // Un telefono bajo: desde el 2026-10-19 las 15 casillas caben en 375x640,
-  // asi que se mira en 375x600, donde no caben.
-  await page.setViewportSize({ width: 375, height: 600 });
+  await page.setViewportSize({ width: 375, height: 640 });
   await page.waitForTimeout(300);
   const railShort = await railOf();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(300);
   console.log(`  barra deslizable: 390x844 ${railTall.overflows ? 'desborda' : 'cabe'} (${railTall.shown ? 'se ve' : 'no se ve'}), ` +
-    `375x600 ${railShort.overflows ? 'desborda' : 'cabe'} (${railShort.shown ? 'se ve' : 'no se ve'}, mando ${railShort.thumb.height.toFixed(0)} de ${railShort.rail.height.toFixed(0)})`);
+    `375x640 ${railShort.overflows ? 'desborda' : 'cabe'} (${railShort.shown ? 'se ve' : 'no se ve'}, mando ${railShort.thumb.height.toFixed(0)} de ${railShort.rail.height.toFixed(0)})`);
   check(!railTall.overflows && !railTall.shown, `con las casillas a la vista, la barra no deberia verse: ${JSON.stringify(railTall)}`);
   check(railShort.overflows && railShort.shown, `con mas casillas de las que caben, no se ve la barra: ${JSON.stringify(railShort)}`);
   check(railShort.thumb.height > 0 && railShort.thumb.height < railShort.rail.height - 1,
     `el mando no mide la parte que se ve: ${railShort.thumb.height} de ${railShort.rail.height}`);
   check(railShort.rail.left >= railShort.grid.right && railShort.rail.right <= railShort.panel.right,
     `la barra no va al lado de la rejilla, dentro del panel: ${JSON.stringify(railShort)}`);
+  // Centrada en el hueco entre la ultima columna y el borde del panel (el
+  // autor, 2026-10-19), y las casillas del tamano de las de PERSONAJE.
+  const railMid = (railTall.rail.left + railTall.rail.right) / 2;
+  const gapMid = (railTall.grid.right + railTall.panel.right) / 2;
+  // PERSONAJE esta en otra pagina, oculta: en 390 sus casillas miden 60.
+  const cellW = await page.evaluate(() => document.querySelector('#invGrid .slot').getBoundingClientRect().width);
+  console.log(`  rejilla del movil: casillas ${cellW}, barra en ${railMid.toFixed(1)}, hueco en ${gapMid.toFixed(1)}`);
+  check(Math.abs(railMid - gapMid) <= 1, `la barra no va centrada en el hueco: ${railMid} / ${gapMid}`);
+  check(cellW === 60, `las casillas de la rejilla no miden lo de PERSONAJE (60): ${cellW}`);
   await page.tap('#invOpen');
   check(!(await page.isVisible('#invPanel')), 'tocar otra vez no cerro el inventario');
 

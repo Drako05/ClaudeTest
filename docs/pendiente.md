@@ -66,6 +66,18 @@ Las deducciones, en `docs/juicio.md`: el estandar de botones en vez de las
 pildoras blancas de la foto, el menu solo en la rejilla, el tope de Dividir,
 el registro de objetos a la izquierda de MAS y lo demas.
 
+En `main` tras las dos tandas en verde en `pruebas` (`d6ca9d7`). **El autor lo
+jugo** (2026-10-19): bien, salvo tres cosas. Pidio redondear las esquinas de
+los botones nuevos; que tocar fuera cierre el selector de Dividir (y, en su
+respuesta, la confirmacion de Destruir, sin destruir); y que las casillas del
+movil no encojan, con el mismo espacio que PERSONAJE, respondiendo al dedo
+solo en su centro de 48 px para que el resto deslice la rejilla, y la barra
+deslizable centrada en el hueco entre la ultima columna y el borde del panel.
+**Hecho**: esquinas de 8 px, cerrar los avisos tocando fuera, casillas de 60
+con `TOUCH_CORE` (el anillo desliza la rejilla por geometria: dejarlo sin
+eventos no servia, por el ajuste de toque del navegador), la barra en el hueco
+y el panel del movil a 8 px de cada lado.
+
 **Falta**: la CI y `main`, que el autor lo juegue, y la auditoria de la tanda.
 
 ---

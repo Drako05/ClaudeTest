@@ -11,6 +11,12 @@ import { equipOf, foodValue, stackMax, type Resource } from '@verdant/shared';
 export const MENU_HOLD_MS = 300;
 /** Columnas de la rejilla (el autor, 2026-10-19). */
 export const GRID_COLUMNS = 5;
+/**
+ * En el movil, la parte de cada casilla de la rejilla que responde al dedo: un
+ * cuadrado centrado de 48 px de 60 (el autor, 2026-10-19). El anillo de
+ * alrededor desliza la rejilla.
+ */
+export const TOUCH_CORE = 48;
 /** Lo que separa el menu de la casilla, en px. **Deduccion mia.** */
 export const MENU_GAP = 6;
 
@@ -91,6 +97,13 @@ export function scrollToShow(cell: Box, view: Box): number {
   if (cell.top < view.top) return cell.top - view.top;
   if (cell.bottom > view.bottom) return cell.bottom - view.bottom;
   return 0;
+}
+
+/** Si un punto cae en el cuadrado centrado de lado `core` de una casilla (`TOUCH_CORE`). */
+export function inCore(x: number, y: number, cell: Box, core: number): boolean {
+  const cx = (cell.left + cell.right) / 2;
+  const cy = (cell.top + cell.bottom) / 2;
+  return Math.abs(x - cx) <= core / 2 && Math.abs(y - cy) <= core / 2;
 }
 
 /** La cantidad de Dividir, ceñida entre 0 y la pila menos 1 (*deduccion*: entera seria moverla). */
