@@ -42,19 +42,9 @@ import { impactLook, MAX_PARTICLES, progressOf } from './effects.js';
 
 /** Opacidad de las esquirlas de golpe. **Propuesta mia.** */
 const CHIP_OPACITY = 0.45;
+import { WORLD_PX } from './world-art.js';
 import type { World } from '@verdant/sim';
 
-/** Pixeles por casilla del arte isometrico, de donde vienen los tamanos. */
-const PX_PER_TILE = 32;
-
-/**
- * Lo que crecieron los objetos del mundo (`billboards.ts`, `BASE`).
- *
- * Los escombros van con ellos: son astillas de lo que se derriba, asi que junto
- * a un personaje 2,3 veces mas grande y sin este factor pasarian de chinas a
- * polvo. No es un numero nuevo, es el mismo.
- */
-const OBJECT_SCALE = 2.3;
 
 /**
  * Cuantos barridos pueden verse a la vez.
@@ -283,7 +273,8 @@ export class EffectsView {
       // La misma curva con la que el isometrico los desvanece, aplicada al
       // tamano: se apagan encogiendo. Ver la nota de cabecera.
       const fade = Math.min(1, (1 - progressOf(p)) * 2.2);
-      const side = (p.size / PX_PER_TILE) * OBJECT_SCALE * fade;
+      // Su tamano, en pixeles de arte: los mismos 24 por bloque que el mundo.
+      const side = (p.size / WORLD_PX) * fade;
       this.scratch.position.set(p.x, p.z + side / 2, p.y);
       this.scratch.scale.set(side, side, side);
       this.scratch.rotation.set(0, 0, 0);

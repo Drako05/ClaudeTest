@@ -126,7 +126,7 @@ export interface Particle {
   vx: number;
   vy: number;
   vz: number;
-  /** Lado del cuadrado, en pixeles de pantalla. */
+  /** Lado del cubo, en pixeles de arte: 24 por bloque, como todo el mundo (`WORLD_PX`). */
   size: number;
   color: number;
   /** Segundos que lleva vivo y los que dura en total. */
@@ -278,7 +278,9 @@ export class Effects {
         vy: Math.sin(angle) * speed,
         vz: RISE * (0.6 + random() * 0.8),
         // Pequenos pero visibles: por debajo de esto se pierden sobre la hierba.
-        size: 2.4 + random() * 4.6,
+        // En pixeles enteros, como el resto del pixelart (de 4 a 12, lo que
+        // median antes: 0,17 a 0,5 bloques).
+        size: 4 + Math.floor(random() * 9),
         color: colors[Math.floor(random() * colors.length) % colors.length],
         age: 0,
         ttl: DEBRIS_SECONDS * (0.7 + random() * 0.6),
@@ -310,7 +312,7 @@ export class Effects {
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         vz: RISE * (0.3 + random() * 0.5),
-        size: 1 + random() * 1.5,
+        size: 2 + Math.floor(random() * 2),
         color: desaturate(colors[Math.floor(random() * colors.length) % colors.length], CHIP_SATURATION),
         age: 0,
         ttl: DEBRIS_SECONDS * (0.45 + random() * 0.3),

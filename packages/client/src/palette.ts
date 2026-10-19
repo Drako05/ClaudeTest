@@ -1,16 +1,33 @@
 /**
  * Los colores de cada especie, en un sitio y sin DOM.
  *
- * Estaban junto al codigo que los pinta, hoy `art.ts`. Salieron aqui
- * porque ahora hay un segundo consumidor: los escombros que saltan al recolectar
- * algo tienen que ser **los colores de ese objeto**, no unos parecidos. Con la
- * tabla compartida no pueden separarse; con una copia, se separarian al primer
- * retoque.
+ * Desde el pixelart del mundo (2026-10-19) son **los colores de partida** del
+ * generador (`tools/pixel-mundo.ts`), que saca de cada uno los cuatro tonos de
+ * su dibujo. Lo que se ve son esos dibujos (`world-art.ts`), y de ellos salen
+ * tambien los escombros (`debrisPalette`): las astillas de algo tienen que ser
+ * **los colores de ese objeto**, no unos parecidos.
  *
  * Sin dependencias del navegador, para poder comprobarlo en Node.
  */
 
-import { Feature } from '@verdant/shared';
+import { Feature, Terrain } from '@verdant/shared';
+import { BUSHES, CROWNS, PEBBLES, STATION_ART, STONES, type WorldArt } from './world-art.js';
+
+/**
+ * El color de cada suelo. De el saca el generador los cuatro tonos de sus
+ * teselas, con el de partida como base: el suelo se ve con los colores de
+ * siempre, ahora en pixelart.
+ */
+export const TERRAIN_RGB: Record<Terrain, [number, number, number]> = {
+  [Terrain.DeepWater]: [22, 48, 82],
+  [Terrain.Water]: [41, 96, 148],
+  [Terrain.Sand]: [214, 197, 142],
+  [Terrain.Grass]: [88, 140, 72],
+  [Terrain.Forest]: [56, 100, 52],
+  [Terrain.Rock]: [116, 116, 124],
+  [Terrain.Snow]: [226, 234, 242],
+  [Terrain.Tundra]: [150, 156, 130],
+};
 
 /** Paleta de una especie. Basta esto para distinguirlas de un vistazo. */
 export interface SpeciesLook {
@@ -95,26 +112,23 @@ export const STATION_FACES: Partial<Record<Feature, readonly string[]>> = {
   [Feature.Furnace]: ['#48484f', '#6c6c75', '#8d8d97', '#ff8a2a'],
 };
 
-function toHex(color: string): number {
-  return Number.parseInt(color.slice(1), 16);
+/** Los colores de unos dibujos, sin repetir, como numeros. */
+function colorsOf(...arts: readonly WorldArt[]): number[] {
+  const all = new Set(arts.flatMap((art) => Object.values(art.palette)));
+  return [...all].map((color) => Number.parseInt(color.slice(1), 16));
 }
 
 /**
- * Colores que sueltan los escombros de una feature al ser derribada.
- *
- * El tronco va aparte de la copa porque al talar un arbol saltan las dos cosas,
- * y el fruto entra cuando la especie lo tiene: son los rojos y amarillos que
- * dan variedad al estallido de un arbusto.
+ * Colores que sueltan los escombros de una feature al ser derribada: **los de
+ * su dibujo** (`world-art.ts`), todos. En un arbol saltan la copa y la corteza;
+ * en una mata, tambien sus frutos, que son los rojos y amarillos que dan
+ * variedad al estallido; en un mineral, su piedra y sus vetas. Los brotes no
+ * se recolectan y no sueltan nada.
  */
 export function debrisPalette(feature: Feature): number[] {
-  if (feature === Feature.RockNode || feature === Feature.Pebbles) return ROCK_FACES.map(toHex);
-  const mineral = MINERAL_FACES[feature] ?? STATION_FACES[feature];
-  if (mineral) return mineral.map(toHex);
-
-  const look = LOOKS[feature];
-  if (!look) return [];
-
-  const colors = [look.dark, look.mid, look.light, look.trunk];
-  if (look.fruit) colors.push(look.fruit);
-  return colors.map(toHex);
+  if (feature === Feature.Pebbles) return colorsOf(PEBBLES);
+  const art = STONES[feature] ?? CROWNS[feature] ?? BUSHES[feature];
+  if (art) return colorsOf(art);
+  const station = STATION_ART[feature];
+  return station ? colorsOf(station.top, station.side, station.front) : [];
 }

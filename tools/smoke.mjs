@@ -1674,8 +1674,11 @@ async function resourcesPass(browser, baseUrl) {
     if (oreDropped(mined)) mined = await collect(page);
     await shot(page, '3d-03-montana.png');
     const pickNow = mined.slots.findIndex((s) => s.item === 11);
-    console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickNow]?.wear}, esquirlas ${mined.chipsDrawn}`);
+    console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickNow]?.wear}, esquirlas ${mined.chipsDrawn}, rocas en voxeles ${mined.rocksDrawn}`);
     check(mined.chipsDrawn > 0, 'golpear sin romper no solto esquirlas');
+    // En la montana, las rocas y los minerales son voxeles (el autor,
+    // 2026-10-19), no aspas: alguno se ha puesto.
+    check(mined.rocksDrawn > 0, 'en la montana no se puso ni una roca de voxeles');
     if (iron) check(ores(mined) === 0, 'el hierro salio con el pico de piedra');
     else check(ores(mined) > 0, `con pico no se saco ningun mineral: ${JSON.stringify(mined.inventory)}`);
     check(iron || (mined.slots[pickNow]?.wear ?? 40) < 40, 'el pico no se desgasto al minar');

@@ -95,37 +95,39 @@ export const ITEM_PALETTE: Readonly<Record<string, string>> = {
   6: '#f0d9a0', // luz
   7: '#cfae68', // base
   8: '#9f7f3e', // sombra
-  // Las estaciones: los colores de su modelo 3D (`STATION_FACES`, y los
-  // fijos de `stations-view.ts`), con la luz de cada cara horneada (la tapa
-  // entera, el frente al 95 % y el costado al 74 %) y **pasados a sRGB como
-  // los pinta three.js**, que trata la textura como lineal: es el color que se
-  // mide en pantalla (el autor vio el icono mas oscuro que el bloque).
+  // Las estaciones: los colores de su modelo 3D (sus caras en pixelart,
+  // `STATION_ART` de `world-art.ts`, desde el 2026-10-19), con la luz de cada
+  // cara horneada (la tapa entera, el frente al 95 % y el costado al 74 %)
+  // **como la aplica three.js**: en lineal, sobre la textura tomada por sRGB.
+  // Es el color que se mide en pantalla (el autor vio una vez el icono mas
+  // oscuro que el bloque). Cada uno sustituye, con su mismo papel y su misma
+  // luz, al que se saco de las caras de antes.
   // La mesa de trabajo
-  '!': '#a08360',
-  '@': '#c2a078',
-  $: '#d8b88d',
-  '%': '#d4b48a',
-  '&': '#bda17b',
-  '*': '#be9d75',
-  '+': '#aa8c68',
-  '=': '#6e5b45',
-  '?': '#62513d',
-  '~': '#e0e2e5',
-  '^': '#9d805e',
-  ':': '#8c7253',
+  '!': '#451b14',
+  '@': '#955925',
+  $: '#ca9832',
+  '%': '#c59431',
+  '&': '#b1842a',
+  '*': '#925724',
+  '+': '#824d1f',
+  '=': '#23160b',
+  '?': '#1e1309',
+  '~': '#b4bac2',
+  '^': '#431a13',
+  ':': '#3b1610',
   // El horno
-  ';': '#aeaeb4',
-  ',': '#919197',
-  _: '#5f5f66',
-  '<': '#ffc271',
-  '>': '#8d8d94',
-  '/': '#aaaab0',
-  '|': '#98989d',
-  '(': '#7e7e84',
-  ')': '#c0c0c6',
-  '{': '#54545b',
-  '}': '#f9e5a9',
-  '[': '#f9be6e',
+  ';': '#6b6b76',
+  ',': '#3d3e43',
+  _: '#16161a',
+  '<': '#ff8a2a',
+  '>': '#3b3c41',
+  '/': '#686873',
+  '|': '#5d5d66',
+  '(': '#343539',
+  ')': '#898b94',
+  '{': '#151519',
+  '}': '#f9ce67',
+  '[': '#f98729',
 };
 
 const ROWS: Record<Resource, readonly string[]> = {
