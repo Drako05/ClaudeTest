@@ -159,6 +159,9 @@ que este proyecto ya se comio una vez:
 - **Una captura por ronda, no cuatro.** Cada PNG son 1.200-1.800 tokens y se
   queda en contexto reenviandose el resto del turno. Mira la que decide; las
   demas, solo si la comparacion lo exige de verdad.
+- **Un fichero de mas de ~15 KB que no sea el documento de la parte que se
+  toca se busca con `grep` o se lee por tramos, no entero.** Leer entero es el
+  defecto de la herramienta, y lo leido viaja en el resto del turno.
 
 Y lo que no es cosa del agente: la sesion crece sin parar, asi que el corte
 natural es **empezar sesion nueva al cerrar cada tanda**, y `/usage` desglosa a

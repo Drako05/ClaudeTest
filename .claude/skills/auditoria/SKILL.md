@@ -174,10 +174,17 @@ verificacion no encontraron nada que la primera no viera.
 
 ## Ficheros de la skill
 
+Como se lee cada uno, que cada lectura entera viaja en el resto del turno:
+
 - `references/lentes.md`: el metodo de cada lente y sus patrones conocidos.
+  **Se lee entero** en la fase 2: es el metodo. Si pasa de unos 25 KB, se
+  parte en un fichero por lente y este queda como indice.
 - `references/escapes.md`: el registro de escapes; es la historia de por que
-  la skill es como es.
-- `references/retirados.md`: los terminos que el escaner vigila.
+  la skill es como es. **No se lee entero**: sus metodos ya viven en las
+  lentes. Para buscar, `grep -n '^### '` da la lista de titulos y luego se lee
+  la entrada que toca; para anadir, basta el final y el numero siguiente.
+- `references/retirados.md`: los terminos que el escaner vigila. **No se lee
+  entero**: se busca con `grep` y se anade al final de su seccion.
 - `references/ignorar.md`: los avisos ya juzgados como correctos, con ambito.
 - `scripts/escaner.mjs`: el barrido mecanico y su autoprueba. Es Node puro,
   sin dependencias, para que corra en un contenedor recien creado.

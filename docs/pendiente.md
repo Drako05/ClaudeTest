@@ -358,6 +358,11 @@ importa con fotogramas largos.
 - La estetica del HUD, la fauna, las especies de costa, el subsuelo, y la
   construccion y destruccion del terreno. (El encuadre de las cimas era cosa
   del isometrico y se fue con el; el crafteo ya esta en marcha.)
+- **Titulos internos en los documentos grandes** (el autor, 2026-10-19):
+  `controles.md`, `recoleccion.md` y `reglas.md` pasan de 20 KB con uno a
+  tres titulos, y no se pueden leer por secciones. Se les ponen **cuando una
+  tanda toque cada uno**, moviendo el texto sin reescribirlo, como se partio
+  `pendiente.md`.
 
 ---
 
