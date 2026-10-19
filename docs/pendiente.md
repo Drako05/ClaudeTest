@@ -72,6 +72,11 @@ el 42, una mutacion que sobrevive porque la linea no hace nada, a la B; y el
 P7, una mutacion a mano que deshizo un arreglo sin commit al restaurar desde
 git.
 
+**Despues del cierre**: la CI de `main` cayo en `desktop`: la comprobacion
+nueva de cerrar y reabrir con E dejaba una captura del cursor a medias que la
+prueba de Esc veia como pausa. Ahora se hace sin pedir la captura y comprueba
+que no queda ni pausa ni captura; es el escape P8.
+
 ---
 
 ## Pendiente del autor: las paredes de 2+ voxeles
