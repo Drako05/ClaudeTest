@@ -66,7 +66,8 @@ Las deducciones, en `docs/juicio.md`: el estandar de botones en vez de las
 pildoras blancas de la foto, el menu solo en la rejilla, el tope de Dividir,
 el registro de objetos a la izquierda de MAS y lo demas.
 
-**Falta**: la CI y `main`, que el autor lo juegue, y la auditoria de la tanda.
+En `main` tras las dos tandas en verde en `pruebas` (`d6ca9d7`). **Falta**:
+que el autor lo juegue, y la auditoria de la tanda.
 
 ---
 
