@@ -365,18 +365,20 @@ check(held.open && held.slot === filled, `mantener la casilla no abrio su menu: 
 check(!tappedOut.open && pickedAfter === otherFilled, `tocar otra casilla no cerro el menu o no la eligio: ${JSON.stringify(tappedOut)}`);
 // Un toque que la pagina atiende tarde no es mantener: lo que cuenta es la hora
 // de cada evento, no cuando corre el plazo (la CI de pruebas del 2026-10-19,
-// con la pagina ocupada). Se suelta con la hora de los 0,1 s, pero llega a los 0,6.
+// con la pagina ocupada). Se suelta con la hora de los 0,1 s, pero llega
+// despues de que el plazo abra el menu.
 const lateAt = await slotAt(filled + 1);
 const t0 = Date.now() / 1000;
 await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: lateAt.x, y: lateAt.y, id: 7 }], timestamp: t0 });
-await page.waitForTimeout(600);
+await page.waitForFunction(() => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
 const lateHeld = (await menuOf()).open;
 await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [], timestamp: t0 + 0.1 });
 await page.waitForTimeout(300);
 const lateTap = await menuOf();
 const latePicked = await page.evaluate(() => [...document.querySelectorAll('#invGrid .slot')].findIndex((el) => el.classList.contains('picked')));
 console.log(`  toque atendido tarde: menu ${lateHeld} -> ${lateTap.open}, elegida ${latePicked + 1}`);
-check(lateHeld && !lateTap.open && latePicked === filled, `un toque de 0,1 s atendido tarde dejo el menu abierto: ${JSON.stringify(lateTap)}`);
+check(lateHeld, 'el plazo no abrio el menu antes de soltar: la comprobacion no probaria nada');
+check(!lateTap.open && latePicked === filled, `un toque de 0,1 s atendido tarde dejo el menu abierto: ${JSON.stringify(lateTap)}`);
 // Mantener, y sin soltar, arrastrar a una casilla vacia: cierra el menu y mueve.
 const dragFrom = await slotAt(otherFilled + 1);
 const dragTo = await slotAt(emptyCell + 1);
