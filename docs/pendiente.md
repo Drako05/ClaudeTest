@@ -89,10 +89,17 @@ para otra tanda.» Sus respuestas (seran la directriz 7 de
      la luz hacia el amarillo y la sombra hacia el azul (*deduccion*); la
      nieve, con sombras mas suaves que el resto del suelo;
    - el agua, **quieta** de momento: si se anima, lo decide el autor.
-3. Al juego: un ayudante de rejilla a textura en sRGB, el terreno con UV y un
-   atlas, los objetos a 24 px exactos (sin la cadena `BASE`/`ARBOL`/`DETAIL`)
-   y del mismo tamano en el mundo, rocas de voxeles, estaciones con `PX = 24`.
-4. Verificar, documentos, CI y auditoria.
+3. **Al juego — hecha el 2026-10-19** (el autor: «Dale, manda asi. Luego
+   perfeccionamos»): el suelo en un atlas con sus variantes y paredes de un
+   voxel; las aspas y el jugador a 24 pixeles por bloque, sin la escala de
+   antes; los arboles con su tronco pintado al vuelo; las rocas y minerales en
+   voxeles (`rock-mesh.ts`); el agua, la mesa y el horno en pixelart; los
+   escombros con los colores de su dibujo; los iconos de las estaciones con
+   los colores de sus caras nuevas. Fuera `art.ts`. Lo que costo: la paleta de
+   cada copa tiene que guardar sus cuatro tonos de corteza, y la copa se apoya
+   donde empiezan sus hojas, no en el borde de su dibujo (`docs/arte.md`).
+4. Documentos (hechos: `arte.md`, la directriz 7, `juicio.md`, retirados) y
+   **la auditoria, pendiente**.
 
 **Como se hacen los dibujos**: `tools/pixel-mundo.ts` (`npx vite-node`) los
 saca de formas y los escribe en `packages/client/src/world-art.ts`, donde
@@ -318,6 +325,9 @@ poco a poco. Estan en `docs/guia-de-arte.md`, con tu texto literal:
 4. **Las patas caben en el cuadrado de la caja** (2026-10-14), aplicada.
 5. **Los iconos son pixelart HD de 24 × 24; los objetos, a color**
    (2026-10-17), aplicada a los 30 objetos, los 14 huecos y los botones.
+6. **Un solo boton, para todos los botones** (2026-10-18), aplicada.
+7. **El mundo es pixelart HD, a 24 pixeles por bloque** (2026-10-19),
+   aplicada a todo menos la fauna.
 
 Lo que espera tu juicio:
 

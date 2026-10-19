@@ -86,13 +86,4 @@ export default [
     a: '      return null;',
     prueba: 'smoke:resources',
   },
-  // El canto que asoma, contado tambien en las ramas: las que se ven contra el
-  // cielo a proposito lo harian caer.
-  {
-    nombre: 'pixelart3: asoma cuenta las ramas',
-    fichero: 'packages/client/src/billboards.ts',
-    de: '    for (let x = Math.floor(cx - stemHalf); x < Math.ceil(cx + stemHalf); x++) {',
-    a: '    for (let x = 0; x < px.width; x++) {',
-    prueba: 'smoke:desktop',
-  },
 ];
