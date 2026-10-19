@@ -614,3 +614,14 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
   tomada antes de mutar, no desde git; o se hace commit antes de mutar. Y
   antes del commit de cierre se repasa `git status` contra la lista de
   correcciones.
+
+### P8. Una comprobacion nueva que deja algo a medias a la siguiente (2026-10-19)
+- **Que paso**: la auditoria anadio al humo `desktop`, justo antes de la prueba
+  de Esc, «cerrar el panel con E y reabrirlo con E». Cerrar con E pide
+  capturar el cursor, y esa captura llegaba con el panel ya reabierto; la
+  prueba de Esc la heredaba y veia el juego en pausa. En `pruebas` paso y en
+  la CI de `main` cayo: depende de cuanto tarde el navegador.
+- **Metodo**: al meter una comprobacion entre otras, se mira que deja en
+  marcha (capturas del cursor, temporizadores, animaciones) y si la siguiente
+  depende de ese estado; o se aisla (aqui, sin pedir la captura) o se espera a
+  que se asiente. Y se corre la pasada dos veces en local.

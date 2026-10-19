@@ -1073,6 +1073,13 @@ async function desktopPass(browser, baseUrl) {
     check(gone.slots[free].item < 0 && gone.drops.length === dropsBefore && !(await page.isVisible('#destroyAsk')),
       `Destruir no borro la pila o la tiro al suelo: ${JSON.stringify(gone.slots[free])}`);
     // Cerrar el panel con el menu abierto lo cierra: al volver no sigue ahi.
+    // Sin capturar el cursor: la captura que pide E al cerrar llegaba tarde,
+    // con el panel ya reabierto, y dejaba la prueba de Esc de abajo en pausa
+    // (la CI de main del 2026-10-19).
+    await page.evaluate(() => {
+      window.__lockBackup = HTMLCanvasElement.prototype.requestPointerLock;
+      HTMLCanvasElement.prototype.requestPointerLock = () => {};
+    });
     await page.click(cellSel);
     await page.waitForTimeout(150);
     const openBefore = (await state(page)).itemMenu.open;
@@ -1080,7 +1087,9 @@ async function desktopPass(browser, baseUrl) {
     await page.waitForTimeout(200);
     await page.keyboard.press('KeyE');
     await page.waitForTimeout(200);
+    await page.evaluate(() => { HTMLCanvasElement.prototype.requestPointerLock = window.__lockBackup; });
     const reopened = await state(page);
+    check(!reopened.paused && !reopened.pointerLocked, `cerrar y abrir el panel dejo el juego en pausa o capturado: ${JSON.stringify([reopened.paused, reopened.pointerLocked])}`);
     check(openBefore && reopened.inventoryOpen && !reopened.itemMenu.open && !(await page.isVisible('#itemMenu')),
       `cerrar el panel no cerro el menu de la casilla: ${JSON.stringify(reopened.itemMenu)}`);
   }
