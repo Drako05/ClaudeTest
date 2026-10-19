@@ -1,57 +1,37 @@
 /**
  * La hoja del pixelart del mundo, para que el autor lo revise (`?mundo=1`,
  * 2026-10-19), como la de los iconos (`icon-sheet.ts`). Tapa el juego y pone
- * cada dibujo a su tamano (24 pixeles por bloque) y ampliado, mas una escena
- * de prueba: un trozo de suelo con sus variantes mezcladas, un escalon de medio
- * bloque con su pared, y el roble y la mata encima. La roca de voxeles se
- * ensena en perspectiva, con la luz de cada cara. No toca el mundo: es solo
- * dibujo, en lienzos de pixeles enteros.
+ * cada dibujo ampliado por un entero, sin suavizar: el suelo con sus variantes
+ * y su pared, y mezclado con un escalon; el agua sobre su fondo; los arboles
+ * con su tronco medio; matas, brotes, rocas, guijarros, el jugador y las
+ * estaciones; y una escena de prueba. Las cajas (rocas y estaciones), en
+ * perspectiva con la luz de cada cara. No toca el mundo: es solo dibujo.
  */
 
+import { Feature, Terrain, TERRAIN_NAMES } from '@verdant/shared';
+import { TREE_TRUNKS } from '@verdant/sim';
 import {
-  GRASS_A,
-  GRASS_B,
-  GRASS_C,
-  GRASS_D,
-  MEADOW_BUSH,
-  OAK,
-  ROCK_GROUND_A,
-  ROCK_GROUND_B,
+  BUSHES,
+  CROWNS,
+  PEBBLES,
+  PLAYER,
   ROCK_SHAPE,
-  STONE,
-  WORLD_PALETTE,
+  SAPLINGS,
+  STATION_ART,
+  STONES,
+  TERRAIN_TILES,
+  WATER_SURFACE,
   WORLD_PX,
   type WorldArt,
 } from './world-art.js';
+import { artCanvas, treeArt } from './world-sprites.js';
 
 /** Lo oscuras que se ven las paredes del suelo frente a su tapa (el factor de hoy, `terrain-mesh.ts`). */
 const WALL = 0.72;
 /** La luz de cada cara de un bloque, como las estaciones (`stations-view.ts`). */
 const FACE = { top: 1, lit: 0.95, shade: 0.74 };
-
-/** Una rejilla en un lienzo, a un pixel por pixel de arte, con su luz. */
-function paint(art: WorldArt, light = 1): HTMLCanvasElement {
-  const h = art.rows.length;
-  const w = art.rows[0]!.length;
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d')!;
-  art.rows.forEach((row, y) => {
-    for (let x = 0; x < w; x++) {
-      const color = WORLD_PALETTE[row[x]!];
-      if (!color) continue;
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, 1, 1);
-    }
-  });
-  if (light < 1) {
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = `rgba(0,0,0,${1 - light})`;
-    ctx.fillRect(0, 0, w, h);
-  }
-  return canvas;
-}
+/** Lo que deja ver el agua de su fondo (su opacidad en el juego). */
+const WATER_OPACITY = 0.72;
 
 /** Un lienzo ampliado `k` veces sin suavizar: cada pixel de arte, un cuadrado. */
 function zoom(src: HTMLCanvasElement, k: number): HTMLCanvasElement {
@@ -64,100 +44,152 @@ function zoom(src: HTMLCanvasElement, k: number): HTMLCanvasElement {
   return canvas;
 }
 
+/** Elige variante por casilla, como el juego (aqui, con un hash fijo). */
+const pick = (x: number, y: number, n: number) => (((x * 73856093) ^ (y * 19349663)) >>> 0) % n;
+
 /** Un poco de suelo: `cols × rows` casillas con las variantes mezcladas, y un escalon de medio bloque abajo. */
-function ground(variants: WorldArt[], cols: number, rows: number): HTMLCanvasElement {
-  const tops = variants.map((v) => paint(v));
-  const walls = variants.map((v) => paint(v, WALL));
+function ground(variants: readonly WorldArt[], cols: number, rows: number): HTMLCanvasElement {
+  const tops = variants.map((v) => artCanvas(v));
+  const walls = variants.map((v) => artCanvas(v, WALL));
   const half = WORLD_PX / 2;
   const canvas = document.createElement('canvas');
   canvas.width = cols * WORLD_PX;
   canvas.height = rows * WORLD_PX + half;
   const ctx = canvas.getContext('2d')!;
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      // Como en el juego: la variante, por casilla y con la semilla (aqui, un hash fijo).
-      const pick = ((x * 73856093) ^ (y * 19349663)) >>> 0;
-      ctx.drawImage(tops[pick % tops.length]!, x * WORLD_PX, y * WORLD_PX);
-    }
-  }
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) ctx.drawImage(tops[pick(x, y, tops.length)]!, x * WORLD_PX, y * WORLD_PX);
   // La pared del escalon: la misma tesela, mas oscura, alineada con el mundo.
   for (let x = 0; x < cols; x++) {
-    const pick = ((x * 83492791) >>> 0) % walls.length;
-    ctx.drawImage(walls[pick]!, 0, 0, WORLD_PX, half, x * WORLD_PX, rows * WORLD_PX, WORLD_PX, half);
+    ctx.drawImage(walls[pick(x, 99, walls.length)]!, 0, 0, WORLD_PX, half, x * WORLD_PX, rows * WORLD_PX, WORLD_PX, half);
   }
   return canvas;
 }
 
-/** La escena: suelo de hierba y, encima, el roble y la mata, de pie y a su escala. */
-function scene(): HTMLCanvasElement {
-  const base = ground([GRASS_A, GRASS_B, GRASS_C, GRASS_D], 8, 7);
-  const ctx = base.getContext('2d')!;
-  const oak = paint(OAK);
-  const bush = paint(MEADOW_BUSH);
-  ctx.drawImage(oak, 20, base.height - WORLD_PX * 1.5 - oak.height);
-  ctx.drawImage(bush, 140, base.height - WORLD_PX * 2 - bush.height);
-  ctx.drawImage(bush, 160, base.height - WORLD_PX * 1 - bush.height);
-  return base;
+/** El agua: su fondo, y encima la superficie con la opacidad del juego. */
+function water(cols: number, rows: number): HTMLCanvasElement {
+  const canvas = ground(TERRAIN_TILES[Terrain.Water], cols, rows);
+  const ctx = canvas.getContext('2d')!;
+  ctx.globalAlpha = WATER_OPACITY;
+  const surface = artCanvas(WATER_SURFACE);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) ctx.drawImage(surface, x * WORLD_PX, y * WORLD_PX);
+  return canvas;
+}
+
+/** Un arbol entero, con el tronco desnudo medio de su especie. */
+function tree(feature: Feature): HTMLCanvasElement | null {
+  const law = TREE_TRUNKS[feature];
+  const art = law && treeArt(feature, law.bareMean, law.trunkW);
+  return art ? artCanvas(art) : null;
 }
 
 /**
- * La roca de voxeles en perspectiva, vista desde el suroeste: arriba, la cara
- * oeste (con luz, el sol viene del noroeste) y la sur (en sombra). Cada voxel
- * toma su cuarto de la tesela de piedra, alineado con el mundo como el suelo.
+ * Una caja de voxeles de 0,5 en perspectiva, vista desde el suroeste: arriba,
+ * la cara oeste (con luz, el sol viene del noroeste) y la sur (en sombra).
+ * Cada cara toma su trozo de la textura, alineado con el mundo como el suelo.
+ * `voxels` son [este, sur, arriba] en medios bloques; `faces`, la textura de
+ * arriba, la del oeste y la del sur.
  */
-function voxelRock(k: number): HTMLCanvasElement {
-  const tex = paint(STONE);
+function voxelBox(voxels: readonly (readonly [number, number, number])[], faces: { top: WorldArt; west: WorldArt; south: WorldArt }, k: number): HTMLCanvasElement {
+  const tex = { top: artCanvas(faces.top), west: artCanvas(faces.west), south: artCanvas(faces.south) };
   const half = WORLD_PX / 2;
-  // Vectores de pantalla de un bloque hacia el este, el sur y arriba.
   const A = WORLD_PX * k;
   const east = [A, -A / 2];
   const south = [A, A / 2];
   const up = [0, -A];
+  const down = [0, A];
+  const zMax = Math.max(...voxels.map((v) => v[2])) + 1;
   const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(A * 2.4);
-  canvas.height = Math.ceil(A * 2.3);
+  canvas.width = Math.ceil(A * 2.2);
+  canvas.height = Math.ceil(A * (1.2 + zMax * 0.5));
   const ctx = canvas.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
-  const ox = A * 0.2;
-  const oy = A * 1.55;
+  const ox = A * 0.1;
+  const oy = A * (0.6 + zMax * 0.5);
   const at = (x: number, y: number, z: number) => [ox + x * east[0]! + y * south[0]!, oy + x * east[1]! + y * south[1]! + z * up[1]!];
-  const has = (x: number, y: number, z: number) => ROCK_SHAPE.some(([a, b, c]) => a === x && b === y && c === z);
-  const face = (origin: number[], u: number[], v: number[], sx: number, sy: number, light: number) => {
-    // u y v: lo que avanza en pantalla un pixel de la tesela.
+  const has = (x: number, y: number, z: number) => voxels.some(([a, b, c]) => a === x && b === y && c === z);
+  const face = (img: HTMLCanvasElement, origin: number[], u: number[], v: number[], sx: number, sy: number, light: number) => {
     ctx.setTransform(u[0]! / WORLD_PX, u[1]! / WORLD_PX, v[0]! / WORLD_PX, v[1]! / WORLD_PX, origin[0]!, origin[1]!);
-    ctx.drawImage(tex, sx, sy, half, half, 0, 0, half, half);
+    ctx.drawImage(img, sx, sy, half, half, 0, 0, half, half);
     ctx.fillStyle = `rgba(0,0,0,${1 - light})`;
     ctx.fillRect(0, 0, half, half);
   };
-  const down = [-up[0]!, -up[1]!];
   // De lejos (noreste) a cerca (suroeste), y de abajo arriba.
-  const order = [...ROCK_SHAPE].sort((p, q) => (p[1] - p[0]) - (q[1] - q[0]) || p[2] - q[2]);
+  const order = [...voxels].sort((p, q) => p[1] - p[0] - (q[1] - q[0]) || p[2] - q[2]);
   for (const [x, y, z] of order) {
     const X = x * 0.5;
     const Y = y * 0.5;
-    const Z = z * 0.5;
-    const top = Z + 0.5;
-    // El cuarto de la tesela de este voxel: alineado con el mundo.
+    const top = z * 0.5 + 0.5;
+    const tall = tex.west.height / half;
+    // El trozo de la textura de este voxel, alineado con el mundo.
     const su = (x % 2) * half;
     const sv = (y % 2) * half;
-    const vz = ((1 - z) % 2 + 2) % 2 * half;
-    if (!has(x, y, z + 1)) face(at(X, Y, top), east, south, su, sv, FACE.top);
-    if (!has(x - 1, y, z)) face(at(X, Y, top), south, down, sv, vz, FACE.lit);
-    if (!has(x, y + 1, z)) face(at(X, Y + 0.5, top), east, down, su, vz, FACE.shade);
+    const vz = (tall - 1 - z) * half;
+    if (!has(x, y, z + 1)) face(tex.top, at(X, Y, top), east, south, su, sv, FACE.top);
+    if (!has(x - 1, y, z)) face(tex.west, at(X, Y, top), south, down, sv, vz, FACE.lit);
+    if (!has(x, y + 1, z)) face(tex.south, at(X, Y + 0.5, top), east, down, su, vz, FACE.shade);
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   return canvas;
 }
 
-function figure(caption: string, ...canvases: HTMLCanvasElement[]): HTMLElement {
+/**
+ * Una estacion en perspectiva: una caja de 1 × 1 × su alto, vista como las
+ * rocas, con sus tres caras enteras (arriba, el costado al oeste y el frente
+ * al sur).
+ */
+function stationBox(art: { top: WorldArt; side: WorldArt; front: WorldArt }, k: number): HTMLCanvasElement {
+  const top = artCanvas(art.top);
+  const side = artCanvas(art.side);
+  const front = artCanvas(art.front);
+  const tall = side.height / WORLD_PX;
+  const A = WORLD_PX * k;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(A * 2.2);
+  canvas.height = Math.ceil(A * (1.2 + tall));
+  const ctx = canvas.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  const ox = A * 0.1;
+  const oy = A * (0.6 + tall);
+  const face = (img: HTMLCanvasElement, x: number, y: number, u: number[], v: number[], light: number) => {
+    ctx.setTransform(u[0]! / img.width, u[1]! / img.width, v[0]! / img.height, v[1]! / img.height, x, y);
+    ctx.drawImage(img, 0, 0);
+    ctx.fillStyle = `rgba(0,0,0,${1 - light})`;
+    ctx.fillRect(0, 0, img.width, img.height);
+  };
+  const h = A * tall;
+  face(top, ox, oy - h, [A, -A / 2], [A, A / 2], FACE.top);
+  face(side, ox, oy - h, [A, A / 2], [0, h], FACE.lit);
+  face(front, ox + A, oy - h + A / 2, [A, -A / 2], [0, h], FACE.shade);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  return canvas;
+}
+
+/** La escena de prueba: suelo de hierba con el roble, matas, una roca y el jugador, de pie y a su escala. */
+function scene(): HTMLCanvasElement {
+  const base = ground(TERRAIN_TILES[Terrain.Grass], 10, 8);
+  const ctx = base.getContext('2d')!;
+  const put = (img: HTMLCanvasElement | null, x: number, footY: number) => img && ctx.drawImage(img, Math.round(x - img.width / 2), footY - img.height);
+  put(tree(Feature.MeadowTree), 60, base.height - WORLD_PX * 2);
+  put(artCanvas(BUSHES[Feature.MeadowPlant]!), 150, base.height - WORLD_PX * 3);
+  put(artCanvas(BUSHES[Feature.MeadowPlant]!), 175, base.height - WORLD_PX * 1.5);
+  put(artCanvas(PLAYER), 120, base.height - WORLD_PX * 1.2);
+  put(artCanvas(SAPLINGS[Feature.MeadowTreeSapling]!), 205, base.height - WORLD_PX * 2.5);
+  return base;
+}
+
+function figure(caption: string, ...canvases: (HTMLCanvasElement | null)[]): HTMLElement {
   const cell = document.createElement('figure');
+  const row = document.createElement('div');
   for (const c of canvases) {
+    if (!c) continue;
     c.className = 'worldArt';
-    cell.appendChild(c);
+    // A su tamano exacto: la hoja no estira ni encoge un pixel de arte.
+    c.style.width = `${c.width}px`;
+    c.style.height = `${c.height}px`;
+    row.appendChild(c);
   }
   const label = document.createElement('figcaption');
   label.textContent = caption;
-  cell.appendChild(label);
+  cell.append(row, label);
   return cell;
 }
 
@@ -171,39 +203,95 @@ function group(sheet: HTMLElement, title: string, cells: HTMLElement[]): number 
   return cells.length;
 }
 
+const NAMES: Partial<Record<Feature, string>> = {
+  [Feature.MeadowTree]: 'Roble',
+  [Feature.MeadowTreeRare]: 'Cerezo',
+  [Feature.ForestTree]: 'Picea comun',
+  [Feature.ForestTreeRare]: 'Alerce',
+  [Feature.TundraTree]: 'Picea negra',
+  [Feature.TundraTreeRare]: 'Picea azul',
+  [Feature.MeadowPlant]: 'Mata de la pradera',
+  [Feature.MeadowPlantRare]: 'Mata de la pradera, rara',
+  [Feature.ForestPlant]: 'Mata del bosque',
+  [Feature.ForestPlantRare]: 'Mata del bosque, rara',
+  [Feature.TundraPlant]: 'Mata de la tundra',
+  [Feature.TundraPlantRare]: 'Mata de la tundra, rara',
+  [Feature.MeadowTreeSapling]: 'Brote de roble',
+  [Feature.ForestTreeSapling]: 'Brote de picea',
+  [Feature.TundraTreeSapling]: 'Brote de picea negra',
+  [Feature.MeadowPlantSapling]: 'Brote de mata (pradera)',
+  [Feature.ForestPlantSapling]: 'Brote de mata (bosque)',
+  [Feature.TundraPlantSapling]: 'Brote de mata (tundra)',
+  [Feature.RockNode]: 'Roca',
+  [Feature.CoalNode]: 'Carbon',
+  [Feature.IronNode]: 'Hierro',
+  [Feature.CopperNode]: 'Cobre',
+  [Feature.Workbench]: 'Mesa de trabajo',
+  [Feature.Furnace]: 'Horno',
+};
+
 /** Pone la hoja encima de todo. Devuelve cuantos dibujos ensena. */
 export function showWorldSheet(): number {
   const sheet = document.createElement('div');
   sheet.id = 'worldSheet';
   let count = 0;
-  const swatches = Object.entries(WORLD_PALETTE).map(([key, color]) => {
-    const c = document.createElement('canvas');
-    c.width = c.height = 1;
-    const ctx = c.getContext('2d')!;
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, 1, 1);
-    return figure(`${key} ${color}`, zoom(c, 24));
-  });
-  group(sheet, 'Paleta', swatches);
-  const tile = (name: string, art: WorldArt) => figure(name, paint(art), zoom(paint(art), 4), zoom(paint(art, WALL), 4));
-  count += group(sheet, 'Suelo: tesela a su tamano, ×4 y su pared (×0,72)', [
-    tile('Hierba 1', GRASS_A),
-    tile('Hierba 2', GRASS_B),
-    tile('Hierba 3', GRASS_C),
-    tile('Hierba 4', GRASS_D),
-    tile('Roca 1', ROCK_GROUND_A),
-    tile('Roca 2', ROCK_GROUND_B),
+  const terrains = (Object.keys(TERRAIN_TILES).map(Number) as Terrain[]).filter((t) => t !== Terrain.Water && t !== Terrain.DeepWater);
+  count += group(
+    sheet,
+    'Suelo: cada variante ×3, y su pared (×0,72)',
+    terrains.map((t) =>
+      figure(
+        TERRAIN_NAMES[t]!,
+        ...TERRAIN_TILES[t].map((v) => zoom(artCanvas(v), 3)),
+        zoom(artCanvas(TERRAIN_TILES[t][0]!, WALL), 3),
+      ),
+    ),
+  );
+  count += group(
+    sheet,
+    'Suelo mezclado, con un escalon de medio bloque (×2)',
+    terrains.map((t) => figure(TERRAIN_NAMES[t]!, zoom(ground(TERRAIN_TILES[t], 6, 3), 2))),
+  );
+  count += group(sheet, 'Agua: la superficie ×3, los fondos ×3, y el agua sobre su fondo (×2)', [
+    figure('Superficie', zoom(artCanvas(WATER_SURFACE), 3)),
+    figure('Fondos (agua, agua honda)', ...[Terrain.Water, Terrain.DeepWater].flatMap((t) => TERRAIN_TILES[t].map((v) => zoom(artCanvas(v), 3)))),
+    figure('El agua', zoom(water(6, 3), 2)),
   ]);
-  count += group(sheet, 'Suelo mezclado, con un escalon de medio bloque (×2)', [
-    figure('Hierba', zoom(ground([GRASS_A, GRASS_B, GRASS_C, GRASS_D], 8, 4), 2)),
-    figure('Roca', zoom(ground([ROCK_GROUND_A, ROCK_GROUND_B], 8, 4), 2)),
+  count += group(
+    sheet,
+    'Arboles, con su tronco desnudo medio (×2)',
+    (Object.keys(CROWNS).map(Number) as Feature[]).map((f) => figure(NAMES[f] ?? '', tree(f) && zoom(tree(f)!, 2))),
+  );
+  count += group(
+    sheet,
+    'Matas (×3)',
+    (Object.keys(BUSHES).map(Number) as Feature[]).map((f) => figure(NAMES[f] ?? '', zoom(artCanvas(BUSHES[f]!), 3))),
+  );
+  count += group(
+    sheet,
+    'Brotes (×3)',
+    (Object.keys(SAPLINGS).map(Number) as Feature[]).map((f) => figure(NAMES[f] ?? '', zoom(artCanvas(SAPLINGS[f]!), 3))),
+  );
+  count += group(sheet, 'Rocas de voxeles: su piedra ×3 y en perspectiva', [
+    ...(Object.keys(STONES).map(Number) as Feature[]).map((f) =>
+      figure(NAMES[f] ?? '', zoom(artCanvas(STONES[f]!), 3), voxelBox(ROCK_SHAPE, { top: STONES[f]!, west: STONES[f]!, south: STONES[f]! }, 3)),
+    ),
+    figure('Guijarros (×4)', zoom(artCanvas(PEBBLES), 4)),
   ]);
-  count += group(sheet, 'Elementos: a su tamano y ×3', [
-    figure('Roble (tronco medio, 2,4)', paint(OAK), zoom(paint(OAK), 3)),
-    figure('Mata de la pradera', paint(MEADOW_BUSH), zoom(paint(MEADOW_BUSH), 4)),
-    figure('Roca de voxeles: piedra ×4 y en perspectiva', zoom(paint(STONE), 4), voxelRock(4)),
+  count += group(sheet, 'El jugador (×3) y las estaciones: sus caras ×3 y en perspectiva', [
+    figure('Jugador', zoom(artCanvas(PLAYER), 3)),
+    ...([Feature.Workbench, Feature.Furnace] as const).map((f) => {
+      const art = STATION_ART[f]!;
+      return figure(
+        NAMES[f] ?? '',
+        zoom(artCanvas(art.top), 3),
+        zoom(artCanvas(art.side), 3),
+        zoom(artCanvas(art.front), 3),
+        stationBox(art, 3),
+      );
+    }),
   ]);
-  count += group(sheet, 'Escena de prueba (×2)', [figure('Hierba, roble y matas', zoom(scene(), 2))]);
+  count += group(sheet, 'Escena de prueba (×2)', [figure('Hierba, roble, matas, brote y jugador', zoom(scene(), 2))]);
   document.body.appendChild(sheet);
   return count;
 }
