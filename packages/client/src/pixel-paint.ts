@@ -3,10 +3,10 @@
  * directriz 7): lo que pinta rejillas de caracteres —follaje, ramas, troncos,
  * ruido— sin tocar el DOM.
  *
- * Lo usan dos: `tools/pixel-mundo.ts`, que saca de aqui los dibujos fijos de
- * `world-art.ts` (que luego se retocan a mano), y el juego, que pinta con
- * `barkTrunk` el tronco desnudo de cada arbol, porque tiene trece largos y no
- * se puede guardar dibujado.
+ * Lo usan dos: el generador (`tools/pixel-mundo.ts`), que saca de aqui los
+ * dibujos fijos del mundo, que luego se retocan a mano, y el juego
+ * (`world-sprites.ts`), que pinta con `barkTrunk` el tronco desnudo de cada
+ * arbol, porque tiene trece largos y no se puede guardar dibujado.
  *
  * Una rejilla es una fila de caracteres por fila de pixeles: `.` transparente,
  * cada letra un color de la paleta de su dibujo. Los tonos se pasan como

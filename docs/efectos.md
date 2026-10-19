@@ -12,12 +12,16 @@ de vida— sin DOM ni three.js, y `effects-view.ts` solo lo dibuja: asi la fisic
 las particulas se mide en Node. Avanzan con el tiempo **escalado**, de modo que
 pausar los congela y 64x no inunda la pantalla.
 
-Los colores de los escombros salen de `client/palette.ts`, la misma tabla con la
-que `art.ts` pinta cada especie. Estan juntas a proposito: el encargo era que
-los escombros fueran los colores del objeto, y con una copia se separarian al
-primer retoque. Sobre hierba los verdes de un arbol desaparecen, asi que cada
-cuadrado lleva un contorno oscuro debajo; cambiarles el color habria sido
-traicionar el encargo.
+Los colores de los escombros salen **del dibujo de lo que se rompe**: desde el
+pixelart del mundo (2026-10-19), `debrisPalette` (`client/palette.ts`) toma la
+paleta de su dibujo en `world-art.ts`, toda: la copa y la corteza de un arbol,
+las hojas y los frutos de una mata, la piedra y las vetas de un mineral. El
+encargo era que los escombros fueran los colores del objeto, y con una copia
+se separarian al primer retoque. Son cubos de pixeles enteros a 24 por bloque,
+como el resto del mundo (de 4 a 12; las esquirlas, de 2 a 3). Sobre hierba los
+verdes de un arbol se pierden un poco, y se dejan asi: cambiarles el color
+habria sido traicionar el encargo. (En el isometrico cada cuadrado llevaba un
+contorno oscuro debajo; en 3D son cubos con la luz de la escena.)
 
 **Un efecto recien nacido sobrevive a su primer `advance`, dure lo que dure el
 fotograma.** El bucle corre todos los ticks pendientes de golpe —y dentro de

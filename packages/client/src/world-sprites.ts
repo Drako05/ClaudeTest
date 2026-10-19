@@ -13,6 +13,7 @@ import { CanvasTexture, NearestFilter, NoColorSpace, SRGBColorSpace, type Textur
 import { Feature, isSapling, Terrain } from '@verdant/shared';
 import { hash2DFloat, mulberry32 } from '@verdant/sim';
 import { barkTrunk, blank, toRows } from './pixel-paint.js';
+import type { TileRect } from './terrain-mesh.js';
 import { BUSHES, CROWNS, PEBBLES, PLAYER, SAPLINGS, TERRAIN_TILES, WORLD_PX, type WorldArt } from './world-art.js';
 
 /** Las letras de la corteza en la paleta de una copa (`world-art.ts`). */
@@ -94,7 +95,8 @@ export function artCanvas(art: WorldArt, light = 1): HTMLCanvasElement {
  * tal cual en lo que no se ilumina (aspas, estaciones, agua). El suelo va sin
  * el, como iban los colores por vertice a los que sustituye: la luz de la
  * escena los oscurece y la salida en sRGB los vuelve a aclarar, y el suelo se
- * ve como se veia (medido: la hierba, 92,136,84 en pantalla).
+ * ve como se veia (medido: la roca del suelo, 120,120,116 en pantalla con los
+ * colores por vertice y lo mismo con la textura).
  */
 export function pixelTexture(canvas: HTMLCanvasElement, srgb: boolean): Texture {
   const texture = new CanvasTexture(canvas);
@@ -138,14 +140,6 @@ export function treeSprite(feature: Feature, bare: number, width: number): Sprit
 /** El jugador, de frente. */
 export function playerArt(): SpriteArt {
   return standing(PLAYER);
-}
-
-/** Donde esta cada tesela del suelo en el atlas, en coordenadas de textura. */
-export interface TileRect {
-  u0: number;
-  v0: number;
-  u1: number;
-  v1: number;
 }
 
 /**

@@ -118,13 +118,13 @@ export function flatGeometry(w: number): BufferGeometry {
  * Cuanto mide un pixel de arte en el mundo: **24 pixeles por bloque, en todo**
  * (el autor, 2026-10-19: «caras de 24x24 en bloques (voxeles 12x12). Esa debe
  * ser la medida para todo elemento del juego»). Sustituye a la escala de antes
- * —`BASE = 2,3` para lo que se apoya en el suelo y `ARBOL = 2,6` para los
- * arboles, sobre un arte de 32 pixeles por casilla redibujado a 2,6 veces—,
- * que daba a cada objeto un pixel de otro tamano.
+ * (`docs/arte.md`, «Proporciones»), que crecia lo vivo frente al bloque y daba
+ * a cada objeto un pixel de otro tamano.
  *
- * Los tamanos en el mundo **no cambian**: los dibujos de `world-art.ts` se
- * hicieron a la medida de lo que ya median (el jugador, 1,92; una mata, 1,1;
- * un brote, 0,88; la copa de cada especie, la de su tabla). **Nada de esto
+ * Los tamanos en el mundo **casi no cambian**: los dibujos de `world-art.ts`
+ * se hicieron a la medida de lo que ya median. Medidos (`npm run shots`): el
+ * jugador 1,88 (era 1,93), una mata 1,04 (1,17), un brote 0,79 (0,88), la roca
+ * 1,0 (1,09), y la copa de cada especie, la de su tabla. **Nada de esto
  * llega a `packages/sim`**: el salto, `STEP_UP` y la colision van en unidades
  * de mundo y no saben lo que mide un dibujo. Es arte, no fisica.
  */

@@ -9,7 +9,8 @@
  * pardo, el bisonte rojizo, el pollo de gaviota pardo. **Colores mios**, de la
  * especie real.
  *
- * Van en `MeshLambertMaterial` con colores por vertice, como el terreno, y con
+ * Van en `MeshLambertMaterial` con colores por vertice (como iba el terreno
+ * antes de su textura en pixelart, el 2026-10-19), y con
  * normales planas: la luz es la del mundo, asi que un animal que gira cambia de
  * cara iluminada como cambiaria un bloque.
  *

@@ -86,4 +86,20 @@ export default [
     a: '      return null;',
     prueba: 'smoke:resources',
   },
+  // Las paredes con la luz de las tapas: del mismo tono que el suelo.
+  {
+    nombre: 'pixelart3: pared con luz de tapa',
+    fichero: 'packages/client/src/terrain-mesh.ts',
+    de: '              WALL_LIGHT,\n              tile,',
+    a: '              LID_LIGHT,\n              tile,',
+    prueba: 'test:tests/terrain-mesh.test.ts',
+  },
+  // La nieve sin variantes.
+  {
+    nombre: 'pixelart3: suelo sin variantes',
+    fichero: 'packages/client/src/world-art.ts',
+    de: '  [Terrain.Snow]: [',
+    a: '  [Terrain.Snow]: [] || [',
+    prueba: 'test:tests/world-art.test.ts',
+  },
 ];

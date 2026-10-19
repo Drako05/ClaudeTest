@@ -57,8 +57,10 @@ export const PLAYER_HEIGHT = 1.8;
 
 /**
  * Medidas de las cajas que no son arboles: medio ancho y alto, en bloques.
- * Salen de lo que mide cada dibujo (1,17 el arbusto, 1,09 la roca, 0,88 el
- * brote) y son **deduccion mia**; estan en `docs/juicio.md`.
+ * Salieron de lo que median sus dibujos vectoriales (1,17 el arbusto, 1,09 la
+ * roca, 0,88 el brote) y son **deduccion mia**; estan en `docs/juicio.md`. Los
+ * de pixelart (2026-10-19) miden algo menos: la mata 1,04 de alto, el brote
+ * 0,79, y la roca de voxeles 1 × 1 × 1 (su caja, 0,9 de ancho).
  */
 const BUSH_BOX = { half: 0.45, height: 1.1 };
 const ROCK_BOX = { half: 0.45, height: 1.0 };

@@ -11,13 +11,16 @@
  *
  *   npx vite-node tools/pixel-mundo.ts
  *
+ * Para comprobar que sigue funcionando sin pisar nada (la auditoria, lente C),
+ * a otro fichero: `PIXEL_MUNDO_SALIDA=/tmp/world-art.ts npx vite-node tools/pixel-mundo.ts`.
+ *
  * Determinista: cada dibujo sale de su propia semilla.
  */
 
 import { writeFileSync } from 'node:fs';
 import { Feature, Terrain } from '@verdant/shared';
 import { mulberry32, TREE_TRUNKS } from '@verdant/sim';
-import { LOOKS, MINERAL_FACES, ROCK_FACES, STATION_FACES, TERRAIN_RGB } from '../packages/client/src/palette.js';
+import { LOOKS, MINERAL_FACES, ROCK_BASE, STATION_BASE, TERRAIN_RGB } from '../packages/client/src/palette.js';
 import {
   blank,
   foliage,
@@ -394,7 +397,8 @@ function bush(seed: number, leaf: string[], fruit: string[] | null, bark: string
   limb(g, 13, H, 13, H - 7, 2.4, 2, 'efgh');
   limb(g, 12, H - 1, 6, H - 6, 1.8, 1.4, 'efgh');
   limb(g, 14, H - 1, 20, H - 6, 1.8, 1.4, 'efgh');
-  const masses: Mass[] = [{ x: 13, y: 13, rx: 11.5, ry: 10, z: 0 }];
+  // Del alto de su caja de choque (1,1): de la fila de arriba al pie.
+  const masses: Mass[] = [{ x: 13, y: 12, rx: 11.5, ry: 11.5, z: 0 }];
   foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 3, 5), tones: 'abcd', bump: 0.7, leaves: 0.04 });
   if (fruit) {
     let placed = 0;
@@ -432,8 +436,8 @@ function sapling(seed: number, leaf: string[], bark: string[], kind: 'conifer' |
   limb(g, 6, 21, 6, 6, 2, 1.4, 'efgh');
   const masses: Mass[] =
     kind === 'conifer'
-      ? [0, 1, 2].map((i) => ({ x: 6, y: 14 - i * 4.5, rx: 5.5 - i * 1.5, ry: 3.5, z: i * 3, tier: true }))
-      : [{ x: 6, y: 6, rx: 5.5, ry: 5.5, z: 0 }];
+      ? [0, 1, 2].map((i) => ({ x: 6, y: 14 - i * 5, rx: 5.5 - i * 1.5, ry: 4, z: i * 3, tier: true }))
+      : [{ x: 6, y: 5.5, rx: 5.5, ry: 5.5, z: 0 }];
   foliage(g, rng, { masses, clumps: scatterClumps(rng, masses, 2, 3), tones: 'abcd', bump: 0.7, leaves: 0.05 });
   return { grid: g, palette: pal(['abcd', leaf], ['efgh', bark]) };
 }
@@ -571,7 +575,7 @@ function planks(g: Grid): void {
 
 /** La mesa de trabajo, a 24 pixeles por bloque: el tablero, el costado y el frente con sus herramientas. */
 function workbench(): { top: Art; side: Art; front: Art } {
-  const palette = pal(['abcd', ramp(STATION_FACES[Feature.Workbench]![1]!)], ['e', ['#24170c']], ['mno', ['#e4e8ec', '#b8bec6', '#7e858e']]);
+  const palette = pal(['abcd', ramp(STATION_BASE[Feature.Workbench]!)], ['e', ['#24170c']], ['mno', ['#e4e8ec', '#b8bec6', '#7e858e']]);
   const top = blank(PX, PX);
   planks(top);
   fill(top, 'd', 0, 0, PX, 1);
@@ -621,7 +625,7 @@ function bricks(g: Grid): void {
 
 /** El horno, a 24 pixeles por bloque y 1,25 de alto: arriba el tiro; delante, la boca con la brasa. */
 function furnace(): { top: Art; side: Art; front: Art } {
-  const palette = pal(['abcd', ramp(STATION_FACES[Feature.Furnace]![1]!)], ['e', ['#16161a']], ['ijk', ['#ffd36a', '#ff8a2a', '#b84a14']]);
+  const palette = pal(['abcd', ramp(STATION_BASE[Feature.Furnace]!)], ['e', ['#16161a']], ['ijk', ['#ffd36a', '#ff8a2a', '#b84a14']]);
   const tall = Math.round(PX * 1.25);
   const top = blank(PX, PX);
   bricks(top);
@@ -703,10 +707,10 @@ const saplings: [Feature, string, Art][] = (
 ).map(([f, name, adult, kind], i) => [f, name, sapling(0x5b0 + i, leafOf(adult), kind === 'conifer' ? barkOf(adult) : OAK_BARK, kind)]);
 
 /** La piedra de la roca y los minerales: la del suelo de roca, que se ve en el mundo. */
-const STONE_TONES = groundTones(hexToRgb(ROCK_FACES[1]!));
+const STONE_TONES = groundTones(hexToRgb(ROCK_BASE));
 const stones: [Feature, string, Art][] = [
   [Feature.RockNode, 'Roca', stone(0x5a1, STONE_TONES, null)],
-  [Feature.CoalNode, 'Carbon', stone(0x5a2, STONE_TONES, ['#55555f', '#2b2b31', '#141418'])],
+  [Feature.CoalNode, 'Carbon', stone(0x5a2, STONE_TONES, [...MINERAL_FACES[Feature.CoalNode]!].reverse())],
   [Feature.IronNode, 'Hierro', stone(0x5a3, STONE_TONES, [...MINERAL_FACES[Feature.IronNode]!].reverse())],
   [Feature.CopperNode, 'Cobre', stone(0x5a4, STONE_TONES, [...MINERAL_FACES[Feature.CopperNode]!].reverse())],
 ];
@@ -809,5 +813,6 @@ export const STATION_ART: Readonly<Partial<Record<Feature, { top: WorldArt; side
 };
 `;
 
-writeFileSync(new URL('../packages/client/src/world-art.ts', import.meta.url), out);
-console.log('world-art.ts escrito');
+const target = process.env.PIXEL_MUNDO_SALIDA ?? new URL('../packages/client/src/world-art.ts', import.meta.url);
+writeFileSync(target, out);
+console.log(`escrito: ${target}`);

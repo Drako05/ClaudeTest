@@ -562,6 +562,51 @@ Formato:
 - **Donde vive ahora**: lente G, principio G1 (del hecho a su efecto hay un
   hueco), junto al #9 y el #17, que eran la misma omision.
 
+### 44. Medidas escritas sin medir, o medidas con el modelo de antes (2026-10-19)
+- **Que paso**: al pasar el mundo a pixelart, los comentarios decian que la
+  mata media 1,1, el brote 0,88 y el jugador 1,92 «como antes»; `npm run shots`
+  dio 1,00, 0,75 y 1,88. Y el color del suelo en pantalla se citaba con una
+  medida tomada con los colores por vertice, antes de la textura.
+- **Por que se escapo**: los numeros se escribieron de lo que el dibujo
+  pretendia, y la medida vieja se dio por vigente tras cambiar el modelo.
+- **Metodo**: cada cifra de un comentario sale de ejecutar el sistema de ahora;
+  una medida de antes de un cambio de modelo se repite despues o se quita.
+- **Donde vive ahora**: lente A, principio A2.
+
+### 45. Una comprobacion recortada para excusar un fallo que nadie vio (2026-10-19)
+- **Que paso**: el humo cuenta el canto del tronco que asoma por la copa. Se
+  restringio a las columnas del tallo «porque las ramas se ven contra el cielo
+  a proposito», sin haberlo medido. La mutacion que quitaba la restriccion
+  sobrevivio en la CI: ninguna rama tenia aire encima.
+- **Por que se escapo**: la restriccion se dedujo del dibujo esperado, no del
+  medido; debilitaba la comprobacion sin ganar nada.
+- **Metodo**: antes de relajar una comprobacion se ve el fallo que la
+  justifica; si su mutacion sobrevive, la relajacion no hace nada y se quita.
+- **Donde vive ahora**: lente B, principio B1.
+
+### 46. Textos que solo se comparaban con el modelo sustituido (2026-10-19)
+- **Que paso**: al cambiar el suelo de colores por vertice a textura, se
+  actualizaron los documentos de su parte, pero quedaron hablando del modelo
+  viejo la cabecera de los animales («colores por vertice, como el
+  terreno»), el `README` y `docs/efectos.md` (un contorno del isometrico).
+- **Por que se escapo**: no usaban el modelo, solo lo citaban como referencia,
+  y la lista del disparador decia «los modulos que lo usaban».
+- **Metodo**: al sustituir un modelo se busca su nombre y sus rasgos (no solo
+  sus simbolos) en todo el repo: tambien donde otro se compara con el.
+- **Donde vive ahora**: «Disparadores que cruzan lentes», al sustituir un
+  modelo (E y F).
+
+### 47. Campos de una tabla que el modelo nuevo ya no lee (2026-10-19)
+- **Que paso**: tras el pixelart, la tabla de colores de cada especie seguia
+  con su silueta, su variante rara y dos de sus tres tonos; la roca y las
+  estaciones, con colores que nadie leia. Ningun barrido lo vio: la tabla se
+  exportaba y se usaba, aunque no entera.
+- **Por que se escapo**: el barrido de codigo muerto mira exports, no los
+  campos de cada entrada.
+- **Metodo**: al sustituir un modelo, cada tabla de datos que lo alimentaba se
+  recorre campo a campo buscando quien lee cada uno.
+- **Donde vive ahora**: lente D, principio D1.
+
 ## Del proceso del agente
 
 Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
