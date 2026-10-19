@@ -546,6 +546,16 @@ Formato:
   de escribir otro test si la linea puede cambiar algo; si no puede, se quita.
 - **Donde vive ahora**: lente B, punto 4.
 
+### 43. Un toque largo medido con un temporizador (2026-10-19)
+- **Que paso**: mantener una casilla 0,3 s abre su menu, y se media con un
+  `setTimeout`. Con la pagina ocupada, el plazo corria antes de atender un
+  soltar que habia llegado a los 0,1 s, y un toque abria el menu. Lo vio la CI
+  de `pruebas` una vez entre varias en verde; a un movil lento le pasaria igual.
+- **Como verlo**: un plazo que decide lo que fue un gesto (mantener, doble
+  toque) se mide con la hora de los eventos (`timeStamp`), y el temporizador
+  solo adelanta lo que se ve. Se prueba soltando con la hora de antes del
+  plazo, enviado despues (`Input.dispatchTouchEvent` con `timestamp`).
+
 ## Del proceso del agente
 
 Fallos de como trabaja el agente, no del codigo. Tambien se repiten.

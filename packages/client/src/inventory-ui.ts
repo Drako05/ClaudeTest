@@ -190,6 +190,8 @@ export class InventoryUi {
     timer: number;
     /** Ya abrio el menu manteniendo: soltar no hace nada mas. */
     held: boolean;
+    /** La hora del evento que apoyo el dedo (`timeStamp`). */
+    since: number;
     /**
      * Un dedo que empezo en el anillo de una casilla de la rejilla: desliza la
      * rejilla en vez de arrastrar la casilla (`TOUCH_CORE`).
@@ -578,7 +580,7 @@ export class InventoryUi {
       if (e.button !== 0) return;
       const d = {
         slot, bar, x: e.clientX, y: e.clientY, moving: false, el, over: null, timer: 0, held: false,
-        scroll: null as { y: number; top: number } | null,
+        since: e.timeStamp, scroll: null as { y: number; top: number } | null,
       };
       this.drag = d;
       // En el movil cada casilla de la rejilla responde solo en su centro (el
@@ -642,6 +644,13 @@ export class InventoryUi {
       d.over?.classList.remove('drop');
       this.ghost.style.display = 'none';
       if (d.scroll) return;
+      // Con la pagina ocupada, el plazo puede correr antes de atender un
+      // soltar que llego a tiempo: lo que cuenta es cuanto se mantuvo el dedo,
+      // por la hora de cada evento. Si no llego a 0,3 s, era un toque.
+      if (d.held && !d.moving && !cancelled && e.timeStamp - d.since < MENU_HOLD_MS) {
+        d.held = false;
+        this.closeMenu();
+      }
       if (!d.moving) {
         if (cancelled || d.held) return;
         if (d.bar) this.pending.select = slot;

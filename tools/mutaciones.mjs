@@ -12,7 +12,7 @@
  * - `test:<fichero>`: un fichero de vitest.
  *
  * Ronda: la auditoria al cerrar el inventario de 5 y el menu (2026-10-19):
- * las comprobaciones que la tanda no veia caer.
+ * las comprobaciones que la tanda no veia caer, y el toque atendido tarde.
  */
 export default [
   // Cerrar el panel deja el menu de la casilla abierto.
@@ -30,5 +30,14 @@ export default [
     de: '    if (!this.isOpen(slot) || this.items[slot] === EMPTY || this.counts[slot] < count) return false;',
     a: '    if (!this.isOpen(slot) || this.items[slot] === EMPTY) return false;',
     prueba: 'test:tests/inventory-actions.test.ts',
+  },
+  // Mantener por el plazo y no por la hora de los eventos: un toque atendido
+  // tarde abre el menu.
+  {
+    nombre: 'auditoria5: mantener por el plazo',
+    fichero: 'packages/client/src/inventory-ui.ts',
+    de: 'if (d.held && !d.moving && !cancelled && e.timeStamp - d.since < MENU_HOLD_MS) {',
+    a: 'if (false) {',
+    prueba: 'gestures',
   },
 ];
