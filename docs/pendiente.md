@@ -78,7 +78,8 @@ con `TOUCH_CORE` (el anillo desliza la rejilla por geometria: dejarlo sin
 eventos no servia, por el ajuste de toque del navegador), la barra en el hueco
 y el panel del movil a 8 px de cada lado.
 
-**Falta**: la CI y `main`, que el autor lo juegue, y la auditoria de la tanda.
+En `main` tras las dos tandas en verde en `pruebas` (`6748612`). **Falta**:
+que el autor lo juegue, y la auditoria de la tanda.
 
 ---
 
