@@ -21,17 +21,22 @@ del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
 - **Un pixel de arte es 1/24 de bloque en todo**: suelo, aspas, rocas,
   estaciones, jugador y escombros (`WORLD_PX`). Sustituyo a la escala de
   antes (`BASE`, `ARBOL` y `DETAIL`, abajo en «Proporciones»), que daba a
-  cada objeto un pixel de otro tamano. **Los tamanos en el mundo no
+  cada objeto un pixel de otro tamano. **Los tamanos en el mundo casi no
   cambiaron**: los dibujos se hicieron a la medida de lo que ya median.
+  Medidos con `npm run shots`: el jugador 1,88 (era 1,93), una mata 1,04
+  (1,17), un brote 0,79 (0,88) y la roca 1,0 (1,09); las copas, las de su
+  especie.
 - **El suelo** (`terrain-mesh.ts`): cada casilla toma la tesela de 24 × 24 de
   su suelo en un atlas, en una de sus 3-4 variantes (`terrainVariant`, de la
   casilla y la semilla); la tapa de 1 × 1, la tesela entera; la de cada
   columna, su cuarto. **Las paredes, del mismo material y mas oscuras** (el
   autor; el 0,72 de antes, `WALL_LIGHT`), en caras de un voxel, para que una
-  pared alta repita la textura en vez de estirarla. Sin el ±10 % de brillo
+  pared alta repita la textura en vez de estirarla. Cuesta poco: medido en 25
+  chunks de tres semillas, de un 3 a un 5 % mas de triangulos. Sin el ±10 % de brillo
   por casilla de antes (el autor). Sigue en Lambert: su textura va **sin
   espacio de color**, como iban los colores por vertice a los que sustituye,
-  y se ve con los mismos colores (medido: la hierba, 92,136,84 en pantalla).
+  y se ve con los mismos colores (medido: la roca del suelo, 120,120,116 en
+  pantalla antes y despues).
 - **Lo que no se ilumina** (aspas, estaciones, agua, jugador) va con la
   textura en sRGB: se ve con los colores del dibujo, tal cual.
 - **Las rocas y los minerales son voxeles** (el autor, 2026-10-19), no aspas:

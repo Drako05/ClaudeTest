@@ -180,9 +180,11 @@ numero (linea base actual: unas 3 milesimas de milisegundo).
 alturas; el cliente la malla y la mira. Ni una regla, colision o test del nucleo
 cambio al pasar de cenital a isometrica, ni de isometrica a 3D.
 
-**Los elementos del mundo son aspas de dos laminas**, no sprites que giran con
-la camara: asi el bosque tiene lados. El jugador si es un sprite que mira a la
-camara, por decision del autor. El detalle esta en `docs/arte.md`.
+**El mundo es pixelart a 24 pixeles por bloque**, en todo: suelo, plantas,
+rocas, estaciones y jugador. **Los elementos son aspas de dos laminas**, no
+sprites que giran con la camara: asi el bosque tiene lados. Las rocas y los
+minerales son voxeles, y el jugador un sprite que mira a la camara, por
+decision del autor. El detalle esta en `docs/arte.md`.
 
 **El input tactil no rompe la frontera del nucleo.** El joystick y los botones
 son una segunda fuente que produce la misma `Intent` que el teclado; el nucleo
@@ -191,7 +193,7 @@ no se entera de que existe una pantalla tactil. El vector de la `Intent` es
 joystick producen exactamente lo mismo: uno con teclas, el otro con un pulgar.
 
 **Una malla por chunk, no por tile.** El terreno de cada chunk es una sola
-geometria con color por vertice, y las sombras de sus elementos van en otra
+geometria con las teselas de su suelo en un atlas, y las sombras de sus elementos van en otra
 malla por chunk, apoyada casilla a casilla en el suelo: el coste va por chunk,
 no por casilla.
 
@@ -218,7 +220,7 @@ Encima de eso, lo que vino despues:
 - **El mundo tiene altura, y estorba.** Hasta 41 niveles, laderas escalonadas,
   mesetas y acantilados; y desde la fase 2 hay gravedad, salto y caida, asi que
   ya no se cambia de nivel andando.
-- **Camara libre en 3D**, con los elementos como aspas de dos laminas,
+- **Camara libre en 3D**, en pixelart, con los elementos como aspas de dos laminas,
   proporciones al estilo Minecraft —el jugador dos bloques, y cada arbol
   con la forma de una especie real y un tronco de al menos 2 para ver por
   debajo de la copa—, dia y noche, y los efectos reutilizando la fisica que ya

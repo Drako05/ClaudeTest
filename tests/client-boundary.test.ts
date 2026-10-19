@@ -53,7 +53,7 @@ describe('el cliente cuelga de su entrada', () => {
     // Sin esto, un fallo del patron dejaria el grafo en la entrada sola y el
     // test de huerfanos fallaria por el motivo equivocado.
     expect(graph.size).toBeGreaterThan(10);
-    expect([...graph.keys()].some((f) => f.endsWith('art.ts'))).toBe(true);
+    expect([...graph.keys()].some((f) => f.endsWith('world-art.ts'))).toBe(true);
   });
 
   it('no queda ningun fichero huerfano', () => {

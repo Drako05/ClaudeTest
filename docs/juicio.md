@@ -27,6 +27,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Pixelart del mundo: **sin mipmaps**: el suelo y las aspas se ven a pixeles enteros de cerca, y de lejos centellean un poco en vez de emborronarse | `docs/arte.md`, el pixelart | `pixelTexture` en `world-sprites.ts` |
 | Pixelart del mundo: **el jugador** (tunica azul, calzas pardas, botas, pelo castaño, de frente y a 46 pixeles) y **la mesa y el horno** redibujados a 24 pixeles, con tus diseños de antes | `docs/guia-de-arte.md`, directriz 7 | `player`, `workbench`, `furnace` en `tools/pixel-mundo.ts` |
 | Pixelart del mundo: **los escombros, de 4 a 12 pixeles de arte y las esquirlas de 2 a 3** (lo que median), con todos los colores del dibujo de lo que se rompe | `docs/arte.md`, proporciones | `spawnDebris`, `spawnChips`, `debrisPalette` |
+| Pixelart del mundo: **los tamaños medidos**: el jugador 1,88 (era 1,93), la mata **1,04 con su caja de choque en 1,1**, el brote **0,79 con la suya en 0,85**, la roca 1,0 (su caja, 0,9 de ancho y 1 de alto). Lo que se ve queda unos centimetros por dentro de lo que choca | `docs/arte.md`, el pixelart | el dibujo, o `BUSH_BOX` y `SAPLING_BOX` |
 | Pixelart del mundo: **los iconos de la mesa y el horno, con los colores de sus caras nuevas**: cada color, el del mismo papel y la misma luz que el de antes; los dibujos, los que aprobaste | `docs/guia-de-arte.md`, directriz 5 | la paleta de los iconos |
 | Movil: **el anillo de cada casilla desliza la rejilla por el juego, sin inercia** (se decide por geometria al apoyar el dedo); **la barra deslizable adelgaza** hasta caber en el hueco en un telefono estrecho (17,5 px en 375); **el panel queda a 8 px de cada lado** (el tope de ancho de PC lo dejaba a 16 a la derecha) | `docs/recoleccion.md` | `bindDrag` en `inventory-ui.ts`, reglas CSS |
 | Menu de una casilla y sus avisos: **esquinas de 8 px**, las de los botones con texto (pestañas, Reiniciar) | `docs/recoleccion.md`, las opciones de una casilla | una regla CSS |
@@ -51,7 +52,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Recetas: **el ritmo del + y - mantenidos, su ejemplo tal cual**: uno en el acto, 3 el primer segundo, 4 el segundo, 5 el tercero…, a partes iguales dentro de cada segundo y sin tope de ritmo | `docs/recoleccion.md`, fabricar | `qty-hold.ts` |
 | Recetas: **+ y - de 26 px**, apagados tambien en su tope (el + en lo que alcanza, el - en 1); y **la N se queda despues de fabricar**, bajando sola si ya no alcanza | `docs/recoleccion.md`, fabricar | CSS y `inventory-ui.ts` |
 | Recetas: **los diseños de las 6 categorias** (pico y hacha, la mesa de lado, el crisol con la llama, la tunica, el muslo y la espada); los viste en la hoja | `docs/guia-de-arte.md`, directriz 5 | `CATEGORY_ROWS` |
-| Colores: **el horno se oscurecio con la piedra**, por ser de piedra | `docs/pendiente.md`, la tanda | `STATION_FACES` |
+| Colores: **el horno se oscurecio con la piedra**, por ser de piedra | `docs/pendiente.md`, la tanda | `STATION_BASE` |
 | Iconos: **las reglas de estilo que saque de tu referencia**: contorno oscuro de 1 pixel alrededor de todo (`#1d1a26`, lo afirma un test), luz arriba a la izquierda, 3-4 tonos por material y 1 pixel de margen. Las hojas las aprobaste; las reglas, escritas asi, no las has visto | `docs/guia-de-arte.md`, directriz 5 | la paleta y un test |
 | Iconos: **una paleta comun** de colores por material (madera, corteza, piedra, hierro, cobre, carbon, hoja, baya, carne, hueso, fibra, piel, pluma, caparazon…), de la que salen los 30; las estaciones, con los colores de su modelo | `docs/guia-de-arte.md`, directriz 5 | `ITEM_PALETTE` |
 | Iconos: **48 px en las casillas**, el doble exacto de la rejilla, y **24 donde no caben 40 px de contenido** (el dibujo trae 2 px de margen a 48 y puede invadir el relleno); que sea siempre un multiplo entero es tuyo. La cantidad y el desgaste van encima, con sombra | `docs/recoleccion.md`, el panel | un numero en `index.html` |
@@ -222,7 +223,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | El tronco va en escalones de **un cuarto de bloque** (13 alturas) | Arboles altos | un numero |
 | El **alto de copa** de cada especie (5; 4,5; 3,5; 3; 5; 4,5) y el numero de pisos de las coniferas | Arboles con forma de su especie | numeros en `tree-shapes.ts` |
 | Los pisos de las coniferas con **base plana**, sin puntas caidas | Arboles con forma de su especie | una linea |
-| La punta engrosada de la picea negra: **tres pisos cortos que cierran en punta** desde el 62 % de la copa | Arboles con forma de su especie | numeros en `art.ts` |
+| La punta engrosada de la picea negra: **tres pisos cortos que cierran en punta** desde el 62 % de la copa | Arboles con forma de su especie | `conifer` en `tools/pixel-mundo.ts` |
 | Los arboles raros **pierden su +15 %**: ahora son especie propia | Arboles con forma de su especie | un numero |
 | Desde arriba, un bosque denso con copas grandes **tapa mas al jugador** | Arboles altos | es el cabo de la camara que ya estaba pendiente |
 

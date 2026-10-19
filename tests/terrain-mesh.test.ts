@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, type Terrain } from '@verdant/shared';
 import { CHUNK_COLUMNS, topOf, VOXEL, VOXELS_PER_TILE, World } from '@verdant/sim';
-import { chunkMesh, meshHeightAt, terrainVariant } from '../packages/client/src/terrain-mesh.js';
+import { chunkMesh, meshHeightAt, terrainVariant, WALL_LIGHT } from '../packages/client/src/terrain-mesh.js';
 
 /**
  * La malla del terreno.
@@ -128,7 +128,7 @@ describe('La malla dice lo mismo que el mundo', () => {
 describe('La textura del suelo (pixelart, 24 pixeles por bloque)', () => {
   /** Cuanto abarca cada cuadrilatero en la tesela y en el mundo. */
   function quads(mesh: ReturnType<typeof chunkMesh>) {
-    const out: { lid: boolean; du: number; dv: number; size: number; height: number }[] = [];
+    const out: { lid: boolean; du: number; dv: number; size: number; height: number; light: number[] }[] = [];
     for (let t = 0; t < mesh.indices.length; t += 6) {
       const ids = [0, 1, 2, 5].map((k) => mesh.indices[t + k]);
       const us = ids.map((i) => mesh.uvs[i * 2]);
@@ -143,6 +143,7 @@ describe('La textura del suelo (pixelart, 24 pixeles por bloque)', () => {
         dv: span(vs),
         size: Math.max(span(xs), span(zs)),
         height: span(ys),
+        light: [0, 1, 2].map((c) => mesh.colors[ids[0] * 3 + c]),
       });
     }
     return out;
@@ -166,6 +167,13 @@ describe('La textura del suelo (pixelart, 24 pixeles por bloque)', () => {
       }
     }
     expect(walls, 'el chunk elegido no tiene paredes').toBeGreaterThan(0);
+  });
+
+  it('las paredes, del mismo material y mas oscuras (el autor): la tapa a plena luz, la pared a 0,72', () => {
+    const world = new World(12345);
+    const all = quads(chunkMesh(world, chunkWithRelief(world), flat));
+    for (const q of all) expect(q.light).toEqual(q.lid ? [1, 1, 1] : [...WALL_LIGHT].map((v) => Math.fround(v)));
+    expect(WALL_LIGHT[0]).toBe(0.72);
   });
 
   it('la variante de cada casilla es fija, usa todas y no es la misma en todas partes', () => {

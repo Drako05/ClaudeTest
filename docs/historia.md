@@ -11,12 +11,163 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## El mundo en pixelart HD (2026-10-19) — HECHA
+
+El autor: «adaptemos el arte del terreno y los elementos
+(árboles, rocas, minerales, plantas...) al pixelart HD. Los animales quedan
+para otra tanda.» Sus respuestas (seran la directriz 7 de
+`docs/guia-de-arte.md`):
+- «Caras de 24x24 en bloques (voxeles 12x12). Esa debe ser la medida para
+  todo elemento del juego. Esto implica rehacer las estaciones.»
+- Las paredes del terreno, del **mismo material, mas oscuro**.
+- **Sin contorno** en los elementos del mundo.
+- Entran tambien **el agua, la mesa y el horno, el jugador, y los escombros y
+  esquirlas**.
+- **Rocas y minerales, bloques de voxeles** de forma irregular, no laminas.
+- El suelo, **3-4 variantes por casilla** elegidas con la semilla, **sin** el
+  ±10 % de brillo de hoy.
+- Las **sombras, difuminadas como hoy**.
+
+**El plan, por rondas, cada una ensenada antes de seguir** (como los iconos):
+1. **Muestra de estilo** en la hoja `?mundo=1` (`world-sheet.ts`): hierba (4
+   variantes) y roca (2) con su pared, el roble, la mata de la pradera y la
+   roca de voxeles. **Ensenada el 2026-10-19.** El autor: «El árbol y el
+   arbusto no me convence mucho», con dos referencias (un roble y una mata de
+   bayas en pixelart, que el repo no guarda): «El follaje del árbol debería
+   ser más unido y entrelazado, no como si fueran varias bolas de hojas una
+   al lado de la otra.» Rehechos. El autor: «El arte del árbol que hiciste
+   está bien. Sin contornos es lo correcto», pero las ramas parecian «la
+   copa y luego le recortaste un par de agujeros»; en su referencia (un
+   arbol de copa alta en pixelart) **las ramas van debajo del follaje, y las
+   que se ven dentro son pequenas, con follaje de fondo o sin estar rodeadas
+   del todo**. Y que el detalle sea «más profesional»: en otra referencia, un
+   arbusto «noob» y uno «pro», **el pro da la ilusion de hojas sueltas**.
+   Rehechos otra vez. El autor: las ramas «aparecen no tener textura», lo que
+   cubre la union de las ramas parece «musgo más que hojas», y las hojas
+   «tienen cierta forma, no son solo líneas de color»; los tallos de la mata,
+   planos. Y: **«Hagamos un último intento y aplícalo tal cual como te salga.
+   No vamos a gastar más tiempo en eso, ya habrán otras tandas para
+   perfeccionar los dibujos.»** Hecho el ultimo intento (corteza en ramas y
+   tallos, la horquilla bajo la sombra de la masa principal, hojas con forma
+   en abanicos): **la ronda 1 queda cerrada con eso**.
+2. El resto en la hoja: los 8 terrenos, el agua (animada o no: el autor, al
+   verla), las 6 especies, matas, brotes, rocas y minerales, guijarros, el
+   jugador y las estaciones a 24 px. **Hecha y ensenada el 2026-10-19;
+   esperando al autor.** Lo nuevo:
+   - el pincel se mudo a `client/src/pixel-paint.ts` (puro), porque el juego
+     pinta con `barkTrunk` el tronco desnudo de cada arbol (13 largos);
+     `world-sprites.ts` compone copa y tronco (`treeArt`) y pasa un dibujo a
+     lienzo (`artCanvas`);
+   - cada dibujo lleva **su paleta**, como los iconos: con todos los
+     materiales, las letras de una paleta comun no alcanzan;
+   - las copas de conifera son **pisos** (`Mass.tier`): triangulos de puntas
+     caidas y borde dentado, cada uno sobre el de debajo;
+   - los minerales son la **piedra de la roca con vetas** de su mineral, no
+     una roca entera de su color (*deduccion*);
+   - los colores de lo vivo salen de `palette.ts` con algo mas de saturacion,
+     la luz hacia el amarillo y la sombra hacia el azul (*deduccion*); la
+     nieve, con sombras mas suaves que el resto del suelo;
+   - el agua, **quieta** de momento: si se anima, lo decide el autor.
+3. **Al juego — hecha el 2026-10-19** (el autor: «Dale, manda asi. Luego
+   perfeccionamos»): el suelo en un atlas con sus variantes y paredes de un
+   voxel; las aspas y el jugador a 24 pixeles por bloque, sin la escala de
+   antes; los arboles con su tronco pintado al vuelo; las rocas y minerales en
+   voxeles (`rock-mesh.ts`); el agua, la mesa y el horno en pixelart; los
+   escombros con los colores de su dibujo; los iconos de las estaciones con
+   los colores de sus caras nuevas. Fuera el dibujo vectorial de antes. Lo que costo: la paleta de
+   cada copa tiene que guardar sus cuatro tonos de corteza, y la copa se apoya
+   donde empiezan sus hojas, no en el borde de su dibujo (`docs/arte.md`).
+4. Documentos (`arte.md`, la directriz 7, `juicio.md`, retirados) y la
+   auditoria de cierre (en `docs/pendiente.md` mientras sea la ultima).
+
+**Como se hacen los dibujos**: `tools/pixel-mundo.ts` (`npx vite-node`) los
+saca de formas y los escribe en `packages/client/src/world-art.ts`, donde
+**se retocan a mano**; volver a correrlo pisa los retoques.
+
+**Deducciones de la ronda 1, para el autor:**
+- Los colores son **los que se ven hoy**: el suelo, su hexadecimal (medido en
+  una captura: la hierba `#588c48` sale 92,136,84); los objetos, el de
+  `palette.ts` aclarado como lo aclara three.js, porque sus texturas no llevan
+  espacio de color y las toma por lineales.
+- Cuatro tonos por material (luz, base, sombra, hondo) repartidos por
+  proporciones fijas; la luz del noroeste.
+- La roca de voxeles: 2 × 2 abajo y 3 arriba (le falta la esquina de delante
+  a la derecha).
+- **El follaje** (`foliage` en el generador): la copa son **masas** (en el
+  roble, la principal, dos que cuelgan a los lados y una en sombra debajo,
+  delante de la horquilla), cada una un relieve (su cupula y un bulto por
+  mata), con la luz de su pendiente, la sombra que echa cada mata sobre la de
+  abajo a la derecha y la parte de abajo de cada masa en sombra. Encima,
+  **hojas sueltas** de 2-4 pixeles, de pie o en diagonal hacia arriba, un
+  tono mas claras que lo de detras y con su sombra debajo; en el borde, sus
+  puntas hacen la silueta.
+- **Las ramas** salen de la horquilla, por debajo de la copa, y suben entre
+  las masas; dentro del follaje solo se ven donde la sombra es honda.
+- El tronco, en placas de corteza con las raices abiertas. La mata, de hojas
+  sueltas, con bayas de 2 × 2 y tres tallos.
+- **Las hojas tienen forma** (`LEAVES` en el generador): tres dibujos de 3-4
+  pixeles (de pie, a la izquierda, a la derecha), con canto de luz, cuerpo y
+  sombra, en abanicos de dos o tres hacia fuera de su masa.
+- **Sus colores salen de las referencias**, no de lo que se ve hoy: verdes
+  mas hondos y saturados, corteza rojiza. Las referencias llevan **contorno
+  oscuro**; los dibujos no, porque el autor eligio «sin contorno».
+
+## Auditoria al cerrar el inventario de 5 columnas (2026-10-19)
+
+**El alcance**: de `dc902a3` a `78bead8`: la auditoria anterior y la tanda del
+inventario de 5 columnas, el menu de una casilla y los objetos que caducan,
+con sus ajustes tras jugar. La tanda, entera, en `docs/historia.md`.
+
+**Corregido:**
+- **Numeros viejos**: «22 casillas» en un comentario del humo y en un test, y
+  la barra impresa con 4 casillas en el humo (`slice(0, 4)`); el patron de
+  retirados ahora busca tambien «22 casillas» y «18 casillas».
+- **Una linea que no hacia nada** (escape 42): `split` copiaba el desgaste,
+  que en lo apilable es siempre 0.
+- **Una comprobacion que faltaba**: `takeFrom` sin su tope solo se podia
+  romper desde fuera de comer; tiene ya su test.
+- **Cerrar el panel con el menu abierto** lo cierra, pero no lo probaba nadie:
+  `desktop` lo comprueba.
+
+**Mutado a mano** (cayeron): `firstFree` sin mirar si la casilla esta
+abierta, `eatFrom` con el hambre llena y `takeFrom` sin tope.
+
+**Ejecutado**: el escaner y su autoprueba; `npm run shots` y
+`tools/analyze-world.ts`; typecheck y los tests; la pasada `desktop`.
+
+**Dejado a proposito:**
+- **Con el menu abierto, deslizar la rejilla con la rueda (en PC, con la
+  mochila puesta) lo deja donde estaba**, separado de su casilla. Es un caso
+  raro, y cerrarlo al deslizar lo cerraria tambien al desplazar hasta la
+  casilla elegida.
+- **«Todo está bien» no saca de `docs/juicio.md` las deducciones de la
+  tanda**: el autor lo dijo de la tanda entera, no de cada numero, asi que
+  siguen esperando su juicio (el estandar del escape 38 es lo aprobado
+  expresamente).
+- Las siete claves de la sonda sin lector de tandas anteriores (escape 40)
+  siguen para otra auditoria.
+
+**Escapes** (fase 6): el 41, el ajuste de toque del navegador, a la lente G;
+el 42, una mutacion que sobrevive porque la linea no hace nada, a la B; y el
+P7, una mutacion a mano que deshizo un arreglo sin commit al restaurar desde
+git.
+
+**Despues del cierre**: la CI de `main` cayo en `desktop`: la comprobacion
+nueva de cerrar y reabrir con E dejaba una captura del cursor a medias que la
+prueba de Esc veia como pausa. Ahora se hace sin pedir la captura y comprueba
+que no queda ni pausa ni captura; es el escape P8. Y al probarlo, la CI de
+`pruebas` cayo en los gestos: **un toque corto en una casilla abria el menu si
+la pagina iba ocupada**, porque el plazo de 0,3 s corria antes de atender el
+soltar. Eso le pasaria igual a un movil lento: ahora se mide por la hora de los
+eventos, y los gestos lo comprueban con un soltar de 0,1 s que llega a los 0,6
+(su mutacion cae). Es el escape 43.
+
 ## Las lentes por principios, no por casos (2026-10-19) — HECHA
 
 El autor: la skill de auditoria tiene que construirse con **protocolos que
 sirvan en proyectos parecidos**; ante cada escape, entender la logica de la
 omision y hacer un estandar, no una regla para ese caso. Una tanda propia, y
-`references/lentes.md` en un solo fichero.
+`.claude/skills/auditoria/references/lentes.md` en un solo fichero.
 
 - **`lentes.md` reescrito**: cada lente lleva su pregunta, **principios**
   numerados (`B2`, `G1`) sin nombres del proyecto, cada uno con sus «Casos»

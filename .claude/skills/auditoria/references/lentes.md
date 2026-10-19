@@ -34,10 +34,13 @@ uno, se recorre su lista entera.
   el:
   - A: sus valores y nombres;
   - D: las piezas que ahora solo sostienen los tests;
-  - E: las cabeceras de los modulos que lo usaban;
-  - F: el texto de la regla que lo enunciaba y cada resumen de ese texto;
+  - E: las cabeceras de los modulos que lo usaban, **y las de los que solo se
+    comparaban con el** («como el terreno»);
+  - F: el texto de la regla que lo enunciaba y cada resumen de ese texto
+    (tambien el README);
   - G: lo que transformaba el formato viejo (escalas, medidas).
-  Casos: #22, #26, #30, #31.
+  Se busca su nombre y sus rasgos en todo el repo, no solo sus simbolos.
+  Casos: #22, #26, #30, #31, #46.
 - **Al arreglar algo, su hermana**: el mismo fallo casi nunca esta en un solo
   sitio. Se busca el patron arreglado en el resto del repo antes de cerrar.
   Casos: #7.
@@ -59,7 +62,8 @@ Casos: #1, #19, #30.
 **A2. Un numero se toma de donde vive y del sistema que se ejecuta.** No se
 copia de un documento ni se saca de la formula continua: vale el que produce
 el sistema de verdad (en pasos discretos, el de los pasos), y el que dice la
-afirmacion (si dice «el mas fino», el minimo, no la media). Casos: #20, #27.
+afirmacion (si dice «el mas fino», el minimo, no la media). Una medida de
+antes de cambiar el modelo se repite despues. Casos: #20, #27, #44.
 
 **A3. Un nombre que ya no describe es documentacion falsa que compila.** Una
 variable, funcion o fichero cuyo nombre cuenta un comportamiento que ya no
@@ -81,7 +85,9 @@ POR QUE cayo: una prueba que revienta antes de medir no ha mordido. Si
 romperla es caro, al menos se razona con que estado saldria falsa; si no hay
 ninguno, es de adorno. Y **una mutacion que sobrevive puede ser codigo que no
 hace nada**: antes de escribir otra prueba, se mira si algun estado hace que
-la linea cambie algo; si ninguno, se quita la linea. Casos: #42, P4.
+la linea cambie algo; si ninguno, se quita la linea. Lo mismo al **relajar
+una comprobacion**: se ve antes el fallo que lo justifica. Casos: #42, #45,
+P4.
 
 **B2. El objeto de la medida es el que crees.** Antes de fiarse de una
 comprobacion se verifica que lo medido:
@@ -154,8 +160,11 @@ Casos: #3, #4.
 Casos: #16.
 
 **En este proyecto**: el escaner lista las herramientas que la CI no corre;
-hoy `npm run shots` y `npx vite-node tools/analyze-world.ts` (`slash` corre en
-la CI desde el 2026-10-02). `shots` era de antes del cursor capturado (#3),
+hoy `npm run shots`, `npx vite-node tools/analyze-world.ts` y el generador
+del pixelart, que reescribe `world-art.ts` y pisaria sus retoques a mano: se
+corre a otro fichero, `PIXEL_MUNDO_SALIDA=/tmp/world-art.ts npx vite-node
+tools/pixel-mundo.ts`, y se compara con `diff` (`slash` corre en la CI desde
+el 2026-10-02). `shots` era de antes del cursor capturado (#3),
 `slash` miraba `#thumbPad` de 0x0 (#4) y no creaba su carpeta de capturas (#16).
 
 ## D. Codigo muerto — ¿hay algo que nadie usa?
@@ -164,7 +173,8 @@ la CI desde el 2026-10-02). `shots` era de antes del cursor capturado (#3),
 escriben y no se leen, claves de una sonda que ninguna prueba consulta,
 entradas de una tabla que nadie usa. **Una relacion se comprueba en los dos
 sentidos**: no basta con que cada uso este en la tabla; cada entrada de la
-tabla tiene que tener un uso. Casos: #33, #40.
+tabla tiene que tener un uso, **y cada campo de cada entrada**. Casos: #33,
+#40, #47.
 
 **D2. Si dos mecanismos deciden lo mismo, el que pierde esta muerto.** Dos
 reglas de estilo para el mismo elemento (por especificidad o por orden), dos

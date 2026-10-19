@@ -27,6 +27,9 @@ Formato (el escaner lo lee):
 
 ## Historia que se cuenta a proposito
 
+- `ROCK_FACES` — las tres caras de la roca en `palette.ts`, retiradas el 2026-10-19 (hoy `ROCK_BASE`); la historia cuenta su oscurecimiento. En: `docs/historia.md`.
+- `STATION_FACES` — los colores de las estaciones en `palette.ts`, retirados el 2026-10-19 (hoy `STATION_BASE`). En: `docs/historia.md`.
+- `art.ts` — el arte vectorial del mundo, borrado el 2026-10-19 al pasar a pixelart; la historia cuenta lo que se hizo en el. En: `docs/historia.md`.
 - `AIR_CONTROL` — la desviacion en el aire del salto, retirada el 2026-09-30 y tachada en su tabla de numeros. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 - `effectLayer` — la capa de pantalla del isometrico, que explica por que el barrido va encima. En: `docs/efectos.md`, `packages/client/src/effects-view.ts`.
 - `fpPitch` — la inclinacion aparte de la primera persona, antes de compartir la mirada. En: `docs/controles.md`.

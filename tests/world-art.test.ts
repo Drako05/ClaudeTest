@@ -64,6 +64,14 @@ describe('Los dibujos del mundo', () => {
     }
   });
 
+  it('cada suelo tiene 3 o 4 variantes (el autor), y no hay dos iguales', () => {
+    for (const [t, tiles] of Object.entries(TERRAIN_TILES)) {
+      expect(tiles.length, Terrain[+t]).toBeGreaterThanOrEqual(3);
+      expect(tiles.length, Terrain[+t]).toBeLessThanOrEqual(4);
+      expect(new Set(tiles.map((a) => a.rows.join(''))).size, Terrain[+t]).toBe(tiles.length);
+    }
+  });
+
   it('las caras de bloque miden 24 de ancho, y de alto 24 por bloque', () => {
     for (const tiles of Object.values(TERRAIN_TILES)) {
       for (const a of tiles) expect([a.rows[0]!.length, a.rows.length]).toEqual([WORLD_PX, WORLD_PX]);
