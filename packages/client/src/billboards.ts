@@ -154,7 +154,7 @@ interface Billboard {
   readonly crownW: number;
   /** Grosor del tronco a media altura del tramo desnudo, en bloques. */
   readonly trunkW: number;
-  /** Pixeles del tallo por dentro de la copa con aire justo encima. Ver `trunkPeek`. */
+  /** Pixeles de tronco por dentro de la copa con aire justo encima. Ver `trunkPeek`. */
   readonly peek: number;
   /**
    * Geometria y material del aspa, UNO por especie y compartidos por todas sus
@@ -273,28 +273,28 @@ function trunkWidth(art: SpriteArt, bark: readonly string[], rowsUp: number): nu
 }
 
 /**
- * Cuanto asoma el canto del tallo: pixeles de corteza POR DENTRO de la copa
- * (por encima de su borde bajo) y en las columnas del tallo, con aire justo
- * encima. Un tronco que acaba en punta tapada da cero; el rectangulo de antes,
- * cuyo canto de arriba salia por los lados del cono, no. Solo el tallo: las
- * ramas del roble y del cerezo se ven contra el cielo a proposito, como en la
- * referencia del autor (2026-10-19), y su canto de arriba no es un fallo.
+ * Cuanto asoma el canto del tronco: pixeles de corteza POR DENTRO de la copa
+ * (por encima de su borde bajo) con aire justo encima. Un tronco que acaba en
+ * punta tapada da cero; el rectangulo de antes, cuyo canto de arriba salia por
+ * los lados del cono, no. Los huecos del alerce no cuentan: por ellos se ve el
+ * tronco de lado, pero encima de cada pixel sigue habiendo tronco o follaje.
+ * Las ramas del roble y del cerezo, que se ven entre las masas de su copa,
+ * tampoco: suben hasta el follaje.
  */
-function trunkPeek(art: SpriteArt, bark: readonly string[], bareRows: number, stemHalf: number): number {
+function trunkPeek(art: SpriteArt, bark: readonly string[], bareRows: number): number {
   const px = barkPixels(art, bark);
   if (!px) return 0;
   const bottom = Math.floor(art.anchorY * px.height - bareRows);
-  const cx = art.anchorX * px.width;
   let count = 0;
   for (let y = 1; y < bottom; y++) {
-    for (let x = Math.floor(cx - stemHalf); x < Math.ceil(cx + stemHalf); x++) {
+    for (let x = 0; x < px.width; x++) {
       if (px.isBark(x, y) && px.data[((y - 1) * px.width + x) * 4 + 3]! <= 8) count++;
     }
   }
   return count;
 }
 
-function fromArt(art: SpriteArt | null, cross: boolean, tree?: { bark: readonly string[]; stemHalf: number }): Billboard | null {
+function fromArt(art: SpriteArt | null, cross: boolean, tree?: { bark: readonly string[] }): Billboard | null {
   if (!art) return null;
   const texture = pixelTexture(art.canvas, true);
   const w = art.canvas.width * UNITS;
@@ -315,7 +315,7 @@ function fromArt(art: SpriteArt | null, cross: boolean, tree?: { bark: readonly 
     bare,
     crownW: tree ? crownWidth(art, bare / UNITS) : 0,
     trunkW: tree ? trunkWidth(art, tree.bark, bare / UNITS / 2) : 0,
-    peek: tree ? trunkPeek(art, tree.bark, bare / UNITS, tree.stemHalf) : 0,
+    peek: tree ? trunkPeek(art, tree.bark, bare / UNITS) : 0,
     geometry: cross ? crossGeometry(w, above, below) : null,
     // Basic y no Lambert: el arte ya lleva su luz horneada desde el noroeste.
     // Con Lambert, las dos laminas de una misma aspa se iluminarian distinto y
@@ -395,7 +395,6 @@ export class BillboardSet {
         crown &&
         fromArt(treeSprite(feature, bareBlocks, width), true, {
           bark: [...BARK].map((ch) => crown.palette[ch]!).filter(Boolean),
-          stemHalf: crown.trunkW / 2,
         });
       this.trees.set(key, art ?? null);
     }
@@ -465,7 +464,7 @@ export class BillboardSet {
     rango: [number, number];
     /** Grosor del tronco medido a media altura del tramo desnudo. */
     grosor: number;
-    /** Pixeles del tallo con aire encima por dentro de la copa: su canto asomando. */
+    /** Pixeles de tronco con aire encima por dentro de la copa: su canto asomando. */
     asoma: number;
   }> {
     const out = [];

@@ -206,7 +206,7 @@ con fecha, o la leccion de un fallo que ya paso.
 | Teclas, raton y pausa, la pantalla del movil, la barra de PC, el ojo y las vistas, la camara, los gestos, MIRA/TAP, el auto salto | `docs/controles.md` |
 | El inventario, herramientas, golpes, estaciones, ropa, el panel, el registro de objetos | `docs/recoleccion.md` |
 | Barrido, estocada, escombros, esquirlas, o una medida de «se ve» | `docs/efectos.md` |
-| Aspas, sombras, tamanos, arboles y sus especies | `docs/arte.md` |
+| El pixelart del mundo (suelo, aspas, rocas de voxeles, su generador), sombras, tamanos, arboles y sus especies | `docs/arte.md` |
 | Las directrices de arte del autor (en progreso): como se diseña un modelo o un boton | `docs/guia-de-arte.md` |
 | El relieve, el salto, el hambre | `docs/relieve.md` |
 | Los animales: especies, puntos de vida, botin, su paseo y su dibujo | `docs/fauna.md` |

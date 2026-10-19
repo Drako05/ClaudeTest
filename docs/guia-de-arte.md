@@ -202,6 +202,8 @@ que venga. Son **las directrices del autor** para el diseño.
   objetos, 14 huecos, 20 botones y 6 categorias), cada uno a 48 px y a 96, con
   su nombre.
 - **Aplicada**: los 30 objetos, los 14 huecos y los botones (2026-10-17).
+  Los de la mesa y el horno cambiaron de colores con sus caras en pixelart
+  (2026-10-19, directriz 7): cada color, el del mismo papel y la misma luz.
   Los diseños son del agente, y **el autor los aprobo en dos hojas**
   («Aprobados, adelante con la ronda 2», «Aprobados, adelante con la ronda
   3»). Un objeto nuevo necesita su icono: el test falla si falta.
@@ -249,3 +251,56 @@ que venga. Son **las directrices del autor** para el diseño.
   (`buttonStandard`), que mira cada boton que se ve en PC, en el movil y en
   el panel de desarrollo y falla si uno no cumple.
 - **Aplicada**: todos los botones del juego (2026-10-18).
+
+## Directriz 7: el mundo es pixelart HD, a 24 pixeles por bloque
+
+> «En esta tanda quiero que adaptemos el arte del terreno y los elementos
+> (árboles, rocas, minerales, plantas...) al pixelart HD. Los animales quedan
+> para otra tanda.» — el autor, 2026-10-19
+
+- **Del autor** (respuestas del 2026-10-19):
+  - **la medida**: «Caras de 24x24 en bloques (voxeles 12x12). Esa debe ser
+    la medida para todo elemento del juego. Esto implica rehacer las
+    estaciones.»;
+  - **las paredes del terreno, del mismo material, mas oscuras**;
+  - **sin contorno** en el mundo («Sin contornos es lo correcto», al ver el
+    roble);
+  - entran tambien **el agua, la mesa y el horno, el jugador, y los escombros
+    y esquirlas**;
+  - **las rocas y los minerales, bloques de voxeles**, no laminas;
+  - el suelo, **3-4 variantes por casilla**, sin el brillo por casilla de
+    antes; las **sombras, difuminadas** como antes.
+- **El follaje, con sus referencias** (un roble, una mata de bayas, un arbol
+  de copa alta y un arbusto «noob» frente a uno «pro», en pixelart; el repo no
+  las guarda):
+  - «El follaje del árbol debería ser más unido y entrelazado, no como si
+    fueran varias bolas de hojas una al lado de la otra.»;
+  - las ramas, **debajo del follaje**: «las que se ven dentro del follaje son
+    pequeñas y tienen follaje de fondo o no están totalmente rodeadas de
+    follaje», no huecos recortados en la copa;
+  - **hojas con forma**: «tienen cierta forma, no son solo líneas de color»;
+    el arbusto «pro» «da la ilusión de hojas»;
+  - las ramas y los tallos, **con textura**.
+- **Como se aplico** (lectura del agente, *por confirmar*):
+  - la copa es un relieve de **masas** (la principal y las que cuelgan), cada
+    una con sus matas, la luz de su pendiente y la sombra que cada mata echa
+    sobre la de abajo a la derecha; encima, **hojas sueltas de 3-4 pixeles**
+    con canto de luz, cuerpo y sombra, en abanicos (`foliage` y `LEAVES` en
+    `pixel-paint.ts`);
+  - **cuatro tonos por material** (luz, base, sombra, hondo), la luz del
+    noroeste; lo vivo, desde su color de `palette.ts` con la luz hacia el
+    amarillo y la sombra hacia el azul;
+  - las coniferas, en **pisos** de puntas caidas y borde dentado.
+- **Como se hacen**: `tools/pixel-mundo.ts` los saca de formas y los escribe en
+  `client/src/world-art.ts`, donde se retocan a mano (volver a correrlo pisa
+  los retoques). El detalle, en `docs/arte.md`.
+- **Como se revisa**: `?mundo=1`, la hoja de todos los dibujos.
+- **Aplicada** (2026-10-19): el suelo, el agua, los seis arboles, las seis
+  matas, los seis brotes, la roca, los tres minerales, los guijarros, el
+  jugador, la mesa, el horno y los escombros. El roble y la mata, tras tres
+  rondas con sus referencias, con su ultima palabra: «Hagamos un último
+  intento y aplícalo tal cual como te salga. No vamos a gastar más tiempo en
+  eso, ya habrán otras tandas para perfeccionar los dibujos»; y el resto, «Dale,
+  manda asi. Luego perfeccionamos».
+- **Lo que no la cumple**: la fauna, que es otra tanda.
+

@@ -1,8 +1,54 @@
-# El arte en 3D: aspas y proporciones
+# El arte en 3D: pixelart, aspas y proporciones
 
-Lee esto antes de tocar `billboards.ts`, `art.ts`, `tree-shapes.ts`,
-`shadows.ts`, `shadow-patches.ts`, `sim/trunk.ts` o cualquier tamano de lo que
-se dibuja.
+Lee esto antes de tocar `billboards.ts`, `world-art.ts`, `world-sprites.ts`,
+`pixel-paint.ts`, `rock-mesh.ts`, `terrain-mesh.ts`, `tree-shapes.ts`,
+`shadows.ts`, `shadow-patches.ts`, `sim/trunk.ts`, `tools/pixel-mundo.ts` o
+cualquier tamano de lo que se dibuja.
+
+## El mundo es pixelart a 24 pixeles por bloque (2026-10-19)
+
+Lo pidio el autor: «adaptemos el arte del terreno y los elementos (árboles,
+rocas, minerales, plantas...) al pixelart HD», y fijo la medida: «caras de
+24x24 en bloques (voxeles 12x12). Esa debe ser la medida para todo elemento
+del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
+(directriz 7). Como esta hecho:
+
+- **Los dibujos son rejillas de caracteres** (`world-art.ts`): una fila por
+  fila de pixeles, `.` transparente y cada letra un color de **la paleta de su
+  dibujo**. Los saca de formas `tools/pixel-mundo.ts` (`npx vite-node`) con el
+  pincel de `pixel-paint.ts`, y **despues se retocan a mano en
+  `world-art.ts`**: volver a correr el generador pisa los retoques.
+- **Un pixel de arte es 1/24 de bloque en todo**: suelo, aspas, rocas,
+  estaciones, jugador y escombros (`WORLD_PX`). Sustituyo a la escala de
+  antes (`BASE`, `ARBOL` y `DETAIL`, abajo en «Proporciones»), que daba a
+  cada objeto un pixel de otro tamano. **Los tamanos en el mundo no
+  cambiaron**: los dibujos se hicieron a la medida de lo que ya median.
+- **El suelo** (`terrain-mesh.ts`): cada casilla toma la tesela de 24 × 24 de
+  su suelo en un atlas, en una de sus 3-4 variantes (`terrainVariant`, de la
+  casilla y la semilla); la tapa de 1 × 1, la tesela entera; la de cada
+  columna, su cuarto. **Las paredes, del mismo material y mas oscuras** (el
+  autor; el 0,72 de antes, `WALL_LIGHT`), en caras de un voxel, para que una
+  pared alta repita la textura en vez de estirarla. Sin el ±10 % de brillo
+  por casilla de antes (el autor). Sigue en Lambert: su textura va **sin
+  espacio de color**, como iban los colores por vertice a los que sustituye,
+  y se ve con los mismos colores (medido: la hierba, 92,136,84 en pantalla).
+- **Lo que no se ilumina** (aspas, estaciones, agua, jugador) va con la
+  textura en sRGB: se ve con los colores del dibujo, tal cual.
+- **Las rocas y los minerales son voxeles** (el autor, 2026-10-19), no aspas:
+  `rock-mesh.ts`, siete voxeles de 0,5 (le falta una esquina, para que no
+  sea un cubo) con la piedra de su tesela, girados un cuarto de vuelta por
+  casilla y con la luz de cada cara horneada como las estaciones. Ocupan su
+  casilla (1 × 1 × 1); su caja de choque sigue en 0,9 × 1,0.
+- **Los arboles** son su copa (`CROWNS`, fija) sobre el tronco desnudo de
+  cada uno, que tiene trece largos y su grosor y por eso **se pinta al vuelo**
+  (`treeArt` en `world-sprites.ts`, con `barkTrunk`). La copa se apoya donde
+  empiezan sus hojas en la columna del tronco: el tronco desnudo que se ve es
+  exactamente el del nucleo, que es su hitbox.
+- **Sin contorno** en el mundo (el autor), y las sombras, **difuminadas como
+  antes** (el autor).
+- **Como se revisa**: `?mundo=1` abre la hoja de todos los dibujos
+  (`world-sheet.ts`), ampliados por un entero, con el suelo mezclado, el agua
+  sobre su fondo, las rocas y las estaciones en perspectiva y una escena.
 
 Estaba en `CLAUDE.md` hasta el 2026-10-02 y se mudo aqui **literal** (propuesta 3:
 `CLAUDE.md` se carga entero en cada turno, asi que lleva solo lo operativo y
@@ -10,7 +56,9 @@ un indice de estos documentos).
 
 ## Las features son aspas; el jugador, no
 
-**Cada elemento del mundo son dos laminas cruzadas a 90 grados**, no un billboard.
+**Cada elemento del mundo son dos laminas cruzadas a 90 grados**, no un
+billboard. Salvo las estaciones y, desde el 2026-10-19, las rocas y los
+minerales, que son cajas y voxeles.
 Un sprite se reorienta a la camara en cada frame, y con la camara libre eso
 delata que son cromos: los arboles giran contigo y el bosque no tiene lados. La
 segunda lamina es lo que impide que la primera desaparezca vista de canto, y eso
@@ -35,19 +83,19 @@ que se cruzan se atraviesan, y con `transparent` a secas el orden de pintado
 entre ellas es una loteria; con `alphaTest` cada fragmento se pinta o se
 descarta, escribe profundidad y el orden deja de importar. De ahi salen:
 
-- **El umbral es 0.4 y no puede ser menor**, porque el arte pinta su sombra **al
-  26 %** y con el material opaco cualquier umbral que la conserve la pintaria
-  **negra maciza**. O sea que la sombra del arte se descarta por fuerza.
-- **Por eso la sombra va aparte y tumbada** (`shadows.ts`), que ademas es
+- **El umbral es 0.4.** Lo fijo una sombra que el arte vectorial pintaba al pie
+  **al 26 %**, que con el material opaco saldria **negra maciza**; el pixelart
+  no tiene pixeles a medias (o hay tinta o no), asi que hoy cualquier umbral
+  da lo mismo.
+- **La sombra va aparte y tumbada** (`shadows.ts`), que ademas es
   donde debia estar: la pintada era una elipse VERTICAL pegada al pie, herencia
   de que el arte nacio para una camara isometrica fija. Sin ella unos arboles de
   tres bloques parecen pegatinas flotando. Medido quitandolas: 60.429 pixeles
   oscurecidos con sombras contra 32.882 sin ellas.
 
 **El material es `MeshBasicMaterial`, no Lambert.** El arte ya lleva su luz
-horneada desde el noroeste y el sprite tampoco se iluminaba, asi que asi el
-ASPECTO no cambia y solo cambia la orientacion. Con Lambert las dos laminas de
-una misma aspa se iluminarian distinto y el dibujo se ensuciaria.
+horneada desde el noroeste. Con Lambert las dos laminas de una misma aspa se
+iluminarian distinto y el dibujo se ensuciaria.
 
 **Cada aspa lleva su propio giro, y sale de `hash2DFloat`, no de
 `Math.random`.** No es purismo: los chunks se descartan y se regeneran
@@ -75,6 +123,9 @@ aspas por (chunk, especie) en `InstancedMesh`**, que es lo que bajaria de verdad
 las draw calls.
 
 ## Proporciones
+
+*Lo que sigue es como se llego a los tamanos de hoy. Desde el 2026-10-19 no
+hay escala: el pixelart se dibujo a esos tamanos, a 24 pixeles por bloque.*
 
 **Un bloque no es la unidad de nada vivo.** El arte nacio para el isometrico con
 el jugador midiendo 0,78 bloques y un arbol 1,22, y el autor lo comparo con
@@ -117,14 +168,13 @@ se ve y el que se golpea no pueden no coincidir. Dos cosas que no son de gusto:
   las especies que rozan el minimo) exactamente en cada tope.
   `tests/trunk.test.ts` lo afirma y muerde.
 
-El arte se redibuja por **(especie, cuarto de bloque)**, cada combinacion una
+El arbol se compone por **(especie, cuarto de bloque)**, cada combinacion una
 vez y solo cuando aparece (`BillboardSet.tree`): sigue siendo un Mesh por arbol
-con geometria y material compartidos. `makeFeatureArt(feature, detail, { bare, pxPerBlock })`
-dibuja el tronco y apoya la copa encima. Y el tronco se
-**mide del dibujo**, no de la cuenta: la tirada del color del tronco en la
-columna del pie, que termina donde la copa se pinta encima
-(`window.__verdant.trunks`, que el humo afirma). La copa de cada arbol sale de
-su especie: ver abajo.
+con geometria y material compartidos. `treeArt` (`world-sprites.ts`) pinta el
+tronco y apoya la copa encima. Y el tronco se **mide del dibujo**, no de la
+cuenta: la tirada de corteza (cualquiera de sus cuatro tonos) en la columna
+del pie, que termina donde empiezan las hojas (`window.__verdant.trunks`, que
+el humo afirma). La copa de cada arbol sale de su especie: ver abajo.
 
 **Cada arbol tiene la forma de una especie real** (`tree-shapes.ts`), para no
 iterar proporciones a ojo. El reparto y el alcance son del autor: se toma **solo
@@ -141,17 +191,21 @@ bloques de alto**; el alto exacto y el numero de pisos son deduccion mia.
 | Tundra raro | Picea azul | 4,5 × 2 | cono denso de 6 pisos | 2,2 ± 0,2 | 0,40 |
 
 El grosor es el del pie para el tronco medio; uno mas alto de su especie sale mas
-grueso (`√(desnudo/μ)`). Y el tronco **estrecha y acaba en punta dentro de la
-copa**: fue un rectangulo que subia al 85 % de las coniferas, y ahi el cono ya
-es mas estrecho que el, asi que el autor vio asomar su canto por los lados. En
-las coniferas la punta cae a media altura de un piso, para quedar tapada
-tambien en el alerce, que entre piso y piso deja hueco. `BillboardSet.crowns`
-cuenta los pixeles de tronco con aire encima por dentro de la copa (`asoma`) y
-el humo exige cero; con el rectangulo de antes, caen tres coniferas.
+grueso (`√(desnudo/μ)`). Y el tronco **acaba en punta dentro de la copa**: fue
+un rectangulo que subia al 85 % de las coniferas, y ahi el cono ya es mas
+estrecho que el, asi que el autor vio asomar su canto por los lados. En las
+coniferas la punta cae a media altura de un piso, para quedar tapada tambien
+en el alerce, que entre piso y piso deja hueco. En pixelart, el tallo va
+**recto hasta la base de ese piso y estrecha solo dentro de el**: estrechando
+en los huecos del alerce, cada escalon dejaba un pixel con aire encima. En el
+roble y el cerezo el tronco se abre por debajo de la copa y sus ramas suben
+entre las masas de follaje (la referencia del autor); el tallo del centro no
+asoma dentro de la copa. `BillboardSet.crowns` cuenta los pixeles de tronco
+con aire encima por dentro de la copa (`asoma`) y el humo exige cero; las ramas
+que se ven entre las masas suben hasta el follaje y no cuentan.
 
-Sustituyo a un `CROWN = 1.5` comun que duro un dia. La copa se dibuja **desde
-su borde bajo, que es exactamente el tronco desnudo**: por eso las coniferas
-tienen los pisos de base plana —con las puntas caidas, la copa bajaba de su
+Sustituyo a un `CROWN = 1.5` comun que duro un dia. La copa se apoya **en el
+tronco desnudo exacto**: por eso las coniferas tienen los pisos de base plana —con las puntas caidas, la copa bajaba de su
 borde y ni el tronco ni el ancho median lo que pedia la especie— y la sombrilla
 del cerezo apoya su racimo grande en el borde. Las dos cosas las destapo la
 medida, no la vista. Los raros dejaron de llevar su +15 % generico: ahora son
@@ -168,11 +222,13 @@ con una elipse lisa por penacho, y en el movil del autor se leia como una bola
 clavada en un palo. Ahora la punta engrosada son tres pisos cortos que cierran
 en punta; eso solo lo dice una captura.
 
-La medida del tronco busca el tronco **unas filas por encima del pie**: el
-lienzo redondea su alto al alza, el ancla es una fraccion del alto logico, y la
-fila del pie mezcla tronco y sombra. Con la copa mas alta esa fila cayo mal y el
-frondoso midio **cero** de tronco; mirando solo la fila del pie, que un arbol
-mida bien o no dependia del redondeo.
+La medida del tronco miraba **unas filas por encima del pie** cuando el arte
+era vectorial: el lienzo redondeaba su alto y la fila del pie mezclaba tronco y
+sombra pintada. En pixelart el pie es la ultima fila del lienzo, exacta. Lo
+que si costo: **la paleta de cada copa guarda sus cuatro tonos de corteza
+aunque no los use** (`tools/pixel-mundo.ts`), porque con ellos se pinta el
+tronco debajo; sin uno, ese tono salia transparente y las coniferas median
+0,2 bloques de tronco. Lo afirma `tests/world-art.test.ts`.
 
 **Esto es ARTE, no fisica.** El salto (apice 1,16), `STEP_UP` y la colision van en
 unidades de mundo y no saben lo que mide un sprite, asi que `packages/sim` no se
@@ -180,24 +236,20 @@ entera. Y de paso queda mas cerca de Minecraft de lo que estaba: alli mides 1,8,
 subes 0,6 andando y saltas 1,25; aqui 1,93, `STEP_UP` 0,5 y apice 1,16. La regla
 21 se lee igual de bien con el personaje nuevo.
 
-**El arte se redibuja, no se estira**, que es lo que separa un 2D-HD de un
-pixelado. `makeFeatureArt(feature, detail)` y `makePlayerArt(detail)` crean el
-lienzo `detail` veces mas grande y le aplican `ctx.scale(detail, detail)`: **ni
-una coordenada de dibujo cambia**, y `anchorX`/`anchorY` salen bien solas porque
-ya eran fracciones. Con `detail = 1` sale byte por byte el dibujo original del
-isometrico, que lo verifico su humo mientras existio.
-
 **Las proporciones se MIDEN, no se miran.** `BillboardSet.sizes` busca el pixel
-con tinta mas alto de cada lienzo y lo pasa a bloques; `npm run shots` los
-imprime. No vale el alto del lienzo ni el ancla: un arbol ocupa 39 px de un
-lienzo de 58 y lo que queda por encima del ancla es la cota superior. Estimando por el lienzo me sali
-con que un brote mediria 1,52 bloques y una roca 2,88; medidos son 0,88 y 1,09.
+con tinta mas alto de cada lienzo y lo pasa a bloques (la roca, de sus
+voxeles); `npm run shots` los imprime. No vale el alto del lienzo ni el ancla:
+con el arte vectorial, un arbol ocupaba 39 px de un lienzo de 58, y estimando
+por el lienzo salia que un brote mediria 1,52 bloques y una roca 2,88; medidos
+eran 0,88 y 1,09.
 
 Dos cosas arrastro el cambio y no eran opcionales: **la altura de los ojos**
 subio con el personaje —1.2 le quedaba por las rodillas al nuevo; paso a 1.6 y
 hoy es `EYE_HEIGHT = 1,75`, la misma para las tres vistas y el golpe (deduccion
-mia)—; y **los escombros** llevan el mismo `BASE`, porque son astillas de lo que
-se derriba y sin el pasaban de chinas a polvo. El barrido ya no depende de
+mia)—; y **los escombros** llevaban el mismo `BASE`, porque son astillas de lo
+que se derriba y sin el pasaban de chinas a polvo. Desde el pixelart miden
+pixeles enteros a 24 por bloque (de 4 a 12; las esquirlas, de 2 a 3), lo mismo
+que median, y sus colores son los de su dibujo (`debrisPalette`). El barrido ya no depende de
 esto: recorre el borde del sector del golpe (ver `docs/efectos.md`).
 
 Y una consecuencia que es de juicio del autor, no medible: **el relieve se lee
