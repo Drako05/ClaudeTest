@@ -649,6 +649,9 @@
         top: calc(74px + env(safe-area-inset-top));
         bottom: calc(10px + var(--atk) + 12px + 2 * var(--side) + 20px + env(safe-area-inset-bottom));
         transform: none; grid-template-columns: 1fr; justify-items: center;
+        /* A 8 px de cada lado: el tope de ancho de PC lo dejaba a 16 a la
+           derecha, y el hueco de la barra deslizable quedaba torcido. */
+        max-width: none;
         display: flex; flex-direction: column; overflow: hidden; padding: 0 12px 12px; gap: 0;
       }
       body.touch-active #invPanel[hidden] { display: none; }
@@ -663,15 +666,23 @@
       body.touch-active .invPage { display: none; }
       body.touch-active .invPage.current { display: flex; flex: 1; }
       body.touch-active #invGrid, body.touch-active #recipeList { max-height: none; min-height: 0; }
-      /* Cinco columnas de 60 y la barra deslizable al lado no caben en 390 px:
-         las casillas de la rejilla encogen a lo que quepa, dejando sitio a la
-         barra a cada lado para que la rejilla siga centrada (*deduccion*). La
-         zona de lo seleccionado mide lo mismo que la rejilla. */
-      body.touch-active { --cell: min(60px, (100vw - 120px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 5); }
-      body.touch-active #invGrid { grid-template-columns: repeat(5, var(--cell)); }
-      body.touch-active #invGrid .slot { width: var(--cell); height: var(--cell); }
-      body.touch-active .selected { width: calc(5 * var(--cell) + 4 * 6px); height: calc(10px + var(--cell)); }
-      body.touch-active .selected .slot { width: var(--cell); height: var(--cell); flex: none; }
+      /* La rejilla del movil, con las casillas del tamano de las de PERSONAJE
+         (el autor, 2026-10-19: «que usen el mismo espacio»): 60 px si caben.
+         La barra deslizable va centrada en el hueco entre la ultima columna y
+         el borde derecho del panel (el autor), el que deja el panel de 8 px a
+         cada lado. */
+      body.touch-active {
+        --eq: min(60px, (100vw - 64px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 5);
+        --gridw: calc(5 * var(--eq) + 4 * 6px);
+        --gridgap: calc((100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right) - var(--gridw)) / 2);
+      }
+      body.touch-active #invGrid { grid-template-columns: repeat(5, var(--eq)); }
+      body.touch-active #invGrid .slot { width: var(--eq); height: var(--eq); }
+      body.touch-active #invGrid + .rail {
+        --railw: min(24px, var(--gridgap));
+        left: calc(100% + var(--gridgap) / 2 - var(--railw) / 2);
+      }
+      body.touch-active .selected { width: var(--gridw); }
       body.touch-active #recipeList { height: auto; }
       /* La barra deslizable (`scroll-rail-view.ts`), en PC y en el movil
          (pedido del autor; en PC desde el 2026-10-01). La envoltura es lo que
@@ -997,6 +1008,9 @@
       #thumbPad #use, #thumbPad #run, #thumbPad #jump { border-radius: 14px; }
       #thumbPad #autoJump { border-radius: 8px; }
       #invTabs button { border-radius: 8px; }
+      /* El menu de una casilla y sus dos avisos: las de los botones con texto
+         (*deduccion*: el autor, 2026-10-19, «como todos los demas»). */
+      #itemMenu .btn, .invAsk .btn { border-radius: 8px; }
       body.touch-active #invTabs { column-gap: 4px; }
 
     </style>

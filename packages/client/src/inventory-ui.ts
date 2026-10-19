@@ -61,7 +61,17 @@ import { makePlayerArt } from './art.js';
 import { now } from './clock.js';
 import { equipIcon } from './equip-icons.js';
 import { itemIcon } from './item-icons.js';
-import { clampSplit, MENU_HOLD_MS, OPTION_LABELS, optionsFor, placeMenu, scrollToShow, type ItemOption } from './item-menu.js';
+import {
+  clampSplit,
+  inCore,
+  MENU_HOLD_MS,
+  OPTION_LABELS,
+  optionsFor,
+  placeMenu,
+  scrollToShow,
+  TOUCH_CORE,
+  type ItemOption,
+} from './item-menu.js';
 import { pixelIcon } from './pixel-art.js';
 import { categoryArt } from './silhouette-icons.js';
 import { ScrollRail } from './scroll-rail-view.js';
@@ -180,6 +190,11 @@ export class InventoryUi {
     timer: number;
     /** Ya abrio el menu manteniendo: soltar no hace nada mas. */
     held: boolean;
+    /**
+     * Un dedo que empezo en el anillo de una casilla de la rejilla: desliza la
+     * rejilla en vez de arrastrar la casilla (`TOUCH_CORE`).
+     */
+    scroll: { y: number; top: number } | null;
   } | null = null;
   private hold: { recipe: number; since: number; row: HTMLElement } | null = null;
   /** El + o - mantenido: repite, cada vez mas deprisa (`qtySteps`). */
@@ -232,7 +247,9 @@ export class InventoryUi {
       this.bindDrag(b, i, true);
       this.hotbar.appendChild(b);
     }
-    // La rejilla del inventario: tocar describe; arrastrar mueve o tira.
+    // La rejilla del inventario: tocar describe; arrastrar mueve o tira. En el
+    // movil solo responde el centro de cada casilla, y el anillo desliza la
+    // rejilla (`bindDrag`).
     for (let i = 0; i < this.current().inventory.size; i++) {
       const b = this.slotButton(i);
       b.dataset.grid = '1';
@@ -559,11 +576,22 @@ export class InventoryUi {
     const grid = el.dataset.grid === '1';
     el.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
-      const d = { slot, bar, x: e.clientX, y: e.clientY, moving: false, el, over: null, timer: 0, held: false };
+      const d = {
+        slot, bar, x: e.clientX, y: e.clientY, moving: false, el, over: null, timer: 0, held: false,
+        scroll: null as { y: number; top: number } | null,
+      };
       this.drag = d;
+      // En el movil cada casilla de la rejilla responde solo en su centro (el
+      // autor, 2026-10-19): un dedo que empieza en el anillo desliza la
+      // rejilla. Se decide aqui, por geometria, y no dejando el anillo sin
+      // eventos: el navegador acerca el dedo a lo pulsable (el ajuste de
+      // toque) y el anillo acababa igual en la casilla.
+      if (grid && e.pointerType === 'touch' && !inCore(e.clientX, e.clientY, el.getBoundingClientRect(), TOUCH_CORE)) {
+        d.scroll = { y: e.clientY, top: this.grid.scrollTop };
+      }
       // En el movil, mantener una casilla de la rejilla abre su menu (el autor:
       // 0,3 s); soltar antes es un toque, que la describe.
-      if (grid && e.pointerType === 'touch') {
+      if (grid && e.pointerType === 'touch' && !d.scroll) {
         d.timer = window.setTimeout(() => {
           if (this.drag !== d || d.moving) return;
           d.held = true;
@@ -580,6 +608,10 @@ export class InventoryUi {
     el.addEventListener('pointermove', (e) => {
       const d = this.drag;
       if (!d || d.el !== el) return;
+      if (d.scroll) {
+        this.grid.scrollTop = d.scroll.top - (e.clientY - d.scroll.y);
+        return;
+      }
       if (!d.moving) {
         if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < DRAG_SLOP) return;
         window.clearTimeout(d.timer);
@@ -609,6 +641,7 @@ export class InventoryUi {
       el.classList.remove('dragging');
       d.over?.classList.remove('drop');
       this.ghost.style.display = 'none';
+      if (d.scroll) return;
       if (!d.moving) {
         if (cancelled || d.held) return;
         if (d.bar) this.pending.select = slot;
@@ -681,6 +714,18 @@ export class InventoryUi {
         const t = e.target as Node | null;
         if (t && this.menu.contains(t)) return;
         this.closeMenu();
+      },
+      true,
+    );
+    // Y lo mismo los avisos de Dividir y Destruir: tocar fuera es cancelar (el
+    // autor, 2026-10-19), y ese toque tambien sigue su curso (*deduccion*).
+    document.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (!this.asking) return;
+        const t = e.target as Node | null;
+        if (t && (this.splitAsk.contains(t) || this.destroyAsk.contains(t))) return;
+        this.closeAsk();
       },
       true,
     );

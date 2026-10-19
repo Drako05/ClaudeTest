@@ -79,7 +79,22 @@ Decisiones del autor, que no se tocan sin preguntarle:
     suelo (`Inventory.destroy`, `Intent.destroy`); si al confirmar la casilla
     ya tiene otra cosa, no destruye.
   - **Los botones son del estandar** (directriz 6 de `docs/guia-de-arte.md`),
-    y no las pildoras blancas de la foto (*deduccion*, a confirmar).
+    con las esquinas de 8 px de los botones con texto (el autor, 2026-10-19:
+    redondeadas «como todos los demas»; los 8 px, *deduccion*).
+  - **Tocar fuera del selector de Dividir o de la confirmacion de Destruir los
+    cierra** sin hacer nada (el autor, 2026-10-19), y ese toque sigue su curso
+    (*deduccion*).
+- **En el movil las casillas de la rejilla miden lo de PERSONAJE** (60 px si
+  caben) y **cada una responde solo en su centro de 48 px** (`TOUCH_CORE`): un
+  dedo que empieza en el anillo de 6 px desliza la rejilla (el autor,
+  2026-10-19: atinarle al hueco entre casillas era muy dificil). Se decide por
+  geometria al apoyar el dedo, y la rejilla la desliza el juego, sin inercia
+  (*deduccion*): dejar el anillo sin eventos no sirve, porque el navegador
+  acerca el dedo a lo pulsable (el ajuste de toque) y el anillo acababa igual
+  en la casilla. Soltar un arrastre vale en toda la casilla. La **barra
+  deslizable** va centrada en el hueco entre la ultima columna y el borde
+  derecho del panel (el autor), y en un telefono estrecho adelgaza hasta caber
+  en el (*deduccion*). El panel del movil queda a 8 px de cada lado.
 - **Elegir una casilla que no se ve entera** —la rejilla quedo deslizada a
   medias— **desliza la rejilla hasta que se vea** (el autor, 2026-10-19), lo
   justo y en el acto (`scrollToShow`).
