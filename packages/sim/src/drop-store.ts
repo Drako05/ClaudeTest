@@ -5,8 +5,9 @@
  *
  * Son un monton por tipo: lo que suelta un arbol, cuatro de madera y una rama,
  * son dos montones (el autor). Viven en el `World`, fuera de los chunks, como
- * el overlay (regla 4): duran para siempre (el autor), aunque su chunk se
- * descarte, y no hace falta simularlos lejos, porque posados no cambian.
+ * el overlay (regla 4): siguen ahi aunque su chunk se descarte, hasta que
+ * caducan a los 2 dias de juego (el autor, 2026-10-19), y no hace falta
+ * simularlos lejos, porque posados no cambian.
  *
  * Sin dependencias, para que `world.ts` lo pueda tener sin ciclos.
  */
@@ -36,6 +37,8 @@ export interface Drop {
   homing: boolean;
   /** Desde que tick se deja recoger: lo recien tirado no vuelve en el acto. */
   pickableAt: number;
+  /** El tick en que se genero: de ahi cuenta su caducidad (`DROP_LIFE_TICKS`). */
+  born: number;
 }
 
 export type DropSpec = Omit<Drop, 'id' | 'resting' | 'homing'>;

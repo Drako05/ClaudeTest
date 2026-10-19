@@ -166,10 +166,11 @@
       body.touch-active .ringIcon { width: 48px; height: 48px; }
 
       /*
-        Arriba en el movil (boceto del autor): OTROS a la izquierda, la barra de
-        la mano en medio e INVENTARIO a la derecha. OTROS
-        despliega en columna, debajo de el, el ojo, el HUD y el entorno, que
-        sin el menu no se ven; en PC siguen donde estaban.
+        Arriba en el movil: la barra de la mano desde el borde izquierdo e
+        INVENTARIO a la derecha; OTROS (el boton MAS), debajo de INVENTARIO
+        (el autor, 2026-10-19: le deja sitio a la quinta casilla). OTROS
+        despliega en columna, debajo de el y pegados a la derecha, el ojo, el
+        HUD y el entorno, que sin el menu no se ven; en PC siguen donde estaban.
       */
       .round {
         position: fixed; z-index: 13; display: none;
@@ -182,7 +183,7 @@
       }
       .round svg { width: 24px; height: 24px; }
       body.touch-active .round { display: flex; }
-      #others { left: calc(12px + env(safe-area-inset-left)); }
+      #others { right: calc(12px + env(safe-area-inset-right)); top: calc(74px + env(safe-area-inset-top)); }
       #invOpen { right: calc(12px + env(safe-area-inset-right)); }
       body.touch-active #hudToggle,
       body.touch-active #statsToggle,
@@ -191,23 +192,23 @@
       body.touch-active.others-open #statsToggle,
       body.touch-active.others-open #devToggle,
       body.touch-active.others-open #proj {
-        display: flex; left: calc(16px + env(safe-area-inset-left)); right: auto; z-index: 14;
+        display: flex; right: calc(16px + env(safe-area-inset-right)); left: auto; z-index: 14;
       }
-      body.touch-active #proj { top: calc(74px + env(safe-area-inset-top)); }
-      body.touch-active #hudToggle { top: calc(126px + env(safe-area-inset-top)); }
-      body.touch-active #statsToggle { top: calc(178px + env(safe-area-inset-top)); }
-      body.touch-active #devToggle { top: calc(230px + env(safe-area-inset-top)); }
+      body.touch-active #proj { top: calc(126px + env(safe-area-inset-top)); }
+      body.touch-active #hudToggle { top: calc(178px + env(safe-area-inset-top)); }
+      body.touch-active #statsToggle { top: calc(230px + env(safe-area-inset-top)); }
+      body.touch-active #devToggle { top: calc(282px + env(safe-area-inset-top)); }
       /* El panel de desarrollo, al lado de la columna como el HUD: abajo a la
          izquierda pisaria el joystick. */
       body.touch-active #devPanel {
-        top: calc(74px + env(safe-area-inset-top)); bottom: auto;
-        left: calc(76px + env(safe-area-inset-left));
-        max-width: calc(100vw - 88px - env(safe-area-inset-left));
-        max-height: calc(100vh - 74px - var(--atk) - 2 * var(--side) - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        top: calc(126px + env(safe-area-inset-top)); bottom: auto;
+        right: calc(76px + env(safe-area-inset-right)); left: auto;
+        max-width: calc(100vw - 88px - env(safe-area-inset-right));
+        max-height: calc(100vh - 126px - var(--atk) - 2 * var(--side) - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
       }
       /* El HUD se abre al lado de la columna, no encima. */
       body.touch-active #hud {
-        top: calc(74px + env(safe-area-inset-top)); left: calc(76px + env(safe-area-inset-left));
+        top: calc(126px + env(safe-area-inset-top)); right: calc(76px + env(safe-area-inset-right)); left: auto;
       }
       #proj:focus-visible { outline: 2px solid #8fc4ff; outline-offset: 3px; }
       /* Sostener el ojo abre la barra del angulo: que el movil no saque su menu. */
@@ -446,7 +447,8 @@
         margin: 0 0 14px; font-size: 15px; letter-spacing: .14em; text-align: center;
         text-transform: uppercase; color: #8fc4ff; font-weight: 600;
       }
-      .slots { display: grid; grid-template-columns: repeat(4, 60px); gap: 6px; }
+      /* Cinco columnas (el autor, 2026-10-19): la primera fila es la barra. */
+      .slots { display: grid; grid-template-columns: repeat(5, 60px); gap: 6px; }
       .slot {
         -webkit-appearance: none; appearance: none; position: relative;
         width: 60px; height: 60px; padding: 2px; border-radius: 8px;
@@ -467,6 +469,28 @@
       }
       .slot.on { border-color: rgba(170, 214, 255, .85); background: rgba(60, 104, 168, .72); }
       .slot.picked { outline: 2px solid #ffe89a; outline-offset: -3px; }
+      /* El menu de una casilla y los dos avisos de sus opciones (el autor,
+         2026-10-19), dentro del panel, encima de la rejilla. Los botones son
+         del estandar (directriz 6); el resto, mio. */
+      #itemMenu {
+        position: absolute; z-index: 3; display: flex; flex-direction: column; gap: 6px;
+      }
+      #itemMenu[hidden], .invAsk[hidden] { display: none; }
+      #itemMenu .btn { padding: 8px 14px; font: 600 15px/1 system-ui, sans-serif; text-align: center; }
+      .invAsk {
+        position: absolute; z-index: 4; left: 50%; top: 50%; transform: translate(-50%, -50%);
+        display: flex; flex-direction: column; align-items: center; gap: 8px;
+        padding: 14px; border-radius: 12px;
+        background: rgba(8, 14, 28, .96); border: 1px solid rgba(140, 190, 255, .34);
+      }
+      .invAsk .btn { min-width: 46px; padding: 8px 10px; font: 600 14px/1 system-ui, sans-serif; }
+      .invAsk p { margin: 0; font-size: 14px; color: #e8eef7; text-align: center; }
+      .splitRow, .splitMid, .askButtons { display: flex; gap: 6px; align-items: center; }
+      #splitQty {
+        width: 72px; height: 38px; text-align: center; font: 600 18px/1 ui-monospace, monospace;
+        color: #e8eef7; background: rgba(0, 0, 0, .35); border: 1px solid rgba(140, 190, 255, .34);
+        border-radius: 8px;
+      }
       .slot.dragging { opacity: .35; }
       .slot.drop { border-color: #ffe89a; }
       .slot[hidden] { display: none; }
@@ -477,7 +501,7 @@
       #invGrid { max-height: calc(4 * 60px + 3 * 6px); overflow-y: auto; }
       .selected {
         display: flex; gap: 8px; margin-top: auto; padding-top: 10px; align-items: stretch;
-        width: calc(4 * 60px + 3 * 6px); height: calc(10px + 60px); flex: none;
+        width: calc(5 * 60px + 4 * 6px); height: calc(10px + 60px); flex: none;
       }
       /* Mide siempre lo mismo, para encajar entre paginas: una descripcion
          larga se desliza dentro de su recuadro. */
@@ -600,9 +624,9 @@
 
 
       /*
-        La barra de la mano: las cuatro primeras casillas, siempre a la vista. En
-        PC, abajo al centro sobre la franja de salud; en el movil, arriba entre
-        OTROS e INVENTARIO. Se arrastra dentro de ella con el inventario cerrado
+        La barra de la mano: las cinco primeras casillas, siempre a la vista. En
+        PC, abajo al centro sobre la franja de salud; en el movil, arriba desde
+        el borde izquierdo hasta INVENTARIO. Se arrastra dentro de ella con el inventario cerrado
         y, abierto, entre ella y la rejilla (decision del autor).
       */
       #hotbar {
@@ -610,11 +634,12 @@
         bottom: calc(var(--vitals-h) + 18px + env(safe-area-inset-bottom));
       }
       #hotbar .slot { width: 56px; height: 52px; }
-      /* En el movil, centrada entre OTROS e INVENTARIO: las casillas encogen
-         lo que haga falta para dejar 10 px a cada redondo. */
+      /* En el movil, del borde izquierdo hasta INVENTARIO (el autor,
+         2026-10-19): las casillas encogen lo que haga falta para dejarle 10 px. */
       body.touch-active #hotbar {
         top: calc(12px + env(safe-area-inset-top)); bottom: auto;
-        grid-template-columns: repeat(4, min(56px, (100vw - 166px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 4));
+        left: calc(12px + env(safe-area-inset-left)); transform: none;
+        grid-template-columns: repeat(5, min(56px, (100vw - 110px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 5));
       }
       body.touch-active #hotbar .slot { width: 100%; }
 
@@ -638,6 +663,15 @@
       body.touch-active .invPage { display: none; }
       body.touch-active .invPage.current { display: flex; flex: 1; }
       body.touch-active #invGrid, body.touch-active #recipeList { max-height: none; min-height: 0; }
+      /* Cinco columnas de 60 y la barra deslizable al lado no caben en 390 px:
+         las casillas de la rejilla encogen a lo que quepa, dejando sitio a la
+         barra a cada lado para que la rejilla siga centrada (*deduccion*). La
+         zona de lo seleccionado mide lo mismo que la rejilla. */
+      body.touch-active { --cell: min(60px, (100vw - 120px - env(safe-area-inset-left) - env(safe-area-inset-right)) / 5); }
+      body.touch-active #invGrid { grid-template-columns: repeat(5, var(--cell)); }
+      body.touch-active #invGrid .slot { width: var(--cell); height: var(--cell); }
+      body.touch-active .selected { width: calc(5 * var(--cell) + 4 * 6px); height: calc(10px + var(--cell)); }
+      body.touch-active .selected .slot { width: var(--cell); height: var(--cell); flex: none; }
       body.touch-active #recipeList { height: auto; }
       /* La barra deslizable (`scroll-rail-view.ts`), en PC y en el movil
          (pedido del autor; en PC desde el 2026-10-01). La envoltura es lo que
@@ -755,7 +789,12 @@
          autor, 2026-10-02): `main.ts` lo pone sobre el boton. */
       #pickupFeed.overButton { right: auto; bottom: auto; }
       #pickupFeed.overButton div { right: auto; left: 0; }
-      body.touch-active #pickupFeed { top: calc(72px + env(safe-area-inset-top)); bottom: auto; }
+      /* En el movil cuelga de debajo de INVENTARIO, a la izquierda del boton MAS,
+         que desde el 2026-10-19 esta ahi (*deduccion*: que no lo tape). */
+      body.touch-active #pickupFeed {
+        top: calc(72px + env(safe-area-inset-top)); bottom: auto;
+        right: calc(12px + 52px + 8px + env(safe-area-inset-right));
+      }
       body.touch-active #pickupFeed div { top: 0; bottom: auto; }
       #pause p { margin: 0 0 4px; font-size: 20px; letter-spacing: .12em; text-transform: uppercase; }
       #pause span { color: #8fc4ff; }
@@ -1094,6 +1133,37 @@
         <div id="recipeTabs"></div>
         <div id="recipeList"></div>
       </section>
+      <!-- Las opciones de una casilla (el autor, 2026-10-19), al lado de ella:
+           las rellena `inventory-ui.ts` con las que tocan al objeto. -->
+      <div id="itemMenu" hidden></div>
+      <!-- Dividir: la cantidad que se separa, con sus botones (el autor). -->
+      <div id="splitAsk" class="invAsk" hidden>
+        <div class="splitRow">
+          <button class="btn" type="button" data-add="-1"><span>-1</span></button>
+          <button class="btn" type="button" data-add="-5"><span>-5</span></button>
+          <button class="btn" type="button" data-add="-10"><span>-10</span></button>
+          <button class="btn" type="button" data-set="zero"><span>0</span></button>
+        </div>
+        <div class="splitMid">
+          <button class="btn" id="splitNo" type="button" aria-label="Cancelar"><span>X</span></button>
+          <input id="splitQty" type="text" inputmode="numeric" autocomplete="off" value="0" aria-label="Cantidad" />
+          <button class="btn" id="splitYes" type="button" aria-label="Confirmar"><span>&#10003;</span></button>
+        </div>
+        <div class="splitRow">
+          <button class="btn" type="button" data-add="1"><span>+1</span></button>
+          <button class="btn" type="button" data-add="5"><span>+5</span></button>
+          <button class="btn" type="button" data-add="10"><span>+10</span></button>
+          <button class="btn" type="button" data-set="half"><span>1/2</span></button>
+        </div>
+      </div>
+      <!-- Destruir pide confirmacion (el autor). -->
+      <div id="destroyAsk" class="invAsk" hidden>
+        <p id="destroyText"></p>
+        <div class="askButtons">
+          <button class="btn" id="destroyNo" type="button"><span>Cancelar</span></button>
+          <button class="btn" id="destroyYes" type="button"><span>Destruir</span></button>
+        </div>
+      </div>
     </div>
 
     <!-- Arriba en el movil: OTROS e INVENTARIO. -->

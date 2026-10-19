@@ -21,8 +21,9 @@ Decisiones del autor, que no se tocan sin preguntarle:
   suma el poder de lo que se lleva en la mano (`toolStats`); a mano, algunas
   cosas no se completan. Un arbol sin hacha no cae: suelta ramas. Roca y
   minerales piden pico, y el hierro uno de cobre o mejor.
-- **Se equipa una herramienta**: las casillas 1-4 (la primera fila del
-  inventario) son la barra y la elegida es la mano. La eleccion viaja en la
+- **Se equipa una herramienta**: las casillas 1-5 (la primera fila del
+  inventario, de 5 columnas desde el 2026-10-19) son la barra y la elegida es
+  la mano. La eleccion viaja en la
   `Intent` (`select`), como fabricar (`craft`), mover (`moveFrom`/`moveTo`),
   tirar (`discard`) y usar (`use`): regla 5.
 - **Usar** (clic derecho, boton USAR): **mirando una estacion, la abre**, se
@@ -35,7 +36,8 @@ Decisiones del autor, que no se tocan sin preguntarle:
   2026-10-04; antes, golpear lo que no era suyo no la gastaba). Uno por golpe
   y por objeto, toque a uno o a varios (propuesta mia); al aire o a un brote,
   nada (deduccion mia: lo que no da impacto no se toca).
-- **16 casillas con pilas de 100** (`sim/inventory.ts`), y el **Bolso** las
+- **15 casillas con pilas de 100**, tres filas de 5 (el autor, 2026-10-19;
+  16 hasta entonces) (`sim/inventory.ts`), y el **Bolso** las
   amplia: la bolsa +2 o la mochila +6, **una sola a la vez** (el autor,
   2026-10-04; antes, la bolsa a la cintura y la mochila a la espalda, 24 como
   mucho). Se arrastran a su casilla de PERSONAJE, y **no se quitan ni se
@@ -50,6 +52,37 @@ Decisiones del autor, que no se tocan sin preguntarle:
   (`Inventory.stow`, `Intent.stow`): primero completa pilas del mismo objeto y
   lo que sobre va a la primera casilla vacia; lo que no cabe se queda en la
   barra (el autor: «primero apila, luego vacia»).
+- **Las opciones de una casilla** (el autor, 2026-10-19, con una foto):
+  **clic en PC**, o **mantenerla 0,3 s en el movil**, sobre una casilla de la
+  rejilla con algo abre a su lado **Usar** (lo que se come), **Dividir** (lo
+  apilable), **Equipar** (lo que tiene hueco en PERSONAJE) y **Destruir**
+  (todo), en ese orden y solo las que tocan (`item-menu.ts`).
+  - **Donde**: las columnas 1-2 lo sacan a la derecha y las 3-5 a la
+    izquierda, centrado en la altura de la casilla; en la primera o la ultima
+    fila **visible** de la rejilla se alinea con su borde de arriba o de abajo,
+    para no salirse por encima de las pestanas ni sobre la descripcion.
+  - **Se cierra** al arrastrar, al tocar en otro sitio —y ese toque hace lo
+    suyo—, al cerrar el panel o al cambiar de pagina. Un toque corto en el
+    movil solo describe, como siempre.
+  - **Usar** come de esa casilla (`Intent.useSlot`, `eatFrom`), con las reglas
+    de comer: con el hambre llena, nada. **Equipar** es moverla a su hueco de
+    PERSONAJE, con la regla del Bolso.
+  - **Dividir** abre un selector (el autor): un area con la cantidad, que
+    empieza en 0, con **[-1] [-5] [-10] [0]** encima, **[+1] [+5] [+10] [1/2]**
+    debajo, **X** a la izquierda y **✓** a la derecha. Lo separado va a la
+    **primera casilla libre, barra incluida** (`Inventory.split`,
+    `Intent.splitFrom`/`splitCount`); sin ninguna libre, Dividir sale apagado.
+    La cantidad va de 0 a la pila menos 1 y 1/2 redondea hacia abajo
+    (*deduccion*); con una pila de 1, apagado (*deduccion*).
+  - **Destruir** se lleva **toda la pila, con confirmacion** (el autor):
+    «¿Destruir N × objeto?», Cancelar o Destruir. Desaparece, sin caer al
+    suelo (`Inventory.destroy`, `Intent.destroy`); si al confirmar la casilla
+    ya tiene otra cosa, no destruye.
+  - **Los botones son del estandar** (directriz 6 de `docs/guia-de-arte.md`),
+    y no las pildoras blancas de la foto (*deduccion*, a confirmar).
+- **Elegir una casilla que no se ve entera** —la rejilla quedo deslizada a
+  medias— **desliza la rejilla hasta que se vea** (el autor, 2026-10-19), lo
+  justo y en el acto (`scrollToShow`).
 - **Fabricar es mantener pulsado 1 s** el resultado de la receta (1,5 hasta el
   2026-10-17, el autor), con la fila llenandose de izquierda a derecha **hasta
   el borde derecho de los ingredientes** (la fila mide lo que su contenido);
@@ -254,7 +287,11 @@ cabe y lo que se tira desde el inventario.
 - **Se recogen solos, al acercarse**: a 1 bloque del cuerpo (1,5 hasta que lo
   probo el autor, 2026-10-18), lo que se
   deja recoger vuela al jugador y entra lo que quepa; el resto se queda.
-- **Duran para siempre**: aunque se aleje uno hasta descargar su chunk.
+- **Caducan a los 2 dias de juego** desde que se generaron (el autor,
+  2026-10-19; hasta entonces duraban para siempre), esten donde esten y aunque
+  se aleje uno hasta descargar su chunk (`DROP_LIFE_TICKS`, `Drop.born`). **Al
+  fundirse dos montones cuenta el reloj del mas nuevo** (el autor). Lo que
+  vuela hacia el jugador tambien caduca, si le toca (*deduccion*).
 - **Inventario lleno: el golpe termina igual** y el botin se queda en el suelo.
 - **Lo fabricado que no cabe cae a los pies.**
 - **El botin sale expulsado** de lo que lo suelta (el autor, 2026-10-18,

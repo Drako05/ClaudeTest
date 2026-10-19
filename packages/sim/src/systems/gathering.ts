@@ -819,3 +819,19 @@ export function tryEat(
   store.hunger[id] = Math.min(100, store.hunger[id] + food * BERRIES_PER_MEAL);
   return true;
 }
+
+/**
+ * Come de una casilla concreta: la opcion «Usar» de su menu (el autor,
+ * 2026-10-19). Las mismas reglas que `tryEat` —solo lo que alimenta, y no con
+ * el hambre llena—, pero la unidad sale de esa casilla y no de la ultima que
+ * tenga el objeto.
+ */
+export function eatFrom(store: EntityStore, id: number, inventory: Inventory, slot: number): boolean {
+  const item = inventory.itemAt(slot);
+  if (item === null) return false;
+  const food = foodValue(item);
+  if (food <= 0 || store.hunger[id] >= 100) return false;
+  if (!inventory.takeFrom(slot, BERRIES_PER_MEAL)) return false;
+  store.hunger[id] = Math.min(100, store.hunger[id] + food * BERRIES_PER_MEAL);
+  return true;
+}

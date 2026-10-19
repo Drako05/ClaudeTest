@@ -9,14 +9,15 @@
  * entre 0 y 0,5 de el; lo tirado **se lanza hacia la mirada** y no se deja
  * recoger unos 2 s; se recogen **solos, al acercarse** (un iman de 1 bloque) y
  * entra lo que quepa; un monton por tipo, y **dos iguales que se juntan se
- * funden**; y duran para siempre.
+ * funden**; y caducan a los **2 dias de juego** desde que se generaron, y al
+ * fundirse cuenta el reloj del mas nuevo (el autor, 2026-10-19).
  *
  * Todo lo que no es eso es **deduccion mia** (`docs/juicio.md`), y cada numero
  * lo dice. El azar sale de la semilla y del tick (regla 2), nunca de
  * `Math.random`.
  */
 
-import { stackMax, TICK_DT, TICK_HZ, toolStats, type Resource } from '@verdant/shared';
+import { DAY_TICKS, stackMax, TICK_DT, TICK_HZ, toolStats, type Resource } from '@verdant/shared';
 import { EYE_HEIGHT } from '../aim.js';
 import { PLAYER_HEIGHT, squareFloor } from '../boxes.js';
 import { DROP_HALF, type Drop } from '../drop-store.js';
@@ -49,6 +50,8 @@ export const THROW_SPEED = 6;
 export const THROW_UP = 3;
 /** Lo tirado no se deja recoger durante unos 2 s (el autor). */
 export const THROW_DELAY_TICKS = 2 * TICK_HZ;
+/** Lo que dura un monton en el mundo: 2 dias de juego desde que se genero (el autor, 2026-10-19). */
+export const DROP_LIFE_TICKS = 2 * DAY_TICKS;
 
 /**
  * El suelo de un monton: el de su huella, terreno o caja solida (`squareFloor`,
@@ -129,6 +132,7 @@ export function scatterLoot(world: World, loot: readonly Bundle[], from: LootSou
       vy: sin * side,
       vz: SCATTER_UP,
       pickableAt: tick + LOOT_DELAY_TICKS,
+      born: tick,
     });
   });
 }
@@ -151,6 +155,7 @@ export function dropAtFeet(world: World, store: EntityStore, id: number, item: R
     vy: 0,
     vz: 0,
     pickableAt: tick,
+    born: tick,
   });
 }
 
@@ -174,6 +179,7 @@ export function throwFrom(world: World, store: EntityStore, id: number, thrown: 
     vy: dy * THROW_SPEED,
     vz: up * THROW_SPEED + THROW_UP,
     pickableAt: tick + THROW_DELAY_TICKS,
+    born: tick,
   });
 }
 
@@ -206,8 +212,8 @@ function fall(world: World, d: Drop, dt: number): void {
 
 /**
  * Un monton que se posa junto a otro igual se funde con el (el autor): el
- * viejo se queda con todo. Las herramientas no, que cada una lleva su
- * desgaste.
+ * que ya estaba se queda con todo, y con el reloj del mas nuevo (el autor,
+ * 2026-10-19). Las herramientas no, que cada una lleva su desgaste.
  */
 function merge(world: World, d: Drop): void {
   if (stackMax(d.item) <= 1) return;
@@ -217,15 +223,24 @@ function merge(world: World, d: Drop): void {
     o.count += d.count;
     // Lo recien tirado no se vuelve recogible por caer junto a otro.
     o.pickableAt = Math.max(o.pickableAt, d.pickableAt);
+    o.born = Math.max(o.born, d.born);
     world.drops.remove(d.id);
     return;
   }
 }
 
-/** Avanza la caida de todo lo que no esta posado ni volando hacia el jugador. */
-export function stepDrops(world: World, dt: number = TICK_DT): void {
+/**
+ * Un tick de lo suelto: lo que cumple `DROP_LIFE_TICKS` desaparece, este
+ * posado, cayendo o volando hacia el jugador (*deduccion*: caduca lo que sea),
+ * y lo demas que no esta posado ni volando, cae.
+ */
+export function stepDrops(world: World, tick: number, dt: number = TICK_DT): void {
   if (world.drops.size === 0) return;
   for (const d of world.drops.values()) {
+    if (tick - d.born >= DROP_LIFE_TICKS) {
+      world.drops.remove(d.id);
+      continue;
+    }
     if (!d.resting && !d.homing) fall(world, d, dt);
   }
 }

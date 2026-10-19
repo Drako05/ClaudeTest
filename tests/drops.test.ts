@@ -53,7 +53,7 @@ const drops = (state: GameState): Drop[] => [...state.world.drops.values()];
 /** Un monton recogible ya, soltado justo encima de su suelo. */
 function dropAt(state: GameState, item: Resource, count: number, x: number, y: number, wear = 0): Drop {
   return state.world.drops.add({
-    item, count, wear, x, y, z: dropFloor(state.world, x, y) + 0.5, vx: 0, vy: 0, vz: 0, pickableAt: 0,
+    item, count, wear, x, y, z: dropFloor(state.world, x, y) + 0.5, vx: 0, vy: 0, vz: 0, pickableAt: 0, born: state.tick,
   });
 }
 
@@ -234,7 +234,54 @@ describe('Montones', () => {
   });
 });
 
-describe('Duran para siempre', () => {
+describe('Caducan a los 2 dias de juego', () => {
+  // 2 dias de 28 800 ticks (8 minutos a 60 Hz): el numero del autor, escrito.
+  const TWO_DAYS = 2 * 28800;
+
+  it('lo que se genero sigue justo hasta cumplir 2 dias, y al cumplirlos desaparece', () => {
+    const { state } = atSpawn();
+    const id = state.playerId;
+    const d = dropAt(state, Resource.Wood, 5, state.entities.x[id] + 6, state.entities.y[id]);
+    expect(d.born).toBe(state.tick);
+    skipTime(state, TWO_DAYS);
+    expect(state.world.drops.get(d.id)).toBe(d);
+    act(state);
+    expect(state.world.drops.get(d.id)).toBeUndefined();
+  });
+
+  it('el botin y lo tirado cuentan desde que salen', () => {
+    const { state, tx, ty } = atSpawn();
+    state.world.setFeature(tx + 1, ty, Feature.MeadowPlant);
+    const t0 = state.tick;
+    act(state, { harvest: true, aimX: 1, aimY: 0, aimZ: Math.sin((-40 * Math.PI) / 180) });
+    expect(drops(state).length).toBeGreaterThan(0);
+    for (const d of drops(state)) expect(d.born).toBe(t0);
+    state.inventory.add(Resource.Stone, 3);
+    const t1 = state.tick;
+    const slot = [...Array(state.inventory.size).keys()].find((i) => state.inventory.itemAt(i) === Resource.Stone)!;
+    act(state, { discard: slot });
+    expect(drops(state).find((d) => d.item === Resource.Stone)!.born).toBe(t1);
+  });
+
+  it('al fundirse dos montones se queda el reloj del mas nuevo', () => {
+    const { state } = atSpawn();
+    const id = state.playerId;
+    const x = state.entities.x[id] + 6;
+    const y = state.entities.y[id];
+    const old = dropAt(state, Resource.Wood, 3, x, y);
+    skipTime(state, 1000);
+    const young = dropAt(state, Resource.Wood, 4, x + 0.2, y);
+    skipTime(state, 30);
+    expect(state.world.drops.get(young.id)).toBeUndefined();
+    expect(old.count).toBe(7);
+    expect(old.born).toBe(young.born);
+    // Pasados los 2 dias del viejo, el monton sigue: cuenta el del nuevo.
+    skipTime(state, TWO_DAYS - 1000);
+    expect(state.world.drops.get(old.id)).toBe(old);
+  });
+});
+
+describe('Siguen aunque se descargue su chunk', () => {
   it('alejarse hasta descargar su chunk y volver no los toca', () => {
     const { state } = atSpawn();
     const id = state.playerId;

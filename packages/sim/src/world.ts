@@ -155,7 +155,8 @@ export class World {
   private readonly faunaDead = new Set<string>();
   /**
    * Los objetos sueltos (`drop-store.ts`): fuera de los chunks, como el resto
-   * del overlay (regla 4), porque duran para siempre (el autor, 2026-10-18).
+   * del overlay (regla 4), porque siguen ahi aunque se descargue su chunk,
+   * hasta que caducan a los 2 dias de juego (el autor, 2026-10-19).
    */
   readonly drops = new DropStore();
   /** Los animales de cada chunk cargado. Cache: `faunaOf` es pura. */
