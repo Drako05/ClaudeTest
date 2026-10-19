@@ -11,6 +11,34 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Las lentes por principios, no por casos (2026-10-19) — HECHA
+
+El autor: la skill de auditoria tiene que construirse con **protocolos que
+sirvan en proyectos parecidos**; ante cada escape, entender la logica de la
+omision y hacer un estandar, no una regla para ese caso. Una tanda propia, y
+`references/lentes.md` en un solo fichero.
+
+- **`lentes.md` reescrito**: cada lente lleva su pregunta, **principios**
+  numerados (`B2`, `G1`) sin nombres del proyecto, cada uno con sus «Casos»
+  de `escapes.md`, y al final «En este proyecto» con lo propio de Verdant.
+  Arriba, **disparadores** que cruzan lentes (al sustituir un modelo, al
+  arreglar algo, al retirar algo); abajo, **el proceso del auditor** (Q1-Q4,
+  de los P1-P8).
+- **Familias que estaban repartidas**: el tiempo del hecho contra el de la
+  prueba o del codigo (#7, #9, #13, #17, #23, #43, en B3 y G1); el objeto de
+  la medida (#2, #12, #15, #21, #28, en B2); la plataforma que se interpone
+  (#8, #11, #14, #41, en B5 y G2); lo que dependia de un modelo sustituido
+  (#22, #26, #30, #31, en un disparador).
+- **`SKILL.md`, fase 6**: se nombra la omision sin terminos del proyecto; si
+  encaja en un principio, el escape solo anade su numero; si no, el principio
+  nuevo tiene que cazar otro escape pasado o un caso verosimil en otro
+  proyecto. El principio 6 dice ya «un principio, no un caso».
+- **El escaner**, categoria 14: cada escape tiene que estar citado en algun
+  «Casos». En su primera pasada sobre las lentes viejas dio 11 sin citar
+  (#10, #29, #30, #33 y siete del proceso); con las nuevas, 0.
+- **Los cinco escapes del dia** (#41, #42, #43, P7, P8) se pusieron al
+  formato del registro, con su principio.
+
 ## Inventario de 5 columnas, menu de una casilla y objetos que caducan (2026-10-19) — HECHA
 
 El autor, en lo esencial: los objetos del suelo **caducan a los 2 dias de

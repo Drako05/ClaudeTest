@@ -132,6 +132,7 @@ export function scan(root) {
     sinIndice: [],
     usuarios: [],
     leyes: [],
+    sinPrincipio: [],
   };
 
   // 1. Rutas citadas entre comillas invertidas que no existen.
@@ -405,6 +406,21 @@ export function scan(root) {
     }
   }
 
+  // 14. Escapes que ningun principio de las lentes cita. Un escape tiene que
+  // acabar en un principio (fase 6): si `lentes.md` no lo nombra en ningun
+  // «Casos», o no se generalizo o se perdio al reescribir las lentes. No sabe
+  // nada del proyecto: solo cruza `### N.` de `escapes.md` con `#N` (y `PN`).
+  const escapesFile = join(refs, 'escapes.md');
+  const lensesFile = join(refs, 'lentes.md');
+  if (existsSync(escapesFile) && existsSync(lensesFile)) {
+    const lenses = readFileSync(lensesFile, 'utf8');
+    const cites = new Set([...lenses.matchAll(/(?:#(\d+)|\b(P\d+))\b/g)].map((m) => (m[1] ? `#${m[1]}` : m[2])));
+    for (const m of readFileSync(escapesFile, 'utf8').matchAll(/^### (P?)(\d+)\. (.*)$/gm)) {
+      const id = m[1] ? `P${m[2]}` : `#${m[2]}`;
+      if (!cites.has(id)) report.sinPrincipio.push(`${id} ${m[3].slice(0, 70)}`);
+    }
+  }
+
   return report;
 }
 
@@ -437,6 +453,7 @@ const TITLES = {
   sinIndice: 'Documentos de docs/ que el indice de CLAUDE.md no nombra (lente F)',
   usuarios: 'Ficheros citados como usuarios de un modulo que no lo importan (lente E)',
   leyes: 'Tests que docs/leyes.md cita y no existen con ese nombre (lente F)',
+  sinPrincipio: 'Escapes que ningun principio de references/lentes.md cita (fase 6)',
 };
 
 function print(report) {
@@ -495,6 +512,11 @@ function selfTest() {
   // El indice nombra un documento y se deja el otro.
   put('CLAUDE.md', '# Notas\n\n| Si tocas | Lee |\n|---|---|\n| Algo | `docs/notas.md` |\n| Una ley | `docs/leyes.md` |\n');
   put('.claude/skills/auditoria/references/retirados.md', '- `wheelZoom` — la rueda hacia zoom\n');
+  // Tres escapes: uno citado por numero, uno del proceso citado, y uno sin
+  // principio. `#12` no cuenta como cita de `#1`.
+  put('.claude/skills/auditoria/references/escapes.md',
+    '### 1. Uno sin principio (fecha)\n### 12. Citado (fecha)\n### P3. Del proceso, citado (fecha)\n');
+  put('.claude/skills/auditoria/references/lentes.md', '## A\n\n1. **Algo**. Casos: #12, P3.\n');
   put('.claude/skills/auditoria/references/ignorar.md', '- `nombreJuzgado` — juzgado. En: `docs/otra.md`.\n');
   // La tabla de leyes cita un test que existe, uno por prefijo y uno que no.
   put('tests/leyes.test.ts', "it('la vida no surge sola', () => {});\nit.each(S)(\"semilla %i: el agua corta el paso, y la piedra no\", () => {});\n");
@@ -524,6 +546,7 @@ function selfTest() {
     ['sin indice', (r) => r.sinIndice.length === 1 && r.sinIndice[0].includes('docs/otra.md')],
     ['usuarios', (r) => r.usuarios.length === 1 && r.usuarios[0].includes('`docs.ts`')],
     ['leyes', (r) => r.leyes.length === 1 && r.leyes[0].includes('un test que no existe')],
+    ['sin principio', (r) => r.sinPrincipio.length === 1 && r.sinPrincipio[0].startsWith('#1 ')],
     ['ignorados con ambito', (r) => r.identificadores.some((x) => x.includes('zoom.ts') && x.includes('nombreJuzgado')) &&
       !r.identificadores.some((x) => x.includes('otra.md'))],
   ];

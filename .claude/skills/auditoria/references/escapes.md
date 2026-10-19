@@ -535,7 +535,7 @@ Formato:
   mirar a que elemento llega el `pointerdown`. Si una zona tiene que hacer otra
   cosa que lo de al lado, se decide por geometria en el oyente, no quitandole
   los eventos.
-- **Donde vive ahora**: lente G, «Un dedo cerca de algo pulsable».
+- **Donde vive ahora**: lente G, principio G2 (la plataforma se interpone).
 
 ### 42. Una mutacion que sobrevive porque la linea no hace nada (2026-10-19)
 - **Que paso**: `split` copiaba el desgaste a la casilla nueva. Solo se divide
@@ -544,17 +544,23 @@ Formato:
 - **Por que se escapo**: no se muto en la tanda.
 - **Que lo habria visto**: ante una mutacion que sobrevive, preguntar antes
   de escribir otro test si la linea puede cambiar algo; si no puede, se quita.
-- **Donde vive ahora**: lente B, punto 4.
+- **Donde vive ahora**: lente B, principio B1.
 
 ### 43. Un toque largo medido con un temporizador (2026-10-19)
 - **Que paso**: mantener una casilla 0,3 s abre su menu, y se media con un
   `setTimeout`. Con la pagina ocupada, el plazo corria antes de atender un
   soltar que habia llegado a los 0,1 s, y un toque abria el menu. Lo vio la CI
   de `pruebas` una vez entre varias en verde; a un movil lento le pasaria igual.
-- **Como verlo**: un plazo que decide lo que fue un gesto (mantener, doble
-  toque) se mide con la hora de los eventos (`timeStamp`), y el temporizador
-  solo adelanta lo que se ve. Se prueba soltando con la hora de antes del
-  plazo, enviado despues (`Input.dispatchTouchEvent` con `timestamp`).
+- **Por que se escapo**: en local la pagina no va tan cargada, y la prueba
+  soltaba enseguida: nunca se dio el caso de un soltar atendido tarde.
+- **Que lo habria visto**: preguntar que pasa si el sistema atiende tarde un
+  evento que llego a tiempo. Un plazo que decide lo que fue un gesto
+  (mantener, doble toque) se mide con la hora de los eventos (`timeStamp`), y
+  el temporizador solo adelanta lo que se ve. Se prueba soltando con la hora
+  de antes del plazo, enviado despues (`Input.dispatchTouchEvent` con
+  `timestamp`).
+- **Donde vive ahora**: lente G, principio G1 (del hecho a su efecto hay un
+  hueco), junto al #9 y el #17, que eran la misma omision.
 
 ## Del proceso del agente
 
@@ -624,6 +630,7 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
   tomada antes de mutar, no desde git; o se hace commit antes de mutar. Y
   antes del commit de cierre se repasa `git status` contra la lista de
   correcciones.
+- **Donde vive ahora**: «El proceso del auditor», Q4.
 
 ### P8. Una comprobacion nueva que deja algo a medias a la siguiente (2026-10-19)
 - **Que paso**: la auditoria anadio al humo `desktop`, justo antes de la prueba
@@ -635,3 +642,4 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
   marcha (capturas del cursor, temporizadores, animaciones) y si la siguiente
   depende de ese estado; o se aisla (aqui, sin pedir la captura) o se espera a
   que se asiente. Y se corre la pasada dos veces en local.
+- **Donde vive ahora**: lente B, principio B6.
