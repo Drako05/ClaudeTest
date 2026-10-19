@@ -28,8 +28,10 @@ Salen de fallos reales (`references/escapes.md`), no de un manual.
 4. **«No encontre nada» no es «esta limpio».** Es «no lo encontre con estos
    metodos». Por eso las lentes son varias y la segunda pasada es obligatoria.
 5. **Toda correccion se verifica**, igual que un cambio del juego.
-6. **Lo que se escapa se convierte en metodo** (fase 6). Si no, se vuelve a
-   escapar.
+6. **Lo que se escapa se convierte en un principio, no en un caso** (fase 6).
+   Una regla que solo caza el fallo que la origino no caza al siguiente, que
+   llega con otra ropa; y la skill tiene que servir en proyectos parecidos
+   (el autor, 2026-10-19).
 7. **La interpretacion es del autor.** La auditoria corrige lo que es falso;
    lo que es una decision (un numero de sensacion, un diseno) se le pregunta.
    `docs/el-libro-del-mundo.md` no se toca nunca.
@@ -80,9 +82,10 @@ El informe trae trece categorias:
 
 ## Fase 2 — Lentes
 
-Una pasada por lente, en orden, cada una con su pregunta. El metodo detallado
-y los patrones conocidos estan en `references/lentes.md`: **leelo entero cada
-vez**, porque crece.
+Una pasada por lente, en orden, cada una con su pregunta. Los principios de
+cada lente, y como se aplican aqui, estan en `references/lentes.md`: **leelo
+entero cada vez**, porque crece. Se recorre tambien su seccion de
+disparadores si la tanda hizo alguno (sustituir un modelo, retirar algo).
 
 | Lente | Pregunta |
 |---|---|
@@ -159,14 +162,26 @@ Esta fase es la que hace que la skill mejore. Se hace:
 
 Para cada uno:
 1. Anadelo a `references/escapes.md` con su formato: que paso, por que se
-   escapo, que lo habria visto y donde vive ahora ese metodo.
-2. **Convierte el metodo en algo que se ejecute**:
+   escapo, que lo habria visto y donde vive ahora (el principio, `B2`).
+2. **Nombra la omision logica** que lo dejo pasar, sin terminos del proyecto:
+   no «el toque largo del menu», sino «un plazo decidido por cuando corre el
+   codigo y no por la hora del hecho».
+3. **Buscale principio** en `references/lentes.md`:
+   - **si encaja en uno**, el escape solo anade su numero a «Casos», y lo
+     propio del proyecto va a «En este proyecto» de esa lente. Si encajaba y
+     aun asi se escapo, el principio esta mal dicho: se afina su texto;
+   - **si no encaja**, se escribe un principio nuevo, en general, y tiene que
+     pasar una prueba: **cazar al menos otro escape pasado o un caso
+     verosimil en otro proyecto**. Si solo caza el suyo, es demasiado
+     especifico: se sube un nivel;
+   - si no encaja en ninguna lente, **se crea una lente nueva**.
+4. **Convierte el metodo en algo que se ejecute** cuando se pueda:
    - si es mecanizable, al escaner: una categoria nueva, con su fallo sembrado
      en `--autoprueba`;
-   - si es un termino o valor retirado, a `references/retirados.md`;
-   - si es una forma de mirar, a su lente en `references/lentes.md`, con el
-     patron concreto.
-3. Si un fallo no encaja en ninguna lente, **crea una lente nueva**.
+   - si es un termino o valor retirado, a `references/retirados.md`.
+
+El escaner comprueba que cada escape de `escapes.md` este citado en algun
+«Casos» de `lentes.md` (categoria «Escapes que ningun principio cita»).
 
 Una auditoria que termina sin haber anadido nada a la fase 6 tiene que poder
 decir por que: «no se escapo nada» solo vale si la segunda pasada y la
@@ -174,10 +189,17 @@ verificacion no encontraron nada que la primera no viera.
 
 ## Ficheros de la skill
 
-- `references/lentes.md`: el metodo de cada lente y sus patrones conocidos.
+Como se lee cada uno, que cada lectura entera viaja en el resto del turno:
+
+- `references/lentes.md`: los principios de cada lente, generales, y como se
+  aplican en este proyecto. **Se lee entero** en la fase 2: es el metodo. Si pasa de unos 25 KB, se
+  parte en un fichero por lente y este queda como indice.
 - `references/escapes.md`: el registro de escapes; es la historia de por que
-  la skill es como es.
-- `references/retirados.md`: los terminos que el escaner vigila.
+  la skill es como es. **No se lee entero**: sus metodos ya viven en las
+  lentes. Para buscar, `grep -n '^### '` da la lista de titulos y luego se lee
+  la entrada que toca; para anadir, basta el final y el numero siguiente.
+- `references/retirados.md`: los terminos que el escaner vigila. **No se lee
+  entero**: se busca con `grep` y se anade al final de su seccion.
 - `references/ignorar.md`: los avisos ya juzgados como correctos, con ambito.
 - `scripts/escaner.mjs`: el barrido mecanico y su autoprueba. Es Node puro,
   sin dependencias, para que corra en un contenedor recien creado.

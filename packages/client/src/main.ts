@@ -76,6 +76,7 @@ import { FaunaView } from './fauna-view.js';
 import { DropsView } from './drops-view.js';
 import { faunaGallery } from './fauna-gallery.js';
 import { showIconSheet } from './icon-sheet.js';
+import { showWorldSheet } from './world-sheet.js';
 import { itemIcon } from './item-icons.js';
 import { spriteDepthProbe, type ProbeView } from './sprite-depth-probe.js';
 import { StationSet } from './stations-view.js';
@@ -106,6 +107,7 @@ import * as clock from './clock.js';
 import {
   faunaShownFromLocation,
   iconSheetFromLocation,
+  worldSheetFromLocation,
   manualClockFromLocation,
   onlySlashFromLocation,
   randomSeed,
@@ -704,6 +706,8 @@ function restart(): void {
 
 /** Con `?iconos=1`, la hoja de los iconos encima de todo (`icon-sheet.ts`). */
 const iconSheetCount = iconSheetFromLocation() ? showIconSheet() : 0;
+/** Con `?mundo=1`, la del pixelart del mundo (`world-sheet.ts`). */
+const worldSheetCount = worldSheetFromLocation() ? showWorldSheet() : 0;
 
 /** Con `?reloj=manual` el bucle no corre solo: lo avanza la prueba (`clock.ts`). */
 const manualClock = manualClockFromLocation();
@@ -1327,6 +1331,8 @@ Object.defineProperty(window, '__verdant', {
       faunaGallery: (boxes = false, pixelsPerBlock = 40) => faunaGallery(pixelsPerBlock, boxes),
       /** Cuantos iconos tiene la hoja de `?iconos=1` (0 sin ella). */
       iconSheet: iconSheetCount,
+      /** Cuantos dibujos ensena la hoja de `?mundo=1` (0 sin ella). */
+      worldSheet: worldSheetCount,
       /** Cuantos iconos de boton se rellenaron al arrancar (`installButtonIcons`). */
       buttonIcons,
       /** Cuanto se ve de un sprite pegado de lado a un bloque y con uno delante. */
