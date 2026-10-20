@@ -97,7 +97,10 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   pixel a pixel.
 - **El voxel de 0,5** (`?s=0.5`; `cobre-05.png`, `carbon-05.png`), que pidio
   despues: caras de 12 × 12 y cristales de **0,25 como mucho** (6 pixeles).
-  **Esperando al autor.**
+  El autor: los de los lados «están tan juntos que parecen uno solo»; ahora
+  los dos de cada cara van sueltos, separados de un quinto a dos tercios de la
+  cara segun la cara (*deduccion*), y cada uno a su altura. **Esperando al
+  autor.**
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).

@@ -247,13 +247,21 @@ sides.forEach(([n, at], k) => {
     const u0 = small ? jitter(0.3) : (c === 0 ? -0.2 : 0.22) + jitter(0.15);
     const v0 = 0.25 + r() * 0.55;
     const count = small ? 2 : 2 + Math.floor(r() * 2);
+    // En el voxel, los dos de cada cara sueltos, no en racimo (el autor,
+    // 2026-10-20: «parecen uno solo»): mas cerca en unas caras, mas lejos en
+    // otras, y cada uno a su altura. Solo se sortea en el voxel: el bloque
+    // aprobado sigue igual.
+    const spread = small ? 0.22 + r() * 0.42 : 0;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     for (let i = 0; i < count; i++) {
       const lateral = new THREE.Vector3(n.z, 0, -n.x).multiplyScalar(jitter(0.8));
       const axis = n.clone().multiplyScalar(0.8).add(UP.clone().multiplyScalar(0.7 + r() * 0.5)).add(lateral);
       const big = i === 0;
       // En este orden los sorteos: la posicion antes que el tamano, como en el
       // bloque que aprobo el autor (cambiarlo cambia todo el dibujo).
-      const base = at(u0 + jitter(0.14), v0 + jitter(0.1));
+      const base = small
+        ? at(clamp(u0 + (i - 0.5) * spread + jitter(0.08), -0.38, 0.38), clamp(v0 + jitter(0.4), 0.2, 0.85))
+        : at(u0 + jitter(0.14), v0 + jitter(0.1));
       const [w, h] = small ? (big ? [4, 5] : [3, 4]) : big ? [8, 11] : [6, 7 + Math.floor(r() * 3)];
       addCrystal(base, axis, w, h, 200 + k * 10 + c * 4 + i, r() * Math.PI);
     }
