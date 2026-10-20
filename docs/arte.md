@@ -63,6 +63,10 @@ del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
   - **Una distinta por casilla**. El autor: «me gustaria la opcion de maxima
     variedad». La forma, el sitio, el angulo y el tamaño de cada cristal, y el
     recorrido de cada veta, salen de la casilla y la semilla (regla 2).
+    **Los cristales de cada cara salen de esa cara**: del voxel en el mundo y
+    de la cara, con su propio azar (el autor, 2026-10-20: romper un voxel
+    cambiaba los de los demas, y tienen que estar «ligados a su posicion en
+    el mundo»). Las vetas, del suyo por casilla.
   - **Cada mena lleva su propia malla y su propia textura**: la tesela de la
     roca con sus vetas, y al lado los dibujos de sus cristales, en 64 de
     ancho. Una llamada de dibujo por mena, como la roca. Al descartar su

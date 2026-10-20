@@ -59,9 +59,17 @@ lo primero que toca y las menas», y en la regla 12 (colocar en la rejilla de
   en el humo: la vida rehace chunks mientras se pica y la medida no podia
   fallar (se quito). Se ve en la captura.
 
-**Espera al autor**: las deducciones nuevas, en `docs/juicio.md` (filas
-«Menas de voxeles», «Pala» y «Rejilla de 0,5»), y que la mesa ya no quepa sin
-barra.
+**El autor (2026-10-20)**: la barra de la mesa, «el comportamiento esperado»;
+las deducciones de las menas y las palas, bien. No cierra la tanda: vio dos
+fallos, ya arreglados (commit de esta ronda):
+- **Romper un voxel de mena cambiaba los cristales de los demas**: salian de
+  un solo azar por casilla. Ahora, uno por cara de voxel (`oreModel`).
+- **Corriendo, lo recogido no llegaba**: el iman iba a 8 b/s fijos y
+  corriendo se va a 8,32. Ahora acelera 30 b/s² (el autor) y no suelta por
+  distancia.
+
+Sigue a su juicio la rejilla de 0,5 (`docs/juicio.md`, filas «Rejilla de
+0,5»).
 
 ## Tanda hecha: romper el terreno, voxel a voxel (2026-10-20)
 

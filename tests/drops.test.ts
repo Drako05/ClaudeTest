@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  collectDrops,
   createGame,
   DROP_HALF,
+  HOMING_ACCEL,
+  HOMING_SPEED,
+  RUN_SPEED,
   dropFloor,
   featureBox,
   skipTime,
@@ -11,7 +15,7 @@ import {
   type Drop,
   type GameState,
 } from '@verdant/sim';
-import { emptyIntent, Feature, Resource, TICK_HZ, toolStats, type Intent } from '@verdant/shared';
+import { emptyIntent, Feature, Resource, TICK_DT, TICK_HZ, toolStats, type Intent } from '@verdant/shared';
 import { groundCount } from './ground.js';
 
 /**
@@ -160,6 +164,33 @@ describe('Recoger', () => {
     expect(state.inventory.count(Resource.Stone)).toBe(3);
     expect(state.world.drops.get(far.id)).toBe(far);
     expect(state.inventory.count(Resource.Wood)).toBe(0);
+  });
+
+  it('alcanza aunque se corra, y con un empuje de velocidad tambien: acelera mientras vuela (el autor, 2026-10-20)', () => {
+    // A 8 fijos no llegaba nunca a quien corre (8,32): le seguia detras.
+    expect(RUN_SPEED).toBeGreaterThan(HOMING_SPEED);
+    expect(HOMING_ACCEL).toBe(30);
+    for (const [speed, limit] of [[RUN_SPEED, 0.5], [RUN_SPEED * 2, 1.0]] as const) {
+      const { state } = atSpawn();
+      const e = state.entities;
+      const id = state.playerId;
+      const z = e.z[id];
+      // Detras, a 0,6, a la altura del pecho: en el iman al primer paso.
+      const d = state.world.drops.add({
+        item: Resource.Stone, count: 1, wear: 0, x: e.x[id] - 0.6, y: e.y[id], z: z + 0.9, vx: 0, vy: 0, vz: 0, pickableAt: 0, born: state.tick,
+      });
+      let t = 0;
+      while (state.world.drops.get(d.id) && t < 3) {
+        // Huye en linea recta, como corriendo, sin mirar el terreno.
+        e.x[id] += speed * TICK_DT;
+        e.z[id] = z;
+        collectDrops(state.world, e, id, state.inventory, state.tick);
+        t += TICK_DT;
+      }
+      expect(state.world.drops.get(d.id), `a ${speed.toFixed(2)} b/s`).toBeUndefined();
+      expect(t, `a ${speed.toFixed(2)} b/s`).toBeLessThan(limit);
+      expect(state.inventory.count(Resource.Stone)).toBe(1);
+    }
   });
 
   it('entra lo que cabe y el resto se queda en el suelo, sin volver a volar', () => {

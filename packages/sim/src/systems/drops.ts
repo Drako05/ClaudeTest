@@ -34,6 +34,12 @@ export const DROP_FLOAT = 0.2;
 export const PICKUP_RADIUS = 1;
 /** Lo deprisa que vuela hacia el jugador lo que se recoge, en bloques/s. **El autor lo dio por bueno jugando (2026-10-18).** */
 export const HOMING_SPEED = 8;
+/**
+ * Y lo que acelera mientras vuela, en bloques/s² (el autor, 2026-10-20): a 8
+ * fijos no alcanzaba a quien corre (8,32), y lo que se recoge tiene que llegar
+ * siempre, tambien con lo que haga ir mas deprisa. Sin tope.
+ */
+export const HOMING_ACCEL = 30;
 /** A cuanto se funden dos montones iguales posados. **Deduccion mia.** */
 export const MERGE_RADIUS = 0.5;
 /** El salto del botin al salir, hacia arriba, en bloques/s. **Deduccion mia.** */
@@ -255,28 +261,35 @@ function fromBody(store: EntityStore, id: number, x: number, y: number, z: numbe
 
 /**
  * El iman (el autor: «solo, al acercarse»): lo recogible a `PICKUP_RADIUS` del
- * cuerpo, del que quepa algo, vuela hacia el pecho a `HOMING_SPEED` y, al
- * llegar, entra lo que quepa; el resto vuelve a caer y se queda en el suelo.
- * Si el jugador se aleja o el inventario se llena por el camino, lo suelta.
+ * cuerpo, del que quepa algo, vuela hacia el pecho: sale a `HOMING_SPEED` y
+ * acelera `HOMING_ACCEL`, asi que alcanza aunque se corra. Al llegar, entra lo
+ * que quepa; el resto vuelve a caer y se queda en el suelo.
+ * Si el inventario se llena por el camino, lo suelta.
  */
 export function collectDrops(world: World, store: EntityStore, id: number, inventory: Inventory, tick: number, dt: number = TICK_DT): void {
   if (world.drops.size === 0 || !store.alive[id]) return;
   const chestZ = store.z[id] + PLAYER_HEIGHT / 2;
-  const step = HOMING_SPEED * dt;
   for (const d of world.drops.values()) {
     const far = fromBody(store, id, d.x, d.y, d.z);
     if (!d.homing) {
       if (tick < d.pickableAt || far > PICKUP_RADIUS || inventory.room(d.item) === 0) continue;
       d.homing = true;
+      d.speed = HOMING_SPEED;
       d.resting = false;
       d.vx = 0;
       d.vy = 0;
       d.vz = 0;
     }
-    if (far > PICKUP_RADIUS * 2 || inventory.room(d.item) === 0) {
+    // Una vez en el iman, llega siempre (el autor, 2026-10-20: «que siempre
+    // lleguen al jugador rapidamente una vez esten en rango»): ya no lo suelta
+    // por alejarse, solo si deja de caber.
+    if (inventory.room(d.item) === 0) {
       d.homing = false;
+      d.speed = 0;
       continue;
     }
+    const step = d.speed * dt;
+    d.speed += HOMING_ACCEL * dt;
     const gx = store.x[id] - d.x;
     const gy = store.y[id] - d.y;
     const gz = chestZ - d.z;
@@ -293,6 +306,7 @@ export function collectDrops(world: World, store: EntityStore, id: number, inven
     } else {
       // No cupo todo: lo que queda cae donde esta.
       d.homing = false;
+      d.speed = 0;
       d.resting = false;
     }
   }
