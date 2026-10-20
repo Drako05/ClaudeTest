@@ -81,6 +81,93 @@ el 47 a D1 (cada campo de cada entrada).
 
 ---
 
+## Tanda siguiente: las menas al juego (decidida el 2026-10-20)
+
+**Aun sin empezar.** Lleva al juego el boceto de abajo («Boceto: los minerales
+como piedra con cristales»). El autor contesto cuatro preguntas:
+
+1. **Colores: directo al juego.** El cobre y el carbon, con los del boceto. El
+   hierro no esta en el boceto: lleva los que proponga el agente (*deduccion*),
+   y el autor los corrige luego sobre el juego.
+2. **Piedra: la de la roca del juego** (`STONES[Feature.RockNode]`,
+   `ROCK_BASE #84848e`), con las vetas y los cristales del mineral encima. No
+   la gris verdosa del boceto.
+3. **Variedad**, la maxima: «Me gustaria la opcion de maxima variedad. Usando
+   parametros deterministas que le den una forma segun la coordenada donde se
+   ubique cada bloque, ¿aun seguiria siendo considerable el incremento de uso
+   de memoria y gpu?». La respuesta es **no**. Las cuentas, del codigo:
+   - Los minerales son el 10 % de la piedra de montaña (`HIGHLAND_ROCK` 0,045 ×
+     `MINERAL_SHARE`): el 0,45 % de sus casillas. Se mallan 7 × 7 chunks de 32
+     (`RADIUS = 3` en `main.ts`), unas 50.000 casillas. Aunque todo fuera
+     montaña, serian **unas 225 menas como mucho**.
+   - **Llamadas de dibujo: las mismas.** Ya hay un `Mesh` por objeto
+     (`billboards.ts`, `spawn`) y miles de arboles. Una mena unica sigue siendo
+     una llamada si la piedra y los cristales comparten material: `alphaTest`,
+     y los cristales en quads por las dos caras.
+   - **Memoria: poca.** La forma de juego (`ROCK_SHAPE`, 7 voxeles: 4 tapas y 16
+     caras de lado) lleva unos 28 cristales de corona y 32 de costado.
+     - Geometria: unos 1.000 vertices, unos 40 KB por mena; en el peor caso,
+       unos 9 MB.
+     - Una textura de 64 × 64 por mena: 16 KB; unos 3,6 MB.
+   - **Lo que si cuesta**:
+     - **CPU al cargar un chunk**: pintar y mallar sus menas. Se mide en la
+       tanda, no se supone.
+     - **Liberar al descartar**: hoy las geometrias de la roca son compartidas
+       y no se liberan. Con una por mena hay que hacer `dispose` de su
+       geometria y su textura al descartar el chunk, o la memoria crece sin
+       parar.
+4. **Vecinos: solo dentro de la formacion.** Se quitan los cristales de las
+   caras que tocan otro voxel de la misma mena. Hacia fuera de la casilla
+   salen siempre, aunque haya otra mena o una pared de terreno pegada.
+
+**El plan**, propuesto por el agente y aprobado por el autor como plan:
+
+- **`packages/client/src/ore-mesh.ts`, nuevo y puro** (como `rock-mesh.ts`):
+  - Recibe la mena, la semilla y la casilla. Devuelve arrays planos: los
+    voxeles de piedra de `rockMesh` (reutilizado, con su giro por casilla) y
+    los quads de los cristales.
+  - Porta del boceto (`docs/bocetos/minerales/index.html`) las dos reglas
+    aprobadas: `voxelCrown`, la de la corona, y `voxelSide`, la de los
+    costados.
+  - Porta tambien el quitar cristales de las caras tocadas, como hace
+    `buildScene`.
+  - `ROCK_SHAPE` no tiene voladizo, asi que no hay flor de abajo.
+  - Azar: `mulberry32` sembrado con `hash2D` de la casilla (regla 2). La misma
+    casilla se ve igual al volver.
+- **La textura de cada mena**:
+  - La tesela de la roca del juego, con las vetas y el nodulo pintados encima
+    (`stoneFace` del boceto, sobre esa piedra), y los sprites de sus cristales,
+    todo en un lienzo de 64 × 64 (`pixelTexture`/`artCanvas` de
+    `world-sprites.ts`).
+  - Un solo `MeshBasicMaterial`, con `vertexColors` (la luz por cara, como
+    hoy) y `alphaTest` 0,4.
+- **`billboards.ts`, `spawn`**: `CoalNode`, `IronNode` y `CopperNode` usan
+  `ore-mesh`. La roca normal no cambia. Hay que mirar antes como se descarta
+  hoy un chunk, para liberar lo de cada mena.
+- **Escombros**: `debrisPalette` (`palette.ts`) da a los de una mena el color
+  de su mineral.
+- ***Deduccion*, a juicio del autor**:
+  - La caja de choque sigue de 0,9 × 1,0: los cristales son de dibujo y no se
+    golpean.
+  - La sombra sigue de ancho 1.
+  - Los colores del hierro, de la familia de su icono (`ITEM_PALETTE`).
+- **Tests (`tests/ore-mesh.test.ts`)**:
+  - La misma casilla da la misma malla, y dos casillas, mallas distintas.
+  - Ningun cristal sale de una cara tocada por otro voxel de la mena.
+  - Cristales de 0,25 como mucho.
+  - La corona pone lo que pide y no se pisa mas del 40 %.
+  - Los costados, a 30-56° con arco de 0-20°, y sin tocarse.
+  - Todo cabe en la textura.
+  - Y el humo de `resources` (`rocks` cuenta tambien las menas).
+- **Lo de siempre**:
+  - Las mutaciones y `tools/a-pruebas.sh`, y despues `main`.
+  - Una captura que decida.
+  - La documentacion: `docs/arte.md`, `docs/juicio.md`, y `retirados.md` si
+    se retiran las `STONES` de las menas.
+  - La auditoria al cerrar.
+  - Medir lo que cuesta mallar un chunk con menas
+    (`tests/performance.test.ts` mide el tick, no el mallado).
+
 ## Boceto: los minerales como piedra con cristales (2026-10-20)
 
 El autor, con una referencia (un cubo de roca con cristales de amatista que
