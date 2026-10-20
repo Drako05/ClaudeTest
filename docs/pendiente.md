@@ -99,8 +99,14 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   despues: caras de 12 × 12 y cristales de **0,25 como mucho** (6 pixeles).
   El autor: los de los lados «están tan juntos que parecen uno solo»; ahora
   los dos de cada cara van sueltos, separados de un quinto a dos tercios de la
-  cara segun la cara (*deduccion*), y cada uno a su altura. **Esperando al
-  autor.**
+  cara segun la cara (*deduccion*), y cada uno a su altura. Despues, el
+  autor: que varien «entre 45 y 90 grados con respecto a la cara», en un arco
+  con la punta «hacia adentro o hacia afuera del bloque», y que su distancia y
+  posicion varien «pero nunca lleguen a solaparse sus bases». Leido asi
+  (*por confirmar*): la punta, hacia el centro de la cara o hacia su borde,
+  con hasta 45 grados de desvio; entre dos pies, sus dos medias bases y un
+  margen de 0,08 de la cara (`voxelSide`). Solo en el voxel: el bloque
+  aprobado no cambia. **Esperando al autor.**
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).
