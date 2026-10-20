@@ -124,41 +124,37 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   grados**, hacia el centro de la cara o hacia su borde; posicion y distancia
   al azar, **sin que sus bases se toquen nunca** (entre sus pies, sus dos
   medias bases y 0,08 de la cara). Esta en `voxelSide`, en el boceto.
-- **La corona** (el racimo de arriba): el autor pide reglas de variedad que
-  mantengan **su forma general de flor**. Le propuse ocho y: «aplica todas,
-  con los brotes sueltos». Estan en `voxelCrown`, en el boceto (los numeros,
-  *mios*): de 5 a 7 cristales; uno en el centro, el mas alto (6 pixeles), de 0
-  a 10 grados desde la vertical; los demas, petalos en un anillo a 0,20-0,35
-  del lado, repartidos por igual con ±15 grados, de 3 a 5 pixeles, abiertos
-  hacia fuera de 15 a 40 grados y torcidos hasta ±10; el centro de la flor,
-  hasta 0,12 del lado fuera del de la cara; las bases sin tocarse; y de 0 a 2
-  brotes de 3 pixeles cerca del borde. La hoja `coronas-*.png` ensena seis
-  sorteos de cada mineral (`?semilla=`). **Esperando al autor.**
-- **El fallo de la primera hoja de coronas** («literalmente la flor ya no
-  esta»): la distancia minima entre bases (0,41 del lado, con cristales de 4
-  a 5 pixeles de ancho) era mayor que el radio del anillo (0,20-0,35), asi
-  que cada petalo agotaba sus intentos y se **descartaba en silencio**, y yo
-  mande las fotos sin contarlos. Arreglo: los cristales de la corona miden 3
-  pixeles de ancho, el hueco entre bases es 0,25/N (que no se toquen), 60
-  intentos por petalo, y **nada se descarta sin decirlo**: cada sorteo
-  ensena «corona X de Y» y los solapes de los lados (el titulo de la pagina,
-  `data-corona` y `data-solapes`). Tras el arreglo, dos de los doce sorteos
-  ponen un cristal menos de los pedidos (6 de 7 y 8 de 9). Los costados
-  tenian el mismo riesgo latente: ahora se quedan con la mejor de 80 tiradas
-  y cuentan los solapes (0 en todos).
-- **El grosor de la primera corona, y una flor abajo** (2026-10-20). El
-  autor: «me gustaba mas tu primera corona... permite que se solapen hasta un
-  limite si es necesario con tal de recuperar ese aspecto original sin el
-  riesgo de que queden amontonados por la variedad. ademas, agrega una
-  segunda tirada en la cara de abajo». La primera tenia el centro de 5 x 6 y
-  petalos de 4 x 5, 3 x 4 y 3 x 3: ahora cada cristal mide **un pixel menos
-  de ancho que de alto, nunca menos de 3**, y el centro, 5 x 6. Sus bases se
-  pisaban hasta un 31 % de sus dos medias bases juntas; **el tope es el 40 %**
-  (*deduccion*), y cada sorteo dice cuanto se pisan. La «segunda tirada» la
-  lei como **otra flor, con las mismas reglas, colgando de la cara de abajo**
-  (*mi lectura, por confirmar*); para verla, el voxel flota a 0,3 del suelo y
-  hay una vista desde abajo. Los doce sorteos ponen todos sus cristales.
-  **Esperando al autor.**
+- **La regla de la corona, APROBADA** (2026-10-20: «Bien, ahora me
+  convenciste. guarda esa regla para la corona»), para la cara de arriba de
+  un voxel de mineral, y la misma flor colgando de la de abajo. Esta en
+  `voxelCrown(face)`, en el boceto. Las ocho reglas las propuse yo y el autor
+  las aplico todas («aplica todas, con los brotes sueltos»); los numeros son
+  *mios* y quedan aprobados con la regla:
+  1. De 5 a 7 cristales.
+  2. Uno en el centro, el mas alto y grueso (5 x 6 pixeles), de 0 a 10
+     grados desde la vertical.
+  3. Los demas, petalos en un anillo a 0,20-0,35 del lado, repartidos por
+     igual con ±15 grados, de 3 a 5 pixeles de alto.
+  4. Abiertos hacia fuera de 15 a 40 grados.
+  5. Torcidos de lado hasta ±10 grados.
+  6. El centro de la flor, hasta 0,12 del lado fuera del de la cara.
+  7. **Cada cristal, un pixel menos de ancho que de alto, nunca menos de
+     3**; y sus bases **se pueden pisar hasta un 40 %** de sus dos medias
+     bases juntas, nunca mas. Es el grosor y la apretura de la primera
+     corona, que el autor preferia: «permite que se solapen hasta un limite
+     si es necesario con tal de recuperar ese aspecto original sin el riesgo
+     de que queden amontonados por la variedad». La primera se pisaba hasta
+     un 31 %; el 40 % lo fije yo.
+  8. De 0 a 2 brotes sueltos de 3 x 3, cerca del borde (0,36-0,44).
+  - **Y abajo, otra flor igual** («agrega una segunda tirada en la cara de
+    abajo»): yo lo lei como otra flor colgando de la cara de abajo, y el
+    autor la vio y aprobo la regla. En el boceto, el voxel flota a 0,3 del
+    suelo, y hay una vista desde abajo para verla.
+  - **Nada se descarta sin decirlo**: cada sorteo cuenta lo que pidio y lo que
+    puso, y cuanto se pisan (en el titulo, `data-corona` y `data-abajo`). La
+    leccion viene de la primera hoja de coronas. Con bases que no podian
+    tocarse, ningun petalo cabia en el anillo y se saltaban sin avisar. El
+    autor: «literalmente la flor ya no esta».
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).
