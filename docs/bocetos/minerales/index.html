@@ -245,8 +245,10 @@ const sides = [
   [new THREE.Vector3(0, 0, -1), (u, v) => new THREE.Vector3(u * S, v * S, -0.5 * S)],
 ];
 /**
- * Los dos cristales de una cara del voxel (el autor, 2026-10-20): **en general
- * hacia arriba, pero no todos por igual**. Por encima de la horizontal, de 30 a
+ * Los dos cristales de una cara del voxel: **la regla de los costados**,
+ * aprobada por el autor el 2026-10-20 («perfecto, así me gustan, guarda esa
+ * regla para los costados»). **En general hacia arriba, pero no todos por
+ * igual**. Por encima de la horizontal, de 30 a
  * 56 grados: 56 era lo mas alto que salian la primera vez (de 38 a 56), y el
  * autor lo quiso de tope, con unos grados para bajar (los 26 son *deduccion*).
  * Con la punta en un arco horizontal, hacia el centro de la cara o hacia su

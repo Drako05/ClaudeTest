@@ -116,7 +116,17 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   horizontal) y unos grados para bajar; el arco, igual o mas acotado. Hoy: **de
   30 a 56 grados sobre la horizontal** (los 26 de margen, *deduccion*) y **el
   arco en horizontal, de 0 a 20** grados hacia el centro o el borde de la cara
-  (*deduccion*). **Esperando al autor.**
+  (*deduccion*). El autor: «perfecto, así me gustan, guarda esa regla para
+  los costados».
+- **La regla de los costados, APROBADA** (2026-10-20), para cada cara de lado
+  de un voxel de mineral: dos cristales de 3-4 x 4-5 pixeles; **de 30 a 56
+  grados sobre la horizontal**; la punta en un **arco horizontal de 0 a 20
+  grados**, hacia el centro de la cara o hacia su borde; posicion y distancia
+  al azar, **sin que sus bases se toquen nunca** (entre sus pies, sus dos
+  medias bases y 0,08 de la cara). Esta en `voxelSide`, en el boceto.
+- **La corona** (el racimo de arriba): el autor pide reglas de variedad que
+  mantengan **su forma general de flor**. Propuestas, **esperando al
+  autor**.
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).
