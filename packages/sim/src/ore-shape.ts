@@ -20,6 +20,9 @@ import { hash2D } from './rng.js';
 /** Un voxel de la formacion: [este, sur, altura desde la base], en voxeles. */
 export type OreVoxel = readonly [number, number, number];
 
+/** La sal de la semilla de la forma: que voxel falta arriba y cual va abajo. */
+const ORE_SALT = 0x0e5f0a7;
+
 /** Sin mena en la casilla: lo que guarda `oreBase` del chunk. */
 export const NO_ORE = -32768;
 
@@ -30,7 +33,7 @@ export function isOre(feature: Feature): boolean {
 
 /** La formacion de la mena de la casilla (`tx`, `ty`): sus ocho voxeles. */
 export function oreFormation(seed: number, tx: number, ty: number): OreVoxel[] {
-  const h = hash2D(seed ^ 0x0e5f0a7, tx, ty);
+  const h = hash2D(seed ^ ORE_SALT, tx, ty);
   const missing = h & 3;
   const bottom = (h >>> 2) & 3;
   const corner = (c: number): [number, number] => [c & 1, c >> 1];
@@ -42,5 +45,5 @@ export function oreFormation(seed: number, tx: number, ty: number): OreVoxel[] {
 
 /** Si (`e`, `s`) ∈ {0, 1}² lleva voxel en el nivel de arriba de la formacion. */
 export function oreOnTop(seed: number, tx: number, ty: number, e: number, s: number): boolean {
-  return (hash2D(seed ^ 0x0e5f0a7, tx, ty) & 3) !== e + 2 * s;
+  return (hash2D(seed ^ ORE_SALT, tx, ty) & 3) !== e + 2 * s;
 }

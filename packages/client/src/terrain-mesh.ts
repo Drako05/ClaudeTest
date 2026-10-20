@@ -238,7 +238,9 @@ export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): Mesh
 export function meshHeightAt(mesh: MeshData, wx: number, wy: number): number | null {
   let best: number | null = null;
   for (let t = 0; t < mesh.indices.length; t += 6) {
-    // Una tapa es un cuadrilatero con sus cuatro vertices a la misma altura.
+    // Una cara horizontal (una tapa, o la de abajo de un saliente) es un
+    // cuadrilatero con sus cuatro vertices a la misma altura; la mas alta es
+    // siempre una tapa.
     const ids = [mesh.indices[t], mesh.indices[t + 1], mesh.indices[t + 2], mesh.indices[t + 5]];
     const ys = ids.map((i) => mesh.positions[i * 3 + 1]);
     if (ys.some((y) => y !== ys[0])) continue;

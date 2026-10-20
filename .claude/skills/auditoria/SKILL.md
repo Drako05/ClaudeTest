@@ -59,8 +59,9 @@ node .claude/skills/auditoria/scripts/escaner.mjs
 Si la autoprueba falla, **se arregla el escaner antes de seguir**: un escaner
 que no ve su fallo sembrado no ve los de verdad.
 
-El informe trae trece categorias:
-- rutas y nombres citados que no existen;
+El informe trae quince categorias:
+- rutas citadas que no existen, y nombres citados que no estan en el codigo
+  vivo;
 - CSS sin elemento;
 - ids que el JS pide y el HTML no tiene;
 - exports que nadie usa;
@@ -71,7 +72,11 @@ El informe trae trece categorias:
 - comentarios de documentacion sueltos (dos `/** */` seguidos);
 - documentos de `docs/` que el indice de `CLAUDE.md` no nombra;
 - ficheros que un modulo dice que «lo usan» y no lo importan;
-- tests que `docs/leyes.md` cita y no existen con ese nombre.
+- tests que `docs/leyes.md` cita y no existen con ese nombre;
+- escapes que ningun principio de `references/lentes.md` cita;
+- buenas practicas (lente K): un aviso del compilador apagado, tipos que
+  mienten (`any`, `as unknown as` fuera de los dobles de los tests,
+  `@ts-ignore`), un `catch` vacio sin decir por que, `var`.
 
 **Cada aviso se juzga** y acaba en uno de tres sitios:
 - **se corrige**;
@@ -99,8 +104,10 @@ disparadores si la tanda hizo alguno (sustituir un modelo, retirar algo).
 | H. Tests | ¿Dice cada test lo que afirma? ¿Pasa alguno por suerte? |
 | I. Estructura | ¿Hay calculos duplicados o logica pura metida en el DOM? |
 | J. Reglas del proyecto | ¿Se cumplen las reglas duras de `CLAUDE.md`? ¿Estan anotadas las deducciones? |
+| K. Buenas practicas | ¿Esta escrito como lo escribiria un buen programador de este lenguaje, en este tipo de proyecto? Lo que se puede mejorar sin cambiar lo que hace, se mejora. |
 
-Las lentes C, F y J se aplican **al repo entero**; las demas, a lo que toco la
+Las lentes C, F y J se aplican **al repo entero**, y la K en lo mecanico (el
+compilador y el escaner); las demas, y la lectura de la K, a lo que toco la
 tanda y a todo lo que lo cita.
 
 ## Fase 3 — Segunda pasada, adversaria

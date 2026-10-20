@@ -31,7 +31,6 @@ import {
   hitPartsOf,
   isInert,
   isSapling,
-  isStation,
   Station,
   stationHeight,
   stationOfFeature,
@@ -75,8 +74,9 @@ const SAPLING_BOX = { half: 0.15, height: 0.85 };
  */
 const PEBBLES_BOX = { half: 0.3, height: 0.2 };
 /**
- * Las estaciones ocupan su casilla entera, con el alto de `stationHeight`: lo
- * que se pisa, lo que se golpea y lo que se dibuja son el mismo numero.
+ * Las estaciones ocupan un bloque entero, corrido o no medio bloque (rejilla
+ * de 0,5, `stationOffsetAt`), con el alto de `stationHeight`: lo que se pisa,
+ * lo que se golpea y lo que se dibuja son el mismo numero.
  */
 export const STATION_BOXES: Readonly<Record<Station.Workbench | Station.Furnace, { half: number; height: number }>> = {
   [Station.Workbench]: { half: 0.5, height: stationHeight(Feature.Workbench) },
@@ -86,7 +86,8 @@ export const STATION_BOXES: Readonly<Record<Station.Workbench | Station.Furnace,
 /**
  * La caja del objeto de una casilla, o `null` si no hay nada que golpear.
  *
- * Una caja vertical centrada en la casilla y apoyada en su suelo. **La del
+ * Una caja vertical centrada en la casilla (la de una estacion, corrida con
+ * `stationOffsetAt`) y apoyada en su suelo. **La del
  * arbol es solo su tronco desnudo** (decision del autor: las hojas no), del
  * suelo a la copa y del grosor de su especie, y sale de `treeTrunkAt`, lo mismo
  * que dibuja el cliente: el tronco que se ve es el que se golpea y el que se

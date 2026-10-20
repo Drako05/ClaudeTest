@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   createGame,
+  STRIKE_RAYS,
+  strikeOf,
   DAMAGE_DECAY_TICKS,
   footing,
   headroom,
@@ -16,8 +18,10 @@ import { CHUNK_SIZE, emptyIntent, Feature, Resource, Terrain, ToolKind, toolStat
 /**
  * La destruccion del terreno (el autor, 2026-10-20): el voxel de 0,5 es la
  * unidad del terreno; cada golpe da a cada voxel que toca, que aguanta 3 y se
- * rompe solo; debajo hay mas de lo mismo, sin fondo; nada cae; con cualquier
- * cosa en la mano; sin particulas ni botin.
+ * rompe solo; debajo hay mas de lo mismo, sin fondo; nada cae; sin
+ * particulas. Desde la tanda de la pala, con su herramienta (`voxelWorkOf`: la
+ * roca con pico, lo maleable con pala, y el poder resta), y el voxel de mena
+ * suelta su mineral (`tests/ore-voxels.test.ts`).
  */
 
 /** El jugador en su nacimiento, un rellano llano de 3x3, con el alrededor despejado. Con la semilla 7, de hierba: se cava con pala. */
@@ -327,6 +331,19 @@ describe('el golpe rompe el terreno (el autor, 2026-10-20)', () => {
     }
   });
 
+  it('el barrido que dibuja el cliente es el del golpe: sus rayos siguen cortados donde estaba lo que rompio', () => {
+    const { state } = atSpawn();
+    hold(state, Resource.StoneShovel);
+    let hits = swing(state, 1, 0, 60);
+    for (let i = 0; i < 5 && !hits.some((v) => v.broken); i++) hits = swing(state, 1, 0, 60);
+    expect(hits.some((v) => v.broken)).toBe(true);
+    const cut = state.lastStrikeRays;
+    expect(cut).toHaveLength(STRIKE_RAYS);
+    // Medido despues, lo roto ya no corta: algun rayo llega mas lejos.
+    const now = strikeOf(state.world, state.entities, state.playerId).rays;
+    expect(now.some((r, i) => r.length > cut[i]!.length + 1e-6)).toBe(true);
+  });
+
   it('el daño se olvida a los 3 s sin golpe', () => {
     const { state } = atSpawn();
     hold(state, Resource.StoneShovel);
@@ -341,6 +358,9 @@ describe('el golpe rompe el terreno (el autor, 2026-10-20)', () => {
     const { state, tx, ty } = atSpawn();
     hold(state, Resource.StoneShovel);
     expect(swing(state, 1, 0, 60, true)).toHaveLength(1);
+    // A 40 grados, sin nada delante, tambien llega al suelo: el 0 de abajo es
+    // por la roca, no por el angulo.
+    expect(swing(state, 1, 0, 40, true)).toHaveLength(1);
     state.world.setFeature(tx + 1, ty, Feature.RockNode);
     expect(swing(state, 1, 0, 40, true)).toHaveLength(0);
   });

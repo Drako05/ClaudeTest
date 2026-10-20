@@ -680,7 +680,7 @@ describe('Lo que se pone va en la rejilla de 0,5 (el autor, 2026-10-20)', () => 
     // Un punto de la casilla de al lado (tx+3, ty+1), dentro de la caja.
     expect(squareFloor(w, tx + 3.2, ty + 1.2, 0)).toBe(top);
     expect(w.isCovered(tx + 3, ty + 1)).toBe(true);
-    // Ni se siembra ni se pone nada debajo.
+    // Pisa sus cuatro casillas.
     expect(w.footprintTiles(tx + 2.5, ty + 0.5)).toHaveLength(4);
     w.setFeature(tx + 2, ty, Feature.None);
     expect(w.isCovered(tx + 3, ty + 1)).toBe(false);
@@ -695,5 +695,16 @@ describe('Lo que se pone va en la rejilla de 0,5 (el autor, 2026-10-20)', () => 
     use(state, 1, 0, 45);
     expect(state.lastPlaced).toBeNull();
     expect(state.inventory.count(Resource.Workbench)).toBe(1);
+    // Sin el guijarro, la cubre otra mesa corrida desde (tx, ty+1).
+    state.world.setFeature(tx + 1, ty + 1, Feature.None);
+    expect(state.world.placeStation(tx + 0.5, ty + 1.5, Feature.Workbench)).toEqual({ x: tx, y: ty + 1 });
+    expect(state.world.isCovered(tx + 1, ty + 1)).toBe(true);
+    use(state, 1, 0, 45);
+    expect(state.lastPlaced).toBeNull();
+    expect(state.inventory.count(Resource.Workbench)).toBe(1);
+    // Y sin nada, se pone: lo que lo impedia era lo de la casilla.
+    state.world.setFeature(tx, ty + 1, Feature.None);
+    use(state, 1, 0, 45);
+    expect(state.lastPlaced).not.toBeNull();
   });
 });

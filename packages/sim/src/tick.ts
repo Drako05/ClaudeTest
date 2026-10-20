@@ -94,6 +94,8 @@ export interface GameState {
   lastImpacts: Vec3[];
   /** Los voxeles del terreno que golpeo el ultimo golpe, y si se rompieron. */
   lastVoxelHits: Swing['voxels'];
+  /** Los rayos del ultimo barrido, cortados donde tocaron (`Swing.rays`). */
+  lastStrikeRays: Swing['rays'];
 }
 
 /**
@@ -135,6 +137,7 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     lastAnimalHits: [],
     lastImpacts: [],
     lastVoxelHits: [],
+    lastStrikeRays: [],
   };
 
   streamChunks(state);
@@ -176,6 +179,7 @@ export function step(state: GameState, intent: Intent): void {
   state.lastAnimalHits = [];
   state.lastImpacts = [];
   state.lastVoxelHits = [];
+  state.lastStrikeRays = [];
 
   // El tiempo avanza antes que nada: el resto del tick actua sobre el mundo tal
   // y como esta AHORA, con la vegetacion ya puesta al dia.
@@ -264,6 +268,7 @@ export function step(state: GameState, intent: Intent): void {
       state.lastAnimalHits = swing.animals;
       state.lastImpacts = swing.impacts;
       state.lastVoxelHits = swing.voxels;
+      state.lastStrikeRays = swing.rays;
       // Lo que murio deja de ser una entidad: su muerte ya esta en el overlay.
       for (const hit of swing.animals) {
         if (!hit.killed) continue;

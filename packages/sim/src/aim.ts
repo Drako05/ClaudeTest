@@ -1,8 +1,8 @@
 /**
  * La mirada y el golpe: un SECTOR PLANO que sale de los ojos del jugador.
  *
- * Geometria pura: el suelo y los hitboxes entran como funciones, asi que se
- * mide en Node sin mundo. `systems/gathering.ts` le pone el mundo.
+ * Geometria pura: el terreno (voxel a voxel, `Solid`) y los hitboxes entran
+ * como funciones, asi que se mide en Node sin mundo. `systems/gathering.ts` le pone el mundo.
  *
  * **Regla 12, del autor (2026-09-28).** El golpe es un sector de **3 bloques**
  * (`STRIKE_RANGE`) y **90 grados** (±45 alrededor de la mirada) **en el plano de la mirada**: el
@@ -16,8 +16,8 @@
  * propia: lo decide la geometria.
  *
  * El sector se recorre con **`STRIKE_RAYS` rayos** a lo ancho: cada uno se corta
- * donde entra en el terreno, y un objeto cae si algun rayo cruza su hitbox antes
- * de ese corte. Con 33 rayos, a 3 bloques queda un hueco de 0,147 entre dos
+ * donde entra en el terreno, y **cada rayo da solo a lo primero que toca** —un
+ * voxel, una caja o un cuerpo—: lo de detras no se golpea. Con 33 rayos, a 3 bloques queda un hueco de 0,147 entre dos
  * vecinos, menos que el tronco mas fino (0,21 el de la picea negra mas baja):
  * nada que el sector toque se cuela entre rayos.
  *
@@ -384,15 +384,12 @@ export function gazeTarget(
 /**
  * Donde toca la mirada el terreno, a menos del alcance en horizontal (el de
  * sembrar): la casilla, el punto, y si es la **cara de arriba** o un
- * **costado**. En un costado, `front` es la casilla de este lado de la pared,
- * donde se pone lo que se coloca mirandola (decision del autor, 2026-09-30:
- * aparece junto a la pared y cae al suelo). `null` si no llega o mira al cielo.
+ * **costado**, con el voxel y su cara: lo que se coloca mirando una pared va
+ * delante de esa cara (`placeTarget`). `null` si no llega o mira al cielo.
  */
 export interface Surface {
   /** La casilla del terreno tocado: la de arriba, o la de la pared. */
   tile: Offset;
-  /** La casilla de delante de la pared; en la cara de arriba, la misma. */
-  front: Offset;
   /** El punto tocado. */
   point: Vec3;
   top: boolean;
@@ -406,8 +403,7 @@ export function aimSurface(origin: Vec3, fx: number, fy: number, lookZ: number, 
   const flat = Math.hypot(dir.x, dir.y);
   const hit = groundHit(origin, dir, Math.min(STRIKE_RANGE / Math.max(flat, 1e-3), 8), solid);
   if (!hit) return null;
-  // Un pelo mas alla de la entrada cae dentro de lo tocado; un pelo antes, en la
-  // casilla de este lado.
+  // Un pelo mas alla de la entrada cae dentro de lo tocado.
   const at = (t: number): Offset => ({
     x: Math.floor(origin.x + dir.x * t),
     y: Math.floor(origin.y + dir.y * t),
@@ -415,8 +411,7 @@ export function aimSurface(origin: Vec3, fx: number, fy: number, lookZ: number, 
   const point = { x: origin.x + dir.x * hit.t, y: origin.y + dir.y * hit.t, z: origin.z + dir.z * hit.t };
   const tile = at(hit.t + 1e-6);
   const { voxel, normal } = hit;
-  if (hit.top) return { tile, front: tile, point, top: true, voxel, normal };
-  return { tile, front: at(Math.max(0, hit.t - 1e-6)), point, top: false, voxel, normal };
+  return { tile, point, top: hit.top, voxel, normal };
 }
 
 /**

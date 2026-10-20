@@ -22,14 +22,6 @@ import { collectBiomeEdges } from './biome-edges.js';
 
 const LIFT = 0.03;
 
-/** Las cuatro aristas de una casilla, como pares de esquinas (fx, fy). */
-const SQUARE: ReadonlyArray<readonly [number, number, number, number]> = [
-  [0, 0, 1, 0],
-  [1, 0, 1, 1],
-  [1, 1, 0, 1],
-  [0, 1, 0, 0],
-];
-
 function lines(color: number, opacity: number): LineSegments {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(new Float32Array(0), 3));

@@ -4,7 +4,6 @@ import {
   createGame,
   generateChunk,
   hitboxAt,
-  isOre,
   oreFormation,
   oreVoxelLoot,
   VOXELS_PER_TILE,
@@ -70,7 +69,7 @@ describe('la formacion', () => {
     }
   });
 
-  it('la generacion sigue pura: el chunk y el generador dicen la misma altura en las menas', () => {
+  it('la generacion sigue pura: el chunk no depende de lo generado antes, y el generador dice la misma altura en las menas', () => {
     const world = new World(12345);
     let checked = 0;
     for (const ore of ORES) {
@@ -78,7 +77,11 @@ describe('la formacion', () => {
       const cx = Math.floor(tx / CHUNK_SIZE);
       const cy = Math.floor(ty / CHUNK_SIZE);
       const a = generateChunk(world.gen, cx, cy);
-      const b = generateChunk(world.gen, cx, cy);
+      // Otro generador, con sus vecinos generados antes (regla 3).
+      const other = new World(12345);
+      generateChunk(other.gen, cx + 1, cy);
+      generateChunk(other.gen, cx - 1, cy - 1);
+      const b = generateChunk(other.gen, cx, cy);
       expect(a.height).toEqual(b.height);
       expect(a.oreBase).toEqual(b.oreBase);
       for (let s = 0; s < 4; s++) {
@@ -90,7 +93,6 @@ describe('la formacion', () => {
       }
     }
     expect(checked).toBe(12);
-    expect(isOre(Feature.RockNode)).toBe(false);
   });
 });
 
@@ -106,7 +108,7 @@ describe('picar una mena', () => {
     expect(state.lastHits).toHaveLength(0);
     expect(state.lastImpacts).toHaveLength(0);
     expect(state.lastHarvest).toHaveLength(0);
-    // El carbon, de 1 a 2.
+    // Suelta carbon (cuanto, en el test de abajo).
     expect(groundCount(state.world, Resource.Coal)).toBeGreaterThanOrEqual(1);
   });
 

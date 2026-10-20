@@ -9,9 +9,7 @@ import {
   skipTime,
   step,
   tryCraft,
-  tryHarvestArea,
   Inventory,
-  WorkState,
   World,
 } from '@verdant/sim';
 import {
@@ -718,18 +716,22 @@ describe('Capitulo II: combinar y herramientas', () => {
   });
 
   it('algunos recursos requieren herramientas para recolectarse', () => {
-    // Una mena de cobre generada (desde el 2026-10-20, voxeles): a mano, por
-    // muchos golpes que se den, su voxel sigue ahi; con un pico, sale.
+    // Una mena de carbon generada (desde el 2026-10-20, voxeles): a mano, por
+    // muchos golpes que se den, su voxel sigue ahi y no suelta nada; con un
+    // pico, sale y suelta su carbon (1 a 2 por voxel, siempre algo).
     const state = createGame(12345);
-    const { tx, ty } = oreSite(state.world, Feature.CopperNode);
+    const { tx, ty } = oreSite(state.world, Feature.CoalNode);
     const top = state.world.oreFormationAt(tx, ty)!.voxels.reduce((a, b) => (b[2] > a[2] ? b : a));
     for (let t = 0; t < 20; t++) expect(strikeDown(state, top[0], top[1])).toBe(false);
     expect(state.world.isSolidVoxel(...top)).toBe(true);
     expect(state.lastBlocked).toBe('needPickaxe');
+    expect(groundCount(state.world, Resource.Coal)).toBe(0);
     state.inventory.add(Resource.StonePickaxe, 1);
     state.inventory.select(state.inventory.items.indexOf(Resource.StonePickaxe));
     let hits = 0;
     while (!strikeDown(state, top[0], top[1]) && hits < 10) hits++;
+    expect(hits).toBeLessThan(10);
     expect(state.world.isSolidVoxel(...top)).toBe(false);
+    expect(groundCount(state.world, Resource.Coal)).toBeGreaterThan(0);
   });
 });

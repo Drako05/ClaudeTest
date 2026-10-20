@@ -136,16 +136,11 @@ function colorsOf(...arts: readonly WorldArt[]): number[] {
  * Colores que sueltan los escombros de una feature al ser derribada: **los de
  * su dibujo** (`world-art.ts`), todos. En un arbol saltan la copa y la corteza;
  * en una mata, tambien sus frutos, que son los rojos y amarillos que dan
- * variedad al estallido; en un mineral, la piedra de la roca y los colores
- * de sus vetas y sus cristales. Los brotes no se recolectan y no sueltan nada.
+ * variedad al estallido. Los brotes no se recolectan y no sueltan nada, ni las
+ * menas, que son terreno (el autor, 2026-10-20).
  */
 export function debrisPalette(feature: Feature): number[] {
   if (feature === Feature.Pebbles) return colorsOf(PEBBLES);
-  const ore = ORE_TONES[feature];
-  if (ore) {
-    const own = [...ore.tones, ore.shine, ...(ore.accent ? [ore.accent] : [])].map((c) => Number.parseInt(c.slice(1), 16));
-    return [...new Set([...colorsOf(STONES[Feature.RockNode]!), ...own])];
-  }
   const art = STONES[feature] ?? CROWNS[feature] ?? BUSHES[feature];
   if (art) return colorsOf(art);
   const station = STATION_ART[feature];

@@ -75,7 +75,7 @@ export class Controls {
   }
 
   constructor(
-    private readonly canvas: HTMLCanvasElement,
+    canvas: HTMLCanvasElement,
     private readonly stickEl: HTMLElement | null = null,
     private readonly knobEl: HTMLElement | null = null,
   ) {

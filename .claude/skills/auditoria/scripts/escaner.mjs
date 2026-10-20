@@ -133,6 +133,7 @@ export function scan(root) {
     usuarios: [],
     leyes: [],
     sinPrincipio: [],
+    practicas: [],
   };
 
   // 1. Rutas citadas entre comillas invertidas que no existen.
@@ -421,6 +422,47 @@ export function scan(root) {
     }
   }
 
+  // 15. Buenas practicas que se pueden ver sin leer (lente K). Lo que el
+  // compilador ya vigila no se repite aqui: se mira que siga encendido. Lo
+  // demas son atajos que callan algo: un tipo que miente (`any`, `as unknown
+  // as`, `@ts-ignore`), un error que se traga sin decir por que (un `catch`
+  // vacio sin comentario cerca ni plazo en su linea: la espera acotada del
+  // humo lo lleva, y su fallo lo ve la comprobacion de despues), o un `var`.
+  // La auditoria del 2026-10-20 encendio los avisos de lo no usado y sacaron
+  // 16 restos que ninguna lectura habia visto.
+  const tsconfig = text.get('tsconfig.base.json');
+  if (tsconfig) {
+    for (const flag of ['strict', 'noUnusedLocals', 'noUnusedParameters', 'noFallthroughCasesInSwitch']) {
+      if (!new RegExp(`"${flag}"\\s*:\\s*true`).test(tsconfig)) {
+        report.practicas.push(`tsconfig.base.json: «${flag}» no esta encendido`);
+      }
+    }
+  }
+  const shortcut = [
+    [/:\s*any\b|\bas any\b|<any>/, 'tipo `any`'],
+    // En un test, el doble de un mundo a medias se hace pasar por el entero.
+    [/\bas unknown as\b/, '`as unknown as`', (f) => f.startsWith('tests/')],
+    [/@ts-(?:ignore|nocheck)\b/, '`@ts-ignore`'],
+    [/^\s*var\s/, '`var`'],
+  ];
+  const emptyCatch = /\.catch\(\s*\(\s*\)\s*=>\s*\{\s*\}\s*\)|catch\s*(?:\([^)]*\))?\s*\{\s*\}/;
+  for (const f of code) {
+    const lines = text.get(f).split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^\s*(?:\/\/|\*|\/\*)/.test(line) && !/@ts-/.test(line)) continue;
+      const live = line.replace(/\/\/(?!\s*@ts-).*$/, '').replace(/(['"`])(?:\\.|(?!\1).)*\1/g, '""');
+      for (const [re, what, allowed] of shortcut) {
+        if (re.test(live) && !allowed?.(f)) report.practicas.push(`${f}:${i + 1}  ${what}`);
+      }
+      if (emptyCatch.test(line)) {
+        const near = lines.slice(Math.max(0, i - 4), i + 1);
+        const said = near.some((l) => l.includes('//') && !l.includes('@ts-')) || /timeout/.test(lines[i - 1] ?? '') || /timeout/.test(line);
+        if (!said) report.practicas.push(`${f}:${i + 1}  \`catch\` vacio sin decir por que`);
+      }
+    }
+  }
+
   return report;
 }
 
@@ -454,6 +496,7 @@ const TITLES = {
   usuarios: 'Ficheros citados como usuarios de un modulo que no lo importan (lente E)',
   leyes: 'Tests que docs/leyes.md cita y no existen con ese nombre (lente F)',
   sinPrincipio: 'Escapes que ningun principio de references/lentes.md cita (fase 6)',
+  practicas: 'Buenas practicas: compilador apagado, tipos que mienten, errores tragados (lente K)',
 };
 
 function print(report) {
@@ -524,6 +567,14 @@ function selfTest() {
     '| Ley | Estado | Donde vive | Prueba |\n|---|---|---|---|\n' +
     '| Una | **Cumplida** | `x` | «la vida no surge sola», «el agua corta el paso…» |\n' +
     '| Otra | **Cumplida** | `y` | «un test que no existe» |\n');
+  // Un tsconfig con un aviso apagado, y codigo con cada atajo; el `catch`
+  // comentado y la espera con plazo no cuentan.
+  put('tsconfig.base.json', '{ "compilerOptions": { "strict": true, "noUnusedLocals": true, "noUnusedParameters": false, "noFallthroughCasesInSwitch": true } }\n');
+  put('packages/client/src/atajos.ts',
+    "let a: any = 1;\nconst b = a as unknown as number;\n// @ts-ignore\nvar c = b;\n" +
+    "try { c(); } catch {}\n" +
+    "// Si falla, el siguiente clic lo reintenta.\np.catch(() => {});\n" +
+    "await w(() => x, null, { timeout: 3000 }).catch(() => {});\nconst s = 'texto: any';\n");
   const report = scan(root);
   rmSync(root, { recursive: true, force: true });
   const expect = [
@@ -546,6 +597,10 @@ function selfTest() {
     ['sin indice', (r) => r.sinIndice.length === 1 && r.sinIndice[0].includes('docs/otra.md')],
     ['usuarios', (r) => r.usuarios.length === 1 && r.usuarios[0].includes('`docs.ts`')],
     ['leyes', (r) => r.leyes.length === 1 && r.leyes[0].includes('un test que no existe')],
+    ['practicas', (r) => r.practicas.length === 6 && r.practicas.some((x) => x.includes('atajos.ts:3')) &&r.practicas.some((x) => x.includes('noUnusedParameters')) &&
+      r.practicas.some((x) => x.includes('atajos.ts:1') && x.includes('any')) &&
+      r.practicas.some((x) => x.includes('atajos.ts:2')) && r.practicas.some((x) => x.includes('atajos.ts:4')) &&
+      r.practicas.some((x) => x.includes('atajos.ts:5') && x.includes('catch'))],
     ['sin principio', (r) => r.sinPrincipio.length === 1 && r.sinPrincipio[0].startsWith('#1 ')],
     ['ignorados con ambito', (r) => r.identificadores.some((x) => x.includes('zoom.ts') && x.includes('nombreJuzgado')) &&
       !r.identificadores.some((x) => x.includes('otra.md'))],

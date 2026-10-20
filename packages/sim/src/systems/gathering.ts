@@ -19,9 +19,7 @@ import {
   densityOfKind,
   Feature,
   harvestOf,
-  isInert,
   isRare,
-  isSapling,
   isTerrainSolid,
   LifeKind,
   lifeKindOf,
@@ -33,7 +31,6 @@ import {
   seedFor,
   speciesFor,
   Station,
-  stationHeight,
   stationOfFeature,
   TICK_HZ,
   ToolKind,
@@ -49,22 +46,20 @@ import {
   lookVector,
   plantTile,
   pointAlong,
-  rayBox,
   rayOrientedBox,
   strike,
   type Solid,
   type Voxel,
   STRIKE_RANGE,
-  type Hitbox,
   type Offset,
   type Strike,
+  type StrikeRay,
   type Surface,
   type Vec3,
 } from '../aim.js';
 import { bodyBoxes, bodyOf, BODY_RADIUS, featureBox, objectBase, type OrientedBox } from '../boxes.js';
 export { STATION_BOXES } from '../boxes.js';
 import { VOXEL, VOXELS_PER_TILE } from '../relief.js';
-import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
 import { hash2DFloat } from '../rng.js';
@@ -106,7 +101,7 @@ export interface HarvestResult {
 
 /**
  * Por que un golpe no hizo lo que se esperaba: el inventario no tenia sitio,
- * o hace falta un pico (o uno mejor). Lo cuenta el cliente en un aviso.
+ * o hace falta un pico (o uno mejor) o una pala. Lo cuenta el cliente en un aviso.
  */
 export type Blocked = 'needPickaxe' | 'needBetterPickaxe' | 'needShovel';
 
@@ -204,18 +199,25 @@ export function solidOf(world: World): Solid {
   return (vx, vy, vz) => world.isSolidVoxel(vx, vy, vz);
 }
 
+/**
+ * Hasta donde se mira un animal para el golpe, desde los ojos y en cada eje:
+ * el alcance y lo que puede asomar su caja mas grande. Un filtro barato; lo
+ * que cuenta es si un rayo toca su caja.
+ */
+const BODY_REACH = STRIKE_RANGE + 2;
+
 /** Los ojos de la entidad: el origen del golpe. */
 function eyeOf(store: EntityStore, id: number): Vec3 {
   return { x: store.x[id], y: store.y[id], z: store.z[id] + EYE_HEIGHT };
 }
 
 /**
- * El golpe de la entidad (regla 12): el sector plano de su mirada, cortado por
- * el terreno, y los objetos cuyo hitbox toca.
+ * El golpe de la entidad (regla 12): el sector plano de su mirada, y cada rayo,
+ * a lo primero que toca: un voxel, una caja o un cuerpo (`animals`).
  */
 export function strikeOf(world: World, store: EntityStore, id: number, animals: Iterable<number> = []): Strike {
   const origin = eyeOf(store, id);
-  const reach = STRIKE_RANGE + 2;
+  const reach = BODY_REACH;
   const bodies: Array<{ id: number; boxes: OrientedBox[] }> = [];
   for (const a of animals) {
     if (Math.abs(store.x[a] - origin.x) > reach || Math.abs(store.y[a] - origin.y) > reach) continue;
@@ -294,8 +296,9 @@ export interface Swing {
   /** Los animales que alcanzo, y si murieron. */
   animals: AnimalHit[];
   /**
-   * Los voxeles del terreno que golpeo, y si se rompieron. No dan particulas,
-   * ni impacto, ni botin (el autor, 2026-10-20).
+   * Los voxeles del terreno que golpeo, y si se rompieron. No dan particulas
+   * ni impacto (el autor, 2026-10-20); botin, solo los de mena
+   * (`oreVoxelLoot`).
    */
   voxels: Array<Voxel & { broken: boolean }>;
   /**
@@ -304,6 +307,12 @@ export interface Swing {
    * impacto (pedido del autor, 2026-10-03).
    */
   impacts: Vec3[];
+  /**
+   * Los rayos del sector, cada uno cortado en lo primero que toco: con ellos
+   * dibuja el cliente el barrido, que tiene que ser este golpe y no uno medido
+   * despues, cuando lo roto ya no esta. Vacio en preciso.
+   */
+  rays: readonly StrikeRay[];
 }
 
 /** Un animal alcanzado por un golpe. */
@@ -350,7 +359,7 @@ function animalsInSight(
   const rays = [{ dir, length: hit ? hit.t : STRIKE_RANGE }];
   const out: Array<{ id: number; t: number; at: Vec3 }> = [];
   for (const a of animals) {
-    const reach = STRIKE_RANGE + 2;
+    const reach = BODY_REACH;
     if (Math.abs(store.x[a] - origin.x) > reach || Math.abs(store.y[a] - origin.y) > reach) continue;
     const boxes = animalBoxes(store, a);
     let best = Infinity;
@@ -411,6 +420,8 @@ function hitAnimal(world: World, store: EntityStore, a: number, damage: number, 
  * - Lo que se trabaja a mano (arbustos, guijarros) sale con cualquier cosa.
  * - Un arbol sin hacha no cae: suelta una rama por golpe mientras le queden.
  * - Roca y minerales sin el pico adecuado no dan nada.
+ * - El terreno: cada voxel tocado, con su herramienta (`voxelWorkOf`: pico la
+ *   roca y las menas, pala lo maleable); sin ella, nada.
  * - **A los seres vivos les pega el arma equipada**, si la hay, aunque en la
  *   mano se lleve otra cosa; a lo demas, lo de la mano (el autor, 2026-10-04).
  * - **Todo golpe que toca algo gasta un uso** de lo que pega, sea suyo o no
@@ -429,7 +440,7 @@ export function tryHarvestArea(
   precise = false,
   animals: Iterable<number> = [],
 ): Swing {
-  const swing: Swing = { results: [], hits: [], blocked: null, broke: false, animals: [], impacts: [], voxels: [] };
+  const swing: Swing = { results: [], hits: [], blocked: null, broke: false, animals: [], impacts: [], voxels: [], rays: [] };
   const held = inventory.held();
   const stats = held === null ? null : toolStats(held);
   const weapon = inventory.weapon();
@@ -461,6 +472,7 @@ export function tryHarvestArea(
     beasts = swept.bodies.slice();
     tiles = swept.targets.slice();
     voxels = swept.voxels;
+    swing.rays = swept.rays;
   }
   for (const { id: a, at } of beasts) {
     // El impacto, en el punto donde el golpe toca su caja: lo dibuja el

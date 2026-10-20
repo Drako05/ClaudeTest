@@ -40,7 +40,6 @@ import {
   TERRAIN_NAMES,
   TICK_DT,
   emptyIntent,
-  type Terrain,
 } from '@verdant/shared';
 import {
   actionReach,
@@ -67,6 +66,7 @@ import {
   type GameState,
   NO_ORE,
   VOXEL,
+  VOXELS_PER_TILE,
   type Chunk,
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
@@ -711,8 +711,9 @@ function oresOf(chunk: Chunk): import('three').Object3D[] {
       const tx = chunk.cx * CHUNK_SIZE + lx;
       const ty = chunk.cy * CHUNK_SIZE + ly;
       const f = state.world.oreFormationAt(tx, ty)!;
-      const voxels = f.voxels.map(([vx, vy, vz]) => [vx - tx * 2, vy - ty * 2, vz - f.base] as const);
-      const covered = (e: number, s: number, z: number) => state.world.isSolidVoxelPeek(tx * 2 + e, ty * 2 + s, f.base + z);
+      const [vx0, vy0] = [tx * VOXELS_PER_TILE, ty * VOXELS_PER_TILE];
+      const voxels = f.voxels.map(([vx, vy, vz]) => [vx - vx0, vy - vy0, vz - f.base] as const);
+      const covered = (e: number, s: number, z: number) => state.world.isSolidVoxelPeek(vx0 + e, vy0 + s, f.base + z);
       const mesh = billboards.spawnOre(f.feature, tx, ty, f.base * VOXEL, seed, voxels, covered);
       if (!mesh) continue;
       scene.add(mesh);
@@ -779,11 +780,8 @@ function dispose(key: string, view: ChunkView): void {
   view.mesh.geometry.dispose();
   // Los aspas comparten geometria y material con las demas de su especie, asi
   // que se quitan de la escena pero NO se liberan: siguen en uso. Las menas si,
-  // que cada una lleva lo suyo (`release`); y las sombras, que son del chunk.
-  for (const prop of view.props) {
-    scene.remove(prop);
-    billboards.release(prop);
-  }
+  // que cada una lleva lo suyo (`disposeOres`); y las sombras, que son del chunk.
+  for (const prop of view.props) scene.remove(prop);
   disposeOres(view);
   disposeShadows(view);
   views.delete(key);
@@ -864,10 +862,10 @@ let airPeak = 0;
 const sent = { harvest: 0, jump: 0, use: 0, autoJump: 0, tapUse: 0, tapHarvest: 0 };
 
 /**
- * El ultimo barrido en pixeles de pantalla, punto a punto, y cuales de sus
- * rayos los corto el suelo: para que el humo vea si se dibuja horizontal.
+ * El ultimo barrido en pixeles de pantalla, punto a punto: para que el humo
+ * vea si se dibuja horizontal.
  */
-let lastSweep: { points: Array<{ x: number; y: number }>; cut: boolean[] } | null = null;
+let lastSweep: { points: Array<{ x: number; y: number }> } | null = null;
 /** La ultima estocada, en coordenadas de three.js, para el humo. */
 let lastStab: { from: Vector3Like; to: Vector3Like; eye: Vector3Like } | null = null;
 type Vector3Like = { x: number; y: number; z: number };
@@ -1088,8 +1086,9 @@ function runFrame(now: number, draw: boolean): void {
       // El barrido recorre el BORDE CURVO DEL AREA REAL del golpe, pedido del
       // autor: el extremo de cada rayo del sector, ya cortado por el terreno,
       // que sale de los ojos en las tres vistas. Es el mismo golpe que acaba de
-      // decidir la simulacion. Sale siempre, haya algo que golpear o no: es el
-      // gesto, no el resultado.
+      // decidir la simulacion (`lastStrikeRays`: medido ahora, lo que cayo ya
+      // no cortaria su rayo). Sale siempre, haya algo que golpear o no: es el
+      // gesto, no el resultado; si el golpe no salio, el sector de ahora.
       // En modo preciso, en cambio, una estocada recta hasta lo golpeado.
       const e = state.entities;
       const id = state.playerId;
@@ -1106,11 +1105,11 @@ function runFrame(now: number, draw: boolean): void {
         lastStab = { from, to, eye: { x: eye.x, y: eye.z, z: eye.y } };
         effects.spawnSlash(stabLine(from, to), width);
       } else {
-        const rays = strikeOf(state.world, e, id, state.fauna.values()).rays;
+        const rays = state.lastStrikeRays.length > 0 ? state.lastStrikeRays : strikeOf(state.world, e, id, state.fauna.values()).rays;
         const edge = slashEdge(eye, rays);
         effects.spawnSlash(edge, width);
         // En pantalla, para que el humo vea si se dibuja horizontal.
-        lastSweep = { points: edge.map(toScreen), cut: rays.map((r) => r.length < STRIKE_RANGE - 1e-6) };
+        lastSweep = { points: edge.map(toScreen) };
       }
     }
     // Lo golpeado que siguio en pie suelta esquirlas: mas pequenas, apagadas y
@@ -1131,8 +1130,8 @@ function runFrame(now: number, draw: boolean): void {
     // Un animal no suelta fragmentos, ni golpeado ni al morir (decision del
     // autor, 2026-10-03): solo su impacto.
     for (const hit of state.lastAnimalHits) if (hit.killed) animalsKilled++;
-    // El terreno no suelta nada al golpearlo ni al romperse (el autor,
-    // 2026-10-20): solo se cuenta.
+    // El terreno no suelta particulas al golpearlo ni al romperse (el autor,
+    // 2026-10-20): solo se cuenta. El mineral de una mena lo suelta el nucleo.
     for (const v of state.lastVoxelHits) {
       voxelHits++;
       if (v.broken) voxelsBroken++;
@@ -1173,7 +1172,7 @@ function runFrame(now: number, draw: boolean): void {
   // frame ANTERIOR —`camera.follow` es unas lineas mas abajo—, y eso no se nota:
   // un frame de desfase en el giro de una cinta de 3 px no tiene efecto visible,
   // y adelantar el `follow` obligaria a recolocarlo todo por nada.
-  effectsView.update(effects, state.world, camera.active.position);
+  effectsView.update(effects, camera.active.position);
 
   const look = controls.takeLook();
   camera.orbit(look.dx, look.dy);

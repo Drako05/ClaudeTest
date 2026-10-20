@@ -54,7 +54,6 @@ export function collectBiomeEdges(world: World, chunk: Chunk): number[] {
 
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-      const idx = ly * CHUNK_SIZE + lx;
       const mine = biomeAt(lx, ly);
       const wx = baseX + lx;
       const wy = baseY + ly;

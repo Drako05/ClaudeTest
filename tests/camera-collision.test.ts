@@ -53,6 +53,16 @@ describe('colision de la camara', () => {
     expect(d).toBeCloseTo(hit - CAMERA_MARGIN, 3);
   });
 
+  it('se para ante una estacion corrida medio bloque desde la casilla de al lado', () => {
+    // La estacion de la casilla (-1, -3), corrida al este (rejilla de 0,5):
+    // su caja ocupa x de -0,5 a 0,5. El rayo va al norte por x = 0,25, y solo
+    // cruza casillas de x = 0.
+    const station = { x0: -0.5, x1: 0.5, y0: -3, y1: -2, z0: 0, z1: 1 };
+    const boxes = (tx: number, ty: number) => (tx === -1 && ty === -3 ? station : null);
+    const d = cameraClearance({ x: 0.25, y: 0.5, z: 0.5 }, { x: 0, y: -1, z: 0 }, 20, flat, boxes);
+    expect(d).toBeCloseTo(2.5 - CAMERA_MARGIN, 3);
+  });
+
   it('pasa POR ENCIMA de un tronco bajo: las hojas no son hitbox', () => {
     // El tronco desnudo acaba a 2; a esa distancia el rayo ya va mas alto.
     const trunk = box(-2.5, 0.5, 0.15, 0, 2);

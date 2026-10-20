@@ -3,7 +3,8 @@
  * de ella, en laminas cruzadas como los arboles (el autor, 2026-10-20, con una
  * referencia de amatista; el boceto, `docs/bocetos/minerales/`). Una distinta
  * por casilla: «me gustaria la opcion de maxima variedad», con todo sacado de
- * la casilla y la semilla (regla 2), para que al volver se vea igual.
+ * su sitio en el mundo —la casilla, y cada cristal de su voxel y su cara— y la
+ * semilla (regla 2), para que al volver, o al romper un voxel, se vea igual.
  *
  * Las reglas, las que aprobo el autor en el boceto:
  * - **La corona** (`crown`), en cada tapa: una flor de 5 a 7 cristales.

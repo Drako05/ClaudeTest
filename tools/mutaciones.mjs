@@ -11,13 +11,17 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: cristales ligados a su sitio e iman que acelera (2026-10-20).
+ * Ronda: la auditoria al cerrar la tanda de la pala y las menas (2026-10-20).
  */
 export default [
-  // Los cristales vuelven a depender de lo que se puso antes: cambian al romper.
-  { nombre: 'menas: cristales sin sitio', fichero: 'packages/client/src/ore-mesh.ts', de: 'Math.imul((z + 64) * 8 + face, 0x9e3779b1), tx * 2 + e, ty * 2 + s));', a: 'Math.imul(crystals.length + 0 * (z + face + e + s), 0x9e3779b1), tx, ty));', prueba: 'test:tests/ore-mesh.test.ts' },
-  // El iman no acelera: corriendo nunca llega.
-  { nombre: 'iman: sin aceleracion', fichero: 'packages/sim/src/systems/drops.ts', de: '    d.speed += HOMING_ACCEL * dt;\n', a: '', prueba: 'test:tests/drops.test.ts' },
-  // El iman lo suelta si el jugador se aleja: con un empuje no llega.
-  { nombre: 'iman: lo suelta lejos', fichero: 'packages/sim/src/systems/drops.ts', de: '    if (inventory.room(d.item) === 0) {\n      d.homing = false;', a: '    if (far > PICKUP_RADIUS * 2 || inventory.room(d.item) === 0) {\n      d.homing = false;', prueba: 'test:tests/drops.test.ts' },
+  // La camara solo mira la caja de su propia casilla: atraviesa media estacion corrida.
+  { nombre: 'camara: sin las vecinas', fichero: 'packages/client/src/camera-collision.ts', de: '= [[0, 0], [1, 0], [0, 1], [1, 1]];', a: '= [[0, 0]];', prueba: 'test:tests/camera-collision.test.ts' },
+  // El golpe no cuenta sus rayos: el cliente vuelve a medir el barrido despues del paso.
+  { nombre: 'barrido: sin los rayos del golpe', fichero: 'packages/sim/src/systems/gathering.ts', de: '    swing.rays = swept.rays;\n', a: '', prueba: 'test:tests/voxel-edit.test.ts' },
+  // Se pone una estacion sobre una casilla que cubre otra.
+  { nombre: 'colocar: sobre lo cubierto', fichero: 'packages/sim/src/systems/gathering.ts', de: '    if (world.featureAt(tx, ty) !== Feature.None || world.isCovered(tx, ty)) return null;', a: '    if (world.featureAt(tx, ty) !== Feature.None) return null;', prueba: 'test:tests/stations.test.ts' },
+  // Picar una mena con pico no suelta su mineral.
+  { nombre: 'leyes: la mena sin botin', fichero: 'packages/sim/src/systems/gathering.ts', de: '    if (count > 0) scatterLoot(', a: '    if (count < 0) scatterLoot(', prueba: 'test:tests/world-laws.test.ts' },
+  // Los cristales salen tambien de las caras que tapa el terreno.
+  { nombre: 'menas: cristales bajo tierra', fichero: 'packages/client/src/ore-mesh.ts', de: 'voxels.some(([a, b, c]) => a === x && b === y && c === z) || covered(x, y, z);', a: 'voxels.some(([a, b, c]) => a === x && b === y && c === z);', prueba: 'test:tests/ore-mesh.test.ts' },
 ];
