@@ -27,17 +27,18 @@ import {
   WALK_SPEED,
   type World,
 } from '@verdant/sim';
+import { withVoxels } from './ground.js';
 
 /** Un mundo de columnas: `halves(vx, vy)` es la altura de cada una en medios bloques. */
 function columns(halves: (vx: number, vy: number) => number, features: Record<string, Feature> = {}): World {
-  return {
+  return withVoxels({
     seed: 7,
     groundHeightAt: (x: number, y: number) => halves(Math.floor(x * 2), Math.floor(y * 2)) / 2,
     columnTop: halves,
     featureAt: (x: number, y: number) => features[`${Math.floor(x)},${Math.floor(y)}`] ?? Feature.None,
     isSolidAt: () => false,
     isTerrainSolidAt: () => false,
-  } as unknown as World;
+  }) as unknown as World;
 }
 
 /** Un jugador de pie en (`x`, `y`, `z`). */

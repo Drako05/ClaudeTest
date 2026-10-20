@@ -17,6 +17,7 @@ import {
 } from '../packages/client/src/effects.js';
 import { debrisPalette, LOOKS } from '../packages/client/src/palette.js';
 import { BUSHES, STONES } from '../packages/client/src/world-art.js';
+import { heightField } from './ground.js';
 
 describe('La estocada del modo preciso', () => {
   it('va recta de un extremo al otro: del borde de la pantalla a lo golpeado', () => {
@@ -190,7 +191,7 @@ describe('El slash de la accion', () => {
   it('recorre el borde del area real: el extremo de cada rayo del golpe', () => {
     // Un golpe de verdad del nucleo, con el suelo cortando los rayos de un lado.
     const eye = { x: 10.5, y: 3.5, z: 20 + EYE_HEIGHT };
-    const ground = (_x: number, y: number) => (y > 4.2 ? 21.6 : 20);
+    const ground = heightField((_x, y) => (y > 4.2 ? 21.5 : 20));
     const hit = strike(eye, 1, 0, -0.3, ground, () => null);
     const edge = slashEdge(eye, hit.rays);
     expect(edge).toHaveLength(hit.rays.length);

@@ -23,20 +23,21 @@ import {
   WALK_SPEED,
   type World,
 } from '@verdant/sim';
+import { withVoxels } from './ground.js';
 
 /** Lo que se anda en un tick: se para, como mucho, a un paso de la cara. */
 const STEP = WALK_SPEED * TICK_DT;
 
 /** Un mundo llano con `objects` puestos por casilla ("x,y" -> Feature). */
 function flat(objects: Record<string, Feature>): World {
-  return {
+  return withVoxels({
     seed: 7,
     groundHeightAt: () => 0,
     columnTop: () => 0,
     featureAt: (x: number, y: number) => objects[`${Math.floor(x)},${Math.floor(y)}`] ?? Feature.None,
     isSolidAt: () => false,
     isTerrainSolidAt: () => false,
-  } as unknown as World;
+  }) as unknown as World;
 }
 
 interface Trace {

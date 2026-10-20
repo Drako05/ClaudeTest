@@ -39,6 +39,7 @@ import {
   WALK_SPEED,
   type World,
 } from '@verdant/sim';
+import { withVoxels } from './ground.js';
 
 /**
  * Un mundo de alturas escrito a mano.
@@ -52,7 +53,7 @@ import {
  */
 function heightField(heightOf: (x: number, y: number) => number): World {
   const groundHeightAt = (wx: number, wy: number) => heightOf(Math.floor(wx), Math.floor(wy));
-  return {
+  return withVoxels({
     groundHeightAt,
     // La columna de 0,5, en medios bloques: la de su casilla. Es la que mide
     // la huella entera desde el 2026-10-10.
@@ -61,7 +62,7 @@ function heightField(heightOf: (x: number, y: number) => number): World {
     // Solo el agua detiene el paso (regla 9), y el agua es nivel negativo.
     isSolidAt: (x: number, y: number) => heightOf(Math.floor(x), Math.floor(y)) < 0,
     isTerrainSolidAt: (x: number, y: number) => heightOf(Math.floor(x), Math.floor(y)) < 0,
-  } as unknown as World;
+  }) as unknown as World;
 }
 
 interface Run {
@@ -192,12 +193,12 @@ describe('Ya no se cambia de nivel andando', () => {
     // Al norte, dos escalones de medio bloque (el autor, 2026-10-06: lo que
     // mide <= 0,5 se sube andando, y es de la fisica, no de cada cosa).
     const stairs = (_x: number, y: number) => (y < -0.5 ? 2 : y < 0 ? 1.5 : 1);
-    const world = {
+    const world = withVoxels({
       ...heightField(() => 0),
       groundHeightAt: stairs,
       columnTop: (_vx: number, vy: number) => stairs(0, (vy + 0.5) / 2) * 2,
       featureAt: () => Feature.None,
-    } as unknown as World;
+    }) as unknown as World;
     const out = run(world, { x: 0.5, y: 0.5 }, { moveY: -1, ticks: HASTA_QUE_CAIGA });
 
     expect(out.z).toBe(2);
@@ -372,7 +373,7 @@ describe('En el aire se anda como en el suelo', () => {
 describe('El auto salto', () => {
   /** Un mundo de suelos a mano: `floorAt` es lo que pisa el cuerpo. */
   function floors(floorAt: (x: number, y: number) => number, solidAt: (x: number) => boolean = () => false): World {
-    return {
+    return withVoxels({
       groundHeightAt: floorAt,
       // Cada columna de 0,5, a lo que pide `floorAt` en su centro, en medios
       // bloques: lo que mide la huella entera.
@@ -380,7 +381,7 @@ describe('El auto salto', () => {
       featureAt: () => Feature.None,
       isSolidAt: (x: number) => solidAt(x),
       isTerrainSolidAt: (x: number) => solidAt(x),
-    } as unknown as World;
+    }) as unknown as World;
   }
 
   /** Anda hacia el este con el auto salto como en `tick.ts`, y cuenta. */

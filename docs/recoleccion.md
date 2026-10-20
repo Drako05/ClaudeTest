@@ -21,6 +21,10 @@ Decisiones del autor, que no se tocan sin preguntarle:
   suma el poder de lo que se lleva en la mano (`toolStats`); a mano, algunas
   cosas no se completan. Un arbol sin hacha no cae: suelta ramas. Roca y
   minerales piden pico, y el hierro uno de cobre o mejor.
+- **El terreno se rompe a golpes** (el autor, 2026-10-20): cada voxel de 0,5
+  que toca el golpe aguanta 3, con cualquier cosa en la mano, y no suelta
+  nada. Gasta un uso, como todo golpe que toca algo. Ver `docs/relieve.md`,
+  «Romper el terreno», y la regla 12.
 - **Se equipa una herramienta**: las casillas 1-5 (la primera fila del
   inventario, de 5 columnas desde el 2026-10-19) son la barra y la elegida es
   la mano. La eleccion viaja en la

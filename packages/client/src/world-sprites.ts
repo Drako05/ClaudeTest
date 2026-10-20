@@ -14,7 +14,8 @@ import { Feature, isSapling, Terrain } from '@verdant/shared';
 import { hash2DFloat, mulberry32 } from '@verdant/sim';
 import { barkTrunk, blank, toRows } from './pixel-paint.js';
 import type { TileRect } from './terrain-mesh.js';
-import { BUSHES, CROWNS, PEBBLES, PLAYER, SAPLINGS, TERRAIN_TILES, WORLD_PX, type WorldArt } from './world-art.js';
+import { VOXEL_PX, VOXEL_TILES } from './voxel-art.js';
+import { BUSHES, CROWNS, PEBBLES, PLAYER, SAPLINGS, WORLD_PX, type WorldArt } from './world-art.js';
 
 /** Las letras de la corteza en la paleta de una copa (`world-art.ts`). */
 export const BARK = 'efgh';
@@ -144,27 +145,28 @@ export function playerArt(): SpriteArt {
 
 /**
  * El atlas del suelo: todas las variantes de todos los suelos en un lienzo,
- * una fila por suelo. `rect(terrain, variant)` dice donde cae cada una; `v0`
+ * una fila por suelo, a la medida de la cara de un voxel (`VOXEL_TILES`, 12 ×
+ * 12: el autor, 2026-10-20). `rect(terrain, variant)` dice donde cae cada una; `v0`
  * es su borde de arriba en la imagen (three.js da la vuelta al lienzo, asi que
  * es la `v` mas alta).
  */
 export function terrainAtlas(): { canvas: HTMLCanvasElement; rect: (terrain: Terrain, variant: number) => TileRect; variants: (terrain: Terrain) => number } {
-  const terrains = Object.keys(TERRAIN_TILES).map(Number) as Terrain[];
-  const cols = Math.max(...terrains.map((t) => TERRAIN_TILES[t].length));
+  const terrains = Object.keys(VOXEL_TILES).map(Number) as Terrain[];
+  const cols = Math.max(...terrains.map((t) => VOXEL_TILES[t].length));
   const rows = Math.max(...terrains) + 1;
   const canvas = document.createElement('canvas');
-  canvas.width = cols * WORLD_PX;
-  canvas.height = rows * WORLD_PX;
+  canvas.width = cols * VOXEL_PX;
+  canvas.height = rows * VOXEL_PX;
   const ctx = canvas.getContext('2d')!;
-  for (const t of terrains) TERRAIN_TILES[t].forEach((art, i) => ctx.drawImage(artCanvas(art), i * WORLD_PX, t * WORLD_PX));
+  for (const t of terrains) VOXEL_TILES[t].forEach((art, i) => ctx.drawImage(artCanvas(art), i * VOXEL_PX, t * VOXEL_PX));
   return {
     canvas,
-    variants: (t) => TERRAIN_TILES[t]?.length ?? 1,
+    variants: (t) => VOXEL_TILES[t]?.length ?? 1,
     rect: (t, i) => ({
-      u0: (i * WORLD_PX) / canvas.width,
-      u1: ((i + 1) * WORLD_PX) / canvas.width,
-      v0: 1 - (t * WORLD_PX) / canvas.height,
-      v1: 1 - ((t + 1) * WORLD_PX) / canvas.height,
+      u0: (i * VOXEL_PX) / canvas.width,
+      u1: ((i + 1) * VOXEL_PX) / canvas.width,
+      v0: 1 - (t * VOXEL_PX) / canvas.height,
+      v1: 1 - ((t + 1) * VOXEL_PX) / canvas.height,
     }),
   };
 }

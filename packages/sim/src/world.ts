@@ -46,7 +46,7 @@ import {
 import { collectBiome, type BiomeStats } from './biome.js';
 import { chunkKey, localCoord, toChunkCoord } from './coords.js';
 import { DropStore } from './drop-store.js';
-import { canClimbTo, topOf, VOXELS_PER_TILE, voxelOf, WATER_HEIGHT } from './relief.js';
+import { canClimbTo, topOf, VOXEL, VOXELS_PER_TILE, voxelOf, WATER_HEIGHT } from './relief.js';
 
 /**
  * Casillas que tiene que haber al alcance para nacer en un sitio, contando con
@@ -106,6 +106,11 @@ export interface Chunk {
   readonly height: Int16Array;
   /** Sube cuando lo visible cambia; el renderer lo usa para invalidar cache. */
   revision: number;
+  /**
+   * Sube cuando cambia su terreno (un voxel roto en el o pegado a su borde):
+   * el renderer rehace solo la malla del terreno, no los objetos.
+   */
+  terrainRevision: number;
 }
 
 /** Contabilidad de vida de un chunk. Persiste aunque el chunk se descarte. */
@@ -154,6 +159,21 @@ export class World {
    */
   private readonly faunaDead = new Set<string>();
   /**
+   * **El overlay del terreno** (regla 4; el autor, 2026-10-20): los voxeles
+   * rotos, por chunk y por columna de 0,5, cada uno con su altura en medios
+   * bloques. El terreno que hay es el potencial del generador (`Chunk.height`,
+   * solido de su techo para abajo, sin fondo) menos esto. Fuera del chunk, para
+   * que un hoyo siga ahi al volver (ley del observador).
+   */
+  private readonly broken = new Map<string, Map<number, Set<number>>>();
+  /**
+   * Donde se apoya el objeto de cada casilla que se escribio sobre el terreno
+   * vivo (un brote, una estacion), por clave de tile. Lo generado se apoya en
+   * el potencial y no esta aqui. **Asi lo que pierde su apoyo se queda donde
+   * estaba**: nada cae (el autor, 2026-10-20).
+   */
+  private readonly bases = new Map<string, number>();
+  /**
    * Los objetos sueltos (`drop-store.ts`): fuera de los chunks, como el resto
    * del overlay (regla 4), porque siguen ahi aunque se descargue su chunk,
    * hasta que caducan a los 2 dias de juego (el autor, 2026-10-19).
@@ -199,6 +219,7 @@ export class World {
       feature: new Uint8Array(raw.feature),
       height: raw.height,
       revision: 0,
+      terrainRevision: 0,
     };
     this.chunks.set(key, chunk);
     this.ensureRecord(chunk);
@@ -331,20 +352,166 @@ export class World {
   }
 
   /**
-   * Altura de una columna de 0,5 (en coordenadas de voxel), en medios bloques.
-   * `WATER_HEIGHT` es agua.
+   * Altura de una columna de 0,5 (en coordenadas de voxel), en medios bloques:
+   * el techo de su voxel solido mas alto, lo roto descontado. `WATER_HEIGHT`
+   * es agua.
    *
-   * Sale del chunk y no del generador: es el mismo dato que dibuja el cliente y
-   * el mismo con el que choca el jugador, que es la regla de la fuente unica de
-   * verdad aplicada al relieve.
+   * Sale del chunk y del overlay, no del generador: es el mismo dato que dibuja
+   * el cliente y el mismo con el que choca el jugador, que es la regla de la
+   * fuente unica de verdad aplicada al relieve.
    */
   columnTop(vx: number, vy: number): number {
+    return this.floorBelow(vx, vy, Infinity);
+  }
+
+  /**
+   * El techo que dio el generador a la columna, sin lo roto: el **potencial**
+   * del terreno, como `Chunk.feature` lo es de los objetos. Sobre el se apoya
+   * lo generado (`objectBaseAt`), y miden el nacimiento y la conectividad, que
+   * son del mundo generado.
+   */
+  potentialTop(vx: number, vy: number): number {
     const tx = Math.floor(vx / VOXELS_PER_TILE);
     const ty = Math.floor(vy / VOXELS_PER_TILE);
     const chunk = this.getChunk(toChunkCoord(tx), toChunkCoord(ty));
     const lx = vx - chunk.cx * CHUNK_COLUMNS;
     const ly = vy - chunk.cy * CHUNK_COLUMNS;
     return chunk.height[ly * CHUNK_COLUMNS + lx];
+  }
+
+  /** Los voxeles rotos de la columna (`vx`, `vy`), o `undefined` si no hay. */
+  private brokenIn(vx: number, vy: number): Set<number> | undefined {
+    const cx = Math.floor(vx / CHUNK_COLUMNS);
+    const cy = Math.floor(vy / CHUNK_COLUMNS);
+    return this.broken.get(chunkKey(cx, cy))?.get((vy - cy * CHUNK_COLUMNS) * CHUNK_COLUMNS + (vx - cx * CHUNK_COLUMNS));
+  }
+
+  /**
+   * El suelo de la columna bajo `below` (en medios bloques): el techo del voxel
+   * solido mas alto que empieza por debajo, en medios bloques. Con `Infinity`,
+   * el techo de la columna. Siempre hay uno: el terreno no tiene fondo.
+   */
+  floorBelow(vx: number, vy: number, below: number): number {
+    let h = Math.min(this.potentialTop(vx, vy), below);
+    const gone = this.brokenIn(vx, vy);
+    if (gone) while (gone.has(h - 1)) h--;
+    return h;
+  }
+
+  /**
+   * El techo de la columna sobre `from` (en medios bloques): la base del voxel
+   * solido mas bajo que empieza en `from` o por encima, o `Infinity` si no hay
+   * ninguno. Es lo que corta un salto (regla 21).
+   */
+  ceilingAbove(vx: number, vy: number, from: number): number {
+    const top = this.potentialTop(vx, vy);
+    let z = from;
+    const gone = this.brokenIn(vx, vy);
+    if (gone) while (z < top && gone.has(z)) z++;
+    return z < top ? z : Infinity;
+  }
+
+  /**
+   * Lo mismo que `columnTop`, pero sin generar ni registrar el chunk si no esta
+   * cargado: para que el dibujo de un chunk mire el borde de su vecina (el
+   * generador es puro, regla 3, y lo roto vive fuera del chunk).
+   */
+  columnTopPeek(vx: number, vy: number): number {
+    return this.solidPeek(vx, vy, Infinity, true);
+  }
+
+  /** `isSolidVoxel` sin generar ni registrar el chunk (ver `columnTopPeek`). */
+  isSolidVoxelPeek(vx: number, vy: number, vz: number): boolean {
+    return this.solidPeek(vx, vy, vz, false) === 1;
+  }
+
+  private solidPeek(vx: number, vy: number, vz: number, top: boolean): number {
+    const tx = Math.floor(vx / VOXELS_PER_TILE);
+    const ty = Math.floor(vy / VOXELS_PER_TILE);
+    const chunk = this.chunks.get(chunkKey(toChunkCoord(tx), toChunkCoord(ty)));
+    const potential = chunk
+      ? chunk.height[(vy - chunk.cy * CHUNK_COLUMNS) * CHUNK_COLUMNS + (vx - chunk.cx * CHUNK_COLUMNS)]
+      : this.gen.columnTopAt(vx, vy);
+    const gone = this.brokenIn(vx, vy);
+    if (!top) return vz < potential && !gone?.has(vz) ? 1 : 0;
+    let h = potential;
+    if (gone) while (gone.has(h - 1)) h--;
+    return h;
+  }
+
+  /** Las alturas de los voxeles rotos de la columna, sin orden: para el dibujo. */
+  brokenAt(vx: number, vy: number): ReadonlySet<number> | undefined {
+    return this.brokenIn(vx, vy);
+  }
+
+  /**
+   * Rompe el voxel (`vx`, `vy`, `vz`) para siempre (el autor, 2026-10-20). Lo
+   * de encima no cae: los bloques no tienen gravedad, y los objetos se quedan
+   * donde estaban (`objectBaseAt`). Lo suelto que reposaba ahi si cae: es un
+   * cuerpo. Devuelve false si ahi no habia terreno o es el fondo del agua, que
+   * no se rompe (el agua no se mueve).
+   */
+  breakVoxel(vx: number, vy: number, vz: number): boolean {
+    if (!this.isSolidVoxel(vx, vy, vz)) return false;
+    const tx = Math.floor(vx / VOXELS_PER_TILE);
+    const ty = Math.floor(vy / VOXELS_PER_TILE);
+    if (this.isTerrainSolidAt(tx, ty)) return false;
+    const cx = Math.floor(vx / CHUNK_COLUMNS);
+    const cy = Math.floor(vy / CHUNK_COLUMNS);
+    const key = chunkKey(cx, cy);
+    let columns = this.broken.get(key);
+    if (!columns) {
+      columns = new Map();
+      this.broken.set(key, columns);
+    }
+    const lx = vx - cx * CHUNK_COLUMNS;
+    const ly = vy - cy * CHUNK_COLUMNS;
+    const idx = ly * CHUNK_COLUMNS + lx;
+    let gone = columns.get(idx);
+    if (!gone) {
+      gone = new Set();
+      columns.set(idx, gone);
+    }
+    gone.add(vz);
+    // Su chunk y, si esta en el borde, la vecina que dibuja la cara de al lado.
+    const touch = (x: number, y: number) => {
+      const chunk = this.chunks.get(chunkKey(x, y));
+      if (chunk) chunk.terrainRevision++;
+    };
+    touch(cx, cy);
+    if (lx === 0) touch(cx - 1, cy);
+    if (lx === CHUNK_COLUMNS - 1) touch(cx + 1, cy);
+    if (ly === 0) touch(cx, cy - 1);
+    if (ly === CHUNK_COLUMNS - 1) touch(cx, cy + 1);
+    if (this.drops.size > 0) this.drops.wake(tx, ty);
+    return true;
+  }
+
+  /**
+   * Donde se apoya el objeto de la casilla (`feature`): la altura de la base de
+   * su caja. Lo que se escribio sobre el terreno vivo, donde quedo al
+   * escribirse; lo generado, sobre el potencial. Las reglas, en `objectBase`
+   * (`boxes.ts`).
+   */
+  objectBaseAt(tx: number, ty: number, feature: Feature): number {
+    return this.bases.get(`${tx},${ty}`) ?? this.settle(tx, ty, feature, (vx, vy) => this.potentialTop(vx, vy));
+  }
+
+  /**
+   * Las reglas de apoyo del autor (2026-10-06) sobre unas columnas: lo
+   * generado, en la mas baja de las cuatro que pisa; lo que pone el jugador
+   * (las estaciones), en la mas alta.
+   */
+  private settle(tx: number, ty: number, feature: Feature, top: (vx: number, vy: number) => number): number {
+    const highest = isStation(feature);
+    let base = highest ? -Infinity : Infinity;
+    for (let sy = 0; sy < VOXELS_PER_TILE; sy++) {
+      for (let sx = 0; sx < VOXELS_PER_TILE; sx++) {
+        const h = topOf(top(tx * VOXELS_PER_TILE + sx, ty * VOXELS_PER_TILE + sy));
+        base = highest ? Math.max(base, h) : Math.min(base, h);
+      }
+    }
+    return base;
   }
 
   /**
@@ -362,13 +529,13 @@ export class World {
   }
 
   /**
-   * Si el voxel (`vx`, `vy`, `vz`) es terreno solido. Hoy la generacion da una
-   * superficie sin huecos —solido de la altura de su columna para abajo—, pero
-   * la pregunta ya es en 3D: las cuevas y lo que se excave o construya cambiaran
-   * de donde sale la respuesta, no quien la hace.
+   * Si el voxel (`vx`, `vy`, `vz`) es terreno solido: **la unica fuente de
+   * verdad del terreno** (regla 4). La generacion da una superficie sin huecos
+   * —solido de la altura de su columna para abajo, sin fondo—, y lo roto se le
+   * quita (`breakVoxel`).
    */
   isSolidVoxel(vx: number, vy: number, vz: number): boolean {
-    return vz < this.columnTop(vx, vy);
+    return vz < this.potentialTop(vx, vy) && !this.brokenIn(vx, vy)?.has(vz);
   }
 
   /**
@@ -438,8 +605,12 @@ export class World {
     this.facings.set(`${wx},${wy}`, ((Math.round(facing) % 4) + 4) % 4);
   }
 
-  /** Cambia lo que hay en un tile y mantiene la contabilidad al dia. */
-  setFeature(wx: number, wy: number, next: Feature): void {
+  /**
+   * Cambia lo que hay en un tile y mantiene la contabilidad al dia. `at`, la
+   * altura desde la que se coloca (donde toco la mirada): lo nuevo se apoya en
+   * el suelo de debajo. Sin ella, en el techo de sus columnas.
+   */
+  setFeature(wx: number, wy: number, next: Feature, at?: number): void {
     const cx = toChunkCoord(wx);
     const cy = toChunkCoord(wy);
     const chunk = this.getChunk(cx, cy);
@@ -447,7 +618,7 @@ export class World {
     const record = this.records.get(chunkKey(cx, cy));
     const biome = biomeOfTerrain(chunk.terrain[idx] as Terrain);
 
-    if (!this.writeTile(chunk, idx, next, biome)) return;
+    if (!this.writeTile(chunk, idx, next, biome, at)) return;
 
     // La poblacion continua sigue al recuento real cuando cambia por accion
     // directa: recolectar o sembrar mueve el ecosistema, no solo el tile.
@@ -467,10 +638,20 @@ export class World {
    * especie: asi lo que se planta y lo que brota siempre cuentan en el mismo
    * sitio, sin que puedan descuadrarse.
    */
-  private writeTile(chunk: Chunk, idx: number, next: Feature, biome: BiomeKind): boolean {
+  private writeTile(chunk: Chunk, idx: number, next: Feature, biome: BiomeKind, at?: number): boolean {
     const key = chunkKey(chunk.cx, chunk.cy);
     const before = this.featureAtIndex(chunk, idx);
     if (before === next) return false;
+    const wx = chunk.cx * CHUNK_SIZE + (idx % CHUNK_SIZE);
+    const wy = chunk.cy * CHUNK_SIZE + Math.floor(idx / CHUNK_SIZE);
+    // Lo que aparece en una casilla vacia se apoya en el terreno de ahora; lo
+    // que cambia en su sitio con la misma regla de apoyo (un brote que madura)
+    // se queda donde estaba; y una casilla que se vacia olvida su apoyo.
+    if (next === Feature.None) this.bases.delete(`${wx},${wy}`);
+    else if (before === Feature.None || isStation(before) !== isStation(next)) {
+      const below = at === undefined ? Infinity : Math.round(at / VOXEL);
+      this.bases.set(`${wx},${wy}`, this.settle(wx, wy, next, (vx, vy) => this.floorBelow(vx, vy, below)));
+    }
 
     let ov = this.overrides.get(key);
     if (!ov) {
@@ -488,24 +669,20 @@ export class World {
     }
 
     if (isSapling(before) || isStation(before)) {
-      const wx = chunk.cx * CHUNK_SIZE + (idx % CHUNK_SIZE);
-      const wy = chunk.cy * CHUNK_SIZE + Math.floor(idx / CHUNK_SIZE);
       this.saplings.delete(`${wx},${wy}`);
       // Desmontar una estacion se lleva su frente.
       this.facings.delete(`${wx},${wy}`);
     }
     // Lo que reposaba ahi, o encima, ya no tiene el mismo suelo.
-    if (this.drops.size > 0) {
-      this.drops.wake(chunk.cx * CHUNK_SIZE + (idx % CHUNK_SIZE), chunk.cy * CHUNK_SIZE + Math.floor(idx / CHUNK_SIZE));
-    }
+    if (this.drops.size > 0) this.drops.wake(wx, wy);
 
     chunk.revision++;
     return true;
   }
 
   /** Siembra un brote, que madurara a adulto pasado su tiempo. */
-  plantSapling(wx: number, wy: number, sapling: Feature): void {
-    this.setFeature(wx, wy, sapling);
+  plantSapling(wx: number, wy: number, sapling: Feature, at?: number): void {
+    this.setFeature(wx, wy, sapling, at);
     this.saplings.set(`${wx},${wy}`, this.now);
   }
 
@@ -849,7 +1026,7 @@ export class World {
    * estan a la misma altura: un rellano llano de verdad, sin medio bloque suelto.
    */
   private isLanding(sx: number, sy: number): boolean {
-    const height = this.columnTop(sx * VOXELS_PER_TILE, sy * VOXELS_PER_TILE);
+    const height = this.potentialTop(sx * VOXELS_PER_TILE, sy * VOXELS_PER_TILE);
     if (height <= WATER_HEIGHT) return false;
     for (let dy = -SPAWN_LANDING_HALF; dy <= SPAWN_LANDING_HALF; dy++) {
       for (let dx = -SPAWN_LANDING_HALF; dx <= SPAWN_LANDING_HALF; dx++) {
@@ -857,7 +1034,7 @@ export class World {
         for (let v = 0; v < VOXELS_PER_TILE * VOXELS_PER_TILE; v++) {
           const vx = (sx + dx) * VOXELS_PER_TILE + (v % VOXELS_PER_TILE);
           const vy = (sy + dy) * VOXELS_PER_TILE + Math.floor(v / VOXELS_PER_TILE);
-          if (this.columnTop(vx, vy) !== height) return false;
+          if (this.potentialTop(vx, vy) !== height) return false;
         }
       }
     }
@@ -893,10 +1070,10 @@ export class World {
       seen.add(key);
       if (this.isSolidAt(Math.floor(x / VOXELS_PER_TILE), Math.floor(y / VOXELS_PER_TILE))) continue;
       if (++reached >= cap) return Math.floor(reached / perTile);
-      const height = this.columnTop(x, y);
+      const height = this.potentialTop(x, y);
       for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
         // Andando se sube medio bloque; saltando, uno entero.
-        if (canClimbTo(height, this.columnTop(nx, ny), climbing)) stack.push([nx, ny]);
+        if (canClimbTo(height, this.potentialTop(nx, ny), climbing)) stack.push([nx, ny]);
       }
     }
     return Math.floor(reached / perTile);

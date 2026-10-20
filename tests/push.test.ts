@@ -14,6 +14,7 @@ import {
   type FaunaIndex,
   type World,
 } from '@verdant/sim';
+import { withVoxels } from './ground.js';
 
 /**
  * Los empujes entre cuerpos (el autor, 2026-10-14): «colisiones similares a
@@ -30,7 +31,7 @@ function fakeWorld(
   water: (tx: number, ty: number) => boolean = () => false,
   terrain: (tx: number, ty: number) => Terrain = () => Terrain.Grass,
 ): World {
-  return {
+  return withVoxels({
     seed: 1,
     isSolidAt: water,
     isTerrainSolidAt: water,
@@ -38,7 +39,7 @@ function fakeWorld(
     columnTop: () => 0,
     featureAt: () => Feature.None,
     terrainAt: terrain,
-  } as unknown as World;
+  }) as unknown as World;
 }
 
 /** Un corral: animales (y un jugador, si se pide) de pie en llano. */

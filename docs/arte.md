@@ -26,13 +26,20 @@ del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
   Medidos con `npm run shots`: el jugador 1,88 (era 1,93), una mata 1,04
   (1,17), un brote 0,79 (0,88) y la roca 1,0 (1,09); las copas, las de su
   especie.
-- **El suelo** (`terrain-mesh.ts`): cada casilla toma la tesela de 24 × 24 de
-  su suelo en un atlas, en una de sus 3-4 variantes (`terrainVariant`, de la
-  casilla y la semilla); la tapa de 1 × 1, la tesela entera; la de cada
-  columna, su cuarto. **Las paredes, del mismo material y mas oscuras** (el
-  autor; el 0,72 de antes, `WALL_LIGHT`), en caras de un voxel, para que una
-  pared alta repita la textura en vez de estirarla. Cuesta poco: medido en 25
-  chunks de tres semillas, de un 3 a un 5 % mas de triangulos. Sin el ±10 % de brillo
+- **El suelo** (`terrain-mesh.ts`): desde el 2026-10-20 **cada cara de voxel
+  lleva su tesela entera de 12 × 12** (`VOXEL_TILES`, `voxel-art.ts`; el
+  autor: el voxel es la unidad del terreno y no debe verse como un cuarto de
+  bloque), en una de sus 3-4 variantes, elegida por voxel y cara con la
+  semilla (`terrainVariant`). Hasta entonces cada casilla tomaba la de 24 ×
+  24, entera en una tapa de 1 × 1 y un cuarto en la de cada columna; las de
+  24 siguen en `world-art.ts` y en la hoja hasta que el autor de por buenas
+  las de 12. **Las paredes, del mismo material y mas oscuras** (el autor; el
+  0,72 de antes, `WALL_LIGHT`), y la cara de abajo de lo que quedo en el
+  aire, mas aun (0,55, `UNDER_LIGHT`, *deduccion*). Las de 12 salen del mismo
+  generador, con los mismos pinceles y colores a la misma densidad, y lo que
+  se reparte por la tesela (briznas, granos, grietas) en proporcion a su area
+  (*deduccion*). Cuesta de 1,6 a 1,9 veces los triangulos de antes (ver
+  `docs/relieve.md`, «Romper el terreno»). Sin el ±10 % de brillo
   por casilla de antes (el autor). Sigue en Lambert: su textura va **sin
   espacio de color**, como iban los colores por vertice a los que sustituye,
   y se ve con los mismos colores (medido: la roca del suelo, 120,120,116 en

@@ -32,6 +32,7 @@ export interface Offset {
 
 /** Un punto o una direccion, con `z` la altura. */
 import type { OrientedBox } from './boxes.js';
+import { VOXEL } from './relief.js';
 
 export interface Vec3 {
   readonly x: number;
@@ -68,9 +69,6 @@ export const STRIKE_RANGE = 3;
 export const STRIKE_HALF_ANGLE = Math.PI / 4;
 /** Rayos con los que se recorre el sector, de su borde derecho al izquierdo. */
 export const STRIKE_RAYS = 33;
-
-/** Paso con el que se busca el suelo a lo largo de un rayo. */
-const GROUND_STEP = 0.05;
 
 /**
  * La direccion en que se mira, unitaria: el rumbo `(fx, fy)` en el plano y la
@@ -119,45 +117,69 @@ export function sectorRays(fx: number, fy: number, lookZ: number, roll = 0): Vec
   return out;
 }
 
-/** La altura del suelo en un punto del plano. */
-export type Ground = (x: number, y: number) => number;
+/**
+ * Si el voxel de 0,5 (`vx`, `vy`, `vz`) es terreno solido (`World.isSolidVoxel`).
+ * El terreno entra asi, voxel a voxel, y no como una altura por punto: lo que
+ * queda en el aire tambien corta (el autor, 2026-10-20: el voxel es la unidad
+ * del terreno).
+ */
+export type Solid = (vx: number, vy: number, vz: number) => boolean;
+
+/** Un voxel de 0,5, en coordenadas de voxel. */
+export interface Voxel {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
 
 /**
- * Donde entra el rayo en el terreno, como distancia desde el origen, o `null` si
- * no entra antes de `maxT`. Y si entra por la CARA DE ARRIBA de la casilla —la
- * que se pisa— o por un costado, que es lo que distingue sembrar en el suelo de
- * sembrar en la pared de un bloque.
+ * Donde entra el rayo en el terreno: la distancia desde el origen, **el voxel
+ * en que entra** y si entra por su **cara de arriba** —la que se pisa— o por
+ * otra, que es lo que distingue sembrar en el suelo de sembrar en la pared de
+ * un bloque. Un origen dentro del terreno da 0, ese voxel y no por arriba.
  */
-export function groundHit(
-  origin: Vec3,
-  dir: Vec3,
-  maxT: number,
-  ground: Ground,
-): { t: number; top: boolean } | null {
-  const below = (t: number): boolean =>
-    origin.z + dir.z * t < ground(origin.x + dir.x * t, origin.y + dir.y * t);
-  if (below(0)) return { t: 0, top: false };
-  let prev = 0;
-  for (let t = GROUND_STEP; ; t += GROUND_STEP) {
-    const at = Math.min(t, maxT);
-    if (below(at)) {
-      // Afinar entre la ultima muestra al aire y la primera bajo tierra.
-      let lo = prev;
-      let hi = at;
-      for (let k = 0; k < 20; k++) {
-        const mid = (lo + hi) / 2;
-        if (below(mid)) hi = mid;
-        else lo = mid;
-      }
-      const x = origin.x + dir.x * hi;
-      const y = origin.y + dir.y * hi;
-      // Por la cara de arriba, el punto de entrada queda a ras de su suelo; por
-      // un costado, muy por debajo de la cima del bloque en que entra.
-      const top = ground(x, y) - (origin.z + dir.z * hi) < 0.05;
-      return { t: hi, top };
+export interface GroundHit {
+  readonly t: number;
+  readonly top: boolean;
+  readonly voxel: Voxel;
+  /** Hacia donde mira la cara por la que entra: un eje, hacia el origen. Dentro, todo 0. */
+  readonly normal: Voxel;
+}
+
+/**
+ * Donde entra el rayo en el terreno, o `null` si no entra antes de `maxT`. Se
+ * recorre voxel a voxel por las caras que cruza (Amanatides y Woo), asi que es
+ * exacto: ni se salta una esquina ni depende de un paso.
+ */
+export function groundHit(origin: Vec3, dir: Vec3, maxT: number, solid: Solid): GroundHit | null {
+  const cell = [Math.floor(origin.x / VOXEL), Math.floor(origin.y / VOXEL), Math.floor(origin.z / VOXEL)];
+  if (solid(cell[0]!, cell[1]!, cell[2]!)) {
+    return { t: 0, top: false, voxel: { x: cell[0]!, y: cell[1]!, z: cell[2]! }, normal: { x: 0, y: 0, z: 0 } };
+  }
+  const o = [origin.x, origin.y, origin.z];
+  const d = [dir.x, dir.y, dir.z];
+  const step = [0, 0, 0];
+  const next = [Infinity, Infinity, Infinity];
+  const delta = [Infinity, Infinity, Infinity];
+  for (let a = 0; a < 3; a++) {
+    if (d[a]! > 0) step[a] = 1;
+    else if (d[a]! < 0) step[a] = -1;
+    else continue;
+    const edge = (cell[a]! + (step[a]! > 0 ? 1 : 0)) * VOXEL;
+    next[a] = (edge - o[a]!) / d[a]!;
+    delta[a] = VOXEL / Math.abs(d[a]!);
+  }
+  for (;;) {
+    const a = next[0]! <= next[1]! && next[0]! <= next[2]! ? 0 : next[1]! <= next[2]! ? 1 : 2;
+    const t = next[a]!;
+    if (t > maxT) return null;
+    cell[a]! += step[a]!;
+    next[a]! += delta[a]!;
+    if (solid(cell[0]!, cell[1]!, cell[2]!)) {
+      const n = [0, 0, 0];
+      n[a] = -step[a]!;
+      return { t, top: a === 2 && step[2]! < 0, voxel: { x: cell[0]!, y: cell[1]!, z: cell[2]! }, normal: { x: n[0]!, y: n[1]!, z: n[2]! } };
     }
-    if (at >= maxT) return null;
-    prev = at;
   }
 }
 
@@ -220,8 +242,17 @@ export function rayOrientedBox(origin: Vec3, dir: Vec3, box: OrientedBox, maxT: 
 
 /** Lo que alcanza un golpe: sus rayos ya cortados y los objetos que toca. */
 export interface Strike {
-  /** Cada rayo del sector, de derecha a izquierda, y hasta donde llega. */
-  readonly rays: ReadonlyArray<{ dir: Vec3; length: number }>;
+  /**
+   * Cada rayo del sector, de derecha a izquierda, hasta donde llega y, si lo
+   * corta el terreno, el voxel en que entra.
+   */
+  readonly rays: ReadonlyArray<{ dir: Vec3; length: number; voxel: Voxel | null }>;
+  /**
+   * **Los voxeles del terreno que toca** (el autor, 2026-10-20): cada uno en
+   * que entra algun rayo, una vez aunque entren varios, del mas cercano al mas
+   * lejano.
+   */
+  readonly voxels: ReadonlyArray<Voxel & { t: number }>;
   /**
    * Las casillas de los objetos tocados, del mas cercano al mas lejano, con la
    * distancia y el punto donde los toca su rayo mas corto: ahi va el impacto.
@@ -244,14 +275,22 @@ export function strike(
   fx: number,
   fy: number,
   lookZ: number,
-  ground: Ground,
+  solid: Solid,
   boxAt: (tx: number, ty: number) => Hitbox | null,
   roll = 0,
 ): Strike {
   const rays = sectorRays(fx, fy, lookZ, roll).map((dir) => {
-    const hit = groundHit(origin, dir, STRIKE_RANGE, ground);
-    return { dir, length: hit ? hit.t : STRIKE_RANGE };
+    const hit = groundHit(origin, dir, STRIKE_RANGE, solid);
+    return { dir, length: hit ? hit.t : STRIKE_RANGE, voxel: hit ? hit.voxel : null };
   });
+  const seen = new Map<string, Voxel & { t: number }>();
+  for (const ray of rays) {
+    if (!ray.voxel) continue;
+    const key = `${ray.voxel.x},${ray.voxel.y},${ray.voxel.z}`;
+    const was = seen.get(key);
+    if (!was || ray.length < was.t) seen.set(key, { ...ray.voxel, t: ray.length });
+  }
+  const voxels = [...seen.values()].sort((a, b) => a.t - b.t || a.z - b.z || a.y - b.y || a.x - b.x);
 
   // Solo pueden caer las casillas a menos del alcance mas media diagonal.
   const reach = Math.ceil(STRIKE_RANGE) + 1;
@@ -275,7 +314,7 @@ export function strike(
     }
   }
   targets.sort((a, b) => a.t - b.t || a.y - b.y || a.x - b.x);
-  return { rays, targets };
+  return { rays, targets, voxels };
 }
 
 /**
@@ -289,11 +328,11 @@ export function gazeTarget(
   fx: number,
   fy: number,
   lookZ: number,
-  ground: Ground,
+  solid: Solid,
   boxAt: (tx: number, ty: number) => Hitbox | null,
 ): (Offset & { t: number; at: Vec3 }) | null {
   const dir = lookVector(fx, fy, lookZ);
-  const hit = groundHit(origin, dir, STRIKE_RANGE, ground);
+  const hit = groundHit(origin, dir, STRIKE_RANGE, solid);
   const length = hit ? hit.t : STRIKE_RANGE;
   const reach = Math.ceil(STRIKE_RANGE) + 1;
   const cx = Math.floor(origin.x);
@@ -325,12 +364,15 @@ export interface Surface {
   /** El punto tocado. */
   point: Vec3;
   top: boolean;
+  /** El voxel tocado y hacia donde mira la cara tocada (`GroundHit`). */
+  voxel: Voxel;
+  normal: Voxel;
 }
 
-export function aimSurface(origin: Vec3, fx: number, fy: number, lookZ: number, ground: Ground): Surface | null {
+export function aimSurface(origin: Vec3, fx: number, fy: number, lookZ: number, solid: Solid): Surface | null {
   const dir = lookVector(fx, fy, lookZ);
   const flat = Math.hypot(dir.x, dir.y);
-  const hit = groundHit(origin, dir, Math.min(STRIKE_RANGE / Math.max(flat, 1e-3), 8), ground);
+  const hit = groundHit(origin, dir, Math.min(STRIKE_RANGE / Math.max(flat, 1e-3), 8), solid);
   if (!hit) return null;
   // Un pelo mas alla de la entrada cae dentro de lo tocado; un pelo antes, en la
   // casilla de este lado.
@@ -340,8 +382,9 @@ export function aimSurface(origin: Vec3, fx: number, fy: number, lookZ: number, 
   });
   const point = { x: origin.x + dir.x * hit.t, y: origin.y + dir.y * hit.t, z: origin.z + dir.z * hit.t };
   const tile = at(hit.t + 1e-6);
-  if (hit.top) return { tile, front: tile, point, top: true };
-  return { tile, front: at(Math.max(0, hit.t - 1e-6)), point, top: false };
+  const { voxel, normal } = hit;
+  if (hit.top) return { tile, front: tile, point, top: true, voxel, normal };
+  return { tile, front: at(Math.max(0, hit.t - 1e-6)), point, top: false, voxel, normal };
 }
 
 /**
@@ -354,10 +397,10 @@ export function aimSurface(origin: Vec3, fx: number, fy: number, lookZ: number, 
  * habria que mirar mas de 61 grados hacia abajo para sembrar en llano; asi
  * basta con unos 41.
  */
-export function plantTile(origin: Vec3, fx: number, fy: number, lookZ: number, ground: Ground): Offset | null {
+export function plantTile(origin: Vec3, fx: number, fy: number, lookZ: number, solid: Solid): Offset | null {
   const dir = lookVector(fx, fy, lookZ);
   const flat = Math.hypot(dir.x, dir.y);
-  const hit = groundHit(origin, dir, Math.min(STRIKE_RANGE / Math.max(flat, 1e-3), 8), ground);
+  const hit = groundHit(origin, dir, Math.min(STRIKE_RANGE / Math.max(flat, 1e-3), 8), solid);
   if (!hit || !hit.top) return null;
   // Un pelo mas alla de la entrada, para caer dentro de la casilla y no en su borde.
   const t = hit.t + 1e-6;

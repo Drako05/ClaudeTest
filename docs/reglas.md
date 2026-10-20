@@ -28,6 +28,14 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
    usan por igual el dibujo, la colision y la recoleccion. Que el renderer leyera
    el potencial crudo por su cuenta fue justo el bug de las plantas que no
    desaparecian al recolectarlas.
+
+   **El terreno tiene el suyo** desde el 2026-10-20 (romper el terreno, el
+   autor): el potencial es la altura de cada columna que dio el generador
+   (`Chunk.height`, solido de ahi para abajo, sin fondo), y lo roto vive fuera
+   del chunk (`World.breakVoxel`, `World.broken`), asi que un hoyo sigue ahi al
+   volver. La unica fuente de verdad es `World.isSolidVoxel`; `columnTop`,
+   `floorBelow` y `ceilingAbove` salen de ella, y el dibujo de un chunk mira el
+   borde de su vecina sin registrarla (`columnTopPeek`, `isSolidVoxelPeek`).
 5. **El input produce `Intent`; nunca muta el estado.** Es lo que permitira
    enviar esa misma Intent por red sin reescribir nada. Teclado y tactil son dos
    fuentes que alimentan la misma estructura; anadir mas no debe cambiar el
@@ -185,6 +193,24 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     terreno, en la casilla de delante de esa pared (`aimSurface`), y la caja
     **cae** hasta su suelo desde donde la tocaba la mirada (decision del autor:
     todo tiene gravedad; la caida solo se ve, el nucleo la pone en su sitio).
+    Desde los voxeles que se rompen, «su suelo» es el de debajo de donde toco
+    la mirada (`floorBelow`), no el techo de la columna: en un tunel, el del
+    tunel.
+
+    **El terreno tambien se golpea** (el autor, 2026-10-20): «quiero que cada
+    golpe impacte realmente a cada bloque de 0.5m y lo pueda destruir de forma
+    independiente». Los rayos van por el terreno **voxel a voxel**
+    (`groundHit`, un recorrido por las caras que cruza, exacto), y cada uno da
+    el voxel en que entra. En barrido, **cada voxel en que entra algun rayo
+    recibe un golpe**, uno aunque entren varios (`Strike.voxels`); en preciso,
+    el del rayo central, si no hay antes un objeto o un animal. **Aguanta 3
+    golpes, con cualquier cosa en la mano** (`VOXEL_WORK`: cada golpe suma 1,
+    lleve lo que lleve), y al tercero se rompe para siempre. **Sin particulas
+    ni botin**; el daño **se olvida a los 3 s** sin golpe y al descargar su
+    chunk, como el de los objetos; y **gasta un uso** de lo que se lleva, como
+    todo golpe que toca algo. El fondo de una casilla de agua corta el golpe
+    pero no se rompe: el agua no se mueve. Lo que pide el autor y lo que se
+    dedujo, en `docs/relieve.md`, «Romper el terreno».
 
 21. **La altura estorba, y estorba con UNA regla: no se entra donde el suelo
     esta por encima de los pies.** De ahi salen las tres cosas a la vez y sin
@@ -232,6 +258,16 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
 
     Andando, la caja admite delante lo que no pase de los pies mas `STEP_UP`;
     en el aire, nada (`slide`, con su margen).
+
+    **Con terreno en el aire** (2026-10-20: lo roto deja voladizos, y nada cae)
+    el suelo y el techo se miden por voxel: lo que pisa una huella es el voxel
+    mas alto que **empieza por debajo** de lo que se mira (`squareFloor` con su
+    tope, `floorBelow`), y lo que empieza por encima es techo (`ceilingOver`,
+    que desde entonces mira tambien el terreno). Para entrar en un sitio, el
+    suelo no puede pasar de los pies mas el margen **y el cuerpo entero tiene
+    que caber** entre ese suelo y el techo de encima (`blocked`): un escalon
+    con un techo bajo encima no se sube. Medido en `tests/voxel-edit.test.ts`:
+    con 2 de hueco se sube, con 1,5 no.
 
     **Los cuerpos no se chocan entre si: se empujan** (el autor, 2026-10-14:
     «colisiones similares a las de minecraft, que no se sienten rigidas»,

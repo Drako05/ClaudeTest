@@ -183,8 +183,9 @@ cambio al pasar de cenital a isometrica, ni de isometrica a 3D.
 **El mundo es pixelart a 24 pixeles por bloque**, en todo: suelo, plantas,
 rocas, estaciones y jugador. **Los elementos son aspas de dos laminas**, no
 sprites que giran con la camara: asi el bosque tiene lados. Las rocas y los
-minerales son voxeles, y el jugador un sprite que mira a la camara, por
-decision del autor. El detalle esta en `docs/arte.md`.
+minerales son voxeles (cada mena, distinta por casilla, con sus vetas y sus
+cristales), y el jugador un sprite que mira a la camara, por decision del
+autor. El detalle esta en `docs/arte.md`.
 
 **El input tactil no rompe la frontera del nucleo.** El joystick y los botones
 son una segunda fuente que produce la misma `Intent` que el teclado; el nucleo

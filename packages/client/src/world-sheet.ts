@@ -25,9 +25,10 @@ import {
   type WorldArt,
 } from './world-art.js';
 import { oreModel } from './ore-mesh.js';
+import { VOXEL_PX, VOXEL_TILES } from './voxel-art.js';
 import { artCanvas, treeArt } from './world-sprites.js';
 
-/** Lo oscuras que se ven las paredes del suelo frente a su tapa (el factor de hoy, `terrain-mesh.ts`). */
+/** Lo oscuras que se ven las paredes del suelo frente a su tapa (el factor de hoy, `terrain-mesh.ts`, `WALL_LIGHT`). */
 const WALL = 0.72;
 /** La luz de cada cara de un bloque, como las estaciones (`stations-view.ts`). */
 const FACE = { top: 1, lit: 0.95, shade: 0.74 };
@@ -48,19 +49,23 @@ function zoom(src: HTMLCanvasElement, k: number): HTMLCanvasElement {
 /** Elige variante por casilla, como el juego (aqui, con un hash fijo). */
 const pick = (x: number, y: number, n: number) => (((x * 73856093) ^ (y * 19349663)) >>> 0) % n;
 
-/** Un poco de suelo: `cols × rows` casillas con las variantes mezcladas, y un escalon de medio bloque abajo. */
-function ground(variants: readonly WorldArt[], cols: number, rows: number): HTMLCanvasElement {
+/**
+ * Un poco de suelo: `cols × rows` teselas de `px` con las variantes mezcladas,
+ * y un escalon de medio bloque abajo (`px` 12, el voxel: una fila de paredes
+ * enteras; 24, el bloque: media tesela de pared).
+ */
+function ground(variants: readonly WorldArt[], cols: number, rows: number, px = WORLD_PX): HTMLCanvasElement {
   const tops = variants.map((v) => artCanvas(v));
   const walls = variants.map((v) => artCanvas(v, WALL));
   const half = WORLD_PX / 2;
   const canvas = document.createElement('canvas');
-  canvas.width = cols * WORLD_PX;
-  canvas.height = rows * WORLD_PX + half;
+  canvas.width = cols * px;
+  canvas.height = rows * px + half;
   const ctx = canvas.getContext('2d')!;
-  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) ctx.drawImage(tops[pick(x, y, tops.length)]!, x * WORLD_PX, y * WORLD_PX);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) ctx.drawImage(tops[pick(x, y, tops.length)]!, x * px, y * px);
   // La pared del escalon: la misma tesela, mas oscura, alineada con el mundo.
   for (let x = 0; x < cols; x++) {
-    ctx.drawImage(walls[pick(x, 99, walls.length)]!, 0, 0, WORLD_PX, half, x * WORLD_PX, rows * WORLD_PX, WORLD_PX, half);
+    ctx.drawImage(walls[pick(x, 99, walls.length)]!, 0, 0, px, half, x * px, rows * px, px, half);
   }
   return canvas;
 }
@@ -237,6 +242,27 @@ export function showWorldSheet(): number {
   sheet.id = 'worldSheet';
   let count = 0;
   const terrains = (Object.keys(TERRAIN_TILES).map(Number) as Terrain[]).filter((t) => t !== Terrain.Water && t !== Terrain.DeepWater);
+  // Lo que pinta el juego desde el 2026-10-20: una tesela de 12 × 12 por cara
+  // de voxel. Las de 24 siguen debajo, hasta que el autor de por buenas estas.
+  count += group(
+    sheet,
+    'Suelo del voxel (12 × 12, en el juego): cada variante ×6, y su pared (×0,72)',
+    terrains.map((t) =>
+      figure(
+        TERRAIN_NAMES[t]!,
+        ...VOXEL_TILES[t].map((v) => zoom(artCanvas(v), 6)),
+        zoom(artCanvas(VOXEL_TILES[t][0]!, WALL), 6),
+      ),
+    ),
+  );
+  count += group(
+    sheet,
+    'Suelo del voxel mezclado, con un escalon de medio bloque (×4)',
+    terrains.map((t) => figure(TERRAIN_NAMES[t]!, zoom(ground(VOXEL_TILES[t], 12, 6, VOXEL_PX), 4))),
+  );
+  count += group(sheet, 'Fondos del agua, del voxel (×6)', [
+    figure('Agua, agua honda', ...[Terrain.Water, Terrain.DeepWater].flatMap((t) => VOXEL_TILES[t].map((v) => zoom(artCanvas(v), 6)))),
+  ]);
   count += group(
     sheet,
     'Suelo: cada variante ×3, y su pared (×0,72)',

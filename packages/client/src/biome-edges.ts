@@ -18,7 +18,7 @@
  */
 
 import { biomeOfTerrain, CHUNK_SIZE, type Terrain } from '@verdant/shared';
-import { CHUNK_COLUMNS, topOf, VOXEL, VOXELS_PER_TILE, type Chunk, type World } from '@verdant/sim';
+import { topOf, VOXEL, VOXELS_PER_TILE, type Chunk, type World } from '@verdant/sim';
 
 /**
  * Segmentos `[x0, h0, z0, x1, h1, z1, ...]` del contorno de biomas de un chunk.
@@ -60,7 +60,7 @@ export function collectBiomeEdges(world: World, chunk: Chunk): number[] {
       const wy = baseY + ly;
       /** El techo de la columna (`sx`, `sy`) ∈ {0, 1}² de esta casilla. */
       const top = (sx: number, sy: number): number =>
-        topOf(chunk.height[(ly * VOXELS_PER_TILE + sy) * CHUNK_COLUMNS + lx * VOXELS_PER_TILE + sx]);
+        topOf(world.columnTopPeek(wx * VOXELS_PER_TILE + sx, wy * VOXELS_PER_TILE + sy));
 
       // La arista que se comparte con el vecino del este va de la esquina (1,0)
       // a la (1,1); la del sur, de la (1,1) a la (0,1). Cada una, en dos tramos

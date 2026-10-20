@@ -230,6 +230,16 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Menas: **la caja de choque no sigue a los cristales** (0,9 × 1,0, como la roca): son de dibujo y no se golpean | `docs/arte.md`, «Las menas» | `sim/boxes.ts` |
 | Menas: **los cristales no llevan la luz de las caras**: brillan igual por todos lados, como en el boceto | `docs/arte.md`, «Las menas» | `geometry` en `ore-mesh.ts` |
 | Menas: **la piedra lleva dos vetas y un nodulo por cada cuarto de su tesela**, la densidad del boceto por cara de voxel | `docs/arte.md`, «Las menas» | `veins` en `ore-mesh.ts` |
+| Romper el terreno: **golpear terreno no da el destello de impacto** (lo lei como parte de «no suelta partículas»; el impacto es para «cualquier cosa destruible») | `docs/relieve.md`, «Romper el terreno» | una linea en `tryHarvestArea` |
+| Romper el terreno: **el golpe al fondo del agua no gasta la herramienta**: lo corta, pero no se rompe, como un brote | `docs/relieve.md`, «Romper el terreno» | una linea en `tryHarvestArea` |
+| Romper el terreno: **lo que aparece en una casilla se apoya en el terreno de ese momento** y se queda ahi; **un brote que madura conserva su base**, y una estacion que sustituye a otra cosa la recalcula | `docs/relieve.md`, «Romper el terreno» | `writeTile` en `world.ts` |
+| Romper el terreno: **lo que se coloca o se siembra se apoya en el suelo de debajo de donde toco la mirada**, hasta medio bloque por encima (no en el techo de la columna): en un tunel, en el tunel | `docs/reglas.md`, regla 12 | `tryPlace`, `tryPlant` |
+| Romper el terreno: **el nacimiento mira el terreno generado**, no el roto: al renacer se puede caer en un hoyo cavado en el rellano | `docs/relieve.md`, «Romper el terreno» | `isLanding` en `world.ts` |
+| Romper el terreno: **la reticula marca la cara del voxel** que se mira (verde arriba, blanca a un lado o abajo), tambien al sembrar, que siembra en la casilla de 1 | `docs/relieve.md`, «Romper el terreno» | `pushVoxelFace` en `overlays.ts` |
+| Romper el terreno: **las sombras caen en el techo de cada columna**: lo que quedo en el aire no da sombra en el hoyo de debajo | `docs/relieve.md`, «Romper el terreno» | `buildShadows` |
+| Romper el terreno: **la cara de abajo de lo que quedo en el aire, a 0,55 de luz** (las paredes, a 0,72) | `docs/arte.md`, el pixelart | `UNDER_LIGHT` en `terrain-mesh.ts` |
+| Romper el terreno: **las teselas de 12 × 12**: mismos pinceles y colores que las de 24, a la misma densidad, con lo que se reparte por ellas en proporcion a su area y semillas propias | `docs/arte.md`, el pixelart | `voxelTerrain` en `tools/pixel-mundo.ts`, o retocarlas en `voxel-art.ts` |
+| Romper el terreno: **un barrido mirando abajo cava**: golpear guijarros, matas o brotes con el sector tambien da a los voxeles del suelo que tocan sus rayos (es lo que pediste, «todos los que toca», y conviene que lo sepas al jugarlo) | `docs/reglas.md`, regla 12 | — |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
 al encadenarlos, pulsados en pleno vuelo. La causa esta localizada y el plan

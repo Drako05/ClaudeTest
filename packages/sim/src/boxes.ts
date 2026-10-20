@@ -129,17 +129,14 @@ export function featureBox(world: World, tx: number, ty: number): Hitbox | null 
  *
  * Que el arbol, el arbusto o el brote que nace de la vida van con lo generado,
  * aunque el brote lo siembre el jugador, es **deduccion mia**.
+ *
+ * Y **nada cae** (el autor, 2026-10-20): la base se fija al aparecer el objeto
+ * —lo generado, sobre el terreno que dio el generador; lo demas, sobre el de
+ * ese momento— y no la mueve que se rompa el terreno de debajo
+ * (`World.objectBaseAt`).
  */
 export function objectBase(world: World, tx: number, ty: number, feature: Feature): number {
-  const highest = isStation(feature);
-  let base = highest ? -Infinity : Infinity;
-  for (let sy = 0; sy < VOXELS_PER_TILE; sy++) {
-    for (let sx = 0; sx < VOXELS_PER_TILE; sx++) {
-      const top = topOf(world.columnTop(tx * VOXELS_PER_TILE + sx, ty * VOXELS_PER_TILE + sy));
-      base = highest ? Math.max(base, top) : Math.min(base, top);
-    }
-  }
-  return base;
+  return world.objectBaseAt(tx, ty, feature);
 }
 
 /** La caja de la casilla si choca (`blocksBody`), o `null`. */
@@ -224,7 +221,10 @@ const memo = {
   stamp: new Int32Array(MEMO_SIDE * MEMO_SIDE),
   box: new Array<Hitbox | null>(MEMO_SIDE * MEMO_SIDE).fill(null),
   colStamp: new Int32Array(MEMO_COLS * MEMO_COLS),
-  colTop: new Float64Array(MEMO_COLS * MEMO_COLS),
+  /** El techo que dio el generador a cada columna, en medios bloques. */
+  colTop: new Int32Array(MEMO_COLS * MEMO_COLS),
+  /** Y sus voxeles rotos, si tiene. */
+  colGone: new Array<ReadonlySet<number> | undefined>(MEMO_COLS * MEMO_COLS).fill(undefined),
 };
 
 /**
@@ -260,19 +260,28 @@ function tile(world: World, tx: number, ty: number): number {
   return i;
 }
 
-/** El techo de la columna de 0,5 (`vx`, `vy`), en el mundo, dentro de una ronda o no. */
-export function columnTopIn(world: World, vx: number, vy: number): number {
+/**
+ * El suelo de la columna de 0,5 (`vx`, `vy`) bajo `head`, en el mundo, dentro
+ * de una ronda o no: el techo de su voxel solido mas alto que empieza por
+ * debajo de `head` (`World.floorBelow`). Lo que empieza mas arriba es techo.
+ */
+export function columnTopIn(world: World, vx: number, vy: number, head = Infinity): number {
+  const below = head === Infinity ? Infinity : Math.ceil(head / VOXEL - 1e-9);
   const lx = vx - memo.ox * VOXELS_PER_TILE;
   const ly = vy - memo.oy * VOXELS_PER_TILE;
   if (memo.world !== world || lx < 0 || ly < 0 || lx >= MEMO_COLS || ly >= MEMO_COLS) {
-    return topOf(world.columnTop(vx, vy));
+    return topOf(world.floorBelow(vx, vy, below));
   }
   const i = ly * MEMO_COLS + lx;
   if (memo.colStamp[i] !== memo.gen) {
     memo.colStamp[i] = memo.gen;
-    memo.colTop[i] = topOf(world.columnTop(vx, vy));
+    memo.colTop[i] = world.potentialTop(vx, vy);
+    memo.colGone[i] = world.brokenAt(vx, vy);
   }
-  return memo.colTop[i];
+  let h = Math.min(memo.colTop[i], below);
+  const gone = memo.colGone[i];
+  if (gone) while (gone.has(h - 1)) h--;
+  return topOf(h);
 }
 
 /** `solidBoxAt`, dentro de una ronda o no. */
@@ -293,16 +302,17 @@ function columnSpan(c: number, half: number): [number, number] {
 
 /**
  * Lo mas alto del terreno bajo una huella cuadrada de medio lado `half`
- * centrada en (`x`, `y`): el techo de cada columna de 0,5 que solapa. Con
- * `half` 0, el de la columna del punto.
+ * centrada en (`x`, `y`): el suelo de cada columna de 0,5 que solapa, contando
+ * solo los voxeles que empiezan por debajo de `head` (los de mas arriba son
+ * techo, `ceilingOver`). Con `half` 0, el de la columna del punto.
  */
-export function terrainUnder(world: World, x: number, y: number, half: number): number {
+export function terrainUnder(world: World, x: number, y: number, half: number, head = Infinity): number {
   const [vx0, vx1] = columnSpan(x, half);
   const [vy0, vy1] = columnSpan(y, half);
   let top = -Infinity;
   for (let vy = vy0; vy <= vy1; vy++) {
     for (let vx = vx0; vx <= vx1; vx++) {
-      top = Math.max(top, columnTopIn(world, vx, vy));
+      top = Math.max(top, columnTopIn(world, vx, vy, head));
     }
   }
   return top;
@@ -316,7 +326,7 @@ export function terrainUnder(world: World, x: number, y: number, half: number): 
  * se pisan, son techo (`headroom`).
  */
 export function squareFloor(world: World, x: number, y: number, half: number, head = Infinity): number {
-  let floor = terrainUnder(world, x, y, half);
+  let floor = terrainUnder(world, x, y, half, head);
   for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
     for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
       const b = solidBox(world, tx, ty);
@@ -337,12 +347,22 @@ export function squareFloor(world: World, x: number, y: number, half: number, he
 }
 
 /**
- * El techo sobre una huella cuadrada: lo mas bajo de las cajas que chocan, la
- * solapan y empiezan a la altura `from` o por encima. `Infinity` si no hay
- * ninguna. Con `from` en la cabeza, es lo que corta un salto.
+ * El techo sobre una huella cuadrada: lo mas bajo de los voxeles del terreno y
+ * de las cajas que chocan que la solapan y empiezan a la altura `from` o por
+ * encima. `Infinity` si no hay ninguno. Con `from` en la cabeza, es lo que
+ * corta un salto (regla 21: la cabeza choca, tambien con el terreno que queda
+ * en el aire).
  */
 export function ceilingOver(world: World, x: number, y: number, half: number, from: number): number {
   let ceiling = Infinity;
+  const [vx0, vx1] = columnSpan(x, half);
+  const [vy0, vy1] = columnSpan(y, half);
+  const start = Math.ceil(from / VOXEL - 1e-9);
+  for (let vy = vy0; vy <= vy1; vy++) {
+    for (let vx = vx0; vx <= vx1; vx++) {
+      ceiling = Math.min(ceiling, topOf(world.ceilingAbove(vx, vy, start)));
+    }
+  }
   for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
     for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
       const b = solidBox(world, tx, ty);

@@ -63,7 +63,8 @@ entero —el porque, las medidas y el fallo que motivo cada una— esta en
    que se llame ni de estado previo.
 4. **Las mutaciones van al overlay** de `World.setFeature`: lo que hay en un
    tile es `override ?? potencial`, la **unica fuente de verdad** para el
-   dibujo, la colision y la recoleccion.
+   dibujo, la colision y la recoleccion. **El terreno igual**: lo roto va a su
+   overlay (`World.breakVoxel`), y lo que hay es `World.isSolidVoxel`.
 5. **El input produce `Intent`; nunca muta el estado.** La mirada viaja en ella
    y es la de la camara, tal cual; `moveX`/`moveY` son **direccion, no
    velocidad**.
@@ -77,11 +78,14 @@ entero —el porque, las medidas y el fallo que motivo cada una— esta en
     (`ChunkRecord.live`), o se rompe la ley del observador.
 12. **El golpe es un SECTOR PLANO que sale de los ojos y cuenta solo si toca
     un hitbox** (`sim/aim.ts`): 3 bloques y 90 grados, 33 rayos que el
-    terreno corta. Cada objeto tiene una caja (`sim/boxes.ts`). Sembrar y
-    colocar van donde la mirada toca el suelo o la pared (`aimSurface`).
+    terreno corta. Cada objeto tiene una caja (`sim/boxes.ts`). **Y el voxel
+    en que entra cada rayo recibe el golpe**: 3 y se rompe, con cualquier cosa,
+    sin particulas ni botin (`VOXEL_WORK`). Sembrar y colocar van donde la
+    mirada toca el suelo o la pared (`aimSurface`).
 13. **El relieve sale de la misma elevacion que el terreno, en voxeles de 0,5**:
     cada columna lleva su altura en medios bloques; el agua, el bioma, la vida y
-    los objetos siguen por casilla de 1.
+    los objetos siguen por casilla de 1. **El voxel es la unidad del terreno**:
+    se rompe solo, se dibuja con su tesela de 12 × 12, y lo de encima no cae.
 14. **La altura y los muros son dos mecanismos distintos** (cordilleras y
     salientes). Antes de tocar su calibracion se mide con
     `npx vite-node tools/analyze-world.ts` contra la **linea base solo-agua**:
@@ -95,7 +99,8 @@ entero —el porque, las medidas y el fallo que motivo cada una— esta en
     el lomo), y pisa con la huella entera (`squareFloor`). **Nada sube de
     golpe**: el escalon se sube tick a tick (`CLIMB_SPEED`, medio bloque en
     0,1 s); **bajar es caer** con la gravedad. Se anda con inercia
-    (`INERTIA_TIME`, 0,1 s) y la cabeza choca. Los cuerpos no se chocan entre
+    (`INERTIA_TIME`, 0,1 s) y la cabeza choca, **tambien con el terreno que
+    quedo en el aire** (`ceilingOver`). Los cuerpos no se chocan entre
     si: **se empujan**, poco a poco y segun su tamaño (`pushBodies`).
 22. **Donde se nace hay que ganarselo** (`findSpawn`): un rellano llano, del
     que se pueda salir, en terreno que sostenga vida.
