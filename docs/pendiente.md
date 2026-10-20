@@ -146,6 +146,19 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   ponen un cristal menos de los pedidos (6 de 7 y 8 de 9). Los costados
   tenian el mismo riesgo latente: ahora se quedan con la mejor de 80 tiradas
   y cuentan los solapes (0 en todos).
+- **El grosor de la primera corona, y una flor abajo** (2026-10-20). El
+  autor: «me gustaba mas tu primera corona... permite que se solapen hasta un
+  limite si es necesario con tal de recuperar ese aspecto original sin el
+  riesgo de que queden amontonados por la variedad. ademas, agrega una
+  segunda tirada en la cara de abajo». La primera tenia el centro de 5 x 6 y
+  petalos de 4 x 5, 3 x 4 y 3 x 3: ahora cada cristal mide **un pixel menos
+  de ancho que de alto, nunca menos de 3**, y el centro, 5 x 6. Sus bases se
+  pisaban hasta un 31 % de sus dos medias bases juntas; **el tope es el 40 %**
+  (*deduccion*), y cada sorteo dice cuanto se pisan. La «segunda tirada» la
+  lei como **otra flor, con las mismas reglas, colgando de la cara de abajo**
+  (*mi lectura, por confirmar*); para verla, el voxel flota a 0,3 del suelo y
+  hay una vista desde abajo. Los doce sorteos ponen todos sus cristales.
+  **Esperando al autor.**
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).

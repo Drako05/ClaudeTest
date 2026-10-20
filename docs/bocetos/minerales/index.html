@@ -197,7 +197,13 @@ for (let i = 0; i < 6; i++) {
 }
 const block = new THREE.Mesh(new THREE.BoxGeometry(S, S, S), faces.map((f) => f.m));
 block.position.y = S / 2;
-scene.add(block);
+// El voxel flota un poco sobre el suelo, para que se vea la flor de su cara de
+// abajo; el bloque aprobado sigue apoyado.
+const LIFT = small ? 0.3 : 0;
+const rock = new THREE.Group();
+rock.position.y = LIFT;
+rock.add(block);
+scene.add(rock);
 
 // Los cristales: laminas cruzadas, como los arboles, que salen de las caras.
 const crystalMats = [];
@@ -218,7 +224,7 @@ function addCrystal(base, axis, w, h, seed, spin) {
   g.rotateY(spin);
   // El pie, hundido un poco en la piedra.
   g.position.copy(base).addScaledVector(dir, -0.06 * S);
-  scene.add(g);
+  rock.add(g);
 }
 
 // El voxel, con su propia semilla (resorteado a peticion del autor,
@@ -236,61 +242,82 @@ const DEG = Math.PI / 180;
  * autor el 2026-10-20, «aplica todas, con los brotes sueltos»; los numeros,
  * del agente).
  * 1. De 5 a 7 cristales.
- * 2. Uno en el centro, el mas alto (6 pixeles, 0,25), casi de pie: de 0 a 10
- *    grados desde la vertical.
+ * 2. Uno en el centro, el mas alto y el mas grueso (5 x 6 pixeles), casi de
+ *    pie: de 0 a 10 grados desde la vertical.
  * 3. Los demas, petalos en un anillo a 0,20-0,35 del lado del centro,
  *    repartidos por igual alrededor con ±15 grados de desorden, y mas bajos
  *    (3 a 5 pixeles).
  * 4. Cada petalo se abre hacia fuera de 15 a 40 grados desde la vertical.
  * 5. Y se tuerce de lado hasta ±10 grados.
  * 6. El centro de la flor se aparta del de la cara hasta 0,12 del lado.
- * 7. Las bases no se tocan (la regla de los costados).
+ * 7. Las bases se pueden solapar, con un tope (abajo).
  * 8. De 0 a 2 brotes sueltos de 3 pixeles, cerca del borde, fuera del anillo.
  *
- * **Todos de 3 pixeles de ancho, y en la corona las bases pueden quedar muy
- * juntas** (sin tocarse: un cuarto de pixel entre ellas). Con el ancho y el
- * margen de los costados, cada petalo tenia que quedar a 0,41 del centro, mas
- * lejos que el anillo (0,20-0,35): no cabia ninguno y se saltaban sin avisar
- * (el autor: «literalmente la flor ya no esta»). Ahora lo que no cabe se
- * cuenta (`crownReport`) y la hoja lo dice.
+ * **El grosor y el solape, los de la primera corona** (el autor, 2026-10-20:
+ * «me gustaba mas tu primera corona... permite que se solapen hasta un limite
+ * si es necesario con tal de recuperar ese aspecto original sin el riesgo de
+ * que queden amontonados»). Aquella tenia el centro de 5 x 6 y los petalos de
+ * 4 x 5, 3 x 4 y 3 x 3: **un pixel menos de ancho que de alto, y nunca menos
+ * de 3**. Y sus bases se pisaban hasta un 31 % de lo que miden sus dos medias
+ * bases juntas; el tope, el 40 % (*deduccion*): deja sitio a la variedad sin
+ * que dos petalos se monten. Lo que no cabe se cuenta (`crowns`) y la hoja lo
+ * dice: la primera vez se saltaban sin avisar («literalmente la flor ya no
+ * esta»).
+ *
+ * `face` es +1 para la cara de arriba y -1 para la de abajo (el autor: «agrega
+ * una segunda tirada en la cara de abajo»): la misma flor, colgando.
  */
-const crownReport = { wanted: 0, placed: 0 };
-function voxelCrown() {
+const OVERLAP = 0.4;
+const crowns = {};
+function voxelCrown(face) {
+  const report = (crowns[face] = { wanted: 0, placed: 0, overlap: 0 });
   const placed = []; // [x, z, media base], en fraccion del lado
-  const gap = 0.25 / N;
-  const free = (x, z, half) =>
-    Math.abs(x) <= 0.44 && Math.abs(z) <= 0.44 && placed.every(([px, pz, ph]) => Math.hypot(x - px, z - pz) >= ph + half + gap);
-  const put = (x, z, w, h, axis, seed) => {
-    crownReport.placed++;
-    placed.push([x, z, w / 2 / N]);
-    addCrystal(new THREE.Vector3(x * S, S, z * S), axis, w, h, seed, r() * Math.PI);
+  // Lo que se pisa con el mas pisado (0 si no toca a ninguno), o null si pasa del tope.
+  const press = (x, z, half) => {
+    if (Math.abs(x) > 0.44 || Math.abs(z) > 0.44) return null;
+    let worst = 0;
+    for (const [px, pz, ph] of placed) {
+      const o = 1 - Math.hypot(x - px, z - pz) / (ph + half);
+      if (o > OVERLAP) return null;
+      worst = Math.max(worst, o);
+    }
+    return worst;
   };
+  const put = (x, z, w, h, axis, seed, o) => {
+    report.placed++;
+    report.overlap = Math.max(report.overlap, o);
+    placed.push([x, z, w / 2 / N]);
+    axis.y *= face;
+    addCrystal(new THREE.Vector3(x * S, face > 0 ? S : 0, z * S), axis, w, h, seed, r() * Math.PI);
+  };
+  const seed0 = face > 0 ? 100 : 300;
   const count = 5 + Math.floor(r() * 3);
-  crownReport.wanted = count;
+  report.wanted = count;
   const off = r() * 0.12;
   const offAt = r() * 2 * Math.PI;
   const cx = Math.cos(offAt) * off;
   const cz = Math.sin(offAt) * off;
-  put(cx, cz, 3, 6, leaning(r() * 10 * DEG, r() * 2 * Math.PI), 100);
+  put(cx, cz, 5, 6, leaning(r() * 10 * DEG, r() * 2 * Math.PI), seed0, 0);
   const petals = count - 1;
   const start = r() * 2 * Math.PI;
   for (let i = 0; i < petals; i++) {
     const h = 3 + Math.floor(r() * 3);
-    const w = 3;
+    const w = Math.max(3, h - 1);
     for (let t = 0; t < 60; t++) {
       const at = start + (i * 2 * Math.PI) / petals + (r() - 0.5) * 30 * DEG;
       const rho = 0.2 + r() * 0.15;
       const x = cx + Math.cos(at) * rho;
       const z = cz + Math.sin(at) * rho;
-      if (!free(x, z, w / 2 / N)) continue;
+      const o = press(x, z, w / 2 / N);
+      if (o === null) continue;
       const open = (15 + r() * 25) * DEG;
       const twist = (r() - 0.5) * 20 * DEG;
-      put(x, z, w, h, leaning(open, at + twist), 110 + i);
+      put(x, z, w, h, leaning(open, at + twist), seed0 + 10 + i, o);
       break;
     }
   }
   const buds = Math.floor(r() * 3);
-  crownReport.wanted += buds;
+  report.wanted += buds;
   for (let i = 0; i < buds; i++) {
     for (let t = 0; t < 40; t++) {
       // Cerca del borde: una de las cuatro orillas, entre 0,36 y 0,44 del centro.
@@ -298,8 +325,9 @@ function voxelCrown() {
       const along = (r() - 0.5) * 0.8;
       const out = 0.36 + r() * 0.08;
       const [x, z] = [[out, along], [-out, along], [along, out], [along, -out]][edge];
-      if (!free(x, z, 3 / 2 / N)) continue;
-      put(x, z, 3, 3, leaning((25 + r() * 25) * DEG, Math.atan2(z, x)), 130 + i);
+      const o = press(x, z, 3 / 2 / N);
+      if (o === null) continue;
+      put(x, z, 3, 3, leaning((25 + r() * 25) * DEG, Math.atan2(z, x)), seed0 + 30 + i, o);
       break;
     }
   }
@@ -307,8 +335,11 @@ function voxelCrown() {
 
 // Arriba: un racimo apretado, los grandes en el centro y abiertos hacia fuera.
 // [x, z en fraccion del lado, ancho, alto en pixeles]. En el voxel, una flor
-// sorteada (`voxelCrown`).
-if (small) voxelCrown();
+// sorteada arriba y otra abajo (`voxelCrown`).
+if (small) {
+  voxelCrown(1);
+  voxelCrown(-1);
+}
 else {
   const top = [[0.02, 0.0, 12, 18], [-0.2, 0.12, 10, 15], [0.2, -0.12, 10, 15], [0.16, 0.24, 8, 11], [-0.22, -0.2, 8, 12], [0.33, 0.06, 6, 8], [-0.34, 0.02, 6, 9], [0.0, -0.32, 6, 8], [-0.04, 0.33, 6, 9]];
   top.forEach(([x, z, w, h], i) => {
@@ -398,20 +429,25 @@ const views = [
   ['Desde el noroeste, mas bajo', -1, -1, 0.15],
   ['Desde arriba', 0.6, 0.8, 1.6],
 ];
+// El voxel lleva flor tambien abajo: se mira desde debajo del suelo (el suelo
+// solo se ve por arriba).
+if (small) views.push(['Desde abajo', -0.6, -0.8, -1.6]);
 const out = document.getElementById('out');
 document.getElementById('title').textContent = `${M.name}: ${small ? `voxel de ${S}` : 'bloque'}, piedra veteada (${N} x ${N} por cara) y cristales en laminas cruzadas`;
 // Lo que se pidio y lo que se puso, para que nada falte sin que se vea.
 if (small) {
-  document.body.dataset.corona = `${crownReport.placed} de ${crownReport.wanted}`;
+  const crown = (c) => `${c.placed} de ${c.wanted} (se pisan hasta un ${Math.round(c.overlap * 100)} %)`;
+  document.body.dataset.corona = crown(crowns[1]);
+  document.body.dataset.abajo = crown(crowns[-1]);
   document.body.dataset.solapes = String(sideReport.overlaps);
-  document.getElementById('title').textContent += ` · corona: ${crownReport.placed} de ${crownReport.wanted} · solapes en los lados: ${sideReport.overlaps}`;
+  document.getElementById('title').textContent += ` · arriba: ${crown(crowns[1])} · abajo: ${crown(crowns[-1])} · solapes en los lados: ${sideReport.overlaps}`;
 }
 const only = params.get('vistas')?.split(',').map(Number);
 for (const [label, x, z, y] of views.filter((_, i) => !only || only.includes(i))) {
   const d = 4.6 * S;
   const len = Math.hypot(x, z, y);
-  camera.position.set((x / len) * d, 0.55 * S + (y / len) * d, (z / len) * d);
-  camera.lookAt(0, 0.65 * S, 0);
+  camera.position.set((x / len) * d, LIFT + 0.55 * S + (y / len) * d, (z / len) * d);
+  camera.lookAt(0, small ? LIFT + 0.5 * S : 0.65 * S, 0);
   renderer.render(scene, camera);
   const img = document.createElement('img');
   img.src = renderer.domElement.toDataURL();
