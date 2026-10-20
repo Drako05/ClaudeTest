@@ -158,6 +158,17 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).
+- **Voxeles juntos** (2026-10-20). El autor pidio cobre de 0,5 «posados en
+  el suelo», cada uno con «una generacion distinta», solo la vista noreste.
+  La regla: **eliminar los cristales de las caras donde se toquen los
+  bloques**. El suelo cuenta como vecino, asi que la flor de abajo solo sale
+  en un voxel que tenga hueco debajo. Las seis formaciones estan en
+  `?escena=1..6` (`SCENES`): 2 y 3 en fila, 2 x 2, 3 x 3, 2 x 2 x 2, y una
+  base de 2 x 2 con uno encima. La hoja es `escenas-cobre.png`. Cada voxel
+  tiene su sorteo y sus vetas (`buildScene`). Al hacerlo aparecio un fallo
+  latente de las vetas: una veta que nace en el borde de la cara puede durar
+  menos de 4 pixeles, y su nodulo leia antes del principio. Ya esta acotado,
+  y los dibujos de antes no cambian.
 - **Aun no es codigo del juego**: llevarlo al juego es una tanda que pide el
   autor.
 

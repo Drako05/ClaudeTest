@@ -55,5 +55,31 @@ for (const m of ['cobre', 'carbon']) {
   await sheet.close();
   console.log('ok', name);
 }
+// Las escenas: varios voxeles de cobre juntos, cada uno con su sorteo y sin
+// cristales donde se tocan; solo la vista del noreste.
+{
+  const cells = [];
+  for (let escena = 1; escena <= 6; escena++) {
+    const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
+    page.on('pageerror', (e) => console.log('error', String(e)));
+    await page.goto(`http://127.0.0.1:${server.address().port}/?m=cobre&s=0.5&escena=${escena}&vistas=1`);
+    await page.waitForSelector('body[data-ready="1"]', { timeout: 30000 });
+    cells.push({
+      img: await page.$eval('#out img', (i) => i.src),
+      title: await page.$eval('#title', (t) => t.textContent.split(': ').slice(1).join(': ')),
+    });
+    console.log(`  escena ${escena}: ${cells.at(-1).title}`);
+    await page.close();
+  }
+  const sheet = await browser.newPage({ viewport: { width: 1000, height: 900 } });
+  await sheet.setContent(`<body style="margin:0;background:#1b2130;color:#e8eef7;font:600 14px monospace">
+    <h1 style="font-size:18px;margin:12px">Cobre, voxeles de 0,5 juntos, desde el noreste: cada uno con su sorteo, sin cristales donde se tocan</h1>
+    <div style="display:grid;grid-template-columns:repeat(3,400px);gap:10px;padding:0 12px 12px">
+    ${cells.map((c, i) => `<figure style="margin:0"><img src="${c.img}" width="400" height="400" style="display:block"><figcaption>${i + 1}. ${c.title.replaceAll(' · ', '<br>')}</figcaption></figure>`).join('')}
+    </div></body>`);
+  await sheet.screenshot({ path: `${dir}escenas-cobre.png`, fullPage: true });
+  await sheet.close();
+  console.log('ok', `${dir}escenas-cobre.png`);
+}
 await browser.close();
 server.close();

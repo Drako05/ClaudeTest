@@ -112,7 +112,8 @@ function stoneFace(seed) {
     }
     // Un nodulo de 3 x 3 (en el voxel, uno solo por cara).
     if (small && k > 0) continue;
-    const [nx, ny] = veins[veins.length - 1 - Math.floor(r() * 4)];
+    // Una de las cuatro ultimas pisadas (o la primera, si la veta salio corta del borde).
+    const [nx, ny] = veins[Math.max(0, veins.length - 1 - Math.floor(r() * 4))];
     for (const [dx, ddy, t] of [[0, 0, 'b'], [1, 0, 'c'], [0, 1, 'c'], [1, 1, 'd'], [-1, 0, 'a'], [0, -1, 'a']]) veins.push([nx + dx, ny + ddy, t]);
   }
   const c = document.createElement('canvas');
@@ -179,31 +180,45 @@ function tex(canvas) {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#9fb9d4');
 
-// El suelo, una losa de hierba lisa de 3 x 3 para apoyar el bloque.
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(3 * S, 3 * S), new THREE.MeshBasicMaterial({ color: '#6d9152' }));
+// `?escena=1..6` pone varios voxeles juntos, apoyados en el suelo (`SCENES`);
+// sin ella, uno solo.
+const escena = Number(params.get('escena') ?? 0);
+
+// El suelo, una losa de hierba lisa de 3 x 3 para apoyar el bloque (de 9 x 9
+// en una escena).
+const ground = new THREE.Mesh(new THREE.PlaneGeometry((escena ? 9 : 3) * S, (escena ? 9 : 3) * S), new THREE.MeshBasicMaterial({ color: '#6d9152' }));
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
 // El bloque: S x S x S, una cara de N x N por lado, con la luz de cada cara
 // horneada como en el juego (arriba 1, oeste y norte 0,95, este y sur 0,74).
-const faces = [];
+// `veins` sortea otras vetas (cada voxel de una escena, las suyas).
 const LIGHT = [0.74, 0.95, 1, 0.5, 0.74, 0.95]; // +x, -x, +y, -y, +z, -z
-for (let i = 0; i < 6; i++) {
-  const canvas = stoneFace(0x51 + i * 97 + (mineral === 'carbon' ? 7 : 0));
-  faces.push(canvas);
-  const m = new THREE.MeshBasicMaterial({ map: tex(canvas) });
-  m.color.setScalar(LIGHT[i]);
-  faces[i] = { canvas, m };
+function stoneBlock(veins) {
+  const faces = [];
+  for (let i = 0; i < 6; i++) {
+    const canvas = stoneFace(0x51 + i * 97 + (mineral === 'carbon' ? 7 : 0) + veins);
+    const m = new THREE.MeshBasicMaterial({ map: tex(canvas) });
+    m.color.setScalar(LIGHT[i]);
+    faces.push({ canvas, m });
+  }
+  const block = new THREE.Mesh(new THREE.BoxGeometry(S, S, S), faces.map((f) => f.m));
+  block.position.y = S / 2;
+  return { block, faces };
 }
-const block = new THREE.Mesh(new THREE.BoxGeometry(S, S, S), faces.map((f) => f.m));
-block.position.y = S / 2;
-// El voxel flota un poco sobre el suelo, para que se vea la flor de su cara de
-// abajo; el bloque aprobado sigue apoyado.
-const LIFT = small ? 0.3 : 0;
-const rock = new THREE.Group();
-rock.position.y = LIFT;
-rock.add(block);
-scene.add(rock);
+// El voxel suelto flota un poco sobre el suelo, para que se vea la flor de su
+// cara de abajo; el bloque aprobado y las escenas, apoyados.
+const LIFT = small && !escena ? 0.3 : 0;
+// El grupo del voxel que se esta haciendo: sus cristales van dentro.
+let rock = new THREE.Group();
+let faces = [];
+if (!escena) {
+  const one = stoneBlock(0);
+  faces = one.faces;
+  rock.position.y = LIFT;
+  rock.add(one.block);
+  scene.add(rock);
+}
 
 // Los cristales: laminas cruzadas, como los arboles, que salen de las caras.
 const crystalMats = [];
@@ -230,7 +245,8 @@ function addCrystal(base, axis, w, h, seed, spin) {
 // El voxel, con su propia semilla (resorteado a peticion del autor,
 // 2026-10-20); el bloque aprobado, con la suya de siempre.
 // `?semilla=` sortea otro voxel, para ver la variedad (la hoja de coronas).
-const r = rng((mineral === 'carbon' ? 0xc0a1 : 0xc0b0) + (small ? 0x3a7 : 0) + Number(params.get('semilla') ?? 0) * 0x101);
+const seedOf = (semilla) => (mineral === 'carbon' ? 0xc0a1 : 0xc0b0) + (small ? 0x3a7 : 0) + semilla * 0x101;
+let r = rng(seedOf(Number(params.get('semilla') ?? 0)));
 const jitter = (k) => (r() - 0.5) * k;
 const UP = new THREE.Vector3(0, 1, 0);
 /** Un eje que se inclina `tilt` desde la vertical, hacia el rumbo `heading`. */
@@ -337,11 +353,12 @@ function voxelCrown(face) {
 // Arriba: un racimo apretado, los grandes en el centro y abiertos hacia fuera.
 // [x, z en fraccion del lado, ancho, alto en pixeles]. En el voxel, una flor
 // sorteada arriba y otra abajo (`voxelCrown`).
-if (small) {
+if (escena) {
+  // Las escenas, mas abajo (`buildScene`).
+} else if (small) {
   voxelCrown(1);
   voxelCrown(-1);
-}
-else {
+} else {
   const top = [[0.02, 0.0, 12, 18], [-0.2, 0.12, 10, 15], [0.2, -0.12, 10, 15], [0.16, 0.24, 8, 11], [-0.22, -0.2, 8, 12], [0.33, 0.06, 6, 8], [-0.34, 0.02, 6, 9], [0.0, -0.32, 6, 8], [-0.04, 0.33, 6, 9]];
   top.forEach(([x, z, w, h], i) => {
     const axis = new THREE.Vector3(x * 1.6 + jitter(0.25), 1, z * 1.6 + jitter(0.25));
@@ -400,7 +417,7 @@ function voxelSide(n, at, k) {
   });
 }
 
-sides.forEach(([n, at], k) => {
+if (!escena) sides.forEach(([n, at], k) => {
   if (small) return voxelSide(n, at, k);
   for (let c = 0; c < 2; c++) {
     const u0 = (c === 0 ? -0.2 : 0.22) + jitter(0.15);
@@ -419,6 +436,46 @@ sides.forEach(([n, at], k) => {
   }
 });
 
+// ---------------------------------------------------------------- las escenas
+/**
+ * Varios voxeles juntos, en [x, alto, z] de la rejilla (el autor, 2026-10-20):
+ * cada uno con su propio sorteo, **y sin cristales en las caras que tocan a
+ * otro voxel o al suelo**.
+ */
+const SCENES = {
+  1: ['2 bloques en fila', [[0, 0, 0], [1, 0, 0]]],
+  2: ['3 bloques en fila', [[0, 0, 0], [1, 0, 0], [2, 0, 0]]],
+  3: ['un 2 x 2', [[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1]]],
+  4: ['un 3 x 3', [0, 1, 2].flatMap((x) => [0, 1, 2].map((z) => [x, 0, z]))],
+  5: ['un 2 x 2 x 2', [0, 1].flatMap((y) => [[0, y, 0], [1, y, 0], [0, y, 1], [1, y, 1]])],
+  6: ['base de 2 x 2 y uno encima', [[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1], [0, 1, 0]]],
+};
+const placedCrowns = [];
+function buildScene(which) {
+  const cells = SCENES[which][1];
+  const has = (x, y, z) => y < 0 || cells.some((c) => c[0] === x && c[1] === y && c[2] === z);
+  // La formacion, centrada en el origen.
+  const mid = [0, 2].map((a) => (Math.min(...cells.map((c) => c[a])) + Math.max(...cells.map((c) => c[a]))) / 2);
+  cells.forEach(([x, y, z], i) => {
+    const semilla = which * 100 + i + 1;
+    r = rng(seedOf(semilla));
+    rock = new THREE.Group();
+    rock.position.set((x - mid[0]) * S, y * S, (z - mid[1]) * S);
+    const { block, faces: f } = stoneBlock(semilla * 1013);
+    faces = f;
+    rock.add(block);
+    scene.add(rock);
+    // El suelo cuenta como vecino: la cara de abajo de la fila del suelo no lleva flor.
+    if (!has(x, y + 1, z)) { voxelCrown(1); placedCrowns.push(crowns[1]); }
+    if (!has(x, y - 1, z)) { voxelCrown(-1); placedCrowns.push(crowns[-1]); }
+    const next = [[1, 0], [-1, 0], [0, 1], [0, -1]]; // el orden de `sides`
+    sides.forEach(([n, at], k) => {
+      if (!has(x + next[k][0], y, z + next[k][1])) voxelSide(n, at, k);
+    });
+  });
+}
+if (escena) buildScene(escena);
+
 // ---------------------------------------------------------------- las vistas
 const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
 renderer.setSize(480, 480);
@@ -432,11 +489,17 @@ const views = [
 ];
 // El voxel lleva flor tambien abajo: se mira desde debajo del suelo (el suelo
 // solo se ve por arriba).
-if (small) views.push(['Desde abajo', -0.6, -0.8, -1.6]);
+if (small && !escena) views.push(['Desde abajo', -0.6, -0.8, -1.6]);
 const out = document.getElementById('out');
 document.getElementById('title').textContent = `${M.name}: ${small ? `voxel de ${S}` : 'bloque'}, piedra veteada (${N} x ${N} por cara) y cristales en laminas cruzadas`;
 // Lo que se pidio y lo que se puso, para que nada falte sin que se vea.
-if (small) {
+if (escena) {
+  const sum = (k) => placedCrowns.reduce((a, c) => a + c[k], 0);
+  const worst = Math.max(...placedCrowns.map((c) => c.overlap));
+  document.body.dataset.corona = `${sum('placed')} de ${sum('wanted')} (se pisan hasta un ${Math.round(worst * 100)} %)`;
+  document.body.dataset.solapes = String(sideReport.overlaps);
+  document.getElementById('title').textContent = `${M.name}, voxeles de ${S}: ${SCENES[escena][0]} · coronas: ${document.body.dataset.corona} · solapes en los lados: ${sideReport.overlaps}`;
+} else if (small) {
   const crown = (c) => `${c.placed} de ${c.wanted} (se pisan hasta un ${Math.round(c.overlap * 100)} %)`;
   document.body.dataset.corona = crown(crowns[1]);
   document.body.dataset.abajo = crown(crowns[-1]);
@@ -444,11 +507,15 @@ if (small) {
   document.getElementById('title').textContent += ` · arriba: ${crown(crowns[1])} · abajo: ${crown(crowns[-1])} · solapes en los lados: ${sideReport.overlaps}`;
 }
 const only = params.get('vistas')?.split(',').map(Number);
+// Una escena se mira desde mas lejos segun lo que mide, y a su media altura.
+const cells = escena ? SCENES[escena][1] : [[0, 0, 0]];
+const span = Math.max(...[0, 1, 2].map((a) => Math.max(...cells.map((c) => c[a])) - Math.min(...cells.map((c) => c[a])) + 1));
+const lift = (Math.max(...cells.map((c) => c[1])) + 1) / 2 - 0.5;
 for (const [label, x, z, y] of views.filter((_, i) => !only || only.includes(i))) {
-  const d = 4.6 * S;
+  const d = 4.6 * S * (escena ? 0.55 + 0.45 * span : 1);
   const len = Math.hypot(x, z, y);
-  camera.position.set((x / len) * d, LIFT + 0.55 * S + (y / len) * d, (z / len) * d);
-  camera.lookAt(0, small ? LIFT + 0.5 * S : 0.65 * S, 0);
+  camera.position.set((x / len) * d, LIFT + lift * S + 0.55 * S + (y / len) * d, (z / len) * d);
+  camera.lookAt(0, small ? LIFT + lift * S + 0.5 * S : 0.65 * S, 0);
   renderer.render(scene, camera);
   const img = document.createElement('img');
   img.src = renderer.domElement.toDataURL();
