@@ -81,10 +81,24 @@ el 47 a D1 (cada campo de cada entrada).
 
 ---
 
-## Tanda en curso: las menas al juego (decidida el 2026-10-20)
+## Tanda hecha: las menas al juego (2026-10-20)
 
-**En el juego desde el 2026-10-20, esperando el juicio del autor sobre la
-captura.** Lo hecho:
+**Dada por buena por el autor** el 2026-10-20, tras ver la captura: «todo
+esta bien por ahora». Commit `8555cb2`, con la CI y el despliegue en verde.
+
+**La auditoria, aplazada por el autor**: «no corras la auditoria aun. quiero
+que pasemos con otra tanda». Se hace cuando la pida. Su alcance parte de la
+«Ultima auditoria» de arriba (`4151766`), asi que cubre esta tanda y la
+siguiente. Esta seccion pasa a `docs/historia.md` al cerrar con esa
+auditoria, no antes.
+
+Siguen a su juicio las deducciones de `docs/juicio.md`, filas «Menas»:
+- los colores del hierro;
+- la caja de choque;
+- la luz de los cristales;
+- las vetas por cara.
+
+Lo hecho:
 - `ore-mesh.ts`, nuevo;
 - `ORE_TONES` en `palette.ts`;
 - `STONES` lleva solo la roca;
@@ -94,7 +108,6 @@ captura.** Lo hecho:
 
 Lo que se decidio por deduccion esta en `docs/juicio.md`, y el modelo en
 `docs/arte.md`, «Las menas». Medido: unos 560 vertices y 1 ms por mena.
-Falta la auditoria al cerrar.
 
 Lleva al juego el boceto de abajo («Boceto: los minerales
 como piedra con cristales»). El autor contesto cuatro preguntas:
