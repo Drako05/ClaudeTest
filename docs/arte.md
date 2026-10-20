@@ -46,13 +46,13 @@ del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
   pantalla antes y despues).
 - **Lo que no se ilumina** (aspas, estaciones, agua, jugador) va con la
   textura en sRGB: se ve con los colores del dibujo, tal cual.
-- **Las rocas y los minerales son voxeles** (el autor, 2026-10-19), no aspas:
+- **Las rocas son voxeles** (el autor, 2026-10-19), no aspas:
   `rock-mesh.ts`, siete voxeles de 0,5 (le falta una esquina, para que no
   sea un cubo) con la piedra de su tesela, girados un cuarto de vuelta por
   casilla y con la luz de cada cara horneada como las estaciones. Ocupan su
   casilla (1 × 1 × 1); su caja de choque sigue en 0,9 × 1,0.
 - **Las menas** (el autor, 2026-10-20; el boceto en `docs/bocetos/minerales/`)
-  son esa misma roca, con **vetas del mineral y cristales que brotan de ella**
+  llevan la piedra de esa roca, con **vetas del mineral y cristales que brotan de ella**
   en laminas cruzadas, como los arboles (`ore-mesh.ts`). Desde la tanda de la
   pala son **una formacion de ocho voxeles del terreno** (`ore-shape.ts`):
   uno abajo, el 2 × 2 en medio y tres arriba, y solo el de arriba asoma. Se
@@ -81,9 +81,10 @@ del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
   - Los cristales no llevan la luz de las caras. Miden 0,25 como mucho. **Ya
     no tiene caja**: su arriba es terreno, se pisa y se sube.
   - **Los colores**, en `ORE_TONES` (`palette.ts`): el cobre y el carbon, los
-    del boceto; el hierro, *deduccion*. Los escombros llevan la piedra y su
-    mineral.
-  - **Lo que cuesta**: unos 560 vertices y 1 ms por mena al mallar su chunk.
+    del boceto; el hierro, *deduccion*. No sueltan escombros: son terreno
+    (el autor, 2026-10-20: «como el terreno: nada»).
+  - **Lo que cuesta** (medido el 2026-10-20, 300 menas): enterrada, unos 400
+    vertices y 0,6 ms al mallar su chunk; cavada del todo, unos 880 y 1 ms.
     Hay unas 225 menas como mucho a la vez, aunque todo fuera montaña.
 - **Los arboles** son su copa (`CROWNS`, fija) sobre el tronco desnudo de
   cada uno, que tiene trece largos y su grosor y por eso **se pinta al vuelo**

@@ -11,6 +11,361 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## La pala, lo primero que toca, las menas de voxeles y la rejilla de 0,5 (2026-10-20) — HECHA
+
+**Cerrada por el autor** el 2026-10-20: «Tus consideraciones sobre la colocación de bloques estan bien y los errores están solucionados. Hemos terminado.» Commit `8e9269e`, con la CI y el despliegue en verde; cerrada con la auditoria de ese dia, en `docs/pendiente.md`.
+
+**Lo que pidio el autor**, con sus respuestas, en `docs/relieve.md`, «La pala,
+lo primero que toca y las menas», y en la regla 12 (colocar en la rejilla de
+0,5). El plan, aprobado como plan.
+
+**Hecho**:
+- **El golpe se para en lo primero** (`strike`, `StrikeRay`): voxel, caja o
+  cuerpo; los animales del barrido salen de ahi (`strikeOf` con `animals`).
+- **La pala** (`ToolKind.Shovel`, tres tiers, recetas al final de `RECIPES`,
+  iconos) y **`voxelWorkOf`**: roca, pico; lo maleable, pala; el poder resta;
+  `needShovel`. `VOXEL_WORK` retirado.
+- **Las menas, ocho voxeles** (`ore-shape.ts`, `Chunk.oreBase`, `World.oreAt`,
+  `oreFormationAt`), sin caja, con botin por voxel (`oreVoxelLoot`); su malla,
+  de lo que queda y sin cristales donde la tapa el terreno, rehecha con el.
+- **Las estaciones en la rejilla de 0,5** (`placeStation`, `stationOffsetAt`,
+  `isCovered`, `footprintTiles`, `SHIFT`).
+- Tests: `ore-voxels.test.ts` (nuevo), y lo de la pala, la rejilla y la
+  oclusion en `voxel-edit`, `stations`, `strike`, `terrain-mesh` y
+  `ore-mesh`; los que creaban menas con `setFeature` pican ahora una generada
+  (`oreSite`, `strikeDown` en `tests/ground.ts`). Humo: `dig` fabrica un pico
+  desde el panel (a mano la roca no se rompe), `resources` pica una mena, y el
+  recetario cuenta 3 de mano y 6 en la mesa. 23 mutaciones; caen todas en
+  local.
+- **Dejado**: que las menas se rehagan al romper un voxel no tiene comprobacion
+  en el humo: la vida rehace chunks mientras se pica y la medida no podia
+  fallar (se quito). Se ve en la captura.
+
+**El autor (2026-10-20)**: la barra de la mesa, «el comportamiento esperado»;
+las deducciones de las menas y las palas, bien. No cierra la tanda: vio dos
+fallos, ya arreglados (commit de esta ronda):
+- **Romper un voxel de mena cambiaba los cristales de los demas**: salian de
+  un solo azar por casilla. Ahora, uno por cara de voxel (`oreModel`).
+- **Corriendo, lo recogido no llegaba**: el iman iba a 8 b/s fijos y
+  corriendo se va a 8,32. Ahora acelera 30 b/s² (el autor) y no suelta por
+  distancia.
+
+Sigue a su juicio la rejilla de 0,5 (`docs/juicio.md`, filas «Rejilla de
+0,5»).
+
+---
+
+## Romper el terreno, voxel a voxel (2026-10-20) — HECHA
+
+**Dada por buena por el autor** (2026-10-20): «Las texturas que hiciste están
+bien, en otra tanda perfeccionamos el arte»; el coste, «de momento no se siente
+la carga en fps, en alguna futura tanda de optimización vemos si tocamos
+algo»; y aprobo mis tres deducciones (sin destello al golpear terreno, lo que
+se pone se apoya bajo donde toca la mirada, y renacer mira el terreno
+generado). Commit `1e9af1f`, con la CI y el despliegue en verde. **Las teselas
+de 24 del suelo** (`TERRAIN_TILES`) siguen sin uso en el juego: retirarlas es
+cosa de la tanda de arte. Pasa a `docs/historia.md` con la auditoria.
+
+**Lo que pidio el autor**, literal y con sus cuatro respuestas, en
+`docs/relieve.md`, «Romper el terreno». En corto: el voxel de 0,5 es la unidad
+del terreno; cada golpe da a cada voxel que toca (en barrido, todos los que
+tocan sus rayos), que aguanta 3 con cualquier cosa y se rompe sin particulas
+ni botin; debajo, mas del mismo suelo, sin fondo; nada cae, tampoco los
+objetos; el agua no se mueve; el daño se olvida a los 3 s; gasta un uso; cada
+cara de voxel con su tesela de 12 × 12; sin pistas del daño (otra tanda).
+
+**Hecho** (el plan, aprobado por el autor como plan):
+- **El nucleo**: el overlay del terreno (`World.broken`, `breakVoxel`,
+  `isSolidVoxel` como unica fuente de verdad; regla 4), los rayos voxel a voxel
+  (`groundHit`, `Solid`; regla 12), el daño por voxel (`VOXEL_WORK`,
+  `voxelDamage`), la fisica con suelo y techo por voxel (`floorBelow`,
+  `ceilingAbove`, `ceilingOver`, `blocked`; regla 21), y la base fija de los
+  objetos (`objectBaseAt`, `bases`).
+- **El dibujo**: caras de voxel con teselas de 12 × 12 (`voxel-art.ts`,
+  generadas por `tools/pixel-mundo.ts`), rehacer solo el terreno de un chunk
+  (`terrainRevision`), la reticula por cara de voxel, y la rejilla y los
+  bordes de bioma que se rehacen con el terreno.
+- **Pruebas**: `tests/voxel-edit.test.ts` (17), `tests/terrain-mesh.test.ts`
+  reescrito, la pasada `dig` del humo (tambien en la matriz de la CI) y 21
+  mutaciones, que caen todas en local.
+
+**Medido**: de 1,6 a 1,9 veces los triangulos, y unos 15 ms por chunk al
+rehacer su terreno (`docs/relieve.md`). El tick, en su presupuesto.
+
+Siguen a su juicio las demas deducciones de esta tanda, en `docs/juicio.md`,
+filas «Romper el terreno».
+
+---
+
+## Las menas al juego (2026-10-20) — HECHA
+
+*Luego* (2026-10-20, la tanda de la pala): las menas son ocho voxeles del terreno, **sin caja** y **sin escombros**; la caja de choque de abajo y los escombros con el color del mineral ya no son de este modelo. Auditada con la de la pala.
+
+**Dada por buena por el autor** el 2026-10-20, tras ver la captura: «todo
+esta bien por ahora». Commit `8555cb2`, con la CI y el despliegue en verde.
+
+**La auditoria, aplazada por el autor**: «no corras la auditoria aun. quiero
+que pasemos con otra tanda». Se hace cuando la pida. Su alcance parte de la
+«Ultima auditoria» de arriba (`4151766`), asi que cubre esta tanda y la
+siguiente. Esta seccion pasa a `docs/historia.md` al cerrar con esa
+auditoria, no antes.
+
+Siguen a su juicio las deducciones de `docs/juicio.md`, filas «Menas»:
+- los colores del hierro;
+- la caja de choque;
+- la luz de los cristales;
+- las vetas por cara.
+
+Lo hecho:
+- `ore-mesh.ts`, nuevo;
+- `ORE_TONES` en `palette.ts`;
+- `STONES` lleva solo la roca;
+- el dibujo de cada mena y su liberacion en `billboards.ts` y `main.ts`;
+- la hoja `?mundo=1`;
+- `tests/ore-mesh.test.ts` y el humo de `resources`.
+
+Lo que se decidio por deduccion esta en `docs/juicio.md`, y el modelo en
+`docs/arte.md`, «Las menas». Medido: unos 560 vertices y 1 ms por mena.
+
+Lleva al juego el boceto de abajo («Boceto: los minerales
+como piedra con cristales»). El autor contesto cuatro preguntas:
+
+1. **Colores: directo al juego.** El cobre y el carbon, con los del boceto. El
+   hierro no esta en el boceto: lleva los que proponga el agente (*deduccion*),
+   y el autor los corrige luego sobre el juego.
+2. **Piedra: la de la roca del juego** (`STONES[Feature.RockNode]`,
+   `ROCK_BASE #84848e`), con las vetas y los cristales del mineral encima. No
+   la gris verdosa del boceto.
+3. **Variedad**, la maxima: «Me gustaria la opcion de maxima variedad. Usando
+   parametros deterministas que le den una forma segun la coordenada donde se
+   ubique cada bloque, ¿aun seguiria siendo considerable el incremento de uso
+   de memoria y gpu?». La respuesta es **no**. Las cuentas, del codigo:
+   - Los minerales son el 10 % de la piedra de montaña (`HIGHLAND_ROCK` 0,045 ×
+     `MINERAL_SHARE`): el 0,45 % de sus casillas. Se mallan 7 × 7 chunks de 32
+     (`RADIUS = 3` en `main.ts`), unas 50.000 casillas. Aunque todo fuera
+     montaña, serian **unas 225 menas como mucho**.
+   - **Llamadas de dibujo: las mismas.** Ya hay un `Mesh` por objeto
+     (`billboards.ts`, `spawn`) y miles de arboles. Una mena unica sigue siendo
+     una llamada si la piedra y los cristales comparten material: `alphaTest`,
+     y los cristales en quads por las dos caras.
+   - **Memoria: poca.** La forma de juego (`ROCK_SHAPE`, 7 voxeles: 4 tapas y 16
+     caras de lado) lleva unos 28 cristales de corona y 32 de costado.
+     - Geometria: unos 1.000 vertices, unos 40 KB por mena; en el peor caso,
+       unos 9 MB.
+     - Una textura de 64 × 64 por mena: 16 KB; unos 3,6 MB.
+   - **Lo que si cuesta**:
+     - **CPU al cargar un chunk**: pintar y mallar sus menas. Se mide en la
+       tanda, no se supone.
+     - **Liberar al descartar**: hoy las geometrias de la roca son compartidas
+       y no se liberan. Con una por mena hay que hacer `dispose` de su
+       geometria y su textura al descartar el chunk, o la memoria crece sin
+       parar.
+4. **Vecinos: solo dentro de la formacion.** Se quitan los cristales de las
+   caras que tocan otro voxel de la misma mena. Hacia fuera de la casilla
+   salen siempre, aunque haya otra mena o una pared de terreno pegada.
+
+**El plan**, propuesto por el agente y aprobado por el autor como plan:
+
+- **`packages/client/src/ore-mesh.ts`, nuevo y puro** (como `rock-mesh.ts`):
+  - Recibe la mena, la semilla y la casilla. Devuelve arrays planos: los
+    voxeles de piedra de `rockMesh` (reutilizado, con su giro por casilla) y
+    los quads de los cristales.
+  - Porta del boceto (`docs/bocetos/minerales/index.html`) las dos reglas
+    aprobadas: `voxelCrown`, la de la corona, y `voxelSide`, la de los
+    costados.
+  - Porta tambien el quitar cristales de las caras tocadas, como hace
+    `buildScene`.
+  - `ROCK_SHAPE` no tiene voladizo, asi que no hay flor de abajo.
+  - Azar: `mulberry32` sembrado con `hash2D` de la casilla (regla 2). La misma
+    casilla se ve igual al volver.
+- **La textura de cada mena**:
+  - La tesela de la roca del juego, con las vetas y el nodulo pintados encima
+    (`stoneFace` del boceto, sobre esa piedra), y los sprites de sus cristales,
+    todo en un lienzo de 64 × 64 (`pixelTexture`/`artCanvas` de
+    `world-sprites.ts`).
+  - Un solo `MeshBasicMaterial`, con `vertexColors` (la luz por cara, como
+    hoy) y `alphaTest` 0,4.
+- **`billboards.ts`, `spawn`**: `CoalNode`, `IronNode` y `CopperNode` usan
+  `ore-mesh`. La roca normal no cambia. Hay que mirar antes como se descarta
+  hoy un chunk, para liberar lo de cada mena.
+- **Escombros**: `debrisPalette` (`palette.ts`) da a los de una mena el color
+  de su mineral.
+- ***Deduccion*, a juicio del autor**:
+  - La caja de choque sigue de 0,9 × 1,0: los cristales son de dibujo y no se
+    golpean.
+  - La sombra sigue de ancho 1.
+  - Los colores del hierro, de la familia de su icono (`ITEM_PALETTE`).
+- **Tests (`tests/ore-mesh.test.ts`)**:
+  - La misma casilla da la misma malla, y dos casillas, mallas distintas.
+  - Ningun cristal sale de una cara tocada por otro voxel de la mena.
+  - Cristales de 0,25 como mucho.
+  - La corona pone lo que pide y no se pisa mas del 40 %.
+  - Los costados, a 30-56° con arco de 0-20°, y sin tocarse.
+  - Todo cabe en la textura.
+  - Y el humo de `resources` (`rocks` cuenta tambien las menas).
+- **Lo de siempre**:
+  - Las mutaciones y `tools/a-pruebas.sh`, y despues `main`.
+  - Una captura que decida.
+  - La documentacion: `docs/arte.md`, `docs/juicio.md`, y `retirados.md` si
+    se retiran las `STONES` de las menas.
+  - La auditoria al cerrar.
+  - Medir lo que cuesta mallar un chunk con menas
+    (`tests/performance.test.ts` mide el tick, no el mallado).
+
+---
+
+## Boceto: los minerales como piedra con cristales (2026-10-20)
+
+El autor, con una referencia (un cubo de roca con cristales de amatista que
+brotan de el; el repo no la guarda): quiere que **el voxel de un mineral sea de
+piedra con vetas del color del mineral, y que de el salgan cristales del
+mineral en laminas cruzadas, como los arboles**, con texturas de 24 × 24.
+Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
+
+**Donde quedo (cierre de sesion, 2026-10-20, `7fc6529`, CI en verde).**
+- **Aprobadas por el autor**: el bloque de 1, la regla de los costados y la
+  de la corona.
+- **Mandada sin respuesta**: la hoja de voxeles juntos (`escenas-cobre.png`).
+- **Por confirmar**: los colores de la piedra y de cada mineral.
+- **Nada en el juego.**
+- **Para comprobar que un cambio no altera lo aprobado**: se vuelve a correr
+  `render.mjs` y `git status` no debe marcar ningun PNG salvo los que se
+  quieren cambiar. Las fotos son deterministas.
+
+- **El boceto**: `docs/bocetos/minerales/` (`index.html`, que genera sus
+  propias texturas, nuevas, y `render.mjs`, que saca las fotos:
+  `node docs/bocetos/minerales/render.mjs`).
+- **El bloque de 1 × 1 × 1** (`cobre-1.png`, `carbon-1.png`): «Están de lujo»
+  (el autor). Hay que conservarlo tal cual: el script reproduce esas fotos
+  pixel a pixel.
+- **El voxel de 0,5** (`?s=0.5`; `cobre-05.png`, `carbon-05.png`), que pidio
+  despues: caras de 12 × 12 y cristales de **0,25 como mucho** (6 pixeles).
+  El autor: los de los lados «están tan juntos que parecen uno solo»; ahora
+  los dos de cada cara van sueltos, separados de un quinto a dos tercios de la
+  cara segun la cara (*deduccion*), y cada uno a su altura. Despues, el
+  autor: que varien «entre 45 y 90 grados con respecto a la cara», en un arco
+  con la punta «hacia adentro o hacia afuera del bloque», y que su distancia y
+  posicion varien «pero nunca lleguen a solaparse sus bases». Leido asi
+  (*por confirmar*): la punta, hacia el centro de la cara o hacia su borde,
+  con hasta 45 grados de desvio; entre dos pies, sus dos medias bases y un
+  margen de 0,08 de la cara (`voxelSide`). Solo en el voxel: el bloque
+  aprobado no cambia. Luego, el autor: **el angulo con la cara, de 45 a 75
+  grados; el arco dentro-fuera, de 0 a 30**, y «resortea» (el voxel lleva su
+  propia semilla). Algunos quedaban mirando al suelo (el arco va en el plano
+  de la cara, que es vertical); el autor eligio que **ninguno apunte hacia
+  abajo**: si cae, se refleja hacia arriba. Resorteado otra vez. Luego el
+  autor: que **en general miren hacia arriba, pero no todos por igual**, con
+  el angulo de la primera vez de tope (salian de 38 a 56 grados sobre la
+  horizontal) y unos grados para bajar; el arco, igual o mas acotado. Hoy: **de
+  30 a 56 grados sobre la horizontal** (los 26 de margen, *deduccion*) y **el
+  arco en horizontal, de 0 a 20** grados hacia el centro o el borde de la cara
+  (*deduccion*). El autor: «perfecto, así me gustan, guarda esa regla para
+  los costados».
+- **La regla de los costados, APROBADA** (2026-10-20), para cada cara de lado
+  de un voxel de mineral: dos cristales de 3-4 x 4-5 pixeles; **de 30 a 56
+  grados sobre la horizontal**; la punta en un **arco horizontal de 0 a 20
+  grados**, hacia el centro de la cara o hacia su borde; posicion y distancia
+  al azar, **sin que sus bases se toquen nunca** (entre sus pies, sus dos
+  medias bases y 0,08 de la cara). Esta en `voxelSide`, en el boceto.
+- **La regla de la corona, APROBADA** (2026-10-20: «Bien, ahora me
+  convenciste. guarda esa regla para la corona»), para la cara de arriba de
+  un voxel de mineral, y la misma flor colgando de la de abajo. Esta en
+  `voxelCrown(face)`, en el boceto. Las ocho reglas las propuse yo y el autor
+  las aplico todas («aplica todas, con los brotes sueltos»); los numeros son
+  *mios* y quedan aprobados con la regla:
+  1. De 5 a 7 cristales.
+  2. Uno en el centro, el mas alto y grueso (5 x 6 pixeles), de 0 a 10
+     grados desde la vertical.
+  3. Los demas, petalos en un anillo a 0,20-0,35 del lado, repartidos por
+     igual con ±15 grados, de 3 a 5 pixeles de alto.
+  4. Abiertos hacia fuera de 15 a 40 grados.
+  5. Torcidos de lado hasta ±10 grados.
+  6. El centro de la flor, hasta 0,12 del lado fuera del de la cara.
+  7. **Cada cristal, un pixel menos de ancho que de alto, nunca menos de
+     3**; y sus bases **se pueden pisar hasta un 40 %** de sus dos medias
+     bases juntas, nunca mas. Es el grosor y la apretura de la primera
+     corona, que el autor preferia: «permite que se solapen hasta un limite
+     si es necesario con tal de recuperar ese aspecto original sin el riesgo
+     de que queden amontonados por la variedad». La primera se pisaba hasta
+     un 31 %; el 40 % lo fije yo.
+  8. De 0 a 2 brotes sueltos de 3 x 3, cerca del borde (0,36-0,44).
+  - **Y abajo, otra flor igual** («agrega una segunda tirada en la cara de
+    abajo»): yo lo lei como otra flor colgando de la cara de abajo, y el
+    autor la vio y aprobo la regla. En el boceto, el voxel flota a 0,3 del
+    suelo, y hay una vista desde abajo para verla.
+  - **Nada se descarta sin decirlo**: cada sorteo cuenta lo que pidio y lo que
+    puso, y cuanto se pisan (en el titulo, `data-corona` y `data-abajo`). La
+    leccion viene de la primera hoja de coronas. Con bases que no podian
+    tocarse, ningun petalo cabia en el anillo y se saltaban sin avisar. El
+    autor: «literalmente la flor ya no esta».
+- Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
+  cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
+  donde, su forma (prisma en punta con su cara de luz y su brillo).
+- **Voxeles juntos** (2026-10-20). El autor pidio cobre de 0,5 «posados en
+  el suelo», cada uno con «una generacion distinta», solo la vista noreste.
+  La regla: **eliminar los cristales de las caras donde se toquen los
+  bloques**. El suelo cuenta como vecino, asi que la flor de abajo solo sale
+  en un voxel que tenga hueco debajo. Las seis formaciones estan en
+  `?escena=1..6` (`SCENES`): 2 y 3 en fila, 2 x 2, 3 x 3, 2 x 2 x 2, y una
+  base de 2 x 2 con uno encima. La hoja es `escenas-cobre.png`. Cada voxel
+  tiene su sorteo y sus vetas (`buildScene`). Al hacerlo aparecio un fallo
+  latente de las vetas: una veta que nace en el borde de la cara puede durar
+  menos de 4 pixeles, y su nodulo leia antes del principio. Ya esta acotado,
+  y los dibujos de antes no cambian.
+- **Aun no es codigo del juego**: llevarlo al juego es una tanda que pide el
+  autor.
+
+---
+
+## Auditoria al cerrar el pixelart del mundo (2026-10-19)
+
+**El alcance**: de `78bead8` a `4151766`: los arreglos de despues de la
+auditoria anterior (el humo de Esc, el toque largo por la hora de los
+eventos), las lentes por principios y la tanda del pixelart del mundo, entera
+en `docs/historia.md`.
+
+**Corregido:**
+- **Medidas escritas sin medir** (escape 44): los comentarios daban a la
+  mata 1,1, al brote 0,88 y al jugador 1,92; medidos con `npm run shots`, 1,04,
+  0,79 y 1,88 (la mata y el brote, tras subir su dibujo a la fila de arriba).
+  Y el color del suelo en pantalla se citaba con una medida de antes de la
+  textura: repetida, la roca da lo mismo antes y despues.
+- **Textos que hablaban del modelo sustituido** (escape 46): los animales «con
+  colores por vertice, como el terreno», el `README` (el terreno en colores por
+  vertice) y `docs/efectos.md` (los escombros de `art.ts`, con un contorno del
+  isometrico); y las cajas de `sim/boxes.ts`, con las medidas del dibujo
+  vectorial.
+- **Campos que nadie leia** (escape 47): la silueta, la variante rara y dos
+  tonos de cada especie en `palette.ts`, las tres caras de la roca y las de las
+  estaciones; hoy `LOOKS` (corteza, hojas y fruto), `ROCK_BASE` y
+  `STATION_BASE`. El carbon dejo de llevar sus colores a mano en el generador.
+- **`TileRect` dos veces** (en `terrain-mesh.ts` y `world-sprites.ts`): uno.
+- **El test de la frontera del cliente** pedia un fichero acabado en `art.ts`,
+  que ya no existe: pide `world-art.ts`.
+- **Dos numeros tuyos sin test**: las paredes a 0,72 y las 3-4 variantes por
+  suelo. Con sus mutaciones, que caen.
+
+**Mutado a mano** (cayeron): las dos nuevas, mas las siete de tests de la
+tanda en local; en la CI, todas.
+
+**Ejecutado**: el escaner y su autoprueba; `npm run shots`,
+`tools/analyze-world.ts` y el generador (a otro fichero, sale identico);
+typecheck y los tests; las pasadas `desktop`, `resources`, `stations`,
+`fauna`, `relief` y `devTools`; los triangulos del suelo (+3-5 %).
+
+**Dejado a proposito:**
+- **La mata y el brote, unos centimetros por dentro de su caja de choque**
+  (1,04 contra 1,1; 0,79 contra 0,85): no se insiste en los dibujos (el
+  autor); esta en `docs/juicio.md`.
+- El generador sigue fuera de la CI: reescribe un fichero que se retoca a
+  mano. Se comprueba a mano, a otro fichero (lente C).
+
+**Escapes** (fase 6): el 44 a A2, el 45 (una comprobacion relajada sin haber
+visto el fallo, cuya mutacion sobrevivio en la CI) a B1, el 46 afina el
+disparador de sustituir un modelo (tambien lo que solo se comparaba con el), y
+el 47 a D1 (cada campo de cada entrada).
+
+---
 ## El mundo en pixelart HD (2026-10-19) — HECHA
 
 El autor: «adaptemos el arte del terreno y los elementos

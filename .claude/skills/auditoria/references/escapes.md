@@ -688,3 +688,61 @@ Fallos de como trabaja el agente, no del codigo. Tambien se repiten.
   depende de ese estado; o se aisla (aqui, sin pedir la captura) o se espera a
   que se asiente. Y se corre la pasada dos veces en local.
 - **Donde vive ahora**: lente B, principio B6.
+
+### 48. Lo sorteado de cada pieza salia de un flujo comun (2026-10-20)
+- **Que paso**: los cristales de una mena salian de un solo generador por
+  casilla, consumido voxel a voxel y cara a cara. Al romper un voxel, los
+  demas consumian otros numeros y **cambiaban de aspecto**. Lo vio el autor
+  jugando; los tests comparaban una formacion entera consigo misma.
+- **Por que se escapo**: la prueba de determinismo era «misma entrada, misma
+  salida», y quitar una pieza es otra entrada. Nadie pregunto de que depende
+  cada pieza.
+- **Que lo habria visto**: quitar una pieza y comparar las que quedan con las
+  de antes. Si cambian, lo de cada una no sale de su sitio.
+- **Donde vive ahora**: lente G, principio G8.
+
+### 49. Dos numeros que tienen que guardar una relacion, fijados cada uno por su lado (2026-10-20)
+- **Que paso**: el iman volaba a 8 b/s y corriendo se va a 8,32: lo recogido
+  no alcanzaba nunca al jugador. Cada numero tenia su test y su decision; la
+  relacion entre ellos («el perseguidor va mas deprisa que el perseguido») no
+  la escribia nadie. Lo vio el autor corriendo.
+- **Por que se escapo**: la auditoria comprueba que cada valor este bien y en
+  todos sus sitios (A1), no que los valores que dependen entre si sigan
+  cumpliendo su relacion cuando uno cambia (correr se anadio despues del
+  iman).
+- **Que lo habria visto**: para cada valor nuevo o cambiado, preguntar con que
+  otro tiene que guardar una relacion, y escribir un test de la relacion.
+- **Donde vive ahora**: lente A, principio A4.
+
+### 50. Una medida del humo tomada antes de que se pintara (2026-10-20)
+- **Que paso**: la pasada del recetario media la barra de la mesa justo al
+  abrirla, antes del fotograma que la coloca. En local paso; en la CI, una
+  vez, no.
+- **Por que se escapo**: B3 ya lo decia (esperar al hecho, no al plazo), pero
+  el «hecho» parecia sincrono: abrir el panel y medir.
+- **Que lo habria visto**: preguntar quien coloca lo que se mide, y si lo hace
+  en el mismo paso o en el siguiente fotograma.
+- **Donde vive ahora**: lente B, principio B3 (afinado: lo que se coloca en un
+  fotograma se espera).
+
+### 51. Restos sin uso que el compilador habria visto (2026-10-20)
+- **Que paso**: al encender `noUnusedLocals` y `noUnusedParameters`, el
+  compilador saco 16 restos: imports de modelos sustituidos (`treeTrunkAt`,
+  `rayBox`, `stationHeight` en la recoleccion), parametros que ya no se leian
+  (`world` en los efectos) y una constante de las casillas (`SQUARE`). Ninguna
+  auditoria anterior los habia visto: la lente D los buscaba a ojo.
+- **Por que se escapo**: lo que una herramienta puede ver se dejaba a la
+  lectura.
+- **Que lo habria visto**: encender la comprobacion del compilador.
+- **Donde vive ahora**: lente K, principio K1; el escaner vigila que siga
+  encendida (categoria «Practicas»).
+
+### P9. Medir el codigo de antes con un `stash` se llevo tests sin commit (2026-10-20)
+- **Que paso**: para medir el mundo con el codigo de antes de la tanda se
+  guardo el trabajo con `git stash` y se recupero despues. Dos tests de la
+  oclusion del golpe, sin commit, no volvieron; lo cazo la ronda de
+  mutaciones, que ya no caian.
+- **Metodo**: lo de antes se mide en otro arbol (`git worktree add`), no
+  apartando el trabajo del actual. Y antes del commit se repasa la lista de
+  tests anadidos contra el diff.
+- **Donde vive ahora**: «El proceso del auditor», Q4.

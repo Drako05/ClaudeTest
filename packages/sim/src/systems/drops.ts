@@ -32,7 +32,7 @@ import { GRAVITY } from './jump.js';
 export const DROP_FLOAT = 0.2;
 /** Hasta donde llega el iman, desde el cuerpo (el autor, 2026-10-18: 1 bloque). */
 export const PICKUP_RADIUS = 1;
-/** Lo deprisa que vuela hacia el jugador lo que se recoge, en bloques/s. **El autor lo dio por bueno jugando (2026-10-18).** */
+/** A que velocidad sale hacia el jugador lo que se recoge, en bloques/s (luego acelera, `HOMING_ACCEL`). **El autor lo dio por bueno jugando (2026-10-18).** */
 export const HOMING_SPEED = 8;
 /**
  * Y lo que acelera mientras vuela, en bloques/s² (el autor, 2026-10-20): a 8

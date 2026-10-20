@@ -67,3 +67,6 @@ Formato (el escaner lo lee):
 - `footPartsOf` — el apoyo de los animales en sus partes mas bajas, retirado en la auditoria del 2026-10-10, que lo cuenta. En: `docs/pendiente.md`, `docs/historia.md`.
 - `partsRest` — el reposo de un animal por las cajas de sus partes, retirado el 2026-10-14 con la caja cuadrada; la historia de las fisicas lo cuenta. En: `docs/historia.md`.
 - `body.ts` — `sim/src/body.ts`, el choque por partes, borrado el 2026-10-14; lo cita la auditoria del 2026-10-10. En: `docs/historia.md`.
+- `VOXEL_WORK` — el trabajo fijo de 3 golpes del terreno, retirado el 2026-10-20 con la pala (`voxelWorkOf`); lo cuenta la historia de esa tanda. En: `docs/historia.md`.
+- `noUnusedLocals` — opcion del compilador, en `tsconfig.base.json`, no un nombre del codigo. En: `docs/pendiente.md`, `docs/historia.md`.
+- `noUnusedParameters` — idem. En: `docs/pendiente.md`, `docs/historia.md`.

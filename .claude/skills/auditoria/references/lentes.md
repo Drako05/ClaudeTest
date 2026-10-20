@@ -69,6 +69,12 @@ antes de cambiar el modelo se repite despues. Casos: #20, #27, #44.
 variable, funcion o fichero cuyo nombre cuenta un comportamiento que ya no
 tiene se renombra.
 
+**A4. Los valores que dependen entre si se comprueban juntos.** Para cada
+valor nuevo o cambiado se pregunta con cual otro tiene que guardar una
+relacion (uno mas rapido, mas alto o mas largo que otro; uno que cabe dentro
+de otro) y la relacion lleva su test, que sigue valiendo cuando cualquiera de
+los dos cambia. Cada uno bien por su lado no basta. Casos: #49.
+
 **En este proyecto**
 - La lista de retirados es `references/retirados.md`; el escaner la vigila.
 - Los literales que el humo no puede importar (es JS suelto): `STRIKE_RANGE`
@@ -106,7 +112,9 @@ plazo fijo y luego mira, o que cuenta lo que hubo en una ventana de tiempo, o
 que sondea una lista efimera, pasa o falla segun la maquina. El sistema anota
 lo que hizo en un acumulador y la prueba **espera al hecho**, con un tope
 dentro de la vida de lo que mide. Y lo que depende del ritmo del entorno de
-prueba se mide con un reloj fingido, no con el suyo. Casos: #7, #9, #13, #23.
+prueba se mide con un reloj fingido, no con el suyo. Tambien lo que parece
+sincrono: si lo que se mide lo coloca el siguiente fotograma, se espera a el.
+Casos: #7, #9, #13, #23, #50.
 
 **B4. Un umbral sacado de una sola maquina no es un umbral.** El umbral va
 entre lo bueno medido en varias maquinas y lo malo conocido. Una medida que
@@ -299,6 +307,12 @@ mundo nace junto a, o desde, cada clase de cosa que lo puede bloquear (solida
 y no solida). Y si lo nuevo se mueve o tapa por su cuenta, se repasa cada
 medida que pudiera estropear (B4). Casos: #24, #37.
 
+**G8. Lo sorteado de cada pieza depende solo de esa pieza.** Si un conjunto
+se genera al azar con semilla, cada pieza saca lo suyo de una semilla propia
+(su sitio, su indice estable), no de un flujo comun que se consume en orden:
+si no, quitar, anadir o reordenar una pieza cambia todas las demas. Se prueba
+quitando una y comparando las que quedan con las de antes. Casos: #48.
+
 **En este proyecto**
 - G1: el reloj fingido es `highRefreshPass`; el escudo de la pausa se pinta
   en el propio evento (#17); el toque largo del menu de una casilla se mide
@@ -312,6 +326,10 @@ medida que pudiera estropear (B4). Casos: #24, #37.
   reparte y baja la mitad (#34).
 - G7: montones, estaciones y cuerpos junto a un tronco y junto a una mata
   (#37); la fauna delante de `slash`, la sonda de profundidad y `shots` (#24).
+- G8: los cristales de las menas, un generador por cara de voxel
+  (`oreModel`), probado rompiendo un voxel (`tests/ore-mesh.test.ts`) (#48).
+- A4: el iman acelera y alcanza corriendo y con el doble de correr
+  (`tests/drops.test.ts`) (#49).
 
 ## H. Tests — ¿dicen lo que afirman?
 
@@ -359,6 +377,88 @@ Casos: #25, #38.
   pasada que no existe. El YAML parsea y cada paso apunta a un fichero que
   existe.
 
+## K. Buenas practicas — ¿esta escrito como lo escribiria un buen programador de este lenguaje, en este tipo de proyecto?
+
+Pedida por el autor (2026-10-20): «una revision del uso de buenas practicas de
+programacion, teniendo en cuenta el lenguaje de programacion y el tipo de
+proyecto; donde sea posible aplicar mejores practicas, entonces se aplican».
+**Esta lente corrige, no solo avisa**: lo que se puede mejorar sin cambiar lo
+que hace el programa, se mejora en la auditoria y se verifica como todo lo
+demas. Lo que cambiaria el comportamiento, un diseno o un numero del autor, se
+le propone (principio 7 de `SKILL.md`).
+
+**Metodo**: antes de leer, se fija **el lenguaje, su version y el tipo de
+proyecto** (una libreria, un servicio, un juego en el navegador, una
+herramienta de linea de ordenes) y se repasa que practicas importan en ese
+cruce; las de aqui son las generales y las de un juego en TypeScript. Primero
+lo mecanico (el compilador y el escaner, en todo el repo), despues la lectura
+(los ficheros que toco la tanda).
+
+**K1. El compilador es la primera prueba.** Se encienden las comprobaciones
+estrictas que el lenguaje ofrece y que el codigo puede cumplir (tipos
+estrictos, sin variables ni parametros sin uso, `switch` exhaustivos), y lo
+que el compilador puede ver no se deja a la revision: una regla que se puede
+encender y no se enciende es una revision a mano en cada tanda, que un dia no
+se hace. Al encender una, se corrige todo lo que saca, o se dice por que no.
+Casos: #51.
+
+**K2. Los tipos dicen la verdad.** Nada de tipos comodin (`any`), ni de
+silenciar al compilador (`@ts-ignore`), ni de conversiones dobles (`as unknown
+as`) fuera de los dobles de prueba. Una afirmacion de no nulo (`!`) solo donde
+un invariante lo garantiza, y cerca de el. Estados que se excluyen, con un
+tipo que los distinga (una union con etiqueta), no con varios booleanos que
+pueden contradecirse.
+
+**K3. Un error se ve.** No se traga en silencio: un `catch` vacio dice en su
+sitio por que se ignora. Un error de programacion falla pronto y con el dato
+que lo explica; uno esperado (la red, el usuario, la plataforma) se maneja
+donde se puede hacer algo.
+
+**K4. Lo que se crea se libera.** Lo que el recolector de basura no recoge
+—memoria de la tarjeta grafica (geometrias, materiales, texturas), oyentes,
+observadores, temporizadores, peticiones— tiene un dueno y un momento de
+liberarse, y se comprueba contando lo creado contra lo liberado.
+
+**K5. El bucle caliente no reserva sin necesidad, y se mide antes de
+optimizar.** En lo que corre por fotograma, por paso o por cada elemento de
+una rejilla, crear objetos, cierres, cadenas de clave o listas cuesta; pero se
+mide antes de tocarlo, y se toca solo si la medida lo pide o si la version
+eficiente es igual de clara.
+
+**K6. Nombres, numeros y funciones.** Un numero con significado tiene nombre
+y unidad; una funcion hace una cosa y su nombre la dice; mas de un booleano
+posicional en una llamada se vuelve un objeto de opciones con nombre. Lo que
+se repite tres veces se comparte (I1).
+
+**K7. Inmutable por defecto.** `const`, `readonly` en lo que se comparte, y no
+se mutan los argumentos salvo que el nombre lo diga.
+
+**K8. La plataforma, con sus reglas.** En el navegador: el texto va con
+`textContent`, y `innerHTML` solo con marcado del propio codigo, nunca con
+datos de fuera; lo guardado en el navegador se lee con `try`/`catch`, que
+puede no estar.
+
+**En este proyecto**
+- Lenguaje: TypeScript estricto (`tsconfig.base.json`) en un monorepo con un
+  nucleo puro (`packages/sim`, `packages/shared`) y un cliente three.js;
+  herramientas en JavaScript de Node (`tools/*.mjs`), sin tipos.
+- K1: `strict`, `noUnusedLocals` y `noUnusedParameters` encendidos desde la
+  auditoria del 2026-10-20, que sacaron 16 sin uso (imports de modelos
+  sustituidos, sobre todo) (#51). Un parametro que se deja a proposito lleva `_`
+  delante.
+- K2 y K3: el escaner lo barre (categoria «Practicas»). Los `.catch(() => {})`
+  de las herramientas del humo son esperas con tope a proposito (`B3`); en el
+  juego, cada uno con su motivo en un comentario justo encima.
+- K4: las menas llevan su propia malla y textura y se liberan con su chunk
+  (`BillboardSet.release`, contado por `oresReleased`); las sombras y el
+  terreno de cada chunk, en `dispose`. Las aspas comparten geometria y no se
+  liberan, a proposito.
+- K5: el presupuesto del tick (`tests/performance.test.ts`, 8 ms) y el coste
+  de mallar un chunk se miden antes de tocar nada (`CLAUDE.md`, «Presupuesto
+  de rendimiento»).
+- K8: los `innerHTML` del cliente pintan marcado del propio codigo (iconos,
+  el panel de desarrollo, el HUD), no datos de fuera.
+
 ---
 
 ## El proceso del auditor
@@ -383,7 +483,9 @@ memoria. Casos: P5, P6.
 
 **Q4. Se restaura desde una copia tomada antes, no desde el control de
 versiones**, que deshace tambien lo que aun no se guardo. Y antes de cerrar
-se repasa la lista de cambios contra la de correcciones. Casos: P7.
+se repasa la lista de cambios contra la de correcciones. Lo de antes se
+mide en otro arbol (`git worktree`), no apartando el trabajo con un `stash`.
+Casos: P7, P9.
 
 (B1 cubre P4 y B6 cubre P8.)
 

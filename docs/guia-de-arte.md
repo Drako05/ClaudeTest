@@ -201,7 +201,8 @@ que venga. Son **las directrices del autor** para el diseño.
 - **Como se revisa**: `?iconos=1` abre en el juego la hoja de los 73 (33
   objetos —las tres palas, desde el 2026-10-20—, 14 huecos, 20 botones y 6
   categorias), cada uno a 48 px y a 96, con su nombre.
-- **Aplicada**: los 30 objetos, los 14 huecos y los botones (2026-10-17).
+- **Aplicada**: los 30 objetos, los 14 huecos y los botones (2026-10-17), y
+  las tres palas (2026-10-20).
   Los de la mesa y el horno cambiaron de colores con sus caras en pixelart
   (2026-10-19, directriz 7): cada color, el del mismo papel y la misma luz.
   Los diseños son del agente, y **el autor los aprobo en dos hojas**

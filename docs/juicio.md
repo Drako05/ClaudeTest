@@ -116,7 +116,7 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Inclinacion de arranque **−0,62** tambien en primera persona (antes entraba a −0,2) y tope de **±83 grados** | Golpe por hitbox y una sola mirada | numeros en `camera.ts` |
 | Sembrar a menos de 3 bloques (el alcance es tuyo) **en horizontal**, no a lo largo de la mirada (asi basta mirar 35 grados abajo, no 44) | Golpe por hitbox y una sola mirada | una linea |
 | El tronco que se golpea es una **caja del grosor del pie**, y el que se ve estrecha hacia la copa: a media altura la picea negra se dibuja de 0,16 y su caja mide 0,21 | Auditoria al cerrar la tanda 2 | estrechar la caja o no estrechar el dibujo |
-| Hitboxes: arbusto 0,9 de ancho × 1,1, roca y minerales 0,9 × 1,0, brote 0,3 × 0,85 | Golpe por hitbox y una sola mirada | numeros en `gathering.ts` |
+| Hitboxes: arbusto 0,9 de ancho × 1,1, roca 0,9 × 1,0 (las menas, sin caja desde el 2026-10-20), brote 0,3 × 0,85 | Golpe por hitbox y una sola mirada | numeros en `gathering.ts` |
 | Colision de camara: se para **0,3** antes, la isometrica a **60** como mucho, y el jugador se oculta con la camara a menos de **1** | Golpe por hitbox y una sola mirada | numeros en `camera*.ts` |
 | Grosor del barrido en primera persona: medio ancho **0,04** a 3 bloques | Golpe por hitbox y una sola mirada | un numero en `effects.ts` |
 | El barrido se **congela en el mundo** al nacer: girar la camara despues no lo arrastra | La accion es un cono | una linea |
@@ -227,7 +227,6 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Los arboles raros **pierden su +15 %**: ahora son especie propia | Arboles con forma de su especie | un numero |
 | Desde arriba, un bosque denso con copas grandes **tapa mas al jugador** | Arboles altos | es el cabo de la camara que ya estaba pendiente |
 | Menas: **los colores del hierro** (`#e6cab6`, `#c2a28e`, `#9c7d6c`, `#6e584e` y el brillo `#fff3e8`): los tonos de sus vetas de antes con una luz encima, sin acento. El autor: «el que propongas» | `docs/arte.md`, «Las menas» | `ORE_TONES` en `palette.ts` |
-| Menas: **la caja de choque no sigue a los cristales** (0,9 × 1,0, como la roca): son de dibujo y no se golpean | `docs/arte.md`, «Las menas» | `sim/boxes.ts` |
 | Menas: **los cristales no llevan la luz de las caras**: brillan igual por todos lados, como en el boceto | `docs/arte.md`, «Las menas» | `geometry` en `ore-mesh.ts` |
 | Menas: **la piedra lleva dos vetas y un nodulo por cada cuarto de su tesela**, la densidad del boceto por cara de voxel | `docs/arte.md`, «Las menas» | `veins` en `ore-mesh.ts` |
 | Romper el terreno: **el golpe al fondo del agua no gasta la herramienta**: lo corta, pero no se rompe, como un brote | `docs/relieve.md`, «Romper el terreno» | una linea en `tryHarvestArea` |

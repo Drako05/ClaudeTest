@@ -8,7 +8,7 @@ export * from './ecology.js';
 export * from './fauna.js';
 export * from './fauna-body.js';
 
-import { BiomeKind, CHUNK_SIZE, LifeKind, Terrain } from './base.js';
+import { BiomeKind, LifeKind, Terrain } from './base.js';
 import { AnimalClass, animalMass, SPECIES, Species, Stage } from './fauna.js';
 
 /**
@@ -374,8 +374,8 @@ export enum ToolKind {
   Axe = 1,
   Pickaxe = 2,
   /**
-   * Un arma: no trabaja nada (poder 0, asi no casa con lo que pide hacha o
-   * pico) y contra lo inerte pega como la mano. Su `damage` es lo que hace a
+   * Un arma: no trabaja nada (poder 0, asi no casa con lo que pide hacha,
+   * pico o pala) y contra lo inerte pega como la mano. Su `damage` es lo que hace a
    * un ser vivo.
    */
   Weapon = 3,

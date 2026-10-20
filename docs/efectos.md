@@ -15,7 +15,7 @@ pausar los congela y 64x no inunda la pantalla.
 Los colores de los escombros salen **del dibujo de lo que se rompe**: desde el
 pixelart del mundo (2026-10-19), `debrisPalette` (`client/palette.ts`) toma la
 paleta de su dibujo en `world-art.ts`, toda: la copa y la corteza de un arbol,
-las hojas y los frutos de una mata, la piedra y las vetas de un mineral. El
+las hojas y los frutos de una mata, la piedra de una roca. El
 encargo era que los escombros fueran los colores del objeto, y con una copia
 se separarian al primer retoque. Son cubos de pixeles enteros a 24 por bloque,
 como el resto del mundo (de 4 a 12; las esquirlas, de 2 a 3). Sobre hierba los
@@ -60,9 +60,11 @@ Dos adaptaciones al pasar a tres dimensiones, y ninguna es capricho:
 
   **El barrido recorre el BORDE CURVO DEL AREA REAL del golpe** (pedido del
   autor con el sector de la regla 12): el extremo de cada uno de sus 33 rayos,
-  ya cortados por el terreno, asi que donde el sector entra en el suelo o en una
-  pared el trazo se pega a el (`slashEdge` en `effects.ts`, puro). No se
-  recalcula nada: es el mismo golpe que decidio la simulacion. Sale de los ojos
+  cada uno cortado en lo primero que toco —el terreno, una caja o un cuerpo—,
+  asi que donde el sector entra en el suelo o en una pared el trazo se pega a
+  el (`slashEdge` en `effects.ts`, puro). No se recalcula nada: son los rayos
+  del golpe que decidio la simulacion (`lastStrikeRays`; medidos despues, lo
+  roto ya no los cortaria, auditoria del 2026-10-20). Sale de los ojos
   en las tres vistas, siempre, haya algo que golpear o no —es el gesto, no el
   resultado—, y se congela en el mundo al nacer. En primera persona, a 3
   bloques de los ojos, lleva medio ancho 0,04 (deduccion mia); en tercera, 0,06:

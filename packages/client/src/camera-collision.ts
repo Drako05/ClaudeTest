@@ -39,6 +39,9 @@ export function cameraClearance(
   return Math.max(CAMERA_MIN, hit - CAMERA_MARGIN);
 }
 
+/** La casilla y las que pueden correr su caja dentro de ella: al oeste y al norte. */
+const NEIGHBOURS: ReadonlyArray<readonly [number, number]> = [[0, 0], [1, 0], [0, 1], [1, 1]];
+
 /**
  * Donde choca primero un rayo desde `pivot` en la direccion unitaria `dir`
  * con el terreno o con un hitbox, sin margen: la distancia, o `maxDist` si no
@@ -54,8 +57,10 @@ export function rayHit(
 ): number {
   let hit = groundHit(pivot, dir, maxDist, solid)?.t ?? maxDist;
 
-  // Los hitboxes viven dentro de su casilla, asi que basta mirar las casillas
-  // que cruza la proyeccion del rayo (Amanatides-Woo), y solo hasta el suelo.
+  // Cada hitbox vive en su casilla o, una estacion en la rejilla de 0,5, corrido
+  // medio bloque al este o al sur (`stationOffsetAt`): basta mirar, en cada
+  // casilla que cruza la proyeccion del rayo (Amanatides-Woo), las cajas de
+  // ella y de sus vecinas al oeste y al norte, y solo hasta el suelo.
   let tx = Math.floor(pivot.x);
   let ty = Math.floor(pivot.y);
   const stepX = Math.sign(dir.x);
@@ -68,8 +73,9 @@ export function rayHit(
   const tDeltaY = dir.y !== 0 ? Math.abs(1 / dir.y) : Infinity;
   let t = 0;
   while (t < hit) {
-    const box = boxAt(tx, ty);
-    if (box) {
+    for (const [ox, oy] of NEIGHBOURS) {
+      const box = boxAt(tx - ox, ty - oy);
+      if (!box) continue;
       const at = rayBox(pivot, dir, box, hit);
       if (at !== null && at < hit) hit = at;
     }

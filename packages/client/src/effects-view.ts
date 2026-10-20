@@ -43,7 +43,6 @@ import { impactLook, MAX_PARTICLES, progressOf } from './effects.js';
 /** Opacidad de las esquirlas de golpe. **Propuesta mia.** */
 const CHIP_OPACITY = 0.45;
 import { WORLD_PX } from './world-art.js';
-import type { World } from '@verdant/sim';
 
 
 /**
@@ -204,8 +203,8 @@ export class EffectsView {
    * Necesita **donde esta la camara** porque la cinta del barrido se orienta
    * hacia ella; ver `ribbon`.
    */
-  update(effects: Effects, world: World, eye: Vector3): void {
-    this.drawSlashes(effects.slashes, world, eye);
+  update(effects: Effects, eye: Vector3): void {
+    this.drawSlashes(effects.slashes, eye);
     this.drawImpacts(effects.impacts, eye);
     this.drawDebris(effects.particles.filter((p) => !p.chip), this.debris, false);
     this.drawDebris(effects.particles.filter((p) => p.chip), this.chips, true);
@@ -230,7 +229,7 @@ export class EffectsView {
     }
   }
 
-  private drawSlashes(slashes: readonly Slash[], world: World, eye: Vector3): void {
+  private drawSlashes(slashes: readonly Slash[], eye: Vector3): void {
     for (let i = 0; i < this.slashes.length; i++) {
       const mesh = this.slashes[i];
       const slash = slashes[i];
