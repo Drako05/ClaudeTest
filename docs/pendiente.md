@@ -89,6 +89,16 @@ piedra con vetas del color del mineral, y que de el salgan cristales del
 mineral en laminas cruzadas, como los arboles**, con texturas de 24 × 24.
 Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
 
+**Donde quedo (cierre de sesion, 2026-10-20, `7fc6529`, CI en verde).**
+- **Aprobadas por el autor**: el bloque de 1, la regla de los costados y la
+  de la corona.
+- **Mandada sin respuesta**: la hoja de voxeles juntos (`escenas-cobre.png`).
+- **Por confirmar**: los colores de la piedra y de cada mineral.
+- **Nada en el juego.**
+- **Para comprobar que un cambio no altera lo aprobado**: se vuelve a correr
+  `render.mjs` y `git status` no debe marcar ningun PNG salvo los que se
+  quieren cambiar. Las fotos son deterministas.
+
 - **El boceto**: `docs/bocetos/minerales/` (`index.html`, que genera sus
   propias texturas, nuevas, y `render.mjs`, que saca las fotos:
   `node docs/bocetos/minerales/render.mjs`).
