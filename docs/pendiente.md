@@ -134,6 +134,18 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   hasta 0,12 del lado fuera del de la cara; las bases sin tocarse; y de 0 a 2
   brotes de 3 pixeles cerca del borde. La hoja `coronas-*.png` ensena seis
   sorteos de cada mineral (`?semilla=`). **Esperando al autor.**
+- **El fallo de la primera hoja de coronas** («literalmente la flor ya no
+  esta»): la distancia minima entre bases (0,41 del lado, con cristales de 4
+  a 5 pixeles de ancho) era mayor que el radio del anillo (0,20-0,35), asi
+  que cada petalo agotaba sus intentos y se **descartaba en silencio**, y yo
+  mande las fotos sin contarlos. Arreglo: los cristales de la corona miden 3
+  pixeles de ancho, el hueco entre bases es 0,25/N (que no se toquen), 60
+  intentos por petalo, y **nada se descarta sin decirlo**: cada sorteo
+  ensena «corona X de Y» y los solapes de los lados (el titulo de la pagina,
+  `data-corona` y `data-solapes`). Tras el arreglo, dos de los doce sorteos
+  ponen un cristal menos de los pedidos (6 de 7 y 8 de 9). Los costados
+  tenian el mismo riesgo latente: ahora se quedan con la mejor de 80 tiradas
+  y cuentan los solapes (0 en todos).
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).

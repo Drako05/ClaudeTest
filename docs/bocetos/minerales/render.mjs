@@ -35,14 +35,19 @@ for (const m of ['cobre', 'carbon']) {
     const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
     await page.goto(`http://127.0.0.1:${server.address().port}/?m=${m}&s=0.5&semilla=${seed}&vistas=0,3`);
     await page.waitForSelector('body[data-ready="1"]', { timeout: 30000 });
-    cells.push(await page.$$eval('#out img', (imgs) => imgs.map((i) => i.src)));
+    cells.push({
+      imgs: await page.$$eval('#out img', (imgs) => imgs.map((i) => i.src)),
+      corona: await page.$eval('body', (b) => b.dataset.corona),
+      solapes: await page.$eval('body', (b) => b.dataset.solapes),
+    });
+    console.log(`  ${m} sorteo ${seed + 1}: corona ${cells.at(-1).corona}, solapes en los lados ${cells.at(-1).solapes}`);
     await page.close();
   }
   const sheet = await browser.newPage({ viewport: { width: 1000, height: 900 } });
   await sheet.setContent(`<body style="margin:0;background:#1b2130;color:#e8eef7;font:600 15px monospace">
     <h1 style="font-size:18px;margin:12px">${m === 'cobre' ? 'Cobre' : 'Carbon'}: seis coronas sorteadas (voxel de 0,5), de lado y desde arriba</h1>
     <div style="display:grid;grid-template-columns:repeat(3,300px);gap:10px;padding:0 12px 12px">
-    ${cells.map((pair, i) => `<figure style="margin:0">${pair.map((src) => `<img src="${src}" width="300" height="300" style="display:block">`).join('')}<figcaption>sorteo ${i + 1}</figcaption></figure>`).join('')}
+    ${cells.map((c, i) => `<figure style="margin:0">${c.imgs.map((src) => `<img src="${src}" width="300" height="300" style="display:block">`).join('')}<figcaption>sorteo ${i + 1}: corona ${c.corona} cristales; solapes en los lados: ${c.solapes}</figcaption></figure>`).join('')}
     </div></body>`);
   const name = `${dir}coronas-${m}.png`;
   await sheet.screenshot({ path: name, fullPage: true });

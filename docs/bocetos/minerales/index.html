@@ -246,27 +246,38 @@ const DEG = Math.PI / 180;
  * 6. El centro de la flor se aparta del de la cara hasta 0,12 del lado.
  * 7. Las bases no se tocan (la regla de los costados).
  * 8. De 0 a 2 brotes sueltos de 3 pixeles, cerca del borde, fuera del anillo.
+ *
+ * **Todos de 3 pixeles de ancho, y en la corona las bases pueden quedar muy
+ * juntas** (sin tocarse: un cuarto de pixel entre ellas). Con el ancho y el
+ * margen de los costados, cada petalo tenia que quedar a 0,41 del centro, mas
+ * lejos que el anillo (0,20-0,35): no cabia ninguno y se saltaban sin avisar
+ * (el autor: «literalmente la flor ya no esta»). Ahora lo que no cabe se
+ * cuenta (`crownReport`) y la hoja lo dice.
  */
+const crownReport = { wanted: 0, placed: 0 };
 function voxelCrown() {
   const placed = []; // [x, z, media base], en fraccion del lado
+  const gap = 0.25 / N;
   const free = (x, z, half) =>
-    Math.abs(x) <= 0.44 && Math.abs(z) <= 0.44 && placed.every(([px, pz, ph]) => Math.hypot(x - px, z - pz) >= ph + half + 0.08);
+    Math.abs(x) <= 0.44 && Math.abs(z) <= 0.44 && placed.every(([px, pz, ph]) => Math.hypot(x - px, z - pz) >= ph + half + gap);
   const put = (x, z, w, h, axis, seed) => {
+    crownReport.placed++;
     placed.push([x, z, w / 2 / N]);
     addCrystal(new THREE.Vector3(x * S, S, z * S), axis, w, h, seed, r() * Math.PI);
   };
   const count = 5 + Math.floor(r() * 3);
+  crownReport.wanted = count;
   const off = r() * 0.12;
   const offAt = r() * 2 * Math.PI;
   const cx = Math.cos(offAt) * off;
   const cz = Math.sin(offAt) * off;
-  put(cx, cz, 5, 6, leaning(r() * 10 * DEG, r() * 2 * Math.PI), 100);
+  put(cx, cz, 3, 6, leaning(r() * 10 * DEG, r() * 2 * Math.PI), 100);
   const petals = count - 1;
   const start = r() * 2 * Math.PI;
   for (let i = 0; i < petals; i++) {
     const h = 3 + Math.floor(r() * 3);
-    const w = h >= 5 ? 4 : 3;
-    for (let t = 0; t < 30; t++) {
+    const w = 3;
+    for (let t = 0; t < 60; t++) {
       const at = start + (i * 2 * Math.PI) / petals + (r() - 0.5) * 30 * DEG;
       const rho = 0.2 + r() * 0.15;
       const x = cx + Math.cos(at) * rho;
@@ -279,6 +290,7 @@ function voxelCrown() {
     }
   }
   const buds = Math.floor(r() * 3);
+  crownReport.wanted += buds;
   for (let i = 0; i < buds; i++) {
     for (let t = 0; t < 40; t++) {
       // Cerca del borde: una de las cuatro orillas, entre 0,36 y 0,44 del centro.
@@ -324,18 +336,24 @@ const sides = [
  * distancia del otro que varia, **sin que sus bases se toquen nunca**: entre
  * sus pies queda al menos lo que miden sus dos medias bases mas un margen.
  */
+const sideReport = { overlaps: 0 };
 function voxelSide(n, at, k) {
   const center = at(0, 0.5);
   const placed = []; // [u, v, media base], en fraccion de la cara
   [[4, 5], [3, 4]].forEach(([w, h], i) => {
     const half = w / 2 / N;
-    let u = 0;
-    let v = 0.5;
+    // El primer sitio que cumple; si ninguno de los 80 cumple, el mas
+    // separado, y queda contado (`sideReport`): nunca se solapa en silencio.
+    const room = (u, v) => Math.min(Infinity, ...placed.map(([pu, pv, ph]) => Math.hypot(u - pu, v - pv) - ph - half - 0.08));
+    let best = null;
     for (let t = 0; t < 80; t++) {
-      u = -0.38 + r() * 0.76;
-      v = 0.18 + r() * 0.64;
-      if (placed.every(([pu, pv, ph]) => Math.hypot(u - pu, v - pv) >= ph + half + 0.08)) break;
+      const cand = [-0.38 + r() * 0.76, 0.18 + r() * 0.64];
+      const slack = room(...cand);
+      if (!best || slack > best.slack) best = { u: cand[0], v: cand[1], slack };
+      if (slack >= 0) break;
     }
+    const { u, v } = best;
+    if (best.slack < 0) sideReport.overlaps++;
     placed.push([u, v, half]);
     const base = at(u, v);
     // El arco, en horizontal: hacia el centro de la cara (-u) o hacia su borde.
@@ -382,6 +400,12 @@ const views = [
 ];
 const out = document.getElementById('out');
 document.getElementById('title').textContent = `${M.name}: ${small ? `voxel de ${S}` : 'bloque'}, piedra veteada (${N} x ${N} por cara) y cristales en laminas cruzadas`;
+// Lo que se pidio y lo que se puso, para que nada falte sin que se vea.
+if (small) {
+  document.body.dataset.corona = `${crownReport.placed} de ${crownReport.wanted}`;
+  document.body.dataset.solapes = String(sideReport.overlaps);
+  document.getElementById('title').textContent += ` · corona: ${crownReport.placed} de ${crownReport.wanted} · solapes en los lados: ${sideReport.overlaps}`;
+}
 const only = params.get('vistas')?.split(',').map(Number);
 for (const [label, x, z, y] of views.filter((_, i) => !only || only.includes(i))) {
   const d = 4.6 * S;
