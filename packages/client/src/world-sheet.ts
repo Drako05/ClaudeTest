@@ -24,6 +24,7 @@ import {
   WORLD_PX,
   type WorldArt,
 } from './world-art.js';
+import { oreModel } from './ore-mesh.js';
 import { artCanvas, treeArt } from './world-sprites.js';
 
 /** Lo oscuras que se ven las paredes del suelo frente a su tapa (el factor de hoy, `terrain-mesh.ts`). */
@@ -278,6 +279,13 @@ export function showWorldSheet(): number {
     ),
     figure('Guijarros (×4)', zoom(artCanvas(PEBBLES), 4)),
   ]);
+  // Una mena de cada mineral, de una casilla cualquiera: cada casilla tiene la
+  // suya (`ore-mesh.ts`). Su textura: la piedra con sus vetas y sus cristales.
+  count += group(
+    sheet,
+    'Menas: la textura de una (×3); cada casilla tiene la suya',
+    ([Feature.CoalNode, Feature.IronNode, Feature.CopperNode] as const).map((f) => figure(NAMES[f] ?? '', zoom(artCanvas(oreModel(f, 1, 0, 0, 0).art), 3))),
+  );
   count += group(sheet, 'El jugador (×3) y las estaciones: sus caras ×3 y en perspectiva', [
     figure('Jugador', zoom(artCanvas(PLAYER), 3)),
     ...([Feature.Workbench, Feature.Furnace] as const).map((f) => {

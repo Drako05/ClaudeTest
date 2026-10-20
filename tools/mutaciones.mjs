@@ -11,95 +11,33 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: el mundo en pixelart, ronda 3 (2026-10-19): al juego.
+ * Ronda: las menas al juego (2026-10-20).
  */
+const ORE = 'packages/client/src/ore-mesh.ts';
+const TEST = 'test:tests/ore-mesh.test.ts';
 export default [
-  // La hoja del mundo sin pintar sus rejillas: lienzos en blanco.
-  {
-    nombre: 'pixelart3: hoja sin pintar',
-    fichero: 'packages/client/src/world-sprites.ts',
-    de: '      ctx.fillStyle = color;\n      ctx.fillRect(x, y, 1, 1);',
-    a: '      ctx.fillStyle = color;',
-    prueba: 'smoke:devTools',
-  },
-  // La pared de un desnivel alto, en una cara estirada en vez de una por voxel.
-  {
-    nombre: 'pixelart3: pared estirada',
-    fichero: 'packages/client/src/terrain-mesh.ts',
-    de: '                [x0 + side.b[0] * VOXEL, z - VOXEL, y0 + side.b[1] * VOXEL],',
-    a: '                [x0 + side.b[0] * VOXEL, below, y0 + side.b[1] * VOXEL],',
-    prueba: 'test:tests/terrain-mesh.test.ts',
-  },
-  // Todas las casillas con la misma variante de suelo.
-  {
-    nombre: 'pixelart3: variante fija',
-    fichero: 'packages/client/src/terrain-mesh.ts',
-    de: '  return Math.min(count - 1, Math.floor(hash2DFloat(seed ^ 0x5eed7e11, wx, wy) * count));',
-    a: '  return 0;',
-    prueba: 'test:tests/terrain-mesh.test.ts',
-  },
-  // La roca con las caras que quedan entre dos voxeles.
-  {
-    nombre: 'pixelart3: roca con caras escondidas',
-    fichero: 'packages/client/src/rock-mesh.ts',
-    de: '      if (has(e + face.d[0], s + face.d[1], z + face.d[2])) continue;\n',
-    a: '',
-    prueba: 'test:tests/world-art.test.ts',
-  },
-  // La cara oeste de la roca, en sombra.
-  {
-    nombre: 'pixelart3: luz de la roca',
-    fichero: 'packages/client/src/rock-mesh.ts',
-    de: '  { d: [-1, 0, 0], light: LIGHT.lit,',
-    a: '  { d: [-1, 0, 0], light: LIGHT.shade,',
-    prueba: 'test:tests/world-art.test.ts',
-  },
-  // La copa apoyada en el borde de su dibujo: el roble enseña tallo de mas.
-  {
-    nombre: 'pixelart3: copa sin asiento',
-    fichero: 'packages/client/src/world-sprites.ts',
-    de: '  const top = crown.rows.length - crownGap(crown.rows, crown.trunkX);',
-    a: '  const top = crown.rows.length;',
-    prueba: 'test:tests/world-art.test.ts',
-  },
-  // La copa del roble sin uno de sus tonos de corteza.
-  {
-    nombre: 'pixelart3: corteza recortada',
-    fichero: 'packages/client/src/world-art.ts',
-    de: ',"h":"#3b2216"},',
-    a: '},',
-    prueba: 'test:tests/world-art.test.ts',
-  },
-  // Los escombros de una roca, sacados de otro dibujo (ninguno).
-  {
-    nombre: 'pixelart3: escombros de otro dibujo',
-    fichero: 'packages/client/src/palette.ts',
-    de: '  const art = STONES[feature] ?? CROWNS[feature] ?? BUSHES[feature];',
-    a: '  const art = CROWNS[feature] ?? BUSHES[feature];',
-    prueba: 'test:tests/effects.test.ts',
-  },
-  // Las rocas sin dibujar.
-  {
-    nombre: 'pixelart3: rocas sin dibujar',
-    fichero: 'packages/client/src/billboards.ts',
-    de: '      this.rocks++;\n      return mesh;',
-    a: '      return null;',
-    prueba: 'smoke:resources',
-  },
-  // Las paredes con la luz de las tapas: del mismo tono que el suelo.
-  {
-    nombre: 'pixelart3: pared con luz de tapa',
-    fichero: 'packages/client/src/terrain-mesh.ts',
-    de: '              WALL_LIGHT,\n              tile,',
-    a: '              LID_LIGHT,\n              tile,',
-    prueba: 'test:tests/terrain-mesh.test.ts',
-  },
-  // La nieve sin variantes.
-  {
-    nombre: 'pixelart3: suelo sin variantes',
-    fichero: 'packages/client/src/world-art.ts',
-    de: '  [Terrain.Snow]: [',
-    a: '  [Terrain.Snow]: [] || [',
-    prueba: 'test:tests/world-art.test.ts',
-  },
+  // Cristales tambien en las caras que tocan otro voxel de la mena.
+  { nombre: 'menas: cristales en caras tapadas', fichero: ORE, de: '      if (has(e + d[0], s + d[1], z + d[2])) continue;\n', a: '', prueba: TEST },
+  // La corona sin tope: las bases se montan unas en otras.
+  { nombre: 'menas: corona sin tope', fichero: ORE, de: '      if (o > CROWN_OVERLAP) return null;\n', a: '', prueba: TEST },
+  // Los petalos finos de la corona que no gusto.
+  { nombre: 'menas: petalos finos', fichero: ORE, de: '    const w = Math.max(3, h - 1);', a: '    const w = 3;', prueba: TEST },
+  // El centro de la flor, fino.
+  { nombre: 'menas: centro fino', fichero: ORE, de: '  put(fx, fz, 5, 6,', a: '  put(fx, fz, 3, 6,', prueba: TEST },
+  // El arco de los costados, el doble.
+  { nombre: 'menas: arco sin acotar', fichero: ORE, de: '* r() * 20 * DEG;', a: '* r() * 40 * DEG;', prueba: TEST },
+  // Los costados, mas inclinados de lo aprobado.
+  { nombre: 'menas: costados de mas', fichero: ORE, de: '(30 + r() * 26) * DEG', a: '(30 + r() * 40) * DEG', prueba: TEST },
+  // Los dos de una cara, sin el margen entre sus bases.
+  { nombre: 'menas: costados que se tocan', fichero: ORE, de: '- ph - half - 0.08)', a: '- ph - half + 0.08)', prueba: TEST },
+  // La misma mena en todas las casillas.
+  { nombre: 'menas: todas iguales', fichero: ORE, de: 'hash2D(seed ^ 0x0e5ca1, tx, ty)', a: 'hash2D(seed ^ 0x0e5ca1, 0, 0)', prueba: TEST },
+  // La piedra sin vetas.
+  { nombre: 'menas: sin vetas', fichero: ORE, de: 'for (let q = 0; q < 4; q++) veins(', a: 'for (let q = 0; q < 0; q++) veins(', prueba: TEST },
+  // Los escombros de una mena, sin su mineral.
+  { nombre: 'menas: escombros sin mineral', fichero: 'packages/client/src/palette.ts', de: '  if (ore) {\n', a: '  if (ore && feature < 0) {\n', prueba: TEST },
+  // El juego, sin menas: la roca de antes para los minerales.
+  { nombre: 'menas: sin cristales en el juego', fichero: 'packages/client/src/billboards.ts', de: '    if (ORE_TONES[feature]) {\n', a: '    if (ORE_TONES[feature] && feature < 0) {\n', prueba: 'smoke:resources' },
+  // Al descartar un chunk, sus menas no se liberan.
+  { nombre: 'menas: sin liberar', fichero: 'packages/client/src/main.ts', de: '    billboards.release(prop);\n', a: '', prueba: 'smoke:resources' },
 ];

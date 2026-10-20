@@ -81,9 +81,22 @@ el 47 a D1 (cada campo de cada entrada).
 
 ---
 
-## Tanda siguiente: las menas al juego (decidida el 2026-10-20)
+## Tanda en curso: las menas al juego (decidida el 2026-10-20)
 
-**Aun sin empezar.** Lleva al juego el boceto de abajo («Boceto: los minerales
+**En el juego desde el 2026-10-20, esperando el juicio del autor sobre la
+captura.** Lo hecho:
+- `ore-mesh.ts`, nuevo;
+- `ORE_TONES` en `palette.ts`;
+- `STONES` lleva solo la roca;
+- el dibujo de cada mena y su liberacion en `billboards.ts` y `main.ts`;
+- la hoja `?mundo=1`;
+- `tests/ore-mesh.test.ts` y el humo de `resources`.
+
+Lo que se decidio por deduccion esta en `docs/juicio.md`, y el modelo en
+`docs/arte.md`, «Las menas». Medido: unos 560 vertices y 1 ms por mena.
+Falta la auditoria al cerrar.
+
+Lleva al juego el boceto de abajo («Boceto: los minerales
 como piedra con cristales»). El autor contesto cuatro preguntas:
 
 1. **Colores: directo al juego.** El cobre y el carbon, con los del boceto. El

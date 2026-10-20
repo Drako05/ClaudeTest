@@ -5,7 +5,9 @@
  * **El arte es pixelart** (el autor, 2026-10-19; guia de arte, directriz 7):
  * los dibujos de `world-art.ts`, pasados a lienzo por `world-sprites.ts` y
  * subidos como textura, a 24 pixeles por bloque. Las rocas y los minerales no
- * son aspas sino voxeles (`rock-mesh.ts`), por decision del autor.
+ * son aspas sino voxeles (`rock-mesh.ts`), por decision del autor; los
+ * minerales, ademas, con sus cristales, una mena distinta por casilla
+ * (`ore-mesh.ts`).
  *
  * **Por que las features dejaron de ser billboards.** Un sprite se reorienta a
  * la camara en cada frame, y con la camara libre eso delata que son cromos: los
@@ -20,7 +22,7 @@
  * un billboard, que es lo que menos miente.
  */
 
-import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial, Sprite, type Texture } from 'three';
+import { BufferAttribute, BufferGeometry, DoubleSide, Mesh, MeshBasicMaterial, Sprite, type Object3D, type Texture } from 'three';
 import { Feature } from '@verdant/shared';
 import {
   BODY_RADIUS,
@@ -33,7 +35,9 @@ import {
   trunkWidthFor,
   TRUNK_BUCKETS,
 } from '@verdant/sim';
-import { rockMesh } from './rock-mesh.js';
+import { oreModel } from './ore-mesh.js';
+import { ORE_TONES } from './palette.js';
+import { rockMesh, type RockMesh } from './rock-mesh.js';
 import { TREE_SHAPES, treeShapeOf } from './tree-shapes.js';
 import { bodySpriteMaterial } from './sprite-depth.js';
 import { CROWNS, ROCK_SHAPE, STONES, WORLD_PX } from './world-art.js';
@@ -134,7 +138,17 @@ const UNITS = 1 / WORLD_PX;
 const isTree = (feature: Feature): boolean => CROWNS[feature] !== undefined;
 
 /** Roca o mineral: van en voxeles, no en aspa. */
-const isRock = (feature: Feature): boolean => STONES[feature] !== undefined;
+const isRock = (feature: Feature): boolean => STONES[feature] !== undefined || ORE_TONES[feature] !== undefined;
+
+/** Una malla de voxeles (`rock-mesh.ts`, `ore-mesh.ts`), subida a la GPU. */
+function upload(mesh: RockMesh): BufferGeometry {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(mesh.positions, 3));
+  geometry.setAttribute('uv', new BufferAttribute(mesh.uvs, 2));
+  geometry.setAttribute('color', new BufferAttribute(mesh.colors, 3));
+  geometry.setIndex(new BufferAttribute(mesh.indices, 1));
+  return geometry;
+}
 
 /** Lo que mide de alto la roca de voxeles, en bloques. */
 const ROCK_HEIGHT = (Math.max(...ROCK_SHAPE.map((v) => v[2])) + 1) * 0.5;
@@ -347,28 +361,25 @@ export class BillboardSet {
    */
   private readonly trees = new Map<number, Billboard | null>();
   /** Las rocas de voxeles: una geometria por giro, un material por piedra. */
-  private readonly rockShapes: BufferGeometry[] = [0, 1, 2, 3].map((turn) => {
-    const mesh = rockMesh(ROCK_SHAPE, turn);
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(mesh.positions, 3));
-    geometry.setAttribute('uv', new BufferAttribute(mesh.uvs, 2));
-    geometry.setAttribute('color', new BufferAttribute(mesh.colors, 3));
-    geometry.setIndex(new BufferAttribute(mesh.indices, 1));
-    return geometry;
-  });
+  private readonly rockShapes: BufferGeometry[] = [0, 1, 2, 3].map((turn) => upload(rockMesh(ROCK_SHAPE, turn)));
   private readonly rockMaterials = new Map<Feature, MeshBasicMaterial>();
   private readonly player: Billboard | null;
   /** Tronco desnudo de los arboles colocados, MEDIDO del dibujo. */
   private readonly placed = { n: 0, min: Infinity, max: 0, sum: 0 };
   /** Rocas y minerales puestos en voxeles, para el humo. Acumulado. */
   rocks = 0;
+  /** Menas puestas, con sus cristales, y las que se liberaron al descartar su chunk. Acumulado. */
+  ores = 0;
+  oresReleased = 0;
 
   constructor() {
     for (const feature of Object.values(Feature)) {
       if (typeof feature !== 'number' || feature === Feature.None) continue;
       if (isRock(feature)) {
+        // Las menas se hacen una a una, cada una con lo suyo (`spawn`).
+        const stone = STONES[feature];
+        if (!stone) continue;
         // Su piedra, con la luz de cada cara horneada en los vertices.
-        const stone = STONES[feature]!;
         this.rockMaterials.set(feature, new MeshBasicMaterial({ map: pixelTexture(artCanvas(stone), true), vertexColors: true }));
         continue;
       }
@@ -505,6 +516,18 @@ export class BillboardSet {
     const tx = Math.floor(wx);
     const ty = Math.floor(wy);
     const turn = hash2DFloat(seed, tx, ty);
+    // Una mena: su propia malla y su propia textura, que se liberan con su
+    // chunk (`release`). Una llamada de dibujo, como la roca.
+    if (ORE_TONES[feature]) {
+      const ore = oreModel(feature, seed, tx, ty, Math.min(3, Math.floor(turn * 4)));
+      const material = new MeshBasicMaterial({ map: pixelTexture(artCanvas(ore.art), true), vertexColors: true, alphaTest: 0.4 });
+      const mesh = new Mesh(upload(ore.mesh), material);
+      mesh.position.set(wx, height, wy);
+      mesh.userData.ore = true;
+      this.rocks++;
+      this.ores++;
+      return mesh;
+    }
     const rock = this.rockMaterials.get(feature);
     if (rock) {
       const mesh = new Mesh(this.rockShapes[Math.min(3, Math.floor(turn * 4))]!, rock);
@@ -529,6 +552,20 @@ export class BillboardSet {
     mesh.position.set(wx, height, wy);
     mesh.rotation.y = turn * (Math.PI / 2);
     return mesh;
+  }
+
+  /**
+   * Libera lo que es solo de ese objeto, al descartar su chunk: la malla y la
+   * textura de una mena. Lo demas (las aspas, la roca) se comparte entre todas
+   * sus instancias y sigue en uso.
+   */
+  release(prop: Object3D): void {
+    if (!prop.userData.ore) return;
+    const mesh = prop as Mesh<BufferGeometry, MeshBasicMaterial>;
+    mesh.geometry.dispose();
+    mesh.material.map?.dispose();
+    mesh.material.dispose();
+    this.oresReleased++;
   }
 
   /** Cuanto mide de ancho lo que se apoya en un tile, para su sombra. La roca ocupa su casilla. */

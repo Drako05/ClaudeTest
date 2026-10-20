@@ -1823,7 +1823,10 @@ export const SAPLINGS: Readonly<Partial<Record<Feature, WorldArt>>> = {
   },
 };
 
-/** La piedra de la roca y la de los tres minerales, con sus vetas: teselas que casan consigo mismas. */
+/**
+ * La piedra de la roca: una tesela que casa consigo misma. Los minerales la
+ * llevan debajo de sus vetas y sus cristales (`ore-mesh.ts`).
+ */
 export const STONES: Readonly<Partial<Record<Feature, WorldArt>>> = {
   // Roca
   [Feature.RockNode]: {
@@ -1854,96 +1857,6 @@ export const STONES: Readonly<Partial<Record<Feature, WorldArt>>> = {
       'bbaaaaaaaabbbbbbaaaaaaaa',
     ],
     palette: {"a":"#9f9fa7","b":"#84848e","c":"#67676f","d":"#4f4f55"},
-  },
-  // Carbon
-  [Feature.CoalNode]: {
-    rows: [
-      'bbbbbcccbbbbbbbbcccijcbb',
-      'bbbbbbcbbbbbbbbbcccjcjbb',
-      'ijbbbbbbbbbbbbbbccccjkcb',
-      'jbjbbbbbbbbcccbbbbcccccb',
-      'cjkbbbabbbbccccbijbbbccc',
-      'cccijaaabbccccccjbbbbbcc',
-      'cccbjjaabbccccccbjkbbbcc',
-      'cccbjkaabbbcccccbbbbbbcc',
-      'dbbbbbbbbbbbbbbbbbbbbbbb',
-      'ddbbbbbbbbbbbbbbbbbbbbab',
-      'dbbbbbcbbbaaaaabbbbbbbbd',
-      'aaabbcccbbaaaaaaabbbaaaa',
-      'aaabbcccbbaaaaaaabbbiaaa',
-      'aabbbcccbbaaaaaaabbbaaja',
-      'bbbbbcccbbaaaaaaabbbaakb',
-      'bbbbbccbbaaaaaaaabbbbbbb',
-      'ccbbcccbbaaaaaaaaaaabbbb',
-      'cccccccbbaadaaaaaaaabbbc',
-      'cccccccbbaadaaaaaaaabbbc',
-      'cccccccijaadaaaaaaaabbbb',
-      'bbcccccjjbaddaaaaaaabbbb',
-      'bbccccccjkbbbdbbbbbbbdbb',
-      'bbbcccccbbbbbbdbbbabddbb',
-      'bbbbbcccbbbbbbbbbccddbbb',
-    ],
-    palette: {"a":"#9f9fa7","b":"#84848e","c":"#67676f","d":"#4f4f55","i":"#55555f","j":"#3d3d45","k":"#2b2b31"},
-  },
-  // Hierro
-  [Feature.IronNode]: {
-    rows: [
-      'akbbccccccccbibbaaaaaaaa',
-      'aabbcccccccbbjjjaaaaaaaa',
-      'aabbccccbbbbcbjkbbbbbbaa',
-      'bbbbbbbbbbbcccbbbbbbbbbb',
-      'bbbbbbbbbbcccccibccccbbb',
-      'bbbbbbbbbbcccccjjjcccccb',
-      'ccbbbbbbbcccccccjkcccccc',
-      'bbbbbbbbbcccccccccccccbb',
-      'bbbbbbbbbbbccccccccccbbb',
-      'abbbbbbbbbbbbbbbccccbbbb',
-      'aabbbbbbbbbbbbbbccccbbba',
-      'aabbbcccbbbaaabbbccccbba',
-      'aaabbcccbbbaaaabbccccbba',
-      'aaabbcccbbbaaabbbccccbba',
-      'bbbbbcccbabbbbbabcijbbbb',
-      'bbabbbcbbbijbbdbdbjjbbbb',
-      'bbaabbbbbbajjddbdddjkbbb',
-      'aaaabbbbaaajkabbbdbadiba',
-      'aaabbbbaaaaaaabbbbbbdjjj',
-      'aabbbbbbaaaaaabbbbbbbdjk',
-      'dabbbbbbbbbbbbbbaaaaaaad',
-      'aabbccccbbbbbbbaaaaaaaad',
-      'aabbcccccbbbbbbbaaaaaaai',
-      'jjbbcccccccbbbbbaaaaaaaj',
-    ],
-    palette: {"a":"#9f9fa7","b":"#84848e","c":"#67676f","d":"#4f4f55","i":"#c2a28e","j":"#9c7d6c","k":"#6e584e"},
-  },
-  // Cobre
-  [Feature.CopperNode]: {
-    rows: [
-      'jkbbbccccbbbaaabbbbbbbbb',
-      'aabbbccccbbbaaabbbbbbbba',
-      'aaabbccccbbaaaabbbbbbbaa',
-      'aaabbbccbbbaaaaabbbbbbaa',
-      'aaabbbbbbbbaaaaabbbbbbaa',
-      'aabbbbbbbbaaaaabbaaabbaa',
-      'aabbbbbbbaaaaabbbaaabbaa',
-      'abbbbbbbbbddaabbbaaabbba',
-      'bbbbbbbijbbdabbbbaaabbbb',
-      'bbbbbbbjjjbbbbbbbaaabbbb',
-      'bbbcbbbbjkdbbbbbbaaabbbb',
-      'cccbbccccccdcccbbaaabbbb',
-      'ijcbbcccccccdccbbaaaabbc',
-      'jjcbcccccccccdcbbaaaabbc',
-      'cjkcccccccccccbbbaaaabbc',
-      'cccccccccbbbijbbbaaadbbc',
-      'cccccccccbbbijjijdddbbbc',
-      'cccccccccbbbjjjjjjdabbbc',
-      'cccbcccccbbbbjkajkaabbbc',
-      'cccbcccccbbbbbbbaaaabbbc',
-      'bbbbcccccbbbbbbbbbbbbbbb',
-      'bbbbccccbbbaaabbbbbbbbbb',
-      'jbbbccccbbbaaaabbbbbbbbi',
-      'jjbbbccccbbbaaabbbbbbbbj',
-    ],
-    palette: {"a":"#9f9fa7","b":"#84848e","c":"#67676f","d":"#4f4f55","i":"#d19a5c","j":"#a5643a","k":"#6b4326"},
   },
 };
 
