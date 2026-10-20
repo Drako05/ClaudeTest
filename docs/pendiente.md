@@ -81,6 +81,207 @@ el 47 a D1 (cada campo de cada entrada).
 
 ---
 
+## Tanda en curso: las menas al juego (decidida el 2026-10-20)
+
+**En el juego desde el 2026-10-20, esperando el juicio del autor sobre la
+captura.** Lo hecho:
+- `ore-mesh.ts`, nuevo;
+- `ORE_TONES` en `palette.ts`;
+- `STONES` lleva solo la roca;
+- el dibujo de cada mena y su liberacion en `billboards.ts` y `main.ts`;
+- la hoja `?mundo=1`;
+- `tests/ore-mesh.test.ts` y el humo de `resources`.
+
+Lo que se decidio por deduccion esta en `docs/juicio.md`, y el modelo en
+`docs/arte.md`, «Las menas». Medido: unos 560 vertices y 1 ms por mena.
+Falta la auditoria al cerrar.
+
+Lleva al juego el boceto de abajo («Boceto: los minerales
+como piedra con cristales»). El autor contesto cuatro preguntas:
+
+1. **Colores: directo al juego.** El cobre y el carbon, con los del boceto. El
+   hierro no esta en el boceto: lleva los que proponga el agente (*deduccion*),
+   y el autor los corrige luego sobre el juego.
+2. **Piedra: la de la roca del juego** (`STONES[Feature.RockNode]`,
+   `ROCK_BASE #84848e`), con las vetas y los cristales del mineral encima. No
+   la gris verdosa del boceto.
+3. **Variedad**, la maxima: «Me gustaria la opcion de maxima variedad. Usando
+   parametros deterministas que le den una forma segun la coordenada donde se
+   ubique cada bloque, ¿aun seguiria siendo considerable el incremento de uso
+   de memoria y gpu?». La respuesta es **no**. Las cuentas, del codigo:
+   - Los minerales son el 10 % de la piedra de montaña (`HIGHLAND_ROCK` 0,045 ×
+     `MINERAL_SHARE`): el 0,45 % de sus casillas. Se mallan 7 × 7 chunks de 32
+     (`RADIUS = 3` en `main.ts`), unas 50.000 casillas. Aunque todo fuera
+     montaña, serian **unas 225 menas como mucho**.
+   - **Llamadas de dibujo: las mismas.** Ya hay un `Mesh` por objeto
+     (`billboards.ts`, `spawn`) y miles de arboles. Una mena unica sigue siendo
+     una llamada si la piedra y los cristales comparten material: `alphaTest`,
+     y los cristales en quads por las dos caras.
+   - **Memoria: poca.** La forma de juego (`ROCK_SHAPE`, 7 voxeles: 4 tapas y 16
+     caras de lado) lleva unos 28 cristales de corona y 32 de costado.
+     - Geometria: unos 1.000 vertices, unos 40 KB por mena; en el peor caso,
+       unos 9 MB.
+     - Una textura de 64 × 64 por mena: 16 KB; unos 3,6 MB.
+   - **Lo que si cuesta**:
+     - **CPU al cargar un chunk**: pintar y mallar sus menas. Se mide en la
+       tanda, no se supone.
+     - **Liberar al descartar**: hoy las geometrias de la roca son compartidas
+       y no se liberan. Con una por mena hay que hacer `dispose` de su
+       geometria y su textura al descartar el chunk, o la memoria crece sin
+       parar.
+4. **Vecinos: solo dentro de la formacion.** Se quitan los cristales de las
+   caras que tocan otro voxel de la misma mena. Hacia fuera de la casilla
+   salen siempre, aunque haya otra mena o una pared de terreno pegada.
+
+**El plan**, propuesto por el agente y aprobado por el autor como plan:
+
+- **`packages/client/src/ore-mesh.ts`, nuevo y puro** (como `rock-mesh.ts`):
+  - Recibe la mena, la semilla y la casilla. Devuelve arrays planos: los
+    voxeles de piedra de `rockMesh` (reutilizado, con su giro por casilla) y
+    los quads de los cristales.
+  - Porta del boceto (`docs/bocetos/minerales/index.html`) las dos reglas
+    aprobadas: `voxelCrown`, la de la corona, y `voxelSide`, la de los
+    costados.
+  - Porta tambien el quitar cristales de las caras tocadas, como hace
+    `buildScene`.
+  - `ROCK_SHAPE` no tiene voladizo, asi que no hay flor de abajo.
+  - Azar: `mulberry32` sembrado con `hash2D` de la casilla (regla 2). La misma
+    casilla se ve igual al volver.
+- **La textura de cada mena**:
+  - La tesela de la roca del juego, con las vetas y el nodulo pintados encima
+    (`stoneFace` del boceto, sobre esa piedra), y los sprites de sus cristales,
+    todo en un lienzo de 64 × 64 (`pixelTexture`/`artCanvas` de
+    `world-sprites.ts`).
+  - Un solo `MeshBasicMaterial`, con `vertexColors` (la luz por cara, como
+    hoy) y `alphaTest` 0,4.
+- **`billboards.ts`, `spawn`**: `CoalNode`, `IronNode` y `CopperNode` usan
+  `ore-mesh`. La roca normal no cambia. Hay que mirar antes como se descarta
+  hoy un chunk, para liberar lo de cada mena.
+- **Escombros**: `debrisPalette` (`palette.ts`) da a los de una mena el color
+  de su mineral.
+- ***Deduccion*, a juicio del autor**:
+  - La caja de choque sigue de 0,9 × 1,0: los cristales son de dibujo y no se
+    golpean.
+  - La sombra sigue de ancho 1.
+  - Los colores del hierro, de la familia de su icono (`ITEM_PALETTE`).
+- **Tests (`tests/ore-mesh.test.ts`)**:
+  - La misma casilla da la misma malla, y dos casillas, mallas distintas.
+  - Ningun cristal sale de una cara tocada por otro voxel de la mena.
+  - Cristales de 0,25 como mucho.
+  - La corona pone lo que pide y no se pisa mas del 40 %.
+  - Los costados, a 30-56° con arco de 0-20°, y sin tocarse.
+  - Todo cabe en la textura.
+  - Y el humo de `resources` (`rocks` cuenta tambien las menas).
+- **Lo de siempre**:
+  - Las mutaciones y `tools/a-pruebas.sh`, y despues `main`.
+  - Una captura que decida.
+  - La documentacion: `docs/arte.md`, `docs/juicio.md`, y `retirados.md` si
+    se retiran las `STONES` de las menas.
+  - La auditoria al cerrar.
+  - Medir lo que cuesta mallar un chunk con menas
+    (`tests/performance.test.ts` mide el tick, no el mallado).
+
+## Boceto: los minerales como piedra con cristales (2026-10-20)
+
+El autor, con una referencia (un cubo de roca con cristales de amatista que
+brotan de el; el repo no la guarda): quiere que **el voxel de un mineral sea de
+piedra con vetas del color del mineral, y que de el salgan cristales del
+mineral en laminas cruzadas, como los arboles**, con texturas de 24 × 24.
+Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
+
+**Donde quedo (cierre de sesion, 2026-10-20, `7fc6529`, CI en verde).**
+- **Aprobadas por el autor**: el bloque de 1, la regla de los costados y la
+  de la corona.
+- **Mandada sin respuesta**: la hoja de voxeles juntos (`escenas-cobre.png`).
+- **Por confirmar**: los colores de la piedra y de cada mineral.
+- **Nada en el juego.**
+- **Para comprobar que un cambio no altera lo aprobado**: se vuelve a correr
+  `render.mjs` y `git status` no debe marcar ningun PNG salvo los que se
+  quieren cambiar. Las fotos son deterministas.
+
+- **El boceto**: `docs/bocetos/minerales/` (`index.html`, que genera sus
+  propias texturas, nuevas, y `render.mjs`, que saca las fotos:
+  `node docs/bocetos/minerales/render.mjs`).
+- **El bloque de 1 × 1 × 1** (`cobre-1.png`, `carbon-1.png`): «Están de lujo»
+  (el autor). Hay que conservarlo tal cual: el script reproduce esas fotos
+  pixel a pixel.
+- **El voxel de 0,5** (`?s=0.5`; `cobre-05.png`, `carbon-05.png`), que pidio
+  despues: caras de 12 × 12 y cristales de **0,25 como mucho** (6 pixeles).
+  El autor: los de los lados «están tan juntos que parecen uno solo»; ahora
+  los dos de cada cara van sueltos, separados de un quinto a dos tercios de la
+  cara segun la cara (*deduccion*), y cada uno a su altura. Despues, el
+  autor: que varien «entre 45 y 90 grados con respecto a la cara», en un arco
+  con la punta «hacia adentro o hacia afuera del bloque», y que su distancia y
+  posicion varien «pero nunca lleguen a solaparse sus bases». Leido asi
+  (*por confirmar*): la punta, hacia el centro de la cara o hacia su borde,
+  con hasta 45 grados de desvio; entre dos pies, sus dos medias bases y un
+  margen de 0,08 de la cara (`voxelSide`). Solo en el voxel: el bloque
+  aprobado no cambia. Luego, el autor: **el angulo con la cara, de 45 a 75
+  grados; el arco dentro-fuera, de 0 a 30**, y «resortea» (el voxel lleva su
+  propia semilla). Algunos quedaban mirando al suelo (el arco va en el plano
+  de la cara, que es vertical); el autor eligio que **ninguno apunte hacia
+  abajo**: si cae, se refleja hacia arriba. Resorteado otra vez. Luego el
+  autor: que **en general miren hacia arriba, pero no todos por igual**, con
+  el angulo de la primera vez de tope (salian de 38 a 56 grados sobre la
+  horizontal) y unos grados para bajar; el arco, igual o mas acotado. Hoy: **de
+  30 a 56 grados sobre la horizontal** (los 26 de margen, *deduccion*) y **el
+  arco en horizontal, de 0 a 20** grados hacia el centro o el borde de la cara
+  (*deduccion*). El autor: «perfecto, así me gustan, guarda esa regla para
+  los costados».
+- **La regla de los costados, APROBADA** (2026-10-20), para cada cara de lado
+  de un voxel de mineral: dos cristales de 3-4 x 4-5 pixeles; **de 30 a 56
+  grados sobre la horizontal**; la punta en un **arco horizontal de 0 a 20
+  grados**, hacia el centro de la cara o hacia su borde; posicion y distancia
+  al azar, **sin que sus bases se toquen nunca** (entre sus pies, sus dos
+  medias bases y 0,08 de la cara). Esta en `voxelSide`, en el boceto.
+- **La regla de la corona, APROBADA** (2026-10-20: «Bien, ahora me
+  convenciste. guarda esa regla para la corona»), para la cara de arriba de
+  un voxel de mineral, y la misma flor colgando de la de abajo. Esta en
+  `voxelCrown(face)`, en el boceto. Las ocho reglas las propuse yo y el autor
+  las aplico todas («aplica todas, con los brotes sueltos»); los numeros son
+  *mios* y quedan aprobados con la regla:
+  1. De 5 a 7 cristales.
+  2. Uno en el centro, el mas alto y grueso (5 x 6 pixeles), de 0 a 10
+     grados desde la vertical.
+  3. Los demas, petalos en un anillo a 0,20-0,35 del lado, repartidos por
+     igual con ±15 grados, de 3 a 5 pixeles de alto.
+  4. Abiertos hacia fuera de 15 a 40 grados.
+  5. Torcidos de lado hasta ±10 grados.
+  6. El centro de la flor, hasta 0,12 del lado fuera del de la cara.
+  7. **Cada cristal, un pixel menos de ancho que de alto, nunca menos de
+     3**; y sus bases **se pueden pisar hasta un 40 %** de sus dos medias
+     bases juntas, nunca mas. Es el grosor y la apretura de la primera
+     corona, que el autor preferia: «permite que se solapen hasta un limite
+     si es necesario con tal de recuperar ese aspecto original sin el riesgo
+     de que queden amontonados por la variedad». La primera se pisaba hasta
+     un 31 %; el 40 % lo fije yo.
+  8. De 0 a 2 brotes sueltos de 3 x 3, cerca del borde (0,36-0,44).
+  - **Y abajo, otra flor igual** («agrega una segunda tirada en la cara de
+    abajo»): yo lo lei como otra flor colgando de la cara de abajo, y el
+    autor la vio y aprobo la regla. En el boceto, el voxel flota a 0,3 del
+    suelo, y hay una vista desde abajo para verla.
+  - **Nada se descarta sin decirlo**: cada sorteo cuenta lo que pidio y lo que
+    puso, y cuanto se pisan (en el titulo, `data-corona` y `data-abajo`). La
+    leccion viene de la primera hoja de coronas. Con bases que no podian
+    tocarse, ningun petalo cabia en el anillo y se saltaban sin avisar. El
+    autor: «literalmente la flor ya no esta».
+- Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
+  cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
+  donde, su forma (prisma en punta con su cara de luz y su brillo).
+- **Voxeles juntos** (2026-10-20). El autor pidio cobre de 0,5 «posados en
+  el suelo», cada uno con «una generacion distinta», solo la vista noreste.
+  La regla: **eliminar los cristales de las caras donde se toquen los
+  bloques**. El suelo cuenta como vecino, asi que la flor de abajo solo sale
+  en un voxel que tenga hueco debajo. Las seis formaciones estan en
+  `?escena=1..6` (`SCENES`): 2 y 3 en fila, 2 x 2, 3 x 3, 2 x 2 x 2, y una
+  base de 2 x 2 con uno encima. La hoja es `escenas-cobre.png`. Cada voxel
+  tiene su sorteo y sus vetas (`buildScene`). Al hacerlo aparecio un fallo
+  latente de las vetas: una veta que nace en el borde de la cara puede durar
+  menos de 4 pixeles, y su nodulo leia antes del principio. Ya esta acotado,
+  y los dibujos de antes no cambian.
+- **Aun no es codigo del juego**: llevarlo al juego es una tanda que pide el
+  autor.
+
 ## Pendiente del autor: las paredes de 2+ voxeles
 
 **Las paredes de 2+ voxeles**, que el

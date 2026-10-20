@@ -189,3 +189,8 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `shadeStepAt|SHADE_STEPS|franja de brillo|TerrainColor` — el suelo de un color por casilla con ±10 % de brillo; desde el 2026-10-19, teselas en pixelart con 3-4 variantes por casilla (`terrainVariant`), sin el brillo (el autor). Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
 - `const PX = 32` — las caras de las estaciones a 32 pixeles por bloque; desde el 2026-10-19, 24 (`STATION_ART`). Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
 - `suelta sus tres caras|ROCK_FACES|STATION_FACES|form: '(conifer|broadleaf|bush)'` — las tres caras de la roca y de las estaciones y la silueta de cada especie en `palette.ts`, de cuando el dibujo vectorial los pintaba; desde el 2026-10-19 la paleta guarda solo los colores de partida del generador (`ROCK_BASE`, `STATION_BASE`, `LOOKS` con `trunk`, `mid` y `fruit`). Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
+
+## Las menas al juego (2026-10-20)
+
+- `MINERAL_FACES` — los tres tonos de las vetas de cada mineral, que el generador pintaba sobre una tesela fija por mineral; desde el 2026-10-20 cada mena se pinta en el juego, una por casilla, con sus vetas y sus cristales (`ore-mesh.ts`), y sus colores estan en `ORE_TONES`. Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `STONES\[Feature\.(CoalNode|IronNode|CopperNode)\]` — la piedra fija de cada mineral en `world-art.ts`; desde el 2026-10-20 `STONES` lleva solo la roca, y los minerales la usan debajo de sus vetas. Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.

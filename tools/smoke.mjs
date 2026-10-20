@@ -1679,6 +1679,11 @@ async function resourcesPass(browser, baseUrl) {
     // En la montana, las rocas y los minerales son voxeles (el autor,
     // 2026-10-19), no aspas: alguno se ha puesto.
     check(mined.rocksDrawn > 0, 'en la montana no se puso ni una roca de voxeles');
+    // Y las menas, cada una con su malla y sus cristales (el autor, 2026-10-20):
+    // al sacar el mineral su chunk se rehace, y la que se fue se libera.
+    console.log(`  menas: puestas ${mined.oresDrawn}, liberadas ${mined.oresReleased}`);
+    check(mined.oresDrawn > 0, 'en la montana no se puso ni una mena con sus cristales');
+    if (!iron) check(mined.oresReleased > 0, 'se saco el mineral y su chunk no libero ninguna mena');
     if (iron) check(ores(mined) === 0, 'el hierro salio con el pico de piedra');
     else check(ores(mined) > 0, `con pico no se saco ningun mineral: ${JSON.stringify(mined.inventory)}`);
     check(iron || (mined.slots[pickNow]?.wear ?? 40) < 40, 'el pico no se desgasto al minar');

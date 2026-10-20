@@ -226,6 +226,10 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | La punta engrosada de la picea negra: **tres pisos cortos que cierran en punta** desde el 62 % de la copa | Arboles con forma de su especie | `conifer` en `tools/pixel-mundo.ts` |
 | Los arboles raros **pierden su +15 %**: ahora son especie propia | Arboles con forma de su especie | un numero |
 | Desde arriba, un bosque denso con copas grandes **tapa mas al jugador** | Arboles altos | es el cabo de la camara que ya estaba pendiente |
+| Menas: **los colores del hierro** (`#e6cab6`, `#c2a28e`, `#9c7d6c`, `#6e584e` y el brillo `#fff3e8`): los tonos de sus vetas de antes con una luz encima, sin acento. El autor: «el que propongas» | `docs/arte.md`, «Las menas» | `ORE_TONES` en `palette.ts` |
+| Menas: **la caja de choque no sigue a los cristales** (0,9 × 1,0, como la roca): son de dibujo y no se golpean | `docs/arte.md`, «Las menas» | `sim/boxes.ts` |
+| Menas: **los cristales no llevan la luz de las caras**: brillan igual por todos lados, como en el boceto | `docs/arte.md`, «Las menas» | `geometry` en `ore-mesh.ts` |
+| Menas: **la piedra lleva dos vetas y un nodulo por cada cuarto de su tesela**, la densidad del boceto por cara de voxel | `docs/arte.md`, «Las menas» | `veins` en `ore-mesh.ts` |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
 al encadenarlos, pulsados en pleno vuelo. La causa esta localizada y el plan

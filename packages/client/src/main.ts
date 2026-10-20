@@ -683,9 +683,12 @@ function dispose(key: string, view: ChunkView): void {
   // El material del suelo es uno para todos los chunks: no se libera.
   view.mesh.geometry.dispose();
   // Los aspas comparten geometria y material con las demas de su especie, asi
-  // que se quitan de la escena pero NO se liberan: siguen en uso. Las sombras
-  // si, que son propias del chunk.
-  for (const prop of view.props) scene.remove(prop);
+  // que se quitan de la escena pero NO se liberan: siguen en uso. Las menas si,
+  // que cada una lleva lo suyo (`release`); y las sombras, que son del chunk.
+  for (const prop of view.props) {
+    scene.remove(prop);
+    billboards.release(prop);
+  }
   if (view.shadows) {
     scene.remove(view.shadows);
     view.shadows.geometry.dispose();
@@ -1299,6 +1302,9 @@ Object.defineProperty(window, '__verdant', {
       chipsDrawn: effectsView.chipsDrawn,
       /** Rocas y minerales puestos en voxeles (`billboards.ts`), acumulado. */
       rocksDrawn: billboards.rocks,
+      /** Menas puestas con sus cristales, y las liberadas al descartar su chunk (`billboards.ts`), acumulado. */
+      oresDrawn: billboards.ores,
+      oresReleased: billboards.oresReleased,
       /** Impactos trazados, acumulado de fotogramas. Ver `EffectsView`. */
       impactsDrawn: effectsView.impactsDrawn,
       effects: effects.tally,

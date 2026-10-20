@@ -1,0 +1,538 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #1b2130; font: 600 15px ui-monospace, monospace; color: #e8eef7; }
+  #out { display: grid; grid-template-columns: repeat(2, 480px); gap: 8px; padding: 12px; width: max-content; }
+  figure { margin: 0; }
+  figcaption { padding: 4px 2px 0; }
+  h1 { font-size: 18px; margin: 12px 12px 0; }
+  .tex { display: flex; gap: 10px; padding: 0 12px 12px; align-items: flex-end; }
+  .tex canvas { image-rendering: pixelated; background: #2a3142; }
+</style>
+<script type="importmap">{ "imports": { "three": "/three.module.js" } }</script>
+</head>
+<body>
+<h1 id="title"></h1>
+<div id="out"></div>
+<div class="tex" id="tex"></div>
+<script type="module">
+import * as THREE from 'three';
+
+const PX = 24; // pixeles de arte por bloque
+const params = new URLSearchParams(location.search);
+const mineral = params.get('m') ?? 'cobre';
+// El lado del bloque, en bloques: 1 (caras de 24 x 24) o 0,5, un voxel (12 x 12).
+const S = Number(params.get('s') ?? 1);
+const N = Math.round(PX * S);
+const small = S < 1;
+
+// ---------------------------------------------------------------- azar
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function noise(r, size, cell) {
+  const n = size / cell;
+  const lat = Array.from({ length: n * n }, () => r());
+  const at = (i, j) => lat[(((j % n) + n) % n) * n + (((i % n) + n) % n)];
+  const s = (t) => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const fx = x / cell, fy = y / cell, i = Math.floor(fx), j = Math.floor(fy);
+    const u = s(fx - i), v = s(fy - j);
+    const a = at(i, j) + (at(i + 1, j) - at(i, j)) * u;
+    const b = at(i, j + 1) + (at(i + 1, j + 1) - at(i, j + 1)) * u;
+    return a + (b - a) * v;
+  };
+}
+
+// ---------------------------------------------------------------- materiales
+const STONE = ['#7d837b', '#5f645d', '#464a44', '#30332f']; // luz, base, sombra, hondo
+const MINERALS = {
+  cobre: {
+    name: 'Cobre',
+    tones: ['#ffd29c', '#ee9248', '#b95c2b', '#7a3519'], // luz, base, sombra, hondo
+    shine: '#fff1dc',
+    accent: '#4fae8f', // cardenillo, en las vetas
+  },
+  carbon: {
+    name: 'Carbon',
+    tones: ['#8b93a6', '#454953', '#2a2c33', '#15161a'],
+    shine: '#d7e0f0',
+    accent: null,
+  },
+};
+const M = MINERALS[mineral];
+
+// ---------------------------------------------------------------- la piedra con vetas
+function stoneFace(seed) {
+  const r = rng(seed);
+  const n1 = noise(r, N, 6), n2 = noise(r, N, 3);
+  const g = Array.from({ length: N }, () => Array(N).fill(1));
+  const vals = [];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) vals.push(n1(x, y) * 0.75 + n2(x, y) * 0.25);
+  const sorted = [...vals].sort((a, b) => a - b);
+  const lo = sorted[Math.floor(vals.length * 0.25)], hi = sorted[Math.floor(vals.length * 0.8)];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const v = vals[y * N + x];
+    g[y][x] = v >= hi ? 0 : v < lo ? 2 : 1;
+  }
+  // Grietas de la piedra: cortas, hondas, con su canto de luz.
+  for (let k = 0; k < (small ? 1 : 2); k++) {
+    let x = Math.floor(r() * N), y = Math.floor(r() * N);
+    for (let s = 0; s < (small ? 2 : 4) + r() * (small ? 2 : 4); s++) {
+      if (y > 0 && x > 0) g[y - 1][x - 1] = 0;
+      g[y][x] = 3;
+      x = Math.min(N - 1, x + (r() < 0.6 ? 1 : 0));
+      y = Math.max(0, Math.min(N - 1, y + (r() < 0.5 ? 1 : r() < 0.5 ? -1 : 0)));
+    }
+  }
+  // Las vetas del mineral: caminos que cruzan la cara, de 1-2 pixeles, con
+  // brillo arriba y sombra abajo; alguna se abre en un nodulo.
+  const veins = [];
+  for (let k = 0; k < (small ? 2 : 3); k++) {
+    let x = r() < 0.5 ? 0 : Math.floor(r() * N), y = Math.floor(r() * N);
+    let dy = r() < 0.5 ? 1 : -1;
+    const len = small ? 5 + Math.floor(r() * 6) : 10 + Math.floor(r() * 14);
+    for (let s = 0; s < len && x < N; s++) {
+      veins.push([x, y, 'b']);
+      if (r() < 0.35) veins.push([x, y + 1, 'c']);
+      if (r() < 0.25) veins.push([x, y - 1, 'a']);
+      x += r() < 0.75 ? 1 : 0;
+      if (r() < 0.4) y += dy;
+      if (r() < 0.15) dy = -dy;
+      y = Math.max(1, Math.min(N - 2, y));
+    }
+    // Un nodulo de 3 x 3 (en el voxel, uno solo por cara).
+    if (small && k > 0) continue;
+    // Una de las cuatro ultimas pisadas (o la primera, si la veta salio corta del borde).
+    const [nx, ny] = veins[Math.max(0, veins.length - 1 - Math.floor(r() * 4))];
+    for (const [dx, ddy, t] of [[0, 0, 'b'], [1, 0, 'c'], [0, 1, 'c'], [1, 1, 'd'], [-1, 0, 'a'], [0, -1, 'a']]) veins.push([nx + dx, ny + ddy, t]);
+  }
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const ctx = c.getContext('2d');
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { ctx.fillStyle = STONE[g[y][x]]; ctx.fillRect(x, y, 1, 1); }
+  for (const [x, y, t] of veins) {
+    if (x < 0 || y < 0 || x >= N || y >= N) continue;
+    let color = M.tones['abcd'.indexOf(t)];
+    if (M.accent && t === 'c' && r() < 0.4) color = M.accent;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  return c;
+}
+
+// ---------------------------------------------------------------- un cristal
+// Un prisma en punta visto de lado: tres caras (luz a la izquierda, base, sombra
+// a la derecha), la punta con su arista, un brillo y el pie que se hunde en la
+// piedra. `w` de ancho, `h` de alto, en pixeles de arte.
+function crystal(w, h, seed) {
+  const r = rng(seed);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  const tip = Math.max(3, Math.round(w * 0.7));
+  const cx = w / 2;
+  const put = (x, y, col) => { if (x >= 0 && x < w && y >= 0 && y < h) { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); } };
+  const [L, B, S, D] = M.tones;
+  for (let y = 0; y < h; y++) {
+    const hw = y < tip ? Math.max(0.5, ((y + 1) / tip) * (w / 2)) : w / 2;
+    const left = Math.round(cx - hw), right = Math.round(cx + hw);
+    for (let x = left; x < right; x++) {
+      const rel = (x + 0.5 - (cx - hw)) / (2 * hw);
+      let col = rel < 0.32 ? L : rel < 0.62 ? B : rel < 0.86 ? S : D;
+      // En la punta, la cara de la luz cae en diagonal: arista hasta el centro.
+      if (y < tip && x + 0.5 > cx + (tip - y) * 0.15) col = rel < 0.62 ? B : rel < 0.86 ? S : D;
+      put(x, y, col);
+    }
+  }
+  // La arista entre la punta y el cuerpo, en sombra a la derecha.
+  for (let x = Math.round(cx); x < w; x++) put(x, tip, S);
+  // Un brillo largo en la cara de la luz y un destello en la punta.
+  const sx = Math.max(0, Math.round(cx - w * 0.28));
+  for (let y = tip + 1; y < h - 3; y++) if (r() < 0.8) put(sx, y, M.shine);
+  put(Math.round(cx) - 1, Math.max(0, Math.round(tip * 0.35)), M.shine);
+  // Una franja interior mas honda, para que se lea como cristal y no como lapiz.
+  const fx = Math.round(cx + w * 0.1);
+  for (let y = tip + 2; y < h - 2; y += 1) if (r() < 0.5) put(fx, y, S);
+  return c;
+}
+
+// ---------------------------------------------------------------- texturas
+function tex(canvas) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.magFilter = THREE.NearestFilter;
+  t.minFilter = THREE.NearestFilter;
+  t.generateMipmaps = false;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// ---------------------------------------------------------------- la escena
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#9fb9d4');
+
+// `?escena=1..6` pone varios voxeles juntos, apoyados en el suelo (`SCENES`);
+// sin ella, uno solo.
+const escena = Number(params.get('escena') ?? 0);
+
+// El suelo, una losa de hierba lisa de 3 x 3 para apoyar el bloque (de 9 x 9
+// en una escena).
+const ground = new THREE.Mesh(new THREE.PlaneGeometry((escena ? 9 : 3) * S, (escena ? 9 : 3) * S), new THREE.MeshBasicMaterial({ color: '#6d9152' }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// El bloque: S x S x S, una cara de N x N por lado, con la luz de cada cara
+// horneada como en el juego (arriba 1, oeste y norte 0,95, este y sur 0,74).
+// `veins` sortea otras vetas (cada voxel de una escena, las suyas).
+const LIGHT = [0.74, 0.95, 1, 0.5, 0.74, 0.95]; // +x, -x, +y, -y, +z, -z
+function stoneBlock(veins) {
+  const faces = [];
+  for (let i = 0; i < 6; i++) {
+    const canvas = stoneFace(0x51 + i * 97 + (mineral === 'carbon' ? 7 : 0) + veins);
+    const m = new THREE.MeshBasicMaterial({ map: tex(canvas) });
+    m.color.setScalar(LIGHT[i]);
+    faces.push({ canvas, m });
+  }
+  const block = new THREE.Mesh(new THREE.BoxGeometry(S, S, S), faces.map((f) => f.m));
+  block.position.y = S / 2;
+  return { block, faces };
+}
+// El voxel suelto flota un poco sobre el suelo, para que se vea la flor de su
+// cara de abajo; el bloque aprobado y las escenas, apoyados.
+const LIFT = small && !escena ? 0.3 : 0;
+// El grupo del voxel que se esta haciendo: sus cristales van dentro.
+let rock = new THREE.Group();
+let faces = [];
+if (!escena) {
+  const one = stoneBlock(0);
+  faces = one.faces;
+  rock.position.y = LIFT;
+  rock.add(one.block);
+  scene.add(rock);
+}
+
+// Los cristales: laminas cruzadas, como los arboles, que salen de las caras.
+const crystalMats = [];
+function addCrystal(base, axis, w, h, seed, spin) {
+  const canvas = crystal(w, h, seed);
+  crystalMats.push(canvas);
+  const mat = new THREE.MeshBasicMaterial({ map: tex(canvas), alphaTest: 0.5, side: THREE.DoubleSide });
+  const W = w / PX, H = h / PX;
+  const geo = new THREE.PlaneGeometry(W, H);
+  geo.translate(0, H / 2, 0);
+  const g = new THREE.Group();
+  const a = new THREE.Mesh(geo, mat);
+  const b = new THREE.Mesh(geo, mat);
+  b.rotation.y = Math.PI / 2;
+  g.add(a, b);
+  const dir = axis.clone().normalize();
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+  g.rotateY(spin);
+  // El pie, hundido un poco en la piedra.
+  g.position.copy(base).addScaledVector(dir, -0.06 * S);
+  rock.add(g);
+}
+
+// El voxel, con su propia semilla (resorteado a peticion del autor,
+// 2026-10-20); el bloque aprobado, con la suya de siempre.
+// `?semilla=` sortea otro voxel, para ver la variedad (la hoja de coronas).
+const seedOf = (semilla) => (mineral === 'carbon' ? 0xc0a1 : 0xc0b0) + (small ? 0x3a7 : 0) + semilla * 0x101;
+let r = rng(seedOf(Number(params.get('semilla') ?? 0)));
+const jitter = (k) => (r() - 0.5) * k;
+const UP = new THREE.Vector3(0, 1, 0);
+/** Un eje que se inclina `tilt` desde la vertical, hacia el rumbo `heading`. */
+const leaning = (tilt, heading) => new THREE.Vector3(Math.sin(tilt) * Math.cos(heading), Math.cos(tilt), Math.sin(tilt) * Math.sin(heading));
+const DEG = Math.PI / 180;
+
+/**
+ * La corona del voxel: una flor. **La regla de la corona, aprobada por el
+ * autor el 2026-10-20** («Bien, ahora me convenciste. guarda esa regla para
+ * la corona»). Las reglas las propuso el agente, igual que los numeros, y el
+ * autor las aplico todas («aplica todas, con los brotes sueltos»).
+ * 1. De 5 a 7 cristales.
+ * 2. Uno en el centro, el mas alto y el mas grueso (5 x 6 pixeles), casi de
+ *    pie: de 0 a 10 grados desde la vertical.
+ * 3. Los demas, petalos en un anillo a 0,20-0,35 del lado del centro,
+ *    repartidos por igual alrededor con ±15 grados de desorden, y mas bajos
+ *    (3 a 5 pixeles).
+ * 4. Cada petalo se abre hacia fuera de 15 a 40 grados desde la vertical.
+ * 5. Y se tuerce de lado hasta ±10 grados.
+ * 6. El centro de la flor se aparta del de la cara hasta 0,12 del lado.
+ * 7. Las bases se pueden solapar, con un tope (abajo).
+ * 8. De 0 a 2 brotes sueltos de 3 pixeles, cerca del borde, fuera del anillo.
+ *
+ * **El grosor y el solape, los de la primera corona** (el autor, 2026-10-20:
+ * «me gustaba mas tu primera corona... permite que se solapen hasta un limite
+ * si es necesario con tal de recuperar ese aspecto original sin el riesgo de
+ * que queden amontonados»). Aquella tenia el centro de 5 x 6 y los petalos de
+ * 4 x 5, 3 x 4 y 3 x 3: **un pixel menos de ancho que de alto, y nunca menos
+ * de 3**. Y sus bases se pisaban hasta un 31 % de lo que miden sus dos medias
+ * bases juntas; el tope, el 40 % (*deduccion*): deja sitio a la variedad sin
+ * que dos petalos se monten. Lo que no cabe se cuenta (`crowns`) y la hoja lo
+ * dice: la primera vez se saltaban sin avisar («literalmente la flor ya no
+ * esta»).
+ *
+ * `face` es +1 para la cara de arriba y -1 para la de abajo (el autor: «agrega
+ * una segunda tirada en la cara de abajo»): la misma flor, colgando.
+ */
+const OVERLAP = 0.4;
+const crowns = {};
+function voxelCrown(face) {
+  const report = (crowns[face] = { wanted: 0, placed: 0, overlap: 0 });
+  const placed = []; // [x, z, media base], en fraccion del lado
+  // Lo que se pisa con el mas pisado (0 si no toca a ninguno), o null si pasa del tope.
+  const press = (x, z, half) => {
+    if (Math.abs(x) > 0.44 || Math.abs(z) > 0.44) return null;
+    let worst = 0;
+    for (const [px, pz, ph] of placed) {
+      const o = 1 - Math.hypot(x - px, z - pz) / (ph + half);
+      if (o > OVERLAP) return null;
+      worst = Math.max(worst, o);
+    }
+    return worst;
+  };
+  const put = (x, z, w, h, axis, seed, o) => {
+    report.placed++;
+    report.overlap = Math.max(report.overlap, o);
+    placed.push([x, z, w / 2 / N]);
+    axis.y *= face;
+    addCrystal(new THREE.Vector3(x * S, face > 0 ? S : 0, z * S), axis, w, h, seed, r() * Math.PI);
+  };
+  const seed0 = face > 0 ? 100 : 300;
+  const count = 5 + Math.floor(r() * 3);
+  report.wanted = count;
+  const off = r() * 0.12;
+  const offAt = r() * 2 * Math.PI;
+  const cx = Math.cos(offAt) * off;
+  const cz = Math.sin(offAt) * off;
+  put(cx, cz, 5, 6, leaning(r() * 10 * DEG, r() * 2 * Math.PI), seed0, 0);
+  const petals = count - 1;
+  const start = r() * 2 * Math.PI;
+  for (let i = 0; i < petals; i++) {
+    const h = 3 + Math.floor(r() * 3);
+    const w = Math.max(3, h - 1);
+    for (let t = 0; t < 60; t++) {
+      const at = start + (i * 2 * Math.PI) / petals + (r() - 0.5) * 30 * DEG;
+      const rho = 0.2 + r() * 0.15;
+      const x = cx + Math.cos(at) * rho;
+      const z = cz + Math.sin(at) * rho;
+      const o = press(x, z, w / 2 / N);
+      if (o === null) continue;
+      const open = (15 + r() * 25) * DEG;
+      const twist = (r() - 0.5) * 20 * DEG;
+      put(x, z, w, h, leaning(open, at + twist), seed0 + 10 + i, o);
+      break;
+    }
+  }
+  const buds = Math.floor(r() * 3);
+  report.wanted += buds;
+  for (let i = 0; i < buds; i++) {
+    for (let t = 0; t < 40; t++) {
+      // Cerca del borde: una de las cuatro orillas, entre 0,36 y 0,44 del centro.
+      const edge = Math.floor(r() * 4);
+      const along = (r() - 0.5) * 0.8;
+      const out = 0.36 + r() * 0.08;
+      const [x, z] = [[out, along], [-out, along], [along, out], [along, -out]][edge];
+      const o = press(x, z, 3 / 2 / N);
+      if (o === null) continue;
+      put(x, z, 3, 3, leaning((25 + r() * 25) * DEG, Math.atan2(z, x)), seed0 + 30 + i, o);
+      break;
+    }
+  }
+}
+
+// Arriba: un racimo apretado, los grandes en el centro y abiertos hacia fuera.
+// [x, z en fraccion del lado, ancho, alto en pixeles]. En el voxel, una flor
+// sorteada arriba y otra abajo (`voxelCrown`).
+if (escena) {
+  // Las escenas, mas abajo (`buildScene`).
+} else if (small) {
+  voxelCrown(1);
+  voxelCrown(-1);
+} else {
+  const top = [[0.02, 0.0, 12, 18], [-0.2, 0.12, 10, 15], [0.2, -0.12, 10, 15], [0.16, 0.24, 8, 11], [-0.22, -0.2, 8, 12], [0.33, 0.06, 6, 8], [-0.34, 0.02, 6, 9], [0.0, -0.32, 6, 8], [-0.04, 0.33, 6, 9]];
+  top.forEach(([x, z, w, h], i) => {
+    const axis = new THREE.Vector3(x * 1.6 + jitter(0.25), 1, z * 1.6 + jitter(0.25));
+    addCrystal(new THREE.Vector3((x + jitter(0.05)) * S, S, (z + jitter(0.05)) * S), axis, w, h, 100 + i, r() * Math.PI);
+  });
+}
+// Los lados: racimos pequenos pegados a la piedra, que brotan hacia fuera y
+// hacia arriba. En el voxel, dos sueltos por cara (`voxelSide`).
+const sides = [
+  [new THREE.Vector3(1, 0, 0), (u, v) => new THREE.Vector3(0.5 * S, v * S, u * S)],
+  [new THREE.Vector3(-1, 0, 0), (u, v) => new THREE.Vector3(-0.5 * S, v * S, u * S)],
+  [new THREE.Vector3(0, 0, 1), (u, v) => new THREE.Vector3(u * S, v * S, 0.5 * S)],
+  [new THREE.Vector3(0, 0, -1), (u, v) => new THREE.Vector3(u * S, v * S, -0.5 * S)],
+];
+/**
+ * Los dos cristales de una cara del voxel: **la regla de los costados**,
+ * aprobada por el autor el 2026-10-20 («perfecto, así me gustan, guarda esa
+ * regla para los costados»). **En general hacia arriba, pero no todos por
+ * igual**. Por encima de la horizontal, de 30 a
+ * 56 grados: 56 era lo mas alto que salian la primera vez (de 38 a 56), y el
+ * autor lo quiso de tope, con unos grados para bajar (los 26 son *deduccion*).
+ * Con la punta en un arco horizontal, hacia el centro de la cara o hacia su
+ * borde, de 0 a 20 grados (acotado desde 30). Y a una
+ * distancia del otro que varia, **sin que sus bases se toquen nunca**: entre
+ * sus pies queda al menos lo que miden sus dos medias bases mas un margen.
+ */
+const sideReport = { overlaps: 0 };
+function voxelSide(n, at, k) {
+  const center = at(0, 0.5);
+  const placed = []; // [u, v, media base], en fraccion de la cara
+  [[4, 5], [3, 4]].forEach(([w, h], i) => {
+    const half = w / 2 / N;
+    // El primer sitio que cumple; si ninguno de los 80 cumple, el mas
+    // separado, y queda contado (`sideReport`): nunca se solapa en silencio.
+    const room = (u, v) => Math.min(Infinity, ...placed.map(([pu, pv, ph]) => Math.hypot(u - pu, v - pv) - ph - half - 0.08));
+    let best = null;
+    for (let t = 0; t < 80; t++) {
+      const cand = [-0.38 + r() * 0.76, 0.18 + r() * 0.64];
+      const slack = room(...cand);
+      if (!best || slack > best.slack) best = { u: cand[0], v: cand[1], slack };
+      if (slack >= 0) break;
+    }
+    const { u, v } = best;
+    if (best.slack < 0) sideReport.overlaps++;
+    placed.push([u, v, half]);
+    const base = at(u, v);
+    // El arco, en horizontal: hacia el centro de la cara (-u) o hacia su borde.
+    const along = at(1, 0.5).sub(at(0, 0.5)).normalize(); // +u, en el mundo
+    const toCenter = -Math.sign(u) || 1;
+    const arc = (r() < 0.5 ? toCenter : -toCenter) * r() * (20 * Math.PI / 180);
+    const out = n.clone().multiplyScalar(Math.cos(arc)).add(along.multiplyScalar(Math.sin(arc)));
+    // Y hacia arriba: de 30 a 56 grados sobre la horizontal.
+    const rise = (30 + r() * 26) * (Math.PI / 180);
+    const axis = out.multiplyScalar(Math.cos(rise)).add(UP.clone().multiplyScalar(Math.sin(rise)));
+    addCrystal(base, axis, w, h, 200 + k * 10 + i, r() * Math.PI);
+  });
+}
+
+if (!escena) sides.forEach(([n, at], k) => {
+  if (small) return voxelSide(n, at, k);
+  for (let c = 0; c < 2; c++) {
+    const u0 = (c === 0 ? -0.2 : 0.22) + jitter(0.15);
+    const v0 = 0.25 + r() * 0.55;
+    const count = 2 + Math.floor(r() * 2);
+    for (let i = 0; i < count; i++) {
+      const lateral = new THREE.Vector3(n.z, 0, -n.x).multiplyScalar(jitter(0.8));
+      const axis = n.clone().multiplyScalar(0.8).add(UP.clone().multiplyScalar(0.7 + r() * 0.5)).add(lateral);
+      const big = i === 0;
+      // En este orden los sorteos: la posicion antes que el tamano, como en el
+      // bloque que aprobo el autor (cambiarlo cambia todo el dibujo).
+      const base = at(u0 + jitter(0.14), v0 + jitter(0.1));
+      const [w, h] = big ? [8, 11] : [6, 7 + Math.floor(r() * 3)];
+      addCrystal(base, axis, w, h, 200 + k * 10 + c * 4 + i, r() * Math.PI);
+    }
+  }
+});
+
+// ---------------------------------------------------------------- las escenas
+/**
+ * Varios voxeles juntos, en [x, alto, z] de la rejilla (el autor, 2026-10-20):
+ * cada uno con su propio sorteo, **y sin cristales en las caras que tocan a
+ * otro voxel o al suelo**.
+ */
+const SCENES = {
+  1: ['2 bloques en fila', [[0, 0, 0], [1, 0, 0]]],
+  2: ['3 bloques en fila', [[0, 0, 0], [1, 0, 0], [2, 0, 0]]],
+  3: ['un 2 x 2', [[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1]]],
+  4: ['un 3 x 3', [0, 1, 2].flatMap((x) => [0, 1, 2].map((z) => [x, 0, z]))],
+  5: ['un 2 x 2 x 2', [0, 1].flatMap((y) => [[0, y, 0], [1, y, 0], [0, y, 1], [1, y, 1]])],
+  6: ['base de 2 x 2 y uno encima', [[0, 0, 0], [1, 0, 0], [0, 0, 1], [1, 0, 1], [0, 1, 0]]],
+};
+const placedCrowns = [];
+function buildScene(which) {
+  const cells = SCENES[which][1];
+  const has = (x, y, z) => y < 0 || cells.some((c) => c[0] === x && c[1] === y && c[2] === z);
+  // La formacion, centrada en el origen.
+  const mid = [0, 2].map((a) => (Math.min(...cells.map((c) => c[a])) + Math.max(...cells.map((c) => c[a]))) / 2);
+  cells.forEach(([x, y, z], i) => {
+    const semilla = which * 100 + i + 1;
+    r = rng(seedOf(semilla));
+    rock = new THREE.Group();
+    rock.position.set((x - mid[0]) * S, y * S, (z - mid[1]) * S);
+    const { block, faces: f } = stoneBlock(semilla * 1013);
+    faces = f;
+    rock.add(block);
+    scene.add(rock);
+    // El suelo cuenta como vecino: la cara de abajo de la fila del suelo no lleva flor.
+    if (!has(x, y + 1, z)) { voxelCrown(1); placedCrowns.push(crowns[1]); }
+    if (!has(x, y - 1, z)) { voxelCrown(-1); placedCrowns.push(crowns[-1]); }
+    const next = [[1, 0], [-1, 0], [0, 1], [0, -1]]; // el orden de `sides`
+    sides.forEach(([n, at], k) => {
+      if (!has(x + next[k][0], y, z + next[k][1])) voxelSide(n, at, k);
+    });
+  });
+}
+if (escena) buildScene(escena);
+
+// ---------------------------------------------------------------- las vistas
+const renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+renderer.setSize(480, 480);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+const views = [
+  ['Desde el suroeste: caras oeste y sur', -1, 1, 0.45],
+  ['Desde el noreste: caras norte y este', 1, -1, 0.45],
+  ['Desde el noroeste, mas bajo', -1, -1, 0.15],
+  ['Desde arriba', 0.6, 0.8, 1.6],
+];
+// El voxel lleva flor tambien abajo: se mira desde debajo del suelo (el suelo
+// solo se ve por arriba).
+if (small && !escena) views.push(['Desde abajo', -0.6, -0.8, -1.6]);
+const out = document.getElementById('out');
+document.getElementById('title').textContent = `${M.name}: ${small ? `voxel de ${S}` : 'bloque'}, piedra veteada (${N} x ${N} por cara) y cristales en laminas cruzadas`;
+// Lo que se pidio y lo que se puso, para que nada falte sin que se vea.
+if (escena) {
+  const sum = (k) => placedCrowns.reduce((a, c) => a + c[k], 0);
+  const worst = Math.max(...placedCrowns.map((c) => c.overlap));
+  document.body.dataset.corona = `${sum('placed')} de ${sum('wanted')} (se pisan hasta un ${Math.round(worst * 100)} %)`;
+  document.body.dataset.solapes = String(sideReport.overlaps);
+  document.getElementById('title').textContent = `${M.name}, voxeles de ${S}: ${SCENES[escena][0]} · coronas: ${document.body.dataset.corona} · solapes en los lados: ${sideReport.overlaps}`;
+} else if (small) {
+  const crown = (c) => `${c.placed} de ${c.wanted} (se pisan hasta un ${Math.round(c.overlap * 100)} %)`;
+  document.body.dataset.corona = crown(crowns[1]);
+  document.body.dataset.abajo = crown(crowns[-1]);
+  document.body.dataset.solapes = String(sideReport.overlaps);
+  document.getElementById('title').textContent += ` · arriba: ${crown(crowns[1])} · abajo: ${crown(crowns[-1])} · solapes en los lados: ${sideReport.overlaps}`;
+}
+const only = params.get('vistas')?.split(',').map(Number);
+// Una escena se mira desde mas lejos segun lo que mide, y a su media altura.
+const cells = escena ? SCENES[escena][1] : [[0, 0, 0]];
+const span = Math.max(...[0, 1, 2].map((a) => Math.max(...cells.map((c) => c[a])) - Math.min(...cells.map((c) => c[a])) + 1));
+const lift = (Math.max(...cells.map((c) => c[1])) + 1) / 2 - 0.5;
+for (const [label, x, z, y] of views.filter((_, i) => !only || only.includes(i))) {
+  const d = 4.6 * S * (escena ? 0.55 + 0.45 * span : 1);
+  const len = Math.hypot(x, z, y);
+  camera.position.set((x / len) * d, LIFT + lift * S + 0.55 * S + (y / len) * d, (z / len) * d);
+  camera.lookAt(0, small ? LIFT + lift * S + 0.5 * S : 0.65 * S, 0);
+  renderer.render(scene, camera);
+  const img = document.createElement('img');
+  img.src = renderer.domElement.toDataURL();
+  const fig = document.createElement('figure');
+  const cap = document.createElement('figcaption');
+  cap.textContent = label;
+  fig.append(img, cap);
+  out.appendChild(fig);
+}
+// Las texturas sueltas, ampliadas: una cara de piedra y unos cristales.
+const texDiv = document.getElementById('tex');
+const show = (canvas, k) => { const c = document.createElement('canvas'); c.width = canvas.width * k; c.height = canvas.height * k; const x = c.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(canvas, 0, 0, c.width, c.height); texDiv.appendChild(c); };
+const k = small ? 12 : 6;
+show(faces[0].canvas, k);
+show(faces[4].canvas, k);
+for (const c of crystalMats.slice(0, 3)) show(c, k);
+document.body.dataset.ready = '1';
+</script>
+</body>
+</html>

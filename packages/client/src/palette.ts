@@ -83,19 +83,29 @@ export const LOOKS: Partial<Record<Feature, SpeciesLook>> = {
   },
 };
 
+/** Los colores de un mineral: los de sus vetas y sus cristales. */
+export interface OreTones {
+  /** Luz, base, sombra y hondo. */
+  readonly tones: readonly [string, string, string, string];
+  /** El brillo del cristal. */
+  readonly shine: string;
+  /** Un tono que salpica las vetas (el cardenillo del cobre), o ninguno. */
+  readonly accent: string | null;
+}
+
 /**
- * Los tres tonos de las vetas de cada mineral, de oscuro a claro. Desde el
- * pixelart (2026-10-19) un mineral es la piedra de la roca con sus vetas
- * encima (`stone` en `tools/pixel-mundo.ts`): se leen como vetas del mismo
- * material y no como objetos ajenos.
+ * Los colores de cada mineral (el autor, 2026-10-20: «directo al juego»). Una
+ * mena es la piedra de la roca con vetas del mineral y cristales que brotan de
+ * ella (`ore-mesh.ts`, el boceto de `docs/bocetos/minerales/`). El cobre y el
+ * carbon son los del boceto; el hierro no estaba en el boceto y es *deduccion*: los
+ * tonos de antes de sus vetas, con una luz encima, mas claros que la roca (el
+ * autor, 2026-10-17: «has la piedra un poco más oscura y el hierro un poco más
+ * claro»).
  */
-export const MINERAL_FACES: Partial<Record<Feature, readonly string[]>> = {
-  [Feature.CoalNode]: ['#2b2b31', '#3d3d45', '#55555f'],
-  // Mas claro que la roca, para no confundirse con ella (el autor,
-  // 2026-10-17: «has la piedra un poco más oscura y el hierro un poco más
-  // claro», en los iconos y en el mundo).
-  [Feature.IronNode]: ['#6e584e', '#9c7d6c', '#c2a28e'],
-  [Feature.CopperNode]: ['#6b4326', '#a5643a', '#d19a5c'],
+export const ORE_TONES: Partial<Record<Feature, OreTones>> = {
+  [Feature.CoalNode]: { tones: ['#8b93a6', '#454953', '#2a2c33', '#15161a'], shine: '#d7e0f0', accent: null },
+  [Feature.IronNode]: { tones: ['#e6cab6', '#c2a28e', '#9c7d6c', '#6e584e'], shine: '#fff3e8', accent: null },
+  [Feature.CopperNode]: { tones: ['#ffd29c', '#ee9248', '#b95c2b', '#7a3519'], shine: '#fff1dc', accent: '#4fae8f' },
 };
 
 /**
@@ -126,11 +136,16 @@ function colorsOf(...arts: readonly WorldArt[]): number[] {
  * Colores que sueltan los escombros de una feature al ser derribada: **los de
  * su dibujo** (`world-art.ts`), todos. En un arbol saltan la copa y la corteza;
  * en una mata, tambien sus frutos, que son los rojos y amarillos que dan
- * variedad al estallido; en un mineral, su piedra y sus vetas. Los brotes no
- * se recolectan y no sueltan nada.
+ * variedad al estallido; en un mineral, la piedra de la roca y los colores
+ * de sus vetas y sus cristales. Los brotes no se recolectan y no sueltan nada.
  */
 export function debrisPalette(feature: Feature): number[] {
   if (feature === Feature.Pebbles) return colorsOf(PEBBLES);
+  const ore = ORE_TONES[feature];
+  if (ore) {
+    const own = [...ore.tones, ore.shine, ...(ore.accent ? [ore.accent] : [])].map((c) => Number.parseInt(c.slice(1), 16));
+    return [...new Set([...colorsOf(STONES[Feature.RockNode]!), ...own])];
+  }
   const art = STONES[feature] ?? CROWNS[feature] ?? BUSHES[feature];
   if (art) return colorsOf(art);
   const station = STATION_ART[feature];

@@ -44,6 +44,31 @@ del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
   sea un cubo) con la piedra de su tesela, girados un cuarto de vuelta por
   casilla y con la luz de cada cara horneada como las estaciones. Ocupan su
   casilla (1 × 1 × 1); su caja de choque sigue en 0,9 × 1,0.
+- **Las menas** (el autor, 2026-10-20; el boceto en `docs/bocetos/minerales/`)
+  son esa misma roca, con **vetas del mineral y cristales que brotan de ella**
+  en laminas cruzadas, como los arboles (`ore-mesh.ts`).
+  - **Una distinta por casilla**. El autor: «me gustaria la opcion de maxima
+    variedad». La forma, el sitio, el angulo y el tamaño de cada cristal, y el
+    recorrido de cada veta, salen de la casilla y la semilla (regla 2).
+  - **Cada mena lleva su propia malla y su propia textura**: la tesela de la
+    roca con sus vetas, y al lado los dibujos de sus cristales, en 64 de
+    ancho. Una llamada de dibujo por mena, como la roca. Al descartar su
+    chunk se liberan (`BillboardSet.release`).
+  - **Las reglas son las del boceto, aprobadas**:
+    - la de la corona en cada tapa, una flor de 5 a 7 cristales que se pisan
+      hasta un 40 %;
+    - la de los costados en cada cara de lado: dos cristales, de 30 a 56
+      grados hacia arriba;
+    - y **ningun cristal donde se tocan dos voxeles de la mena**, «solo dentro
+      de la formacion»: hacia fuera de la casilla salen siempre.
+  - Los cristales no llevan la luz de las caras. Miden 0,25 como mucho, asi
+    que la mena se ve hasta 1,25 de alto. Su caja de choque no cambia
+    (*deduccion*).
+  - **Los colores**, en `ORE_TONES` (`palette.ts`): el cobre y el carbon, los
+    del boceto; el hierro, *deduccion*. Los escombros llevan la piedra y su
+    mineral.
+  - **Lo que cuesta**: unos 560 vertices y 1 ms por mena al mallar su chunk.
+    Hay unas 225 menas como mucho a la vez, aunque todo fuera montaña.
 - **Los arboles** son su copa (`CROWNS`, fija) sobre el tronco desnudo de
   cada uno, que tiene trece largos y su grosor y por eso **se pinta al vuelo**
   (`treeArt` en `world-sprites.ts`, con `barkTrunk`). La copa se apoya donde

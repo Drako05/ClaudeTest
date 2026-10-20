@@ -20,7 +20,7 @@
 import { writeFileSync } from 'node:fs';
 import { Feature, Terrain } from '@verdant/shared';
 import { mulberry32, TREE_TRUNKS } from '@verdant/sim';
-import { LOOKS, MINERAL_FACES, ROCK_BASE, STATION_BASE, TERRAIN_RGB } from '../packages/client/src/palette.js';
+import { LOOKS, ROCK_BASE, STATION_BASE, TERRAIN_RGB } from '../packages/client/src/palette.js';
 import {
   blank,
   foliage,
@@ -444,21 +444,13 @@ function sapling(seed: number, leaf: string[], bark: string[], kind: 'conifer' |
 
 // ------------------------------------------------------------------ piedra
 
-/** La piedra de la roca de voxeles; un mineral, con sus vetas encima. */
-function stone(seed: number, tones: string[], ore: string[] | null): Art {
-  const g = stoneGrid(seed);
-  if (ore) {
-    const rng = mulberry32(seed ^ 0x0e);
-    for (let k = 0; k < 6; k++) {
-      const x = Math.floor(rng() * PX);
-      const y = Math.floor(rng() * PX);
-      const cells = [[0, 0], [1, 0], [0, 1], [1, 1], [2, 1], [1, 2]].filter(() => rng() < 0.75);
-      for (const [dx, dy] of cells) g[wrap(y + dy!)]![wrap(x + dx!)] = 'j';
-      g[wrap(y)]![wrap(x)] = 'i';
-      g[wrap(y + 2)]![wrap(x + 2)] = 'k';
-    }
-  }
-  return { grid: g, palette: pal(['abcd', tones], ['ijk', ore ?? []]) };
+/**
+ * La piedra de la roca de voxeles. Los minerales la usan tambien, con sus vetas
+ * y sus cristales encima, pero esos se pintan en el juego, una mena distinta por
+ * casilla (`ore-mesh.ts`).
+ */
+function stone(seed: number, tones: string[]): Art {
+  return { grid: stoneGrid(seed), palette: pal(['abcd', tones]) };
 }
 
 /** Los guijarros, vistos desde arriba: tres piedras redondeadas, con la luz arriba a la izquierda. */
@@ -706,14 +698,9 @@ const saplings: [Feature, string, Art][] = (
   ] as const
 ).map(([f, name, adult, kind], i) => [f, name, sapling(0x5b0 + i, leafOf(adult), kind === 'conifer' ? barkOf(adult) : OAK_BARK, kind)]);
 
-/** La piedra de la roca y los minerales: la del suelo de roca, que se ve en el mundo. */
+/** La piedra de la roca, y la de los minerales: la del suelo de roca, que se ve en el mundo. */
 const STONE_TONES = groundTones(hexToRgb(ROCK_BASE));
-const stones: [Feature, string, Art][] = [
-  [Feature.RockNode, 'Roca', stone(0x5a1, STONE_TONES, null)],
-  [Feature.CoalNode, 'Carbon', stone(0x5a2, STONE_TONES, [...MINERAL_FACES[Feature.CoalNode]!].reverse())],
-  [Feature.IronNode, 'Hierro', stone(0x5a3, STONE_TONES, [...MINERAL_FACES[Feature.IronNode]!].reverse())],
-  [Feature.CopperNode, 'Cobre', stone(0x5a4, STONE_TONES, [...MINERAL_FACES[Feature.CopperNode]!].reverse())],
-];
+const stones: [Feature, string, Art][] = [[Feature.RockNode, 'Roca', stone(0x5a1, STONE_TONES)]];
 
 const bench = workbench();
 const oven = furnace();
@@ -780,7 +767,10 @@ export const SAPLINGS: Readonly<Partial<Record<Feature, WorldArt>>> = {
 ${byFeature(saplings)}
 };
 
-/** La piedra de la roca y la de los tres minerales, con sus vetas: teselas que casan consigo mismas. */
+/**
+ * La piedra de la roca: una tesela que casa consigo misma. Los minerales la
+ * llevan debajo de sus vetas y sus cristales (\`ore-mesh.ts\`).
+ */
 export const STONES: Readonly<Partial<Record<Feature, WorldArt>>> = {
 ${byFeature(stones)}
 };
