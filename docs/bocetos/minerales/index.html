@@ -221,7 +221,9 @@ function addCrystal(base, axis, w, h, seed, spin) {
   scene.add(g);
 }
 
-const r = rng(mineral === 'carbon' ? 0xc0a1 : 0xc0b0);
+// El voxel, con su propia semilla (resorteado a peticion del autor,
+// 2026-10-20); el bloque aprobado, con la suya de siempre.
+const r = rng((mineral === 'carbon' ? 0xc0a1 : 0xc0b0) + (small ? 0x2f1 : 0));
 const jitter = (k) => (r() - 0.5) * k;
 const UP = new THREE.Vector3(0, 1, 0);
 // Arriba: un racimo apretado, los grandes en el centro y abiertos hacia fuera.
@@ -244,8 +246,8 @@ const sides = [
 ];
 /**
  * Los dos cristales de una cara del voxel (el autor, 2026-10-20): cada uno
- * entre 45 y 90 grados con la cara, con la punta en un arco que la lleva hacia
- * el centro de la cara o hacia su borde (hasta 45 grados a cada lado), y a una
+ * entre 45 y 75 grados con la cara, con la punta en un arco que la lleva hacia
+ * el centro de la cara o hacia su borde (de 0 a 30 grados a cada lado), y a una
  * distancia del otro que varia, **sin que sus bases se toquen nunca**: entre
  * sus pies queda al menos lo que miden sus dos medias bases mas un margen.
  */
@@ -266,8 +268,8 @@ function voxelSide(n, at, k) {
     // El arco: del centro de la cara hacia fuera, o al reves, con su desvio.
     let radial = base.clone().sub(center);
     if (radial.length() < 1e-3) radial = new THREE.Vector3(n.z, 0, -n.x);
-    radial.normalize().multiplyScalar(r() < 0.5 ? -1 : 1).applyAxisAngle(n, (r() - 0.5) * (Math.PI / 2));
-    const tilt = Math.PI / 4 + r() * (Math.PI / 4); // con la cara: de 45 a 90 grados
+    radial.normalize().multiplyScalar(r() < 0.5 ? -1 : 1).applyAxisAngle(n, (r() - 0.5) * (Math.PI / 3));
+    const tilt = Math.PI / 4 + r() * (Math.PI / 6); // con la cara: de 45 a 75 grados
     const axis = n.clone().multiplyScalar(Math.sin(tilt)).add(radial.multiplyScalar(Math.cos(tilt)));
     addCrystal(base, axis, w, h, 200 + k * 10 + i, r() * Math.PI);
   });

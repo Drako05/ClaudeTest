@@ -106,7 +106,9 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   (*por confirmar*): la punta, hacia el centro de la cara o hacia su borde,
   con hasta 45 grados de desvio; entre dos pies, sus dos medias bases y un
   margen de 0,08 de la cara (`voxelSide`). Solo en el voxel: el bloque
-  aprobado no cambia. **Esperando al autor.**
+  aprobado no cambia. Luego, el autor: **el angulo con la cara, de 45 a 75
+  grados; el arco dentro-fuera, de 0 a 30**, y «resortea» (el voxel lleva su
+  propia semilla). **Esperando al autor.**
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).
