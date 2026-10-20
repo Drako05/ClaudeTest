@@ -110,8 +110,13 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   grados; el arco dentro-fuera, de 0 a 30**, y «resortea» (el voxel lleva su
   propia semilla). Algunos quedaban mirando al suelo (el arco va en el plano
   de la cara, que es vertical); el autor eligio que **ninguno apunte hacia
-  abajo**: si cae, se refleja hacia arriba. Resorteado otra vez. **Esperando
-  al autor.**
+  abajo**: si cae, se refleja hacia arriba. Resorteado otra vez. Luego el
+  autor: que **en general miren hacia arriba, pero no todos por igual**, con
+  el angulo de la primera vez de tope (salian de 38 a 56 grados sobre la
+  horizontal) y unos grados para bajar; el arco, igual o mas acotado. Hoy: **de
+  30 a 56 grados sobre la horizontal** (los 26 de margen, *deduccion*) y **el
+  arco en horizontal, de 0 a 20** grados hacia el centro o el borde de la cara
+  (*deduccion*). **Esperando al autor.**
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).

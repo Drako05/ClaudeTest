@@ -245,9 +245,12 @@ const sides = [
   [new THREE.Vector3(0, 0, -1), (u, v) => new THREE.Vector3(u * S, v * S, -0.5 * S)],
 ];
 /**
- * Los dos cristales de una cara del voxel (el autor, 2026-10-20): cada uno
- * entre 45 y 75 grados con la cara, con la punta en un arco que la lleva hacia
- * el centro de la cara o hacia su borde (de 0 a 30 grados a cada lado), y a una
+ * Los dos cristales de una cara del voxel (el autor, 2026-10-20): **en general
+ * hacia arriba, pero no todos por igual**. Por encima de la horizontal, de 30 a
+ * 56 grados: 56 era lo mas alto que salian la primera vez (de 38 a 56), y el
+ * autor lo quiso de tope, con unos grados para bajar (los 26 son *deduccion*).
+ * Con la punta en un arco horizontal, hacia el centro de la cara o hacia su
+ * borde, de 0 a 20 grados (acotado desde 30). Y a una
  * distancia del otro que varia, **sin que sus bases se toquen nunca**: entre
  * sus pies queda al menos lo que miden sus dos medias bases mas un margen.
  */
@@ -265,16 +268,14 @@ function voxelSide(n, at, k) {
     }
     placed.push([u, v, half]);
     const base = at(u, v);
-    // El arco: del centro de la cara hacia fuera, o al reves, con su desvio.
-    let radial = base.clone().sub(center);
-    if (radial.length() < 1e-3) radial = new THREE.Vector3(n.z, 0, -n.x);
-    radial.normalize().multiplyScalar(r() < 0.5 ? -1 : 1).applyAxisAngle(n, (r() - 0.5) * (Math.PI / 3));
-    const tilt = Math.PI / 4 + r() * (Math.PI / 6); // con la cara: de 45 a 75 grados
-    const axis = n.clone().multiplyScalar(Math.sin(tilt)).add(radial.multiplyScalar(Math.cos(tilt)));
-    // Ninguno cuelga hacia el suelo (el autor, 2026-10-20, opcion 1): si la
-    // inclinacion cae hacia abajo, se refleja hacia arriba. La cara es
-    // vertical, asi que el angulo con ella y el arco siguen siendo los mismos.
-    if (axis.y < 0) axis.y = -axis.y;
+    // El arco, en horizontal: hacia el centro de la cara (-u) o hacia su borde.
+    const along = at(1, 0.5).sub(at(0, 0.5)).normalize(); // +u, en el mundo
+    const toCenter = -Math.sign(u) || 1;
+    const arc = (r() < 0.5 ? toCenter : -toCenter) * r() * (20 * Math.PI / 180);
+    const out = n.clone().multiplyScalar(Math.cos(arc)).add(along.multiplyScalar(Math.sin(arc)));
+    // Y hacia arriba: de 30 a 56 grados sobre la horizontal.
+    const rise = (30 + r() * 26) * (Math.PI / 180);
+    const axis = out.multiplyScalar(Math.cos(rise)).add(UP.clone().multiplyScalar(Math.sin(rise)));
     addCrystal(base, axis, w, h, 200 + k * 10 + i, r() * Math.PI);
   });
 }
