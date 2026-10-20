@@ -2000,6 +2000,12 @@ async function stationsPass(browser, baseUrl) {
   // la mesa cabian sin barra; las barras no van apretadas contra lo de al lado;
   // los titulos, mas grandes. Desde las palas (2026-10-20) son seis: no caben,
   // y la lista se desliza con su barra.
+  // La barra se pone al dia en el siguiente fotograma del navegador
+  // (`scroll-rail-view.ts`): en la CI se midio antes. Se espera, con tope.
+  await page.waitForFunction(() => {
+    const rail = document.getElementById('recipeList').parentElement.querySelector('.rail');
+    return getComputedStyle(rail).visibility === 'visible';
+  }, null, { timeout: 3000 }).catch(() => {});
   const layoutPc = await page.evaluate(() => {
     const r = (el) => el.getBoundingClientRect().toJSON();
     const list = document.getElementById('recipeList');
