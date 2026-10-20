@@ -107,23 +107,38 @@ export function oreModel(
 ): OreModel {
   const ore = ORE_TONES[feature];
   if (!ore) throw new Error(`${Feature[feature]} no es un mineral`);
-  const r = mulberry32(hash2D(seed ^ 0x0e5ca1, tx, ty));
   const has = (x: number, y: number, z: number) => voxels.some(([a, b, c]) => a === x && b === y && c === z) || covered(x, y, z);
+  /**
+   * El azar de una cara de un voxel: de la semilla, el voxel en el mundo y la
+   * cara, y de nada mas (el autor, 2026-10-20: los cristales, «ligados a su
+   * posicion en el mundo»). Asi romper un voxel no cambia los de los demas.
+   */
+  const faceRng = ([e, s, z]: Voxel, face: number) =>
+    mulberry32(hash2D(seed ^ 0x0e5ca1 ^ Math.imul((z + 64) * 8 + face, 0x9e3779b1), tx * 2 + e, ty * 2 + s));
 
   const crystals: Crystal[] = [];
+  /** La semilla del dibujo de cada cristal, de su cara. */
+  const paints: number[] = [];
   const crowns: { wanted: number; placed: number; overlap: number }[] = [];
   let sideOverlaps = 0;
+  /** Lo que pone una cara, con su azar; y despues, el de los dibujos de lo que puso. */
+  const onFace = (voxel: Voxel, face: number, put: (r: () => number) => void) => {
+    const r = faceRng(voxel, face);
+    const from = crystals.length;
+    put(r);
+    for (let i = from; i < crystals.length; i++) paints.push(r());
+  };
 
   for (const voxel of voxels) {
     const [e, s, z] = voxel;
     // El centro de la cara de arriba, en three.js (x al este, y arriba, z al sur).
     const cx = (e + 0.5) * V - 0.5;
     const cz = (s + 0.5) * V - 0.5;
-    if (!has(e, s, z + 1)) crowns.push(crown(r, voxel, [cx, (z + 1) * V, cz], crystals));
+    if (!has(e, s, z + 1)) onFace(voxel, 0, (r) => crowns.push(crown(r, voxel, [cx, (z + 1) * V, cz], crystals)));
     // Y abajo, si se cavo debajo: «la misma flor colgando de la de abajo».
-    if (!has(e, s, z - 1)) crowns.push(crown(r, voxel, [cx, z * V, cz], crystals, true));
-    for (const [d, n] of SIDES) {
-      if (has(e + d[0], s + d[1], z + d[2])) continue;
+    if (!has(e, s, z - 1)) onFace(voxel, 1, (r) => crowns.push(crown(r, voxel, [cx, z * V, cz], crystals, true)));
+    SIDES.forEach(([d, n], k) => {
+      if (has(e + d[0], s + d[1], z + d[2])) return;
       // Un punto de la cara: `u` de lado a lado y `v` de abajo arriba, en
       // fracciones del voxel; +u va al este o al sur, segun la cara.
       const at = (u: number, v: number): Vec => [
@@ -131,15 +146,17 @@ export function oreModel(
         (z + v) * V,
         d[1] !== 0 ? cz + d[1] * V * 0.5 : cz + u * V,
       ];
-      sideOverlaps += side(r, voxel, d, n, at, crystals);
-    }
+      onFace(voxel, 2 + k, (r) => (sideOverlaps += side(r, voxel, d, n, at, crystals)));
+    });
   }
 
   // La textura: la piedra con sus vetas y, al lado, un dibujo por cristal.
   const stone = STONES[Feature.RockNode]!;
   const grid = stone.rows.map((row) => [...row]);
-  for (let q = 0; q < 4; q++) veins(r, grid, (q % 2) * N, Math.floor(q / 2) * N, ore.accent !== null);
-  const sprites = crystals.map((c) => paintCrystal(c.w, c.h, r()));
+  // Las vetas, de su propio azar por casilla: la textura no cambia al romper.
+  const veinRng = mulberry32(hash2D(seed ^ 0x7e1a5, tx, ty));
+  for (let q = 0; q < 4; q++) veins(veinRng, grid, (q % 2) * N, Math.floor(q / 2) * N, ore.accent !== null);
+  const sprites = crystals.map((c, i) => paintCrystal(c.w, c.h, paints[i]!));
   const slots = pack(crystals);
   const height = Math.max(WORLD_PX, ...slots.map((p, i) => p[1] + crystals[i]!.h));
   const rows = Array.from({ length: height }, (_, y) => Array.from({ length: ATLAS_W }, (_, x) => (y < WORLD_PX && x < WORLD_PX ? grid[y]![x]! : '.')));

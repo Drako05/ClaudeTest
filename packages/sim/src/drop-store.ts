@@ -35,13 +35,15 @@ export interface Drop {
   resting: boolean;
   /** Volando hacia el jugador, que lo esta recogiendo (el iman). */
   homing: boolean;
+  /** Lo deprisa que vuela hacia el, en bloques/s: acelera mientras vuela (`HOMING_ACCEL`). */
+  speed: number;
   /** Desde que tick se deja recoger: lo recien tirado no vuelve en el acto. */
   pickableAt: number;
   /** El tick en que se genero: de ahi cuenta su caducidad (`DROP_LIFE_TICKS`). */
   born: number;
 }
 
-export type DropSpec = Omit<Drop, 'id' | 'resting' | 'homing'>;
+export type DropSpec = Omit<Drop, 'id' | 'resting' | 'homing' | 'speed'>;
 
 export class DropStore {
   private next = 1;
@@ -52,7 +54,7 @@ export class DropStore {
   }
 
   add(spec: DropSpec): Drop {
-    const drop: Drop = { ...spec, id: this.next++, resting: false, homing: false };
+    const drop: Drop = { ...spec, id: this.next++, resting: false, homing: false, speed: 0 };
     this.byId.set(drop.id, drop);
     return drop;
   }

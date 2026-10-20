@@ -247,3 +247,48 @@ describe('La mena en el terreno (el autor, 2026-10-20: voxeles que se pican)', (
     }
   });
 });
+
+describe('Los cristales, ligados a su sitio (el autor, 2026-10-20)', () => {
+  it('romper un voxel no cambia los cristales de los demas: cada cara que sigue al aire lleva los mismos', () => {
+    const key = (c: OreModel['crystals'][number]) => `${c.voxel.join()}|${c.face.join()}`;
+    for (let i = 0; i < 20; i++) {
+      const shape = oreFormation(23, i, 3 * i);
+      const buried = (_e: number, _s: number, z: number) => z <= -1;
+      const whole = oreModel(ORES[i % 3]!, 23, i, 3 * i, shape, buried);
+      // Sin uno de los de arriba: sus vecinas ganan caras al aire, el resto no cambia.
+      const top = shape.filter(([, , z]) => z === 0);
+      const gone = top[i % top.length]!;
+      const less = oreModel(ORES[i % 3]!, 23, i, 3 * i, shape.filter((v) => v !== gone), buried);
+      const touches = (c: OreModel['crystals'][number]) => {
+        const [e, s, z] = c.voxel;
+        const [de, ds, dz] = c.face;
+        return e + de === gone[0] && s + ds === gone[1] && z + dz === gone[2];
+      };
+      const before = new Map<string, string[]>();
+      whole.crystals.forEach((c, k) => {
+        if (c.voxel === gone || touches(c)) return;
+        before.set(key(c), [...(before.get(key(c)) ?? []), JSON.stringify(c) + spriteOf(whole, k)]);
+      });
+      const after = new Map<string, string[]>();
+      less.crystals.forEach((c, k) => {
+        if (touches(c)) return;
+        after.set(key(c), [...(after.get(key(c)) ?? []), JSON.stringify(c) + spriteOf(less, k)]);
+      });
+      // Las caras que estaban al aire siguen con lo mismo; las nuevas, aparte.
+      for (const [face, list] of before) expect(after.get(face), face).toEqual(list);
+    }
+  });
+});
+
+/** Los pixeles del dibujo del cristal `k` en la textura de su mena. */
+function spriteOf(m: OreModel, k: number): string {
+  const c = m.crystals[k]!;
+  // Su dibujo, sacado de la malla: las uv de su primera lamina.
+  const rock = m.mesh.positions.length / 3 - m.crystals.length * 8;
+  const at = (rock + k * 8) * 2;
+  const W = m.art.rows[0]!.length;
+  const H = m.art.rows.length;
+  const x0 = Math.round(m.mesh.uvs[at]! * W);
+  const y0 = Math.round((1 - m.mesh.uvs[at + 1]!) * H);
+  return m.art.rows.slice(y0, y0 + c.h).map((r) => r.slice(x0, x0 + c.w)).join('/');
+}

@@ -347,6 +347,12 @@ cabe y lo que se tira desde el inventario.
   durante unos 2 s.
 - **Mientras flota, sube y baja suave**, y mira siempre a la camara. Sin
   nombre ni numero: solo el icono del objeto, el del inventario.
+- **Lo que entra en el iman llega siempre** (el autor, 2026-10-20: corriendo
+  no llegaba nunca, «que siempre lleguen al jugador rápidamente una vez estén
+  en rango»): sale a 8 b/s (`HOMING_SPEED`; corriendo se va a 8,32) y
+  **acelera 30 b/s²** mientras vuela (`HOMING_ACCEL`, el autor), sin tope, para
+  que alcance tambien con lo que haga ir mas deprisa. Y ya no lo suelta por
+  alejarse (antes, a mas de 2 bloques): solo si deja de caber.
 
 **Como esta hecho**:
 - El nucleo: `sim/drop-store.ts` (los datos, en el `World`, fuera de los

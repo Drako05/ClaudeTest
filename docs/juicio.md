@@ -236,15 +236,8 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 | Romper el terreno: **las sombras caen en el techo de cada columna**: lo que quedo en el aire no da sombra en el hoyo de debajo | `docs/relieve.md`, «Romper el terreno» | `buildShadows` |
 | Romper el terreno: **la cara de abajo de lo que quedo en el aire, a 0,55 de luz** (las paredes, a 0,72) | `docs/arte.md`, el pixelart | `UNDER_LIGHT` en `terrain-mesh.ts` |
 | Romper el terreno: **las teselas de 12 × 12**: mismos pinceles y colores que las de 24, a la misma densidad, con lo que se reparte por ellas en proporcion a su area y semillas propias | `docs/arte.md`, el pixelart | `voxelTerrain` en `tools/pixel-mundo.ts`, o retocarlas en `voxel-art.ts` |
-| Menas de voxeles: **la base es la columna mas baja de la casilla**; **que voxel falta arriba y cual va abajo**, de la casilla y la semilla | `docs/relieve.md`, «La pala, lo primero que toca y las menas» | `oreFormation` en `ore-shape.ts` |
-| Menas de voxeles: **el botin, por igual**: 0 o 1 la mitad de las veces (el carbon, 1 o 2), del voxel y la semilla | `docs/relieve.md` | `oreVoxelLoot` |
-| Menas de voxeles: **la casilla queda vacia con el ultimo voxel**, y hasta entonces no se pone nada en ella | `docs/recoleccion.md` | `tryHarvestArea` |
-| Menas de voxeles: **sin sombra**, como el terreno; y **bajo lo que queda en el aire, la flor de abajo** de la regla de la corona (estaba en tu regla; en el juego no habia voladizos) | `docs/arte.md`, «Las menas» | `oreModel` |
-| Pala: **sin la herramienta, el golpe al suelo gasta igual** (todo golpe que toca algo); y **el aviso de lo que pedia un objeto del mismo golpe manda** sobre el del suelo | `docs/reglas.md`, regla 12 | `tryHarvestArea` |
-| Pala: **sus iconos**, de la familia del hacha y el pico (la hoja con el mango en diagonal, la ligadura de fibra y la empuñadura en T) | `docs/guia-de-arte.md`, directriz 5 | `item-icons.ts` |
 | Rejilla de 0,5: **la caja se centra en la esquina de voxel mas cercana a la mirada**; en un costado, **medio bloque por fuera de la cara**, pegada a ella | `docs/reglas.md`, regla 12 | `placeTarget` |
 | Rejilla de 0,5: **no se pone si alguna de sus hasta cuatro casillas tiene un objeto** (un guijarro tambien), esta cubierta o es agua; no se apila sobre otra estacion | `docs/reglas.md`, regla 12 | `tryPlace` |
-| Rejilla de 0,5: **la mesa, con seis herramientas, ya no cabe sin barra**: se desliza (las cuatro de antes cabian, pedido tuyo del 2026-10-01) | `docs/recoleccion.md` | la altura de las filas del recetario |
 | Romper el terreno: **un barrido mirando abajo cava**: golpear guijarros, matas o brotes con el sector tambien da a los voxeles del suelo que tocan sus rayos (es lo que pediste, «todos los que toca», y conviene que lo sepas al jugarlo) | `docs/reglas.md`, regla 12 | — |
 
 Y una cosa que **tu ya diagnosticaste y aparcaste**: los saltos que se pierden
