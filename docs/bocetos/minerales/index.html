@@ -223,7 +223,7 @@ function addCrystal(base, axis, w, h, seed, spin) {
 
 // El voxel, con su propia semilla (resorteado a peticion del autor,
 // 2026-10-20); el bloque aprobado, con la suya de siempre.
-const r = rng((mineral === 'carbon' ? 0xc0a1 : 0xc0b0) + (small ? 0x2f1 : 0));
+const r = rng((mineral === 'carbon' ? 0xc0a1 : 0xc0b0) + (small ? 0x3a7 : 0));
 const jitter = (k) => (r() - 0.5) * k;
 const UP = new THREE.Vector3(0, 1, 0);
 // Arriba: un racimo apretado, los grandes en el centro y abiertos hacia fuera.
@@ -271,6 +271,10 @@ function voxelSide(n, at, k) {
     radial.normalize().multiplyScalar(r() < 0.5 ? -1 : 1).applyAxisAngle(n, (r() - 0.5) * (Math.PI / 3));
     const tilt = Math.PI / 4 + r() * (Math.PI / 6); // con la cara: de 45 a 75 grados
     const axis = n.clone().multiplyScalar(Math.sin(tilt)).add(radial.multiplyScalar(Math.cos(tilt)));
+    // Ninguno cuelga hacia el suelo (el autor, 2026-10-20, opcion 1): si la
+    // inclinacion cae hacia abajo, se refleja hacia arriba. La cara es
+    // vertical, asi que el angulo con ella y el arco siguen siendo los mismos.
+    if (axis.y < 0) axis.y = -axis.y;
     addCrystal(base, axis, w, h, 200 + k * 10 + i, r() * Math.PI);
   });
 }

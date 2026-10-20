@@ -108,7 +108,10 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   margen de 0,08 de la cara (`voxelSide`). Solo en el voxel: el bloque
   aprobado no cambia. Luego, el autor: **el angulo con la cara, de 45 a 75
   grados; el arco dentro-fuera, de 0 a 30**, y «resortea» (el voxel lleva su
-  propia semilla). **Esperando al autor.**
+  propia semilla). Algunos quedaban mirando al suelo (el arco va en el plano
+  de la cara, que es vertical); el autor eligio que **ninguno apunte hacia
+  abajo**: si cae, se refleja hacia arriba. Resorteado otra vez. **Esperando
+  al autor.**
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).
