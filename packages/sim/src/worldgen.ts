@@ -21,6 +21,7 @@ import {
 } from '@verdant/shared';
 import { heightFrom, MAX_HEIGHT, OUTCROP_RISE, SEA_LEVEL, VOXELS_PER_TILE, WATER_HEIGHT } from './relief.js';
 import { hash2DFloat, SimplexNoise } from './rng.js';
+import { isOre, NO_ORE, oreOnTop } from './ore-shape.js';
 
 /** Guijarros: fraccion de las casillas vacias de tierra, y de roca. **Propuesta mia.** */
 const PEBBLES_LAND = 0.02;
@@ -262,7 +263,15 @@ export class WorldGen {
     const ty = Math.floor(vy / VOXELS_PER_TILE);
     if (this.elevationAt(tx, ty) < SEA_LEVEL) return WATER_HEIGHT;
     const corner = (x: number, y: number): [number, number] => [this.reliefAt(x, y), this.outcropAt(x, y)];
-    return this.columnFrom(vx - tx * VOXELS_PER_TILE, vy - ty * VOXELS_PER_TILE, corner(tx, ty), corner(tx + 1, ty), corner(tx, ty + 1), corner(tx + 1, ty + 1));
+    const corners = [corner(tx, ty), corner(tx + 1, ty), corner(tx, ty + 1), corner(tx + 1, ty + 1)] as const;
+    const sx = vx - tx * VOXELS_PER_TILE;
+    const sy = vy - ty * VOXELS_PER_TILE;
+    const h = this.columnFrom(sx, sy, ...corners);
+    // La mena sube lo de su nivel de arriba sobre la columna mas baja (`oreTops`).
+    if (!isOre(this.featureAt(tx, ty, this.terrainAt(tx, ty))) || !oreOnTop(this.seed, tx, ty, sx, sy)) return h;
+    let base = Infinity;
+    for (let s = 0; s < 4; s++) base = Math.min(base, this.columnFrom(s & 1, s >> 1, ...corners));
+    return Math.max(h, base + 1);
   }
 
   /**
@@ -391,6 +400,11 @@ export interface GeneratedChunk {
    * indice `ly * CHUNK_COLUMNS + lx`). `WATER_HEIGHT` es agua.
    */
   readonly height: Int16Array;
+  /**
+   * La base de la mena de cada casilla de 1, en medios bloques: su columna mas
+   * baja tal como la dio el relieve (`ore-shape.ts`). `NO_ORE` donde no hay.
+   */
+  readonly oreBase: Int16Array;
 }
 
 /**
@@ -403,6 +417,7 @@ export function generateChunk(gen: WorldGen, cx: number, cy: number): GeneratedC
   const terrain = new Uint8Array(n);
   const feature = new Uint8Array(n);
   const height = new Int16Array(CHUNK_COLUMNS * CHUNK_COLUMNS);
+  const oreBase = new Int16Array(n).fill(NO_ORE);
   const baseX = cx * CHUNK_SIZE;
   const baseY = cy * CHUNK_SIZE;
 
@@ -447,10 +462,29 @@ export function generateChunk(gen: WorldGen, cx: number, cy: number): GeneratedC
             : gen.columnFrom(sx, sy, corners[at], corners[at + 1], corners[at + side], corners[at + side + 1]);
         }
       }
+      // Una mena (el autor, 2026-10-20): ocho voxeles desde la columna mas baja;
+      // los de arriba quedan sobre el terreno.
+      if (!water && isOre(feature[idx] as Feature)) oreTops(gen.seed, wx, wy, height, ly, lx, oreBase, idx);
     }
   }
 
-  return { terrain, feature, height };
+  return { terrain, feature, height, oreBase };
+}
+
+/**
+ * Pone la mena de la casilla (`wx`, `wy`) en las alturas de su chunk: guarda su
+ * base —la columna mas baja de la casilla— y sube a `base + 1` las columnas de
+ * su nivel de arriba que no pasen de ahi. Lo de abajo ya es terreno: solo cambia
+ * de que es (`World.oreAt`).
+ */
+function oreTops(seed: number, wx: number, wy: number, height: Int16Array, ly: number, lx: number, oreBase: Int16Array, idx: number): void {
+  const col = (s: number) => (ly * VOXELS_PER_TILE + (s >> 1)) * CHUNK_COLUMNS + lx * VOXELS_PER_TILE + (s & 1);
+  let base = Infinity;
+  for (let s = 0; s < 4; s++) base = Math.min(base, height[col(s)]!);
+  oreBase[idx] = base;
+  for (let s = 0; s < 4; s++) {
+    if (oreOnTop(seed, wx, wy, s & 1, s >> 1)) height[col(s)] = Math.max(height[col(s)]!, base + 1);
+  }
 }
 
 function clamp01(v: number): number {

@@ -38,6 +38,7 @@ import {
   TICK_HZ,
   ToolKind,
   toolStats,
+  voxelWorkOf,
   workOf,
 } from '@verdant/shared';
 import {
@@ -107,7 +108,7 @@ export interface HarvestResult {
  * Por que un golpe no hizo lo que se esperaba: el inventario no tenia sitio,
  * o hace falta un pico (o uno mejor). Lo cuenta el cliente en un aviso.
  */
-export type Blocked = 'needPickaxe' | 'needBetterPickaxe';
+export type Blocked = 'needPickaxe' | 'needBetterPickaxe' | 'needShovel';
 
 /**
  * El daño acumulado en cada objeto golpeado y las ramas que ya se le han
@@ -143,14 +144,16 @@ export function forgetUnloadedDamage(work: WorkState, world: World): void {
 }
 
 /**
- * Los golpes que aguanta un voxel del terreno antes de romperse, con cualquier
- * cosa en la mano: **3** (el autor, 2026-10-20: «pegar con cualquier cosa
- * rompe el terreno. el terreno aguanta 3 golpes antes de romperse»). Cada
- * golpe suma 1, lleve lo que lleve.
+ * El botin de un voxel de mena al romperse (el autor, 2026-10-20): **de 0 a 1
+ * de su mineral; el carbon, de 1 a 2**. Por igual cada cantidad, y del voxel y
+ * la semilla (regla 2; *deduccion*).
  */
-export const VOXEL_WORK = 3;
+export function oreVoxelLoot(seed: number, ore: Feature, x: number, y: number, z: number): number {
+  const roll = hash2DFloat(seed ^ 0x6f7265, x * 4099 + z, y - z * 8191);
+  return (ore === Feature.CoalNode ? 1 : 0) + (roll < 0.5 ? 1 : 0);
+}
 
-/** Daño acumulado de un voxel del terreno ahora mismo, de 0 a `VOXEL_WORK`. */
+/** Daño acumulado de un voxel del terreno ahora mismo, de 0 a su trabajo (`voxelWorkOf`). */
 export function voxelDamageAt(work: WorkState, x: number, y: number, z: number, tick: number): number {
   const d = work.voxelDamage.get(`${x},${y},${z}`);
   if (!d || tick - d.tick > DAMAGE_DECAY_TICKS) return 0;
@@ -210,15 +213,23 @@ function eyeOf(store: EntityStore, id: number): Vec3 {
  * El golpe de la entidad (regla 12): el sector plano de su mirada, cortado por
  * el terreno, y los objetos cuyo hitbox toca.
  */
-export function strikeOf(world: World, store: EntityStore, id: number): Strike {
+export function strikeOf(world: World, store: EntityStore, id: number, animals: Iterable<number> = []): Strike {
+  const origin = eyeOf(store, id);
+  const reach = STRIKE_RANGE + 2;
+  const bodies: Array<{ id: number; boxes: OrientedBox[] }> = [];
+  for (const a of animals) {
+    if (Math.abs(store.x[a] - origin.x) > reach || Math.abs(store.y[a] - origin.y) > reach) continue;
+    bodies.push({ id: a, boxes: animalBoxes(store, a) });
+  }
   return strike(
-    eyeOf(store, id),
+    origin,
     store.facingX[id],
     store.facingY[id],
     store.lookZ[id],
     solidOf(world),
     (tx, ty) => hitboxAt(world, tx, ty),
     store.lookRoll[id],
+    bodies,
   );
 }
 
@@ -323,25 +334,20 @@ export function animalBoxes(store: EntityStore, id: number): OrientedBox[] {
 }
 
 /**
- * Los animales que alcanza un golpe, cada uno con la distancia desde los ojos.
- * En barrido, todos los que cruza algun rayo del sector ya cortado por el
- * terreno; en preciso, solo el rayo central, cortado igual.
+ * Los animales que alcanza el rayo central del golpe preciso, cada uno con la
+ * distancia desde los ojos, cortado por el terreno. (En barrido los da
+ * `strikeOf`, rayo a rayo con lo demas.)
  */
-function animalsInReach(
+function animalsInSight(
   world: World,
   store: EntityStore,
   id: number,
   animals: Iterable<number>,
-  precise: boolean,
 ): Array<{ id: number; t: number; at: Vec3 }> {
   const origin = eyeOf(store, id);
-  const rays = precise
-    ? (() => {
-        const dir = lookVector(store.facingX[id], store.facingY[id], store.lookZ[id]);
-        const hit = groundHit(origin, dir, STRIKE_RANGE, solidOf(world));
-        return [{ dir, length: hit ? hit.t : STRIKE_RANGE }];
-      })()
-    : strikeOf(world, store, id).rays;
+  const dir = lookVector(store.facingX[id], store.facingY[id], store.lookZ[id]);
+  const hit = groundHit(origin, dir, STRIKE_RANGE, solidOf(world));
+  const rays = [{ dir, length: hit ? hit.t : STRIKE_RANGE }];
   const out: Array<{ id: number; t: number; at: Vec3 }> = [];
   for (const a of animals) {
     const reach = STRIKE_RANGE + 2;
@@ -433,10 +439,11 @@ export function tryHarvestArea(
 
   // Los animales, con el mismo golpe (regla 12). En preciso solo cuenta el
   // primer objetivo de la mira, sea un animal o un objeto del mundo.
-  const beasts = animalsInReach(world, store, id, animals, precise);
+  let beasts: Array<{ id: number; t: number; at: Vec3 }>;
   let tiles: Array<Offset & { at: Vec3 }>;
   let voxels: readonly Voxel[];
   if (precise) {
+    beasts = animalsInSight(world, store, id, animals);
     const tile = preciseTarget(world, store, id);
     tiles = tile ? [tile] : [];
     if (beasts.length > 0) {
@@ -449,7 +456,9 @@ export function tryHarvestArea(
     const ground = tiles.length + beasts.length === 0 ? groundHit(eyeOf(store, id), dir, STRIKE_RANGE, solidOf(world)) : null;
     voxels = ground ? [ground.voxel] : [];
   } else {
-    const swept = strikeOf(world, store, id);
+    // Cada rayo, a lo primero que toca: animal, objeto o terreno.
+    const swept = strikeOf(world, store, id, animals);
+    beasts = swept.bodies.slice();
     tiles = swept.targets.slice();
     voxels = swept.voxels;
   }
@@ -500,21 +509,44 @@ export function tryHarvestArea(
     swing.results.push(result);
   }
 
-  // El terreno (el autor, 2026-10-20): cada voxel que toca el golpe recibe uno,
-  // y al tercero se rompe. Gasta lo de la mano, como todo lo que se toca. El
-  // fondo del agua corta el golpe, pero no se rompe: ni se cuenta.
+  // El terreno (el autor, 2026-10-20): cada voxel que toca el golpe recibe el
+  // poder de lo que se lleva, si es su herramienta (`voxelWorkOf`: la roca y
+  // las menas, el pico; lo maleable, la pala), y al llegar a su trabajo se
+  // rompe. Gasta lo de la mano igual, como todo lo que se toca. El fondo del
+  // agua corta el golpe, pero no se rompe: ni se cuenta.
   for (const v of voxels) {
-    if (world.isTerrainSolidAt(Math.floor(v.x / VOXELS_PER_TILE), Math.floor(v.y / VOXELS_PER_TILE))) continue;
+    const tx = Math.floor(v.x / VOXELS_PER_TILE);
+    const ty = Math.floor(v.y / VOXELS_PER_TILE);
+    const ore = world.oreAt(v.x, v.y, v.z);
+    const need = voxelWorkOf(world.terrainAt(tx, ty), ore);
+    if (!need) continue;
     touchedTile = true;
+    const power = stats && stats.kind === need.tool && stats.tier >= need.tier ? stats.power : 0;
+    if (power === 0) {
+      swing.voxels.push({ x: v.x, y: v.y, z: v.z, broken: false });
+      // Lo que pedia un objeto del mismo golpe manda: es lo que se apuntaba.
+      swing.blocked ??=
+        need.tool === ToolKind.Shovel ? 'needShovel' : stats?.kind === ToolKind.Pickaxe ? 'needBetterPickaxe' : 'needPickaxe';
+      continue;
+    }
     const key = `${v.x},${v.y},${v.z}`;
-    const done = voxelDamageAt(work, v.x, v.y, v.z, tick) + 1;
-    if (done < VOXEL_WORK) {
+    const done = voxelDamageAt(work, v.x, v.y, v.z, tick) + power;
+    if (done < need.work) {
       work.voxelDamage.set(key, { work: done, tick, x: v.x, y: v.y, z: v.z });
       swing.voxels.push({ x: v.x, y: v.y, z: v.z, broken: false });
       continue;
     }
     work.voxelDamage.delete(key);
-    swing.voxels.push({ x: v.x, y: v.y, z: v.z, broken: world.breakVoxel(v.x, v.y, v.z) });
+    const broken = world.breakVoxel(v.x, v.y, v.z);
+    swing.voxels.push({ x: v.x, y: v.y, z: v.z, broken });
+    if (!broken || ore === Feature.None) continue;
+    // Una mena suelta su botin desde su voxel, sin particulas (el autor), y
+    // con el ultimo de sus voxeles la casilla queda vacia.
+    const count = oreVoxelLoot(world.seed, ore, v.x, v.y, v.z);
+    const resource = harvestOf(ore)!.resource;
+    const from = { x: (v.x + 0.5) * VOXEL, y: (v.y + 0.5) * VOXEL, z: v.z * VOXEL, half: VOXEL / 2 };
+    if (count > 0) scatterLoot(world, [{ item: resource, count }], from, tick, v.x * 31 + v.y * 17 + v.z);
+    if (world.oreFormationAt(tx, ty)?.voxels.length === 0) world.setFeature(tx, ty, Feature.None);
   }
 
   const touchedBeast = beasts.length > 0;
@@ -754,23 +786,32 @@ export function aimedSurface(world: World, store: EntityStore, id: number): Surf
 
 /**
  * Donde se colocaria algo: la casilla en que la mirada toca el suelo, o, si
- * toca un costado del terreno, **la de delante de esa pared** (decision del
- * autor, 2026-09-30: aparece junto a la pared y cae hasta el suelo). A menos
- * del alcance en horizontal, como sembrar.
+ * toca un costado del terreno, **delante de esa pared** (decision del autor,
+ * 2026-09-30: aparece junto a la pared y cae hasta el suelo). A menos del
+ * alcance en horizontal, como sembrar.
+ *
+ * **En la rejilla de 0,5** (el autor, 2026-10-20): la caja de 1 × 1 se centra
+ * en la esquina de voxel mas cercana a donde toca la mirada; en un costado,
+ * medio bloque por fuera de la cara, para quedar pegada a ella (*deduccion*).
+ * `x0`, `y0`, su esquina noroeste; `x`, `y`, la casilla de esa esquina.
  */
-export function placeTarget(world: World, store: EntityStore, id: number): Placed | null {
+export function placeTarget(world: World, store: EntityStore, id: number): (Placed & { x0: number; y0: number }) | null {
   const surface = aimedSurface(world, store, id);
   if (!surface) return null;
-  return { x: surface.front.x, y: surface.front.y, z: surface.point.z };
+  const { point, normal } = surface;
+  const snap = (v: number) => Math.round(v / VOXEL) * VOXEL;
+  const x0 = snap(point.x + normal.x * VOXEL) - 0.5;
+  const y0 = snap(point.y + normal.y * VOXEL) - 0.5;
+  return { x: Math.floor(x0), y: Math.floor(y0), z: point.z, x0, y0 };
 }
 
 /**
  * Coloca la estacion de la mano donde la mirada toca el suelo, o delante de la
- * pared que mira, a menos del alcance (decisiones del autor). Hace falta una
- * casilla vacia, sin agua, y que no pise el cuerpo del jugador, que quedaria
- * dentro de ella (propuesta mia). Se apoya sobre lo mas alto que toque de su
- * casilla, por poco que sea (el autor, 2026-10-06; `objectBase`). Devuelve
- * donde, o `null`.
+ * pared que mira, a menos del alcance (decisiones del autor), en la rejilla de
+ * 0,5. Hace falta que **cada casilla que pisa** este vacia, sin cubrir y sin
+ * agua, y que no pise el cuerpo del jugador, que quedaria dentro de ella
+ * (propuesta mia). Se apoya sobre lo mas alto que toque, por poco que sea (el
+ * autor, 2026-10-06; `objectBase`). Devuelve donde, o `null`.
  */
 export function tryPlace(world: World, store: EntityStore, id: number, inventory: Inventory): Placed | null {
   const item = inventory.inHand();
@@ -779,19 +820,17 @@ export function tryPlace(world: World, store: EntityStore, id: number, inventory
   if (feature === Feature.None) return null;
   const at = placeTarget(world, store, id);
   if (!at) return null;
-  const { x, y } = at;
-  if (world.featureAt(x, y) !== Feature.None) return null;
-  if (isTerrainSolid(world.terrainAt(x, y))) return null;
+  const { x0, y0 } = at;
+  for (const [tx, ty] of world.footprintTiles(x0, y0)) {
+    if (world.featureAt(tx, ty) !== Feature.None || world.isCovered(tx, ty)) return null;
+    if (isTerrainSolid(world.terrainAt(tx, ty))) return null;
+  }
   const px = store.x[id];
   const py = store.y[id];
-  const touches =
-    x >= Math.floor(px - BODY_RADIUS) &&
-    x <= Math.floor(px + BODY_RADIUS) &&
-    y >= Math.floor(py - BODY_RADIUS) &&
-    y <= Math.floor(py + BODY_RADIUS);
+  const touches = px + BODY_RADIUS > x0 && px - BODY_RADIUS < x0 + 1 && py + BODY_RADIUS > y0 && py - BODY_RADIUS < y0 + 1;
   if (touches) return null;
   inventory.spendInHand();
-  world.setFeature(x, y, feature, at.z + VOXEL);
+  const { x, y } = world.placeStation(x0, y0, feature, at.z + VOXEL);
   // Su cara principal, hacia quien la pone (pedido del autor, 2026-10-02).
   world.setStationFacing(x, y, facingToward(x, y, px, py));
   return { x, y, z: Math.max(at.z, objectBase(world, x, y, feature)) };
@@ -837,7 +876,7 @@ export function tryPlant(
   const aimed = targetTile(world, store, id);
   if (!aimed) return null;
   const { x, y } = aimed;
-  if (world.featureAt(x, y) !== Feature.None) return null;
+  if (world.featureAt(x, y) !== Feature.None || world.isCovered(x, y)) return null;
 
   const terrain = world.terrainAt(x, y);
   if (isTerrainSolid(terrain)) return null;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CHUNK_SIZE, Terrain } from '@verdant/shared';
+import { CHUNK_SIZE, Feature, Terrain } from '@verdant/shared';
 import { CHUNK_COLUMNS, VOXEL, VOXELS_PER_TILE, World } from '@verdant/sim';
+import { oreSite } from './ground.js';
 import { chunkMesh, Face, meshHeightAt, terrainVariant, UNDER_LIGHT, WALL_LIGHT } from '../packages/client/src/terrain-mesh.js';
 
 /**
@@ -53,8 +54,12 @@ describe('La malla dice lo mismo que el mundo', () => {
       let checked = 0;
       for (let ly = 0; ly < CHUNK_COLUMNS; ly += 3) {
         for (let lx = 0; lx < CHUNK_COLUMNS; lx += 3) {
-          const x = (chunk.cx * CHUNK_COLUMNS + lx + 0.5) * VOXEL;
-          const y = (chunk.cy * CHUNK_COLUMNS + ly + 0.5) * VOXEL;
+          const vx = chunk.cx * CHUNK_COLUMNS + lx;
+          const vy = chunk.cy * CHUNK_COLUMNS + ly;
+          // La tapa de una mena la pone su malla (`ore-mesh.ts`), no esta.
+          if (world.oreAt(vx, vy, world.columnTop(vx, vy) - 1) !== Feature.None) continue;
+          const x = (vx + 0.5) * VOXEL;
+          const y = (vy + 0.5) * VOXEL;
           expect(meshHeightAt(mesh, x, y), `columna en (${x}, ${y})`).toBe(world.groundHeightAt(x, y));
           checked++;
         }
@@ -68,7 +73,15 @@ describe('La malla dice lo mismo que el mundo', () => {
     // llana ya no sale como un bloque de 1, sino como sus cuatro voxeles.
     const world = new World(12345);
     const chunk = chunkWithRelief(world);
-    expect(lidsOf(chunkMesh(world, chunk, flat))).toBe(CHUNK_COLUMNS * CHUNK_COLUMNS);
+    let ores = 0;
+    for (let ly = 0; ly < CHUNK_COLUMNS; ly++) {
+      for (let lx = 0; lx < CHUNK_COLUMNS; lx++) {
+        const vx = chunk.cx * CHUNK_COLUMNS + lx;
+        const vy = chunk.cy * CHUNK_COLUMNS + ly;
+        if (world.oreAt(vx, vy, world.columnTop(vx, vy) - 1) !== Feature.None) ores++;
+      }
+    }
+    expect(lidsOf(chunkMesh(world, chunk, flat))).toBe(CHUNK_COLUMNS * CHUNK_COLUMNS - ores);
   });
 
   it('el terreno de la malla es el que dice el mundo', () => {
@@ -250,5 +263,24 @@ describe('La textura del suelo (pixelart, 24 pixeles por bloque)', () => {
     expect(distintasDeSuVecina).toBeGreaterThan(1600 * 0.6);
     expect(distintasDeArriba).toBeGreaterThan(1600 * 0.6);
     expect(distintasDeLado).toBeGreaterThan(1600 * 0.6);
+  });
+});
+
+describe('Las menas las dibuja su malla, no el terreno (2026-10-20)', () => {
+  it('sobre los voxeles de una mena no hay tapa ni pared del terreno', () => {
+    const world = new World(12345);
+    const { tx, ty } = oreSite(world, Feature.CoalNode);
+    const chunk = world.getChunk(Math.floor(tx / CHUNK_SIZE), Math.floor(ty / CHUNK_SIZE));
+    const mesh = chunkMesh(world, chunk, flat);
+    const f = world.oreFormationAt(tx, ty)!;
+    let tops = 0;
+    for (const [vx, vy, vz] of f.voxels) {
+      if (world.isSolidVoxel(vx, vy, vz + 1)) continue;
+      tops++;
+      // La tapa de ese voxel estaria a (vz + 1) * 0,5, sobre su columna.
+      const h = meshHeightAt(mesh, (vx + 0.5) * VOXEL, (vy + 0.5) * VOXEL);
+      expect(h === null || h < (vz + 1) * VOXEL).toBe(true);
+    }
+    expect(tops).toBeGreaterThan(0);
   });
 });

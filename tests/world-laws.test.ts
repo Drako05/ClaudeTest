@@ -37,7 +37,7 @@ import {
   toolStats,
   withinEquilibrium,
 } from '@verdant/shared';
-import { groundCount } from './ground.js';
+import { groundCount, oreSite, strikeDown } from './ground.js';
 
 /**
  * Las leyes de "El libro del mundo", convertidas en pruebas.
@@ -718,31 +718,18 @@ describe('Capitulo II: combinar y herramientas', () => {
   });
 
   it('algunos recursos requieren herramientas para recolectarse', () => {
+    // Una mena de cobre generada (desde el 2026-10-20, voxeles): a mano, por
+    // muchos golpes que se den, su voxel sigue ahi; con un pico, sale.
     const state = createGame(12345);
-    const e = state.entities;
-    const id = state.playerId;
-    const tx = Math.floor(e.x[id]);
-    const ty = Math.floor(e.y[id]);
-    e.x[id] = tx + 0.5;
-    e.y[id] = ty + 0.5;
-    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) state.world.setFeature(tx + dx, ty + dy, Feature.None);
-    state.world.setFeature(tx + 1, ty, Feature.CopperNode);
-    e.facingX[id] = 1;
-    e.facingY[id] = 0;
-    e.lookZ[id] = Math.sin((-30 * Math.PI) / 180);
-
-    // A mano, por muchos golpes que se den, el mineral sigue ahi.
-    const hands = new Inventory();
-    const work = new WorkState();
-    for (let t = 0; t < 20; t++) tryHarvestArea(state.world, e, id, hands, t, work);
-    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.CopperNode);
-    expect(groundCount(state.world, Resource.Copper)).toBe(0);
-
-    // Con un pico, sale.
-    const pick = new Inventory();
-    pick.add(Resource.StonePickaxe, 1);
-    for (let t = 0; t < 5; t++) tryHarvestArea(state.world, e, id, pick, 100 + t, work);
-    expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.None);
-    expect(groundCount(state.world, Resource.Copper)).toBeGreaterThan(0);
+    const { tx, ty } = oreSite(state.world, Feature.CopperNode);
+    const top = state.world.oreFormationAt(tx, ty)!.voxels.reduce((a, b) => (b[2] > a[2] ? b : a));
+    for (let t = 0; t < 20; t++) expect(strikeDown(state, top[0], top[1])).toBe(false);
+    expect(state.world.isSolidVoxel(...top)).toBe(true);
+    expect(state.lastBlocked).toBe('needPickaxe');
+    state.inventory.add(Resource.StonePickaxe, 1);
+    state.inventory.select(state.inventory.items.indexOf(Resource.StonePickaxe));
+    let hits = 0;
+    while (!strikeDown(state, top[0], top[1]) && hits < 10) hits++;
+    expect(state.world.isSolidVoxel(...top)).toBe(false);
   });
 });

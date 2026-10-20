@@ -77,15 +77,18 @@ entero —el porque, las medidas y el fallo que motivo cada una— esta en
 11. **Un paso de vida lee estado congelado y escribe en otro**
     (`ChunkRecord.live`), o se rompe la ley del observador.
 12. **El golpe es un SECTOR PLANO que sale de los ojos y cuenta solo si toca
-    un hitbox** (`sim/aim.ts`): 3 bloques y 90 grados, 33 rayos que el
-    terreno corta. Cada objeto tiene una caja (`sim/boxes.ts`). **Y el voxel
-    en que entra cada rayo recibe el golpe**: 3 y se rompe, con cualquier cosa,
-    sin particulas ni botin (`VOXEL_WORK`). Sembrar y colocar van donde la
-    mirada toca el suelo o la pared (`aimSurface`).
+    un hitbox** (`sim/aim.ts`): 3 bloques y 90 grados, 33 rayos, y **cada
+    rayo da solo a lo primero que toca**: un voxel, una caja o un cuerpo. Cada
+    objeto tiene una caja (`sim/boxes.ts`). El voxel se rompe con su
+    herramienta (`voxelWorkOf`: la roca y las menas, pico; lo maleable, pala;
+    el poder resta), sin particulas; el de mena suelta su mineral. Sembrar y
+    colocar van donde la mirada toca el suelo o la pared (`aimSurface`), y lo
+    que se pone, en la rejilla de 0,5.
 13. **El relieve sale de la misma elevacion que el terreno, en voxeles de 0,5**:
     cada columna lleva su altura en medios bloques; el agua, el bioma, la vida y
     los objetos siguen por casilla de 1. **El voxel es la unidad del terreno**:
     se rompe solo, se dibuja con su tesela de 12 × 12, y lo de encima no cae.
+    **Una mena son ocho voxeles del terreno** (`ore-shape.ts`), no un objeto.
 14. **La altura y los muros son dos mecanismos distintos** (cordilleras y
     salientes). Antes de tocar su calibracion se mide con
     `npx vite-node tools/analyze-world.ts` contra la **linea base solo-agua**:

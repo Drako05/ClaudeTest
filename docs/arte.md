@@ -53,7 +53,13 @@ del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
   casilla (1 × 1 × 1); su caja de choque sigue en 0,9 × 1,0.
 - **Las menas** (el autor, 2026-10-20; el boceto en `docs/bocetos/minerales/`)
   son esa misma roca, con **vetas del mineral y cristales que brotan de ella**
-  en laminas cruzadas, como los arboles (`ore-mesh.ts`).
+  en laminas cruzadas, como los arboles (`ore-mesh.ts`). Desde la tanda de la
+  pala son **una formacion de ocho voxeles del terreno** (`ore-shape.ts`):
+  uno abajo, el 2 × 2 en medio y tres arriba, y solo el de arriba asoma. Se
+  dibujan **los que quedan**, y **una cara tapada por el terreno no lleva ni
+  piedra ni cristales**: cavando alrededor aparecen las del medio, y bajo lo
+  que queda en el aire cuelga la flor de abajo de la regla de la corona. Se
+  rehacen con el terreno de su chunk. Sin sombra: son terreno (*deduccion*).
   - **Una distinta por casilla**. El autor: «me gustaria la opcion de maxima
     variedad». La forma, el sitio, el angulo y el tamaño de cada cristal, y el
     recorrido de cada veta, salen de la casilla y la semilla (regla 2).
@@ -68,9 +74,8 @@ del juego». Sus directrices de estilo, en `docs/guia-de-arte.md`
       grados hacia arriba;
     - y **ningun cristal donde se tocan dos voxeles de la mena**, «solo dentro
       de la formacion»: hacia fuera de la casilla salen siempre.
-  - Los cristales no llevan la luz de las caras. Miden 0,25 como mucho, asi
-    que la mena se ve hasta 1,25 de alto. Su caja de choque no cambia
-    (*deduccion*).
+  - Los cristales no llevan la luz de las caras. Miden 0,25 como mucho. **Ya
+    no tiene caja**: su arriba es terreno, se pisa y se sube.
   - **Los colores**, en `ORE_TONES` (`palette.ts`): el cobre y el carbon, los
     del boceto; el hierro, *deduccion*. Los escombros llevan la piedra y su
     mineral.

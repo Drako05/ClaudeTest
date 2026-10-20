@@ -65,6 +65,8 @@ import {
   WATER_SURFACE,
   dropFloor,
   type GameState,
+  NO_ORE,
+  VOXEL,
   type Chunk,
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
@@ -592,6 +594,8 @@ let lastTapAim: Aim | null = null;
 interface ChunkView {
   mesh: Mesh;
   readonly props: import('three').Object3D[];
+  /** Las menas del chunk: son terreno, y se rehacen con el (`oresOf`). */
+  ores: import('three').Object3D[];
   /** Donde caen las sombras de sus objetos, para rehacerlas sobre el terreno nuevo. */
   readonly spots: ShadowSpot[];
   /** Todas las sombras del chunk en una malla. Null si no hay ninguna. */
@@ -665,11 +669,12 @@ function buildChunk(cx: number, cy: number): ChunkView {
       const ground = objectBase(state.world, wx, wy, feature);
       // Las estaciones son cajas, no aspas (decision del autor).
       if (isStation(feature)) {
-        const box = stations.spawn(feature, wx, wy, ground, seed, state.world.stationFacingAt(wx, wy));
+        const offset = state.world.stationOffsetAt(wx, wy);
+        const box = stations.spawn(feature, wx, wy, ground, seed, state.world.stationFacingAt(wx, wy), offset);
         if (box) {
           scene.add(box);
           props.push(box);
-          spots.push({ x, z: y, width: stations.widthOf(feature) });
+          spots.push({ x: x + offset[0], z: y + offset[1], width: stations.widthOf(feature) });
         }
         continue;
       }
@@ -684,6 +689,7 @@ function buildChunk(cx: number, cy: number): ChunkView {
   return {
     mesh,
     props,
+    ores: oresOf(chunk),
     spots,
     shadows: shadowsOf(spots),
     triangles,
@@ -692,10 +698,44 @@ function buildChunk(cx: number, cy: number): ChunkView {
   };
 }
 
-/** Rehace el terreno de un chunk ya dibujado, y las sombras que caen en el. */
+/**
+ * Las menas de un chunk (el autor, 2026-10-20: formaciones de voxeles del
+ * terreno): de cada casilla con mena, lo que le queda, sin cara ni cristales
+ * donde la tapa el terreno.
+ */
+function oresOf(chunk: Chunk): import('three').Object3D[] {
+  const out: import('three').Object3D[] = [];
+  for (let ly = 0; ly < CHUNK_SIZE; ly++) {
+    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+      if (chunk.oreBase[ly * CHUNK_SIZE + lx] === NO_ORE) continue;
+      const tx = chunk.cx * CHUNK_SIZE + lx;
+      const ty = chunk.cy * CHUNK_SIZE + ly;
+      const f = state.world.oreFormationAt(tx, ty)!;
+      const voxels = f.voxels.map(([vx, vy, vz]) => [vx - tx * 2, vy - ty * 2, vz - f.base] as const);
+      const covered = (e: number, s: number, z: number) => state.world.isSolidVoxelPeek(tx * 2 + e, ty * 2 + s, f.base + z);
+      const mesh = billboards.spawnOre(f.feature, tx, ty, f.base * VOXEL, seed, voxels, covered);
+      if (!mesh) continue;
+      scene.add(mesh);
+      out.push(mesh);
+    }
+  }
+  return out;
+}
+
+function disposeOres(view: ChunkView): void {
+  for (const ore of view.ores) {
+    scene.remove(ore);
+    billboards.release(ore);
+  }
+  view.ores = [];
+}
+
+/** Rehace el terreno de un chunk ya dibujado, sus menas y las sombras que caen en el. */
 function rebuildTerrain(view: ChunkView, chunk: Chunk): void {
   scene.remove(view.mesh);
   view.mesh.geometry.dispose();
+  disposeOres(view);
+  view.ores = oresOf(chunk);
   const { mesh, triangles } = terrainMeshOf(chunk);
   view.mesh = mesh;
   view.triangles = triangles;
@@ -744,6 +784,7 @@ function dispose(key: string, view: ChunkView): void {
     scene.remove(prop);
     billboards.release(prop);
   }
+  disposeOres(view);
   disposeShadows(view);
   views.delete(key);
 }
@@ -1065,7 +1106,7 @@ function runFrame(now: number, draw: boolean): void {
         lastStab = { from, to, eye: { x: eye.x, y: eye.z, z: eye.y } };
         effects.spawnSlash(stabLine(from, to), width);
       } else {
-        const rays = strikeOf(state.world, e, id).rays;
+        const rays = strikeOf(state.world, e, id, state.fauna.values()).rays;
         const edge = slashEdge(eye, rays);
         effects.spawnSlash(edge, width);
         // En pantalla, para que el humo vea si se dibuja horizontal.

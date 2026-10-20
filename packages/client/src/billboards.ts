@@ -502,6 +502,34 @@ export class BillboardSet {
   }
 
   /**
+   * La mena de la casilla (`tx`, `ty`): los voxeles que le quedan de su
+   * formacion, [este, sur, altura desde su base], con su pie en el centro de
+   * la casilla a la altura `height` de su base; `covered`, si hay terreno en un
+   * voxel de fuera de ella. Su propia malla y su propia textura, que se liberan
+   * con su chunk (`release`). Una llamada de dibujo, como la roca. `null` si ya
+   * no le queda ninguno.
+   */
+  spawnOre(
+    feature: Feature,
+    tx: number,
+    ty: number,
+    height: number,
+    seed: number,
+    voxels: readonly (readonly [number, number, number])[],
+    covered: (e: number, s: number, z: number) => boolean,
+  ): Mesh | null {
+    if (voxels.length === 0 || !ORE_TONES[feature]) return null;
+    const ore = oreModel(feature, seed, tx, ty, voxels, covered);
+    const material = new MeshBasicMaterial({ map: pixelTexture(artCanvas(ore.art), true), vertexColors: true, alphaTest: 0.4 });
+    const mesh = new Mesh(upload(ore.mesh), material);
+    mesh.position.set(tx + 0.5, height, ty + 0.5);
+    mesh.userData.ore = true;
+    this.rocks++;
+    this.ores++;
+    return mesh;
+  }
+
+  /**
    * Un objeto nuevo para esa feature, ya apoyado en el suelo: un aspa, o la
    * roca de voxeles.
    *
@@ -516,18 +544,8 @@ export class BillboardSet {
     const tx = Math.floor(wx);
     const ty = Math.floor(wy);
     const turn = hash2DFloat(seed, tx, ty);
-    // Una mena: su propia malla y su propia textura, que se liberan con su
-    // chunk (`release`). Una llamada de dibujo, como la roca.
-    if (ORE_TONES[feature]) {
-      const ore = oreModel(feature, seed, tx, ty, Math.min(3, Math.floor(turn * 4)));
-      const material = new MeshBasicMaterial({ map: pixelTexture(artCanvas(ore.art), true), vertexColors: true, alphaTest: 0.4 });
-      const mesh = new Mesh(upload(ore.mesh), material);
-      mesh.position.set(wx, height, wy);
-      mesh.userData.ore = true;
-      this.rocks++;
-      this.ores++;
-      return mesh;
-    }
+    // Una mena no sale de aqui: es terreno desde el 2026-10-20 (`spawnOre`).
+    if (ORE_TONES[feature]) return null;
     const rock = this.rockMaterials.get(feature);
     if (rock) {
       const mesh = new Mesh(this.rockShapes[Math.min(3, Math.floor(turn * 4))]!, rock);

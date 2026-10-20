@@ -41,9 +41,13 @@ import {
 } from '@verdant/shared';
 import type { Hitbox } from './aim.js';
 import { EntityKind, type EntityStore } from './entities.js';
+import { isOre } from './ore-shape.js';
 import { topOf, VOXEL, VOXELS_PER_TILE, voxelOf } from './relief.js';
 import { treeTrunkAt } from './trunk.js';
 import type { World } from './world.js';
+
+/** Lo que puede correrse la caja de una estacion fuera de su casilla (la rejilla de 0,5). */
+const SHIFT = 0.5;
 
 /** Medio ancho del cuerpo del jugador, en tiles: su huella. */
 export const BODY_RADIUS = 0.34;
@@ -90,7 +94,8 @@ export const STATION_BOXES: Readonly<Record<Station.Workbench | Station.Furnace,
  */
 export function featureBox(world: World, tx: number, ty: number): Hitbox | null {
   const feature = world.featureAt(tx, ty);
-  if (feature === Feature.None || !harvestOf(feature)) return null;
+  // Una mena no es un objeto desde el 2026-10-20: son voxeles del terreno.
+  if (feature === Feature.None || !harvestOf(feature) || isOre(feature)) return null;
   let half: number;
   let height: number;
   const trunk = treeTrunkAt(world.seed, tx, ty, feature);
@@ -109,8 +114,11 @@ export function featureBox(world: World, tx: number, ty: number): Hitbox | null 
   } else {
     ({ half, height } = BUSH_BOX);
   }
-  const cx = tx + 0.5;
-  const cy = ty + 0.5;
+  // Una estacion puede ir corrida medio bloque en la rejilla de 0,5 (el autor,
+  // 2026-10-20); lo demas, en el centro de su casilla.
+  const [ox, oy] = station === null ? [0, 0] : world.stationOffsetAt(tx, ty);
+  const cx = tx + 0.5 + ox;
+  const cy = ty + 0.5 + oy;
   const z0 = objectBase(world, tx, ty, feature);
   return { x0: cx - half, x1: cx + half, y0: cy - half, y1: cy + half, z0, z1: z0 + height };
 }
@@ -327,8 +335,10 @@ export function terrainUnder(world: World, x: number, y: number, half: number, h
  */
 export function squareFloor(world: World, x: number, y: number, half: number, head = Infinity): number {
   let floor = terrainUnder(world, x, y, half, head);
-  for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
-    for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
+  // Una casilla mas al oeste y al norte: la caja de una estacion corrida
+  // asoma medio bloque a la casilla de al lado.
+  for (let ty = Math.floor(y - half - SHIFT); ty <= Math.floor(y + half); ty++) {
+    for (let tx = Math.floor(x - half - SHIFT); tx <= Math.floor(x + half); tx++) {
       const b = solidBox(world, tx, ty);
       if (
         b &&
@@ -363,8 +373,8 @@ export function ceilingOver(world: World, x: number, y: number, half: number, fr
       ceiling = Math.min(ceiling, topOf(world.ceilingAbove(vx, vy, start)));
     }
   }
-  for (let ty = Math.floor(y - half); ty <= Math.floor(y + half); ty++) {
-    for (let tx = Math.floor(x - half); tx <= Math.floor(x + half); tx++) {
+  for (let ty = Math.floor(y - half - SHIFT); ty <= Math.floor(y + half); ty++) {
+    for (let tx = Math.floor(x - half - SHIFT); tx <= Math.floor(x + half); tx++) {
       const b = solidBox(world, tx, ty);
       if (
         b &&

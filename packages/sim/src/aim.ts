@@ -240,22 +240,35 @@ export function rayOrientedBox(origin: Vec3, dir: Vec3, box: OrientedBox, maxT: 
   return tmin;
 }
 
+/**
+ * Un rayo del golpe: hasta donde llega y que lo paro, una cosa como mucho: el
+ * voxel del terreno en que entra, la caja de la casilla `tile` o el cuerpo
+ * `body`. Nada, si llega al alcance.
+ */
+export interface StrikeRay {
+  readonly dir: Vec3;
+  readonly length: number;
+  readonly voxel: Voxel | null;
+  readonly tile: Offset | null;
+  readonly body: number | null;
+}
+
 /** Lo que alcanza un golpe: sus rayos ya cortados y los objetos que toca. */
 export interface Strike {
-  /**
-   * Cada rayo del sector, de derecha a izquierda, hasta donde llega y, si lo
-   * corta el terreno, el voxel en que entra.
-   */
-  readonly rays: ReadonlyArray<{ dir: Vec3; length: number; voxel: Voxel | null }>;
+  /** Cada rayo del sector, de derecha a izquierda, y lo primero que toca. */
+  readonly rays: ReadonlyArray<StrikeRay>;
+  /** Los cuerpos (`bodies` de `strike`) que son lo primero de algun rayo, del mas cercano al mas lejano. */
+  readonly bodies: ReadonlyArray<{ id: number; t: number; at: Vec3 }>;
   /**
    * **Los voxeles del terreno que toca** (el autor, 2026-10-20): cada uno en
-   * que entra algun rayo, una vez aunque entren varios, del mas cercano al mas
-   * lejano.
+   * que entra algun rayo sin nada antes, una vez aunque entren varios, del mas
+   * cercano al mas lejano.
    */
   readonly voxels: ReadonlyArray<Voxel & { t: number }>;
   /**
-   * Las casillas de los objetos tocados, del mas cercano al mas lejano, con la
-   * distancia y el punto donde los toca su rayo mas corto: ahi va el impacto.
+   * Las casillas de los objetos que son lo primero de algun rayo, del mas
+   * cercano al mas lejano, con la distancia y el punto donde los toca su rayo
+   * mas corto: ahi va el impacto.
    */
   readonly targets: ReadonlyArray<Offset & { t: number; at: Vec3 }>;
 }
@@ -268,7 +281,8 @@ export function pointAlong(origin: Vec3, dir: Vec3, t: number): Vec3 {
 /**
  * El golpe desde `origin` —los ojos— mirando hacia `(fx, fy)` con inclinacion
  * `lookZ`, y el plano del sector girado `roll` alrededor de la mirada.
- * `boxAt` da el hitbox del objeto de una casilla, o `null`.
+ * `boxAt` da el hitbox del objeto de una casilla, o `null`; `bodies`, las
+ * cajas de los cuerpos que tambien paran el golpe (los animales).
  */
 export function strike(
   origin: Vec3,
@@ -278,43 +292,61 @@ export function strike(
   solid: Solid,
   boxAt: (tx: number, ty: number) => Hitbox | null,
   roll = 0,
+  bodies: ReadonlyArray<{ id: number; boxes: readonly OrientedBox[] }> = [],
 ): Strike {
-  const rays = sectorRays(fx, fy, lookZ, roll).map((dir) => {
-    const hit = groundHit(origin, dir, STRIKE_RANGE, solid);
-    return { dir, length: hit ? hit.t : STRIKE_RANGE, voxel: hit ? hit.voxel : null };
-  });
-  const seen = new Map<string, Voxel & { t: number }>();
-  for (const ray of rays) {
-    if (!ray.voxel) continue;
-    const key = `${ray.voxel.x},${ray.voxel.y},${ray.voxel.z}`;
-    const was = seen.get(key);
-    if (!was || ray.length < was.t) seen.set(key, { ...ray.voxel, t: ray.length });
-  }
-  const voxels = [...seen.values()].sort((a, b) => a.t - b.t || a.z - b.z || a.y - b.y || a.x - b.x);
-
   // Solo pueden caer las casillas a menos del alcance mas media diagonal.
   const reach = Math.ceil(STRIKE_RANGE) + 1;
   const cx = Math.floor(origin.x);
   const cy = Math.floor(origin.y);
-  const targets: Array<Offset & { t: number; at: Vec3 }> = [];
+  const boxes: Array<{ x: number; y: number; box: Hitbox }> = [];
   for (let ty = cy - reach; ty <= cy + reach; ty++) {
     for (let tx = cx - reach; tx <= cx + reach; tx++) {
       const box = boxAt(tx, ty);
-      if (!box) continue;
-      let best = Infinity;
-      let bestDir: Vec3 | null = null;
-      for (const ray of rays) {
-        const t = rayBox(origin, ray.dir, box, ray.length);
-        if (t !== null && t < best) {
-          best = t;
-          bestDir = ray.dir;
-        }
-      }
-      if (bestDir) targets.push({ x: tx, y: ty, t: best, at: pointAlong(origin, bestDir, best) });
+      if (box) boxes.push({ x: tx, y: ty, box });
     }
   }
-  targets.sort((a, b) => a.t - b.t || a.y - b.y || a.x - b.x);
-  return { rays, targets, voxels };
+
+  // Cada rayo da a lo primero que toca (el autor, 2026-10-20: «el
+  // comportamiento debe ser lógico y coherente con lo que se ve»): el
+  // terreno, una caja o un cuerpo. Lo de detras no se golpea.
+  const rays = sectorRays(fx, fy, lookZ, roll).map((dir): StrikeRay => {
+    const hit = groundHit(origin, dir, STRIKE_RANGE, solid);
+    let ray: StrikeRay = { dir, length: hit ? hit.t : STRIKE_RANGE, voxel: hit ? hit.voxel : null, tile: null, body: null };
+    for (const { x, y, box } of boxes) {
+      const t = rayBox(origin, dir, box, ray.length);
+      if (t !== null && t < ray.length) ray = { dir, length: t, voxel: null, tile: { x, y }, body: null };
+    }
+    for (const { id, boxes: parts } of bodies) {
+      for (const part of parts) {
+        const t = rayOrientedBox(origin, dir, part, ray.length);
+        if (t !== null && t < ray.length) ray = { dir, length: t, voxel: null, tile: null, body: id };
+      }
+    }
+    return ray;
+  });
+
+  const seen = new Map<string, Voxel & { t: number }>();
+  const hitTiles = new Map<string, Offset & { t: number; at: Vec3 }>();
+  const hitBodies = new Map<number, { id: number; t: number; at: Vec3 }>();
+  for (const ray of rays) {
+    const at = pointAlong(origin, ray.dir, ray.length);
+    if (ray.voxel) {
+      const key = `${ray.voxel.x},${ray.voxel.y},${ray.voxel.z}`;
+      const was = seen.get(key);
+      if (!was || ray.length < was.t) seen.set(key, { ...ray.voxel, t: ray.length });
+    } else if (ray.tile) {
+      const key = `${ray.tile.x},${ray.tile.y}`;
+      const was = hitTiles.get(key);
+      if (!was || ray.length < was.t) hitTiles.set(key, { ...ray.tile, t: ray.length, at });
+    } else if (ray.body !== null) {
+      const was = hitBodies.get(ray.body);
+      if (!was || ray.length < was.t) hitBodies.set(ray.body, { id: ray.body, t: ray.length, at });
+    }
+  }
+  const voxels = [...seen.values()].sort((a, b) => a.t - b.t || a.z - b.z || a.y - b.y || a.x - b.x);
+  const targets = [...hitTiles.values()].sort((a, b) => a.t - b.t || a.y - b.y || a.x - b.x);
+  const struck = [...hitBodies.values()].sort((a, b) => a.t - b.t || a.id - b.id);
+  return { rays, targets, voxels, bodies: struck };
 }
 
 /**

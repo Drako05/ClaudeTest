@@ -13,6 +13,7 @@ import {
   step,
   STATION_BOXES,
   STRIKE_RANGE,
+  squareFloor,
   type GameState,
 } from '@verdant/sim';
 import {
@@ -28,7 +29,7 @@ import {
   EQUIP_COUNT,
   type Intent,
 } from '@verdant/shared';
-import { collectAll, groundCount } from './ground.js';
+import { collectAll, groundCount, oreSite, strikeDown } from './ground.js';
 
 /**
  * La tanda 2 de fabricacion: mesa, horno, metales y ropa. Decisiones del autor
@@ -408,24 +409,22 @@ describe('Fabricar junto a una estacion', () => {
 });
 
 describe('Las herramientas de metal', () => {
-  it('el pico de cobre mina hierro; el de hierro, mas deprisa', () => {
-    const { state, tx, ty } = atSpawn();
-    const inv = state.inventory;
+  it('el pico de cobre mina hierro; el de hierro, mas deprisa: golpes por voxel', () => {
+    // Una mena de hierro generada, voxel a voxel (el autor, 2026-10-20): su
+    // trabajo de siempre, 6, por voxel; el pico de cobre suma 2 y el de hierro 3.
     const mine = (pick: Resource): number => {
-      inv.discard(0);
+      const state = createGame(12345);
+      const inv = state.inventory;
       inv.add(pick, 1);
-      act(state, { select: 0 });
-      state.world.setFeature(tx + 1, ty, Feature.IronNode);
-      for (let hits = 1; hits <= 10; hits++) {
-        hit(state, 1, 0, 30);
-        if (state.world.featureAt(tx + 1, ty) === Feature.None) return hits;
-      }
+      inv.select(inv.items.indexOf(pick));
+      const { tx, ty } = oreSite(state.world, Feature.IronNode);
+      const top = state.world.oreFormationAt(tx, ty)!.voxels.reduce((a, b) => (b[2] > a[2] ? b : a));
+      for (let hits = 1; hits <= 10; hits++) if (strikeDown(state, top[0], top[1])) return hits;
       return Infinity;
     };
     expect(mine(Resource.StonePickaxe)).toBe(Infinity);
     expect(mine(Resource.CopperPickaxe)).toBe(3);
     expect(mine(Resource.IronPickaxe)).toBe(2);
-    expect(inv.count(Resource.Iron)).toBeGreaterThan(0);
   });
 
   it('cobre: poder 2 y 120 usos; hierro: poder 3 y 250', () => {
@@ -622,11 +621,16 @@ describe('La partida de la tanda 2', () => {
     act(state, { moveFrom: slotOf(Resource.FrameBackpack), moveTo: equipSlot(Equip.Bag) });
     expect(inv.openSlots()).toBe(21);
 
-    // Y con el pico de cobre, hierro.
+    // Y con el pico de cobre, hierro: una mena entera, voxel a voxel.
     toHand(Resource.CopperPickaxe);
-    state.world.setFeature(tx, ty + 1, Feature.IronNode);
-    for (let i = 0; i < 3; i++) hit(state, 0, 1, 30);
-    expect(state.world.featureAt(tx, ty + 1)).toBe(Feature.None);
+    const site = oreSite(state.world, Feature.IronNode);
+    for (let k = 0; k < 40 && state.world.oreFormationAt(site.tx, site.ty)!.voxels.length > 0; k++) {
+      const left = state.world.oreFormationAt(site.tx, site.ty)!.voxels;
+      const top = left.reduce((a, b) => (b[2] > a[2] ? b : a));
+      for (let i = 0; i < 3; i++) strikeDown(state, top[0], top[1]);
+    }
+    expect(state.world.oreFormationAt(site.tx, site.ty)!.voxels).toHaveLength(0);
+    collectAll(state.world, inv);
     expect(inv.count(Resource.Iron)).toBeGreaterThan(0);
   });
 
@@ -635,5 +639,61 @@ describe('La partida de la tanda 2', () => {
     placeWorkbench(state);
     skipTime(state, 60 * 60 * 30);
     expect(state.world.featureAt(tx + 1, ty)).toBe(Feature.Workbench);
+  });
+});
+
+describe('Lo que se pone va en la rejilla de 0,5 (el autor, 2026-10-20)', () => {
+  /** El jugador en (`x`, `y`) de su rellano, con una mesa en la mano. */
+  function holding(dy: number) {
+    const { state, tx, ty } = atSpawn(7);
+    const e = state.entities;
+    e.x[state.playerId] = tx + 0.5;
+    e.y[state.playerId] = ty + 0.5 + dy;
+    state.inventory.add(Resource.Workbench, 1);
+    act(state, { select: state.inventory.items.indexOf(Resource.Workbench) });
+    return { state, tx, ty };
+  }
+
+  it('la caja se centra en la esquina de voxel mas cercana a la mirada: puede quedar a medio bloque', () => {
+    // Mirando al este y abajo, a ras de la mitad de su casilla: centrada en la
+    // casilla; corrida un cuarto al sur, la caja va medio bloque al sur.
+    for (const [dy, offset] of [[0, 0], [0.25, 0.5]] as const) {
+      const { state } = holding(dy);
+      use(state, 1, 0, 45);
+      const placed = state.lastPlaced!;
+      expect(placed).not.toBeNull();
+      expect(state.world.stationOffsetAt(placed.x, placed.y)).toEqual([0, offset]);
+      const box = hitboxAt(state.world, placed.x, placed.y)!;
+      expect(box.y0 - placed.y).toBeCloseTo(offset, 9);
+      expect(box.y1 - box.y0).toBeCloseTo(1, 9);
+      // Lo que pisa ademas de su casilla queda cubierto.
+      expect(state.world.isCovered(placed.x, placed.y + 1)).toBe(offset > 0);
+    }
+  });
+
+  it('una caja corrida choca en la casilla de al lado, y al desmontarla la libera', () => {
+    const { state, tx, ty } = atSpawn(7);
+    const w = state.world;
+    const at = w.placeStation(tx + 2.5, ty + 0.5, Feature.Workbench);
+    expect(at).toEqual({ x: tx + 2, y: ty });
+    const top = hitboxAt(w, tx + 2, ty)!.z1;
+    // Un punto de la casilla de al lado (tx+3, ty+1), dentro de la caja.
+    expect(squareFloor(w, tx + 3.2, ty + 1.2, 0)).toBe(top);
+    expect(w.isCovered(tx + 3, ty + 1)).toBe(true);
+    // Ni se siembra ni se pone nada debajo.
+    expect(w.footprintTiles(tx + 2.5, ty + 0.5)).toHaveLength(4);
+    w.setFeature(tx + 2, ty, Feature.None);
+    expect(w.isCovered(tx + 3, ty + 1)).toBe(false);
+    expect(w.stationOffsetAt(tx + 2, ty)).toEqual([0, 0]);
+    expect(squareFloor(w, tx + 3.2, ty + 1.2, 0)).toBeLessThan(top);
+  });
+
+  it('no se pone donde pisaria algo: un objeto en una de sus casillas, o una casilla cubierta', () => {
+    const { state, tx, ty } = holding(0.25);
+    // La que pondria: corrida al sur desde (tx+1, ty), y pisaria (tx+1, ty+1).
+    state.world.setFeature(tx + 1, ty + 1, Feature.Pebbles);
+    use(state, 1, 0, 45);
+    expect(state.lastPlaced).toBeNull();
+    expect(state.inventory.count(Resource.Workbench)).toBe(1);
   });
 });

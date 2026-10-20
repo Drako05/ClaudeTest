@@ -22,7 +22,7 @@ import {
   Terrain,
   toolStats,
 } from '@verdant/shared';
-import { collectAll, groundCount } from './ground.js';
+import { collectAll, groundCount, oreSite, strikeDown } from './ground.js';
 
 /**
  * La tanda 1 de recoleccion y fabricacion, decisiones del autor: trabajo por
@@ -253,23 +253,37 @@ describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {
     expect(swing(state, -1, 0, 30).blocked).toBe('needPickaxe');
     expect(inv.wear[inv.selected]).toBe(40 - 5);
 
-    // 4. El pico: roca en 3, carbon en 4, cobre en 5; el hierro pide uno mejor.
+    // 4. El pico: roca en 3, y un voxel de carbon en 4, uno de cobre en 5; el
+    // hierro pide uno mejor. Las menas son voxeles desde el 2026-10-20: se
+    // pica la de arriba de una generada.
     toHand(Resource.StonePickaxe, 1);
-    const mine = (f: Feature, hits: number, item: Resource) => {
-      w.setFeature(tx - 1, ty, f);
-      const before = inv.count(item);
-      for (let i = 0; i < hits - 1; i++) swing(state, -1, 0, 30);
-      expect(w.featureAt(tx - 1, ty)).toBe(f);
-      swing(state, -1, 0, 30);
-      expect(w.featureAt(tx - 1, ty)).toBe(Feature.None);
-      expect(inv.count(item)).toBeGreaterThan(before);
+    w.setFeature(tx - 1, ty, Feature.RockNode);
+    const stone = inv.count(Resource.Stone);
+    for (let i = 0; i < 2; i++) swing(state, -1, 0, 30);
+    expect(w.featureAt(tx - 1, ty)).toBe(Feature.RockNode);
+    swing(state, -1, 0, 30);
+    expect(w.featureAt(tx - 1, ty)).toBe(Feature.None);
+    expect(inv.count(Resource.Stone)).toBeGreaterThan(stone);
+    const topOf = (f: Feature) => {
+      const { tx: ox, ty: oy } = oreSite(w, f);
+      return w.oreFormationAt(ox, oy)!.voxels.reduce((p, q) => (q[2] > p[2] ? q : p));
     };
-    mine(Feature.RockNode, 3, Resource.Stone);
-    mine(Feature.CoalNode, 4, Resource.Coal);
-    mine(Feature.CopperNode, 5, Resource.Copper);
-    w.setFeature(tx - 1, ty, Feature.IronNode);
-    for (let i = 0; i < 8; i++) expect(swing(state, -1, 0, 30).blocked).toBe('needBetterPickaxe');
-    expect(w.featureAt(tx - 1, ty)).toBe(Feature.IronNode);
+    const mineOre = (f: Feature, hits: number) => {
+      const top = topOf(f);
+      for (let i = 0; i < hits - 1; i++) expect(strikeDown(state, top[0], top[1])).toBe(false);
+      expect(strikeDown(state, top[0], top[1])).toBe(true);
+    };
+    const coal = inv.count(Resource.Coal) + groundCount(w, Resource.Coal);
+    mineOre(Feature.CoalNode, 4);
+    // El carbon suelta de 1 a 2 por voxel (el autor).
+    expect(inv.count(Resource.Coal) + groundCount(w, Resource.Coal)).toBeGreaterThan(coal);
+    mineOre(Feature.CopperNode, 5);
+    const iron = topOf(Feature.IronNode);
+    for (let i = 0; i < 8; i++) {
+      strikeDown(state, iron[0], iron[1]);
+      expect(state.lastBlocked).toBe('needBetterPickaxe');
+    }
+    expect(w.isSolidVoxel(...iron)).toBe(true);
     // Uno por golpe, tambien los que no pudo con el hierro: 3 + 4 + 5 + 8.
     expect(inv.wear[inv.selected]).toBe(40 - 20);
   });

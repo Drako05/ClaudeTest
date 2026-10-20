@@ -24,7 +24,7 @@
 import { BoxGeometry, Mesh, MeshBasicMaterial, type Material, type Texture } from 'three';
 import { now } from './clock.js';
 import { Feature, Station, stationOfFeature } from '@verdant/shared';
-import { GRAVITY, hash2DFloat, STATION_BOXES, type Placed, type World } from '@verdant/sim';
+import { GRAVITY, hash2DFloat, objectBase, STATION_BOXES, type Placed, type World } from '@verdant/sim';
 import { STATION_ART } from './world-art.js';
 import { artCanvas, pixelTexture } from './world-sprites.js';
 
@@ -99,15 +99,24 @@ export class StationSet {
 
   /**
    * Una caja para la estacion de la casilla `(tx, ty)`, apoyada en su suelo,
-   * con el frente hacia `facing` (el del nucleo, mismo convenio que `SIDES`).
+   * con el frente hacia `facing` (el del nucleo, mismo convenio que `SIDES`) y
+   * corrida `offset` en la rejilla de 0,5 (`World.stationOffsetAt`).
    */
-  spawn(feature: Feature, tx: number, ty: number, ground: number, seed: number, facing: number | null): Mesh | null {
+  spawn(
+    feature: Feature,
+    tx: number,
+    ty: number,
+    ground: number,
+    seed: number,
+    facing: number | null,
+    offset: readonly [number, number] = [0, 0],
+  ): Mesh | null {
     const kind = this.kinds.get(feature);
     if (!kind) return null;
     const turn = facing ?? Math.floor(hash2DFloat(seed ^ 0x51a7, tx, ty) * 4) % 4;
     this.turns.set(`${tx},${ty}`, turn);
     const mesh = new Mesh(kind.geometry, kind.byTurn[turn]);
-    mesh.position.set(tx + 0.5, ground + kind.height / 2, ty + 0.5);
+    mesh.position.set(tx + 0.5 + offset[0], ground + kind.height / 2, ty + 0.5 + offset[1]);
     mesh.userData.half = kind.height / 2;
     // Si esta cayendo, el chunk que se redibuja la entrega a la caida.
     const fall = this.falling.get(`${tx},${ty}`);
@@ -118,7 +127,8 @@ export class StationSet {
 
   /** La estacion recien puesta empieza a caer desde la altura de la mirada. */
   drop(placed: Placed, world: World): void {
-    const ground = world.groundHeightAt(placed.x + 0.5, placed.y + 0.5);
+    // Hasta donde se apoya su caja, la del nucleo.
+    const ground = objectBase(world, placed.x, placed.y, world.featureAt(placed.x, placed.y));
     if (placed.z <= ground + 0.01) return;
     this.falling.set(`${placed.x},${placed.y}`, { from: placed.z, ground, since: now(), mesh: null });
     this.drops++;

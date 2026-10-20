@@ -891,7 +891,7 @@ async function desktopPass(browser, baseUrl) {
     document.getElementById('invPanel').dispatchEvent(ev);
     return ev.defaultPrevented;
   }), 'el clic derecho sobre el panel deja salir el menu del navegador');
-  check((await page.locator('#recipeList .recipe').count()) === 2, 'el recetario no lista las dos herramientas de piedra');
+  check((await page.locator('#recipeList .recipe').count()) === 3, 'el recetario no lista las tres herramientas de piedra (hacha, pico y pala)');
   // Catorce equipables, cada uno con su icono y sin nombre escrito (el autor,
   // 2026-10-04), en cinco columnas alrededor del dibujo.
   const equips = await page.evaluate(() => {
@@ -1662,10 +1662,15 @@ async function resourcesPass(browser, baseUrl) {
     await elapse(page, 200);
     await toHand(page, 11);
     // Con el pico, golpe a golpe: el hierro pide uno mejor, lo demas sale.
+    // Desde el 2026-10-20 la mena es una formacion de voxeles que asoma medio
+    // bloque: se mira hacia ella, y cada voxel pide su trabajo (4 o 5 golpes
+    // con el pico de piedra) y suelta de 0 a 1 (el carbon, de 1 a 2).
+    await look(page, 0, 150);
+    await elapse(page, 200);
     const iron = mineral.kind.includes('hierro');
     let mined = await state(page);
     const oreDropped = (s) => s.drops.some((d) => d.item >= 5 && d.item <= 7);
-    for (let i = 0; i < 10 && ores(mined) === 0 && !oreDropped(mined); i++) {
+    for (let i = 0; i < 40 && ores(mined) === 0 && !oreDropped(mined); i++) {
       await strike(page);
       await elapse(page, 260);
       mined = await state(page);
@@ -1674,13 +1679,14 @@ async function resourcesPass(browser, baseUrl) {
     if (oreDropped(mined)) mined = await collect(page);
     await shot(page, '3d-03-montana.png');
     const pickNow = mined.slots.findIndex((s) => s.item === 11);
-    console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickNow]?.wear}, esquirlas ${mined.chipsDrawn}, rocas en voxeles ${mined.rocksDrawn}`);
-    check(mined.chipsDrawn > 0, 'golpear sin romper no solto esquirlas');
+    console.log(`  con pico: carbon/hierro/cobre ${mined.inventory.slice(5, 8).join('/')}, usos ${mined.slots[pickNow]?.wear}, ` +
+      `voxeles tocados ${mined.voxelHits} y rotos ${mined.voxelsBroken}, rocas en voxeles ${mined.rocksDrawn}`);
+    check(mined.voxelHits > 0, 'el pico no llego a la mena');
     // En la montana, las rocas y los minerales son voxeles (el autor,
     // 2026-10-19), no aspas: alguno se ha puesto.
     check(mined.rocksDrawn > 0, 'en la montana no se puso ni una roca de voxeles');
     // Y las menas, cada una con su malla y sus cristales (el autor, 2026-10-20):
-    // al sacar el mineral su chunk se rehace, y la que se fue se libera.
+    // al romper uno de sus voxeles su chunk rehace sus menas, y libera las de antes.
     console.log(`  menas: puestas ${mined.oresDrawn}, liberadas ${mined.oresReleased}`);
     check(mined.oresDrawn > 0, 'en la montana no se puso ni una mena con sus cristales');
     if (!iron) check(mined.oresReleased > 0, 'se saco el mineral y su chunk no libero ninguna mena');
@@ -1991,8 +1997,9 @@ async function stationsPass(browser, baseUrl) {
   check(bench.inventoryOpen && bench.panelStation === 1, 'USAR mirando la mesa no abrio su panel');
   check(benchTabs.join() === 'Herramientas,Ropa,Armas', `la mesa ensena otras recetas: ${benchTabs}`);
   // El panel de PC (pedido del autor, 2026-10-01): las cuatro herramientas de
-  // la mesa caben sin barra; las barras no van apretadas contra lo de al lado;
-  // los titulos, mas grandes.
+  // la mesa cabian sin barra; las barras no van apretadas contra lo de al lado;
+  // los titulos, mas grandes. Desde las palas (2026-10-20) son seis: no caben,
+  // y la lista se desliza con su barra.
   const layoutPc = await page.evaluate(() => {
     const r = (el) => el.getBoundingClientRect().toJSON();
     const list = document.getElementById('recipeList');
@@ -2010,8 +2017,8 @@ async function stationsPass(browser, baseUrl) {
   });
   console.log(`  panel de PC: ${layoutPc.recipes} recetas ${layoutPc.overflows ? 'desbordan' : 'caben'}, ` +
     `barra a ${(layoutPc.recipesCol.left - layoutPc.gridRail.right).toFixed(0)} px de las recetas, titulos de ${layoutPc.title} px`);
-  check(layoutPc.recipes === 4 && !layoutPc.overflows && layoutPc.listRail === 'hidden',
-    `cuatro recetas no caben sin barra: ${JSON.stringify(layoutPc)}`);
+  check(layoutPc.recipes === 6 && layoutPc.overflows && layoutPc.listRail === 'visible',
+    `las seis herramientas de la mesa no se deslizan con su barra: ${JSON.stringify(layoutPc)}`);
   check(layoutPc.recipesCol.left - layoutPc.gridRail.right >= 12 && layoutPc.panel.right - layoutPc.listRailR.right >= 8,
     `las barras van apretadas: ${JSON.stringify(layoutPc)}`);
   check(layoutPc.title >= 15, `los titulos del panel siguen pequenos: ${layoutPc.title}`);
@@ -2724,7 +2731,7 @@ async function devToolsPass(browser, baseUrl) {
   check(stdDev.bad.length === 0, `hay botones del panel de desarrollo fuera del estandar: ${stdDev.bad.join(' | ')}`);
 
   // La hoja de los iconos (`?iconos=1`, la revision de la tanda del
-  // 2026-10-17): los 30 objetos, los 14 huecos de PERSONAJE, los 20 botones y
+  // 2026-10-17): los 33 objetos (las tres palas, desde el 2026-10-20), los 14 huecos de PERSONAJE, los 20 botones y
   // las 6 categorias de las recetas,
   // cada uno pintado a 48 px y a 96.
   const sheet = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -2734,7 +2741,7 @@ async function devToolsPass(browser, baseUrl) {
     document.querySelectorAll('#iconSheet figure').length, document.querySelectorAll('#iconSheet svg path').length > 0]);
   await sheet.close();
   console.log(`  hoja de iconos: ${JSON.stringify(sheetIcons)}`);
-  check(sheetIcons[0] === 70 && sheetIcons[1] === 70 && sheetIcons[2], `la hoja de iconos no tiene los 70: ${JSON.stringify(sheetIcons)}`);
+  check(sheetIcons[0] === 73 && sheetIcons[1] === 73 && sheetIcons[2], `la hoja de iconos no tiene los 73: ${JSON.stringify(sheetIcons)}`);
   // La hoja del pixelart del mundo (`?mundo=1`, la tanda del 2026-10-19):
   // cada lienzo pintado, ninguno en blanco.
   const world = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -3407,9 +3414,11 @@ async function faunaPass(browser, baseUrl) {
 
 /**
  * Romper el terreno (el autor, 2026-10-20): cada golpe da a cada voxel de 0,5
- * que toca, que aguanta 3 y se rompe solo, con la mano vacia. Los numeros los
- * miden los tests del nucleo (`voxel-edit.test.ts`); aqui, que el golpe llega
- * al terreno y que el dibujo se rehace solo en su terreno.
+ * que toca, que se rompe con su herramienta —la roca, con pico; lo maleable,
+ * con pala— y sin ella no. Los numeros los miden los tests del nucleo
+ * (`voxel-edit.test.ts`); aqui, que el golpe llega al terreno, que a mano no
+ * rompe la roca del nacimiento, que con un pico fabricado si, y que el dibujo
+ * se rehace solo en su terreno.
  */
 async function digPass(browser, baseUrl) {
   console.log('\n== romper el terreno ==');
@@ -3417,7 +3426,8 @@ async function digPass(browser, baseUrl) {
   watchProblems(page, 'romper');
 
   await open(page, baseUrl);
-  // Mirando unos 50 grados abajo, el sector entra en el suelo de delante.
+  // Mirando unos 50 grados abajo, el sector entra en el suelo de delante: la
+  // roca del este del nacimiento (semilla 12345).
   await look(page, 0, 260);
   await elapse(page, 300);
   const before = await state(page);
@@ -3425,24 +3435,48 @@ async function digPass(browser, baseUrl) {
   check(before.lookZ < -0.6, `la mirada no bajo lo bastante: ${before.lookZ.toFixed(2)}`);
   check(before.voxelHits === 0 && before.voxelsBroken === 0, 'el terreno ya estaba golpeado al empezar');
 
-  await strike(page);
-  await elapse(page, 260);
-  await strike(page);
-  await elapse(page, 260);
-  const twice = await state(page);
-  console.log(`  dos golpes: ${twice.voxelHits} voxeles tocados, ${twice.voxelsBroken} rotos`);
-  check(twice.voxelHits >= 2, `los golpes no llegaron al terreno: ${twice.voxelHits}`);
-  check(twice.voxelsBroken === 0, `un voxel se rompio antes del tercer golpe: ${twice.voxelsBroken}`);
-  check(twice.terrainRebuilds === before.terrainRebuilds, 'se rehizo el terreno sin romper nada');
+  // A mano, la roca no se rompe: el golpe la toca, pero nada mas.
+  for (let i = 0; i < 4; i++) {
+    await strike(page);
+    await elapse(page, 260);
+  }
+  const bare = await state(page);
+  console.log(`  a mano: ${bare.voxelHits} voxeles tocados, ${bare.voxelsBroken} rotos`);
+  check(bare.voxelHits >= 4, `los golpes no llegaron al terreno: ${bare.voxelHits}`);
+  check(bare.voxelsBroken === 0, `a mano se rompio la roca: ${bare.voxelsBroken}`);
+  check(bare.terrainRebuilds === before.terrainRebuilds, 'se rehizo el terreno sin romper nada');
 
-  await strike(page);
-  await elapse(page, 260);
+  // Un pico de piedra, de los materiales del panel.
+  await freeCursor(page);
+  await page.click('[data-kit="piedra"]');
+  await page.keyboard.press('KeyE');
+  await elapse(page, 300);
+  const row = await page.locator('#recipeList .recipe:nth-child(2) .result').boundingBox();
+  await page.mouse.move(row.x + row.width / 2, row.y + row.height / 2);
+  await page.mouse.down();
+  await elapse(page, 1900);
+  await page.mouse.up();
+  await elapse(page, 300);
+  await page.keyboard.press('KeyE');
+  await elapse(page, 250);
+  await unfree(page);
+  const crafted = await state(page);
+  const pick = crafted.slots.findIndex((s) => s.item === 11);
+  check(pick >= 0 && pick < 5, `el pico no quedo en la barra: ${JSON.stringify(crafted.slots.slice(0, 6))}`);
+  if (pick >= 0) await page.keyboard.press(`Digit${pick + 1}`);
+  await elapse(page, 200);
+
+  const start = await state(page);
+  for (let i = 0; i < 3; i++) {
+    await strike(page);
+    await elapse(page, 260);
+  }
   const third = await state(page);
-  console.log(`  al tercero: ${third.voxelsBroken} rotos, terreno rehecho ${third.terrainRebuilds - before.terrainRebuilds} veces, ` +
+  console.log(`  con pico: ${third.voxelsBroken} rotos, terreno rehecho ${third.terrainRebuilds - start.terrainRebuilds} veces, ` +
     `${third.triangles} triangulos`);
-  check(third.voxelsBroken > 0, 'al tercer golpe no se rompio ningun voxel');
-  check(third.terrainRebuilds > before.terrainRebuilds, 'se rompio terreno y su malla no se rehizo');
-  check(third.triangles !== before.triangles, 'se rompio terreno y la malla no cambio');
+  check(third.voxelsBroken > 0, 'con el pico, al tercer golpe no se rompio ningun voxel');
+  check(third.terrainRebuilds > start.terrainRebuilds, 'se rompio terreno y su malla no se rehizo');
+  check(third.triangles !== start.triangles, 'se rompio terreno y la malla no cambio');
   check(third.reticle !== null, 'tras romper, la reticula no marca nada');
   await shot(page, '3d-20-romper.png');
 

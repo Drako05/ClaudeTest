@@ -99,7 +99,7 @@ const DESCRIPTIONS: Record<number, string> = {
   [Resource.Branch]: 'Sale de los arboles golpeandolos sin hacha. Para fabricar.',
   [Resource.Fiber]: 'La sueltan los arbustos. Para fabricar.',
   [Resource.StoneAxe]: 'Tala arboles. Se gasta con cada golpe.',
-  [Resource.StonePickaxe]: 'Saca piedra, carbon y cobre. Se gasta con cada golpe.',
+  [Resource.StonePickaxe]: 'Saca piedra, carbon y cobre, y rompe la roca del suelo. Se gasta con cada golpe.',
   [Resource.CopperIngot]: 'Del horno. Para herramientas, la espada y la mochila, en la mesa.',
   [Resource.IronIngot]: 'Del horno. Para las herramientas y la espada de hierro, en la mesa.',
   [Resource.CopperAxe]: 'Tala en dos golpes. Se gasta con cada golpe.',
@@ -121,6 +121,9 @@ const DESCRIPTIONS: Record<number, string> = {
     'Arma: 30 de dano a los animales. Equipada en Arma, en PERSONAJE, golpea con ella aunque lleves otra cosa en la mano.',
   [Resource.IronSword]:
     'Arma: 45 de dano a los animales. Equipada en Arma, en PERSONAJE, golpea con ella aunque lleves otra cosa en la mano.',
+  [Resource.StoneShovel]: 'Cava la arena, la tierra, la tundra y la nieve. Se gasta con cada golpe.',
+  [Resource.CopperShovel]: 'Cava en dos golpes. Se gasta con cada golpe.',
+  [Resource.IronShovel]: 'Cava de un golpe. Se gasta con cada golpe.',
 };
 
 export interface ItemRequests {

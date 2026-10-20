@@ -14,6 +14,7 @@ export * from './aim.js';
 export * from './boxes.js';
 export * from './trunk.js';
 export * from './relief.js';
+export * from './ore-shape.js';
 export * from './biome.js';
 export * from './worldgen.js';
 export * from './world.js';

@@ -198,9 +198,9 @@ que venga. Son **las directrices del autor** para el diseño.
   oscuro que el bloque; lo noto el autor).
 - **Las categorias de las recetas, monocromas** (el autor, 2026-10-17: «para
   que se entienda que son representaciones generales»), como los botones.
-- **Como se revisa**: `?iconos=1` abre en el juego la hoja de los 70 (30
-  objetos, 14 huecos, 20 botones y 6 categorias), cada uno a 48 px y a 96, con
-  su nombre.
+- **Como se revisa**: `?iconos=1` abre en el juego la hoja de los 73 (33
+  objetos —las tres palas, desde el 2026-10-20—, 14 huecos, 20 botones y 6
+  categorias), cada uno a 48 px y a 96, con su nombre.
 - **Aplicada**: los 30 objetos, los 14 huecos y los botones (2026-10-17).
   Los de la mesa y el horno cambiaron de colores con sus caras en pixelart
   (2026-10-19, directriz 7): cada color, el del mismo papel y la misma luz.

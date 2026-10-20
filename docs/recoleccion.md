@@ -20,11 +20,24 @@ Decisiones del autor, que no se tocan sin preguntarle:
 - **Trabajo por golpes.** Cada objeto pide un trabajo (`workOf`) y cada golpe
   suma el poder de lo que se lleva en la mano (`toolStats`); a mano, algunas
   cosas no se completan. Un arbol sin hacha no cae: suelta ramas. Roca y
-  minerales piden pico, y el hierro uno de cobre o mejor.
+  minerales piden pico, y el hierro uno de cobre o mejor; el suelo, pala o
+  pico.
 - **El terreno se rompe a golpes** (el autor, 2026-10-20): cada voxel de 0,5
-  que toca el golpe aguanta 3, con cualquier cosa en la mano, y no suelta
-  nada. Gasta un uso, como todo golpe que toca algo. Ver `docs/relieve.md`,
-  «Romper el terreno», y la regla 12.
+  que toca el golpe, **la roca con pico y lo maleable con pala** (arena,
+  hierba, bosque, tundra y nieve), con 3 de trabajo y el poder restando; no
+  suelta nada. Gasta un uso, como todo golpe que toca algo. Ver
+  `docs/relieve.md`, «Romper el terreno», y la regla 12.
+- **La pala** (el autor, 2026-10-20), con los tiers de las demas: de piedra
+  (poder 1, 40 usos), de cobre (2, 120) y de hierro (3, 250). Sus recetas, a
+  propuesta mia, un material menos que el hacha y el pico: 2 ramas, 1 piedra y
+  2 fibras, a mano; 2 ramas y 2 lingotes de cobre o de hierro, en la mesa. Van
+  al final de `RECIPES`, para no mover los indices. Con ellas **la mesa tiene
+  seis herramientas y su lista se desliza con su barra**: las cuatro de antes
+  cabian sin ella (pedido del autor, 2026-10-01).
+- **Las menas son voxeles** (el autor, 2026-10-20): ocho, que se pican uno a
+  uno con el pico de su tier y el trabajo de la mena por voxel; cada uno
+  suelta 0-1 de su mineral (el carbon, 1-2) y nada de particulas. Con el
+  ultimo, la casilla queda vacia. Ver `docs/relieve.md`, «Las menas».
 - **Se equipa una herramienta**: las casillas 1-5 (la primera fila del
   inventario, de 5 columnas desde el 2026-10-19) son la barra y la elegida es
   la mano. La eleccion viaja en la

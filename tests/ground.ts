@@ -3,8 +3,8 @@
  * 2026-10-18): contar lo que hay suelto y recogerlo de golpe, para los tests
  * que miden lo que da algo y no como se recoge (eso lo mira `drops.test.ts`).
  */
-import { isStation, type Feature, type Resource } from '@verdant/shared';
-import { topOf, VOXEL, type Inventory, type Solid, type World } from '@verdant/sim';
+import { emptyIntent, isStation, type Feature, type Resource } from '@verdant/shared';
+import { step, topOf, VOXEL, type GameState, type Inventory, type Solid, type World } from '@verdant/sim';
 
 /** Cuantas unidades de un objeto hay sueltas en el mundo. */
 export function groundCount(world: World, item: Resource): number {
@@ -43,6 +43,7 @@ export function withVoxels<T extends object>(w: T): T {
       return this.columnTop(vx, vy);
     },
     brokenAt: () => undefined,
+    stationOffsetAt: () => [0, 0] as const,
     floorBelow(this: Columns, vx: number, vy: number, below: number) {
       return Math.min(this.columnTop(vx, vy), below);
     },
@@ -57,4 +58,42 @@ export function withVoxels<T extends object>(w: T): T {
       return isStation(feature) ? Math.max(...tops) : Math.min(...tops);
     },
   });
+}
+
+/**
+ * La mena generada de esa clase mas cerca del origen (por anillos): su
+ * casilla. Desde el 2026-10-20 una mena es una formacion de voxeles que pone el
+ * generador (`ore-shape.ts`): no sale de `setFeature`.
+ */
+export function oreSite(world: World, feature: Feature): { tx: number; ty: number } {
+  for (let r = 0; r < 800; r++) {
+    for (let x = -r; x <= r; x++) {
+      for (const y of r === 0 ? [0] : [-r, r]) {
+        if (world.gen.featureAt(x, y, world.gen.terrainAt(x, y)) === feature) return { tx: x, ty: y };
+      }
+    }
+    for (let y = -r + 1; y < r; y++) {
+      for (const x of [-r, r]) {
+        if (world.gen.featureAt(x, y, world.gen.terrainAt(x, y)) === feature) return { tx: x, ty: y };
+      }
+    }
+  }
+  throw new Error(`ninguna ${feature} cerca`);
+}
+
+/**
+ * Pone de pie al jugador sobre la columna de 0,5 (`vx`, `vy`), mirando abajo, y
+ * le da un golpe preciso: al voxel de debajo de sus pies. Devuelve si se rompio.
+ */
+export function strikeDown(state: GameState, vx: number, vy: number): boolean {
+  const e = state.entities;
+  const id = state.playerId;
+  e.x[id] = (vx + 0.5) * VOXEL;
+  e.y[id] = (vy + 0.5) * VOXEL;
+  e.z[id] = topOf(state.world.columnTop(vx, vy));
+  e.vx[id] = 0;
+  e.vy[id] = 0;
+  e.vz[id] = 0;
+  step(state, { ...emptyIntent(), harvest: true, precise: true, aimX: 1, aimY: 0, aimZ: -1 });
+  return state.lastVoxelHits.some((v) => v.broken);
 }

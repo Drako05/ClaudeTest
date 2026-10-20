@@ -88,6 +88,7 @@ const SPAWN_ROOM_HALF = 24;
  */
 const SPAWN_LANDING_HALF = 1;
 import { hash2D, hash2DFloat } from './rng.js';
+import { NO_ORE, oreFormation } from './ore-shape.js';
 import { CHUNK_COLUMNS, generateChunk, WorldGen } from './worldgen.js';
 import { faunaOf, type Animal } from './fauna.js';
 
@@ -104,6 +105,8 @@ export interface Chunk {
    * `WATER_HEIGHT` es agua. El terreno son voxeles: solidos de ahi para abajo.
    */
   readonly height: Int16Array;
+  /** La base de la mena de cada casilla, o `NO_ORE` (`GeneratedChunk.oreBase`). */
+  readonly oreBase: Int16Array;
   /** Sube cuando lo visible cambia; el renderer lo usa para invalidar cache. */
   revision: number;
   /**
@@ -174,6 +177,14 @@ export class World {
    */
   private readonly bases = new Map<string, number>();
   /**
+   * **Lo que se pone va en la rejilla de 0,5** (el autor, 2026-10-20): cuanto se
+   * corre la caja de la estacion de cada casilla, 0 o 0,5 en cada eje, hacia el
+   * este y el sur. Su casilla es la «ancla», la de su esquina noroeste.
+   */
+  private readonly offsets = new Map<string, readonly [number, number]>();
+  /** Las casillas que pisa una estacion corrida ademas de su ancla, con la de su ancla. */
+  private readonly covered = new Map<string, string>();
+  /**
    * Los objetos sueltos (`drop-store.ts`): fuera de los chunks, como el resto
    * del overlay (regla 4), porque siguen ahi aunque se descargue su chunk,
    * hasta que caducan a los 2 dias de juego (el autor, 2026-10-19).
@@ -218,6 +229,7 @@ export class World {
       terrain: raw.terrain,
       feature: new Uint8Array(raw.feature),
       height: raw.height,
+      oreBase: raw.oreBase,
       revision: 0,
       terrainRevision: 0,
     };
@@ -439,6 +451,35 @@ export class World {
     return h;
   }
 
+  /**
+   * De que mena es el voxel (`vx`, `vy`, `vz`), o `Feature.None` si es terreno
+   * sin mas (o aire). Lo dice el potencial: la formacion que puso el generador
+   * en su casilla (`ore-shape.ts`); que siga ahi lo dice `isSolidVoxel`.
+   */
+  oreAt(vx: number, vy: number, vz: number): Feature {
+    const tx = Math.floor(vx / VOXELS_PER_TILE);
+    const ty = Math.floor(vy / VOXELS_PER_TILE);
+    const chunk = this.getChunk(toChunkCoord(tx), toChunkCoord(ty));
+    return oreIn(chunk, this.seed, vx, vy, vz);
+  }
+
+  /**
+   * La mena de la casilla, si tiene: cual, su base (medios bloques) y los
+   * voxeles de su formacion que quedan, en coordenadas de voxel del mundo.
+   */
+  oreFormationAt(tx: number, ty: number): { feature: Feature; base: number; voxels: [number, number, number][] } | null {
+    const chunk = this.getChunk(toChunkCoord(tx), toChunkCoord(ty));
+    const idx = localCoord(ty) * CHUNK_SIZE + localCoord(tx);
+    const base = chunk.oreBase[idx]!;
+    if (base === NO_ORE) return null;
+    const voxels: [number, number, number][] = [];
+    for (const [e, s, dz] of oreFormation(this.seed, tx, ty)) {
+      const v: [number, number, number] = [tx * VOXELS_PER_TILE + e, ty * VOXELS_PER_TILE + s, base + dz];
+      if (this.isSolidVoxel(...v)) voxels.push(v);
+    }
+    return { feature: chunk.feature[idx] as Feature, base, voxels };
+  }
+
   /** Las alturas de los voxeles rotos de la columna, sin orden: para el dibujo. */
   brokenAt(vx: number, vy: number): ReadonlySet<number> | undefined {
     return this.brokenIn(vx, vy);
@@ -505,9 +546,13 @@ export class World {
   private settle(tx: number, ty: number, feature: Feature, top: (vx: number, vy: number) => number): number {
     const highest = isStation(feature);
     let base = highest ? -Infinity : Infinity;
+    // Las columnas que pisa su caja: las de su casilla, corridas con ella.
+    const [ox, oy] = this.stationOffsetAt(tx, ty);
+    const vx0 = (tx + ox) * VOXELS_PER_TILE;
+    const vy0 = (ty + oy) * VOXELS_PER_TILE;
     for (let sy = 0; sy < VOXELS_PER_TILE; sy++) {
       for (let sx = 0; sx < VOXELS_PER_TILE; sx++) {
-        const h = topOf(top(tx * VOXELS_PER_TILE + sx, ty * VOXELS_PER_TILE + sy));
+        const h = topOf(top(vx0 + sx, vy0 + sy));
         base = highest ? Math.max(base, h) : Math.min(base, h);
       }
     }
@@ -595,6 +640,45 @@ export class World {
     return isTerrainSolid(chunk.terrain[localCoord(wy) * CHUNK_SIZE + localCoord(wx)] as Terrain);
   }
 
+  /** Cuanto se corre la caja de la estacion de `(wx, wy)` hacia el este y el sur: 0 o 0,5. */
+  stationOffsetAt(wx: number, wy: number): readonly [number, number] {
+    return this.offsets.get(`${wx},${wy}`) ?? [0, 0];
+  }
+
+  /** Si la casilla la pisa una estacion corrida desde otra: ahi no se pone ni brota nada. */
+  isCovered(wx: number, wy: number): boolean {
+    return this.covered.has(`${wx},${wy}`);
+  }
+
+  /**
+   * Las casillas que pisaria una caja de 1 × 1 con su esquina noroeste en
+   * (`x0`, `y0`), en la rejilla de 0,5: de una a cuatro.
+   */
+  footprintTiles(x0: number, y0: number): [number, number][] {
+    const out: [number, number][] = [];
+    for (let ty = Math.floor(y0); ty < y0 + 1; ty++) for (let tx = Math.floor(x0); tx < x0 + 1; tx++) out.push([tx, ty]);
+    return out;
+  }
+
+  /**
+   * Pone una estacion con la esquina noroeste de su caja en (`x0`, `y0`), en la
+   * rejilla de 0,5 (el autor, 2026-10-20): su ancla es la casilla de esa
+   * esquina, y las demas que pisa quedan cubiertas. `at`, la altura desde la
+   * que se coloca (`setFeature`).
+   */
+  placeStation(x0: number, y0: number, feature: Feature, at?: number): { x: number; y: number } {
+    const tx = Math.floor(x0);
+    const ty = Math.floor(y0);
+    const key = `${tx},${ty}`;
+    const offset: [number, number] = [x0 - tx, y0 - ty];
+    if (offset[0] !== 0 || offset[1] !== 0) this.offsets.set(key, offset);
+    for (const [cx, cy] of this.footprintTiles(x0, y0)) {
+      if (cx !== tx || cy !== ty) this.covered.set(`${cx},${cy}`, key);
+    }
+    this.setFeature(tx, ty, feature, at);
+    return { x: tx, y: ty };
+  }
+
   /** Hacia donde mira el frente de la estacion de `(wx, wy)`, o `null`. */
   stationFacingAt(wx: number, wy: number): number | null {
     return this.facings.get(`${wx},${wy}`) ?? null;
@@ -668,6 +752,15 @@ export class World {
       if (isKind !== null) record.count[lifeSlot(biome, isKind)]++;
     }
 
+    if (isStation(before) && !isStation(next)) {
+      // Desmontarla libera lo que cubria.
+      const [ox, oy] = this.stationOffsetAt(wx, wy);
+      for (const [cx, cy] of this.footprintTiles(wx + ox, wy + oy)) {
+        this.covered.delete(`${cx},${cy}`);
+        if (this.drops.size > 0) this.drops.wake(cx, cy);
+      }
+      this.offsets.delete(`${wx},${wy}`);
+    }
     if (isSapling(before) || isStation(before)) {
       this.saplings.delete(`${wx},${wy}`);
       // Desmontar una estacion se lleva su frente.
@@ -855,6 +948,8 @@ export class World {
       if (biomeOfTerrain(terrain) !== biome) continue;
       if (densityOfKind(terrain, kind) <= 0) continue;
       if (this.featureAtIndex(chunk, idx) !== Feature.None) continue;
+      // Bajo una estacion corrida no brota nada.
+      if (this.covered.size > 0 && this.covered.has(`${chunk.cx * CHUNK_SIZE + (idx % CHUNK_SIZE)},${chunk.cy * CHUNK_SIZE + Math.floor(idx / CHUNK_SIZE)}`)) continue;
 
       const species = speciesFor(biome, kind);
       if (species === Feature.None) continue;
@@ -1078,4 +1173,24 @@ export class World {
     }
     return Math.floor(reached / perTile);
   }
+}
+
+/**
+ * De que mena es el voxel (`vx`, `vy`, `vz`) de `chunk` (que tiene que ser el
+ * suyo), o `Feature.None`: `World.oreAt` sin buscar el chunk, para el dibujo.
+ */
+export function oreIn(chunk: Chunk, seed: number, vx: number, vy: number, vz: number): Feature {
+  const tx = Math.floor(vx / VOXELS_PER_TILE);
+  const ty = Math.floor(vy / VOXELS_PER_TILE);
+  const idx = (ty - chunk.cy * CHUNK_SIZE) * CHUNK_SIZE + (tx - chunk.cx * CHUNK_SIZE);
+  const base = chunk.oreBase[idx]!;
+  if (base === NO_ORE) return Feature.None;
+  const dz = vz - base;
+  if (dz < -2 || dz > 0) return Feature.None;
+  const e = vx - tx * VOXELS_PER_TILE;
+  const s = vy - ty * VOXELS_PER_TILE;
+  for (const [oe, os, oz] of oreFormation(seed, tx, ty)) {
+    if (oe === e && os === s && oz === dz) return chunk.feature[idx] as Feature;
+  }
+  return Feature.None;
 }

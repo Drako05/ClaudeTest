@@ -140,3 +140,40 @@ semillas): **de 1,6 a 1,9 veces los triangulos** (270.000-330.000 a
 sino con cuatro; y **unos 15 ms por chunk** al rehacer su terreno tras romper
 un voxel (de unos 9 a unos 15 por chunk al mallarlo). Lo que se haga para el
 movil lo decide el autor a la vista de esto (pendiente desde los voxeles).
+
+### La pala, lo primero que toca y las menas (2026-10-20, la tanda siguiente)
+
+El autor dio por buena la tanda de arriba y pidio cuatro cambios:
+
+- **«El golpe parece atravesar las cajas y seguir hasta golpear el terreno,
+  esto no debe pasar»**: cada rayo da solo a lo primero que toca (eligio que
+  valga para todo, tambien un objeto detras de otro). Ver la regla 12.
+- **La pala**, «solo con ella se puede romper terreno maleable, como arena y
+  tierras»: arena, hierba, bosque, tundra y nieve (las eligio). **La roca, solo
+  el pico.** Y el poder resta, como con los objetos: con el trabajo de 3, la
+  de piedra rompe en 3 golpes, la de cobre en 2 y la de hierro en 1. A mano ya
+  no se rompe nada. Las recetas, en `docs/recoleccion.md`.
+- **Lo que se pone va en la rejilla de 0,5** (regla 12, «Colocar»).
+- **Las menas, una formacion de voxeles** («cada voxel es golpeable de forma
+  independiente y se destruye como el terreno uno a uno»): ocho, en tres
+  niveles —«1 solo bloque abajo, luego el 2x2, luego los 3 bloques de
+  arriba»—; los dos primeros sustituyen terreno y el de arriba queda encima.
+  Cada voxel aguanta el trabajo de su mena (eligio «su trabajo de hoy»:
+  carbon 4, cobre 5, hierro 6, el poder resta) y suelta 0-1 de su mineral, el
+  carbon 1-2. Sin particulas (lo eligio).
+
+Como esta hecho, en las menas:
+- **El generador las pone en las alturas** (`generateChunk`, `oreTops`, y lo
+  mismo `WorldGen.columnTopAt`, que sigue puro): la base de la mena es la
+  columna mas baja de su casilla, tal como la dio el relieve; las columnas de
+  su nivel de arriba suben a la base + 1. Guarda la base por casilla
+  (`Chunk.oreBase`). Que voxel falta arriba y cual va abajo sale de la
+  casilla y la semilla (*deduccion*).
+- **El material**: `World.oreAt` dice de que mena es un voxel, por la
+  formacion de su casilla (el potencial); que siga ahi, `isSolidVoxel`. La
+  mena ya no es un objeto (sin caja); la casilla guarda su feature hasta que
+  se rompe el ultimo voxel, y entonces queda vacia.
+- **Medido** (`tools/analyze-world.ts`, tres semillas): la conectividad, la
+  misma; las columnas al pie de un escalon de 1 suben de 2.575 a 2.597, de
+  4.691 a 4.713 y de 3.398 a 3.434 (las menas asoman medio bloque). Las de 2+
+  no cambian.

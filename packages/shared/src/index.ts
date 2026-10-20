@@ -308,12 +308,16 @@ export enum Resource {
   StoneDagger = 27,
   CopperSword = 28,
   IronSword = 29,
+  // La pala (el autor, 2026-10-20): solo ella rompe el suelo maleable.
+  StoneShovel = 30,
+  CopperShovel = 31,
+  IronShovel = 32,
 }
 /**
  * Cuantos objetos distintos hay. «Recurso» abarca tambien las herramientas:
  * todo lo que ocupa una casilla del inventario.
  */
-export const RESOURCE_COUNT = 30;
+export const RESOURCE_COUNT = 33;
 export const RESOURCE_NAMES: readonly string[] = [
   'Madera',
   'Piedra',
@@ -345,6 +349,9 @@ export const RESOURCE_NAMES: readonly string[] = [
   'Punal de piedra',
   'Espada de cobre',
   'Espada de hierro',
+  'Pala de piedra',
+  'Pala de cobre',
+  'Pala de hierro',
 ];
 
 /**
@@ -372,6 +379,8 @@ export enum ToolKind {
    * un ser vivo.
    */
   Weapon = 3,
+  /** Rompe el suelo maleable: arena, hierba, bosque, tundra y nieve (el autor, 2026-10-20). */
+  Shovel = 4,
 }
 
 export interface ToolStats {
@@ -408,6 +417,13 @@ export function toolStats(item: Resource): ToolStats | null {
       return { kind: ToolKind.Axe, power: 3, tier: 3, uses: 250 };
     case Resource.IronPickaxe:
       return { kind: ToolKind.Pickaxe, power: 3, tier: 3, uses: 250 };
+    // La pala, con los de su tier (el autor, 2026-10-20).
+    case Resource.StoneShovel:
+      return { kind: ToolKind.Shovel, power: 1, tier: 1, uses: 40 };
+    case Resource.CopperShovel:
+      return { kind: ToolKind.Shovel, power: 2, tier: 2, uses: 120 };
+    case Resource.IronShovel:
+      return { kind: ToolKind.Shovel, power: 3, tier: 3, uses: 250 };
     // Las armas (decision del autor, 2026-10-04): el daño, suyo; que duren
     // menos que la herramienta de su material, tambien. Los usos, tres cuartos
     // de los de esa herramienta, son **deduccion mia**.
@@ -532,6 +548,30 @@ export function workOf(f: Feature): Work | null {
     case Feature.Workbench:
     case Feature.Furnace:
       return { tool: ToolKind.Hand, tier: 0, work: 3 };
+    default:
+      return null;
+  }
+}
+
+/**
+ * Lo que pide un voxel del terreno para romperse (el autor, 2026-10-20): **la
+ * roca, el pico**; **lo maleable —arena, hierba, bosque, tundra y nieve—, la
+ * pala**, y con las dos el poder resta, como con los objetos: 3 de trabajo, asi
+ * que piedra 3 golpes, cobre 2 y hierro 1. A mano, nada. Un voxel de mena, lo
+ * que pedia la mena entera (`workOf`), por voxel. `null`: el fondo del agua,
+ * que no se rompe.
+ */
+export function voxelWorkOf(terrain: Terrain, ore: Feature = Feature.None): Work | null {
+  if (ore !== Feature.None) return workOf(ore);
+  switch (terrain) {
+    case Terrain.Rock:
+      return { tool: ToolKind.Pickaxe, tier: 1, work: 3 };
+    case Terrain.Sand:
+    case Terrain.Grass:
+    case Terrain.Forest:
+    case Terrain.Tundra:
+    case Terrain.Snow:
+      return { tool: ToolKind.Shovel, tier: 1, work: 3 };
     default:
       return null;
   }
@@ -750,6 +790,39 @@ export const RECIPES: readonly Recipe[] = [
     inputs: [
       { item: Resource.Branch, count: 1 },
       { item: Resource.IronIngot, count: 4 },
+    ],
+    station: Station.Workbench,
+  },
+  // Las palas (el autor, 2026-10-20, a propuesta mia: un material menos que
+  // el hacha y el pico). Al final, para no mover los indices de las demas.
+  {
+    category: 'Herramientas',
+    output: Resource.StoneShovel,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 2 },
+      { item: Resource.Stone, count: 1 },
+      { item: Resource.Fiber, count: 2 },
+    ],
+    station: Station.Hand,
+  },
+  {
+    category: 'Herramientas',
+    output: Resource.CopperShovel,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 2 },
+      { item: Resource.CopperIngot, count: 2 },
+    ],
+    station: Station.Workbench,
+  },
+  {
+    category: 'Herramientas',
+    output: Resource.IronShovel,
+    count: 1,
+    inputs: [
+      { item: Resource.Branch, count: 2 },
+      { item: Resource.IronIngot, count: 2 },
     ],
     station: Station.Workbench,
   },
