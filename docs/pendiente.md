@@ -81,6 +81,29 @@ el 47 a D1 (cada campo de cada entrada).
 
 ---
 
+## Boceto: los minerales como piedra con cristales (2026-10-20)
+
+El autor, con una referencia (un cubo de roca con cristales de amatista que
+brotan de el; el repo no la guarda): quiere que **el voxel de un mineral sea de
+piedra con vetas del color del mineral, y que de el salgan cristales del
+mineral en laminas cruzadas, como los arboles**, con texturas de 24 × 24.
+Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
+
+- **El boceto**: `docs/bocetos/minerales/` (`index.html`, que genera sus
+  propias texturas, nuevas, y `render.mjs`, que saca las fotos:
+  `node docs/bocetos/minerales/render.mjs`).
+- **El bloque de 1 × 1 × 1** (`cobre-1.png`, `carbon-1.png`): «Están de lujo»
+  (el autor). Hay que conservarlo tal cual: el script reproduce esas fotos
+  pixel a pixel.
+- **El voxel de 0,5** (`?s=0.5`; `cobre-05.png`, `carbon-05.png`), que pidio
+  despues: caras de 12 × 12 y cristales de **0,25 como mucho** (6 pixeles).
+  **Esperando al autor.**
+- Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
+  cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
+  donde, su forma (prisma en punta con su cara de luz y su brillo).
+- **Aun no es codigo del juego**: llevarlo al juego es una tanda que pide el
+  autor.
+
 ## Pendiente del autor: las paredes de 2+ voxeles
 
 **Las paredes de 2+ voxeles**, que el
