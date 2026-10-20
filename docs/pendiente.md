@@ -125,8 +125,15 @@ Pidio solo un ejemplo, sin tocar el juego, para el cobre y el carbon.
   al azar, **sin que sus bases se toquen nunca** (entre sus pies, sus dos
   medias bases y 0,08 de la cara). Esta en `voxelSide`, en el boceto.
 - **La corona** (el racimo de arriba): el autor pide reglas de variedad que
-  mantengan **su forma general de flor**. Propuestas, **esperando al
-  autor**.
+  mantengan **su forma general de flor**. Le propuse ocho y: «aplica todas,
+  con los brotes sueltos». Estan en `voxelCrown`, en el boceto (los numeros,
+  *mios*): de 5 a 7 cristales; uno en el centro, el mas alto (6 pixeles), de 0
+  a 10 grados desde la vertical; los demas, petalos en un anillo a 0,20-0,35
+  del lado, repartidos por igual con ±15 grados, de 3 a 5 pixeles, abiertos
+  hacia fuera de 15 a 40 grados y torcidos hasta ±10; el centro de la flor,
+  hasta 0,12 del lado fuera del de la cara; las bases sin tocarse; y de 0 a 2
+  brotes de 3 pixeles cerca del borde. La hoja `coronas-*.png` ensena seis
+  sorteos de cada mineral (`?semilla=`). **Esperando al autor.**
 - Lo que elegi yo (*por confirmar*): la piedra gris verdosa, los colores de
   cada mineral (y el cardenillo en las vetas del cobre), cuantos cristales y
   donde, su forma (prisma en punta con su cara de luz y su brillo).

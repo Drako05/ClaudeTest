@@ -223,19 +223,87 @@ function addCrystal(base, axis, w, h, seed, spin) {
 
 // El voxel, con su propia semilla (resorteado a peticion del autor,
 // 2026-10-20); el bloque aprobado, con la suya de siempre.
-const r = rng((mineral === 'carbon' ? 0xc0a1 : 0xc0b0) + (small ? 0x3a7 : 0));
+// `?semilla=` sortea otro voxel, para ver la variedad (la hoja de coronas).
+const r = rng((mineral === 'carbon' ? 0xc0a1 : 0xc0b0) + (small ? 0x3a7 : 0) + Number(params.get('semilla') ?? 0) * 0x101);
 const jitter = (k) => (r() - 0.5) * k;
 const UP = new THREE.Vector3(0, 1, 0);
+/** Un eje que se inclina `tilt` desde la vertical, hacia el rumbo `heading`. */
+const leaning = (tilt, heading) => new THREE.Vector3(Math.sin(tilt) * Math.cos(heading), Math.cos(tilt), Math.sin(tilt) * Math.sin(heading));
+const DEG = Math.PI / 180;
+
+/**
+ * La corona del voxel: una flor (las reglas que propuso el agente y aplico el
+ * autor el 2026-10-20, «aplica todas, con los brotes sueltos»; los numeros,
+ * del agente).
+ * 1. De 5 a 7 cristales.
+ * 2. Uno en el centro, el mas alto (6 pixeles, 0,25), casi de pie: de 0 a 10
+ *    grados desde la vertical.
+ * 3. Los demas, petalos en un anillo a 0,20-0,35 del lado del centro,
+ *    repartidos por igual alrededor con ±15 grados de desorden, y mas bajos
+ *    (3 a 5 pixeles).
+ * 4. Cada petalo se abre hacia fuera de 15 a 40 grados desde la vertical.
+ * 5. Y se tuerce de lado hasta ±10 grados.
+ * 6. El centro de la flor se aparta del de la cara hasta 0,12 del lado.
+ * 7. Las bases no se tocan (la regla de los costados).
+ * 8. De 0 a 2 brotes sueltos de 3 pixeles, cerca del borde, fuera del anillo.
+ */
+function voxelCrown() {
+  const placed = []; // [x, z, media base], en fraccion del lado
+  const free = (x, z, half) =>
+    Math.abs(x) <= 0.44 && Math.abs(z) <= 0.44 && placed.every(([px, pz, ph]) => Math.hypot(x - px, z - pz) >= ph + half + 0.08);
+  const put = (x, z, w, h, axis, seed) => {
+    placed.push([x, z, w / 2 / N]);
+    addCrystal(new THREE.Vector3(x * S, S, z * S), axis, w, h, seed, r() * Math.PI);
+  };
+  const count = 5 + Math.floor(r() * 3);
+  const off = r() * 0.12;
+  const offAt = r() * 2 * Math.PI;
+  const cx = Math.cos(offAt) * off;
+  const cz = Math.sin(offAt) * off;
+  put(cx, cz, 5, 6, leaning(r() * 10 * DEG, r() * 2 * Math.PI), 100);
+  const petals = count - 1;
+  const start = r() * 2 * Math.PI;
+  for (let i = 0; i < petals; i++) {
+    const h = 3 + Math.floor(r() * 3);
+    const w = h >= 5 ? 4 : 3;
+    for (let t = 0; t < 30; t++) {
+      const at = start + (i * 2 * Math.PI) / petals + (r() - 0.5) * 30 * DEG;
+      const rho = 0.2 + r() * 0.15;
+      const x = cx + Math.cos(at) * rho;
+      const z = cz + Math.sin(at) * rho;
+      if (!free(x, z, w / 2 / N)) continue;
+      const open = (15 + r() * 25) * DEG;
+      const twist = (r() - 0.5) * 20 * DEG;
+      put(x, z, w, h, leaning(open, at + twist), 110 + i);
+      break;
+    }
+  }
+  const buds = Math.floor(r() * 3);
+  for (let i = 0; i < buds; i++) {
+    for (let t = 0; t < 40; t++) {
+      // Cerca del borde: una de las cuatro orillas, entre 0,36 y 0,44 del centro.
+      const edge = Math.floor(r() * 4);
+      const along = (r() - 0.5) * 0.8;
+      const out = 0.36 + r() * 0.08;
+      const [x, z] = [[out, along], [-out, along], [along, out], [along, -out]][edge];
+      if (!free(x, z, 3 / 2 / N)) continue;
+      put(x, z, 3, 3, leaning((25 + r() * 25) * DEG, Math.atan2(z, x)), 130 + i);
+      break;
+    }
+  }
+}
+
 // Arriba: un racimo apretado, los grandes en el centro y abiertos hacia fuera.
-// [x, z en fraccion del lado, ancho, alto en pixeles]. En el voxel de 0,5, los
-// cristales miden como mucho 6 pixeles: 0,25 bloques.
-const top = small
-  ? [[0.02, 0.0, 5, 6], [-0.22, 0.14, 4, 5], [0.22, -0.12, 4, 5], [0.18, 0.26, 3, 4], [-0.24, -0.22, 3, 4], [0.34, 0.06, 3, 3]]
-  : [[0.02, 0.0, 12, 18], [-0.2, 0.12, 10, 15], [0.2, -0.12, 10, 15], [0.16, 0.24, 8, 11], [-0.22, -0.2, 8, 12], [0.33, 0.06, 6, 8], [-0.34, 0.02, 6, 9], [0.0, -0.32, 6, 8], [-0.04, 0.33, 6, 9]];
-top.forEach(([x, z, w, h], i) => {
-  const axis = new THREE.Vector3(x * 1.6 + jitter(0.25), 1, z * 1.6 + jitter(0.25));
-  addCrystal(new THREE.Vector3((x + jitter(0.05)) * S, S, (z + jitter(0.05)) * S), axis, w, h, 100 + i, r() * Math.PI);
-});
+// [x, z en fraccion del lado, ancho, alto en pixeles]. En el voxel, una flor
+// sorteada (`voxelCrown`).
+if (small) voxelCrown();
+else {
+  const top = [[0.02, 0.0, 12, 18], [-0.2, 0.12, 10, 15], [0.2, -0.12, 10, 15], [0.16, 0.24, 8, 11], [-0.22, -0.2, 8, 12], [0.33, 0.06, 6, 8], [-0.34, 0.02, 6, 9], [0.0, -0.32, 6, 8], [-0.04, 0.33, 6, 9]];
+  top.forEach(([x, z, w, h], i) => {
+    const axis = new THREE.Vector3(x * 1.6 + jitter(0.25), 1, z * 1.6 + jitter(0.25));
+    addCrystal(new THREE.Vector3((x + jitter(0.05)) * S, S, (z + jitter(0.05)) * S), axis, w, h, 100 + i, r() * Math.PI);
+  });
+}
 // Los lados: racimos pequenos pegados a la piedra, que brotan hacia fuera y
 // hacia arriba. En el voxel, dos sueltos por cara (`voxelSide`).
 const sides = [
@@ -314,7 +382,8 @@ const views = [
 ];
 const out = document.getElementById('out');
 document.getElementById('title').textContent = `${M.name}: ${small ? `voxel de ${S}` : 'bloque'}, piedra veteada (${N} x ${N} por cara) y cristales en laminas cruzadas`;
-for (const [label, x, z, y] of views) {
+const only = params.get('vistas')?.split(',').map(Number);
+for (const [label, x, z, y] of views.filter((_, i) => !only || only.includes(i))) {
   const d = 4.6 * S;
   const len = Math.hypot(x, z, y);
   camera.position.set((x / len) * d, 0.55 * S + (y / len) * d, (z / len) * d);
