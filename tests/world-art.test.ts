@@ -18,6 +18,7 @@ import {
   type WorldArt,
 } from '../packages/client/src/world-art.js';
 import { BARK, treeArt } from '../packages/client/src/world-sprites.js';
+import { VOXEL_PX, VOXEL_TILES } from '../packages/client/src/voxel-art.js';
 
 /**
  * El pixelart del mundo (el autor, 2026-10-19; guia de arte, directriz 7):
@@ -30,6 +31,7 @@ import { BARK, treeArt } from '../packages/client/src/world-sprites.js';
 function everything(): [string, WorldArt][] {
   const out: [string, WorldArt][] = [];
   for (const [t, tiles] of Object.entries(TERRAIN_TILES)) tiles.forEach((a, i) => out.push([`suelo ${Terrain[+t]} ${i}`, a]));
+  for (const [t, tiles] of Object.entries(VOXEL_TILES)) tiles.forEach((a, i) => out.push([`voxel ${Terrain[+t]} ${i}`, a]));
   for (const [name, table] of [['copa', CROWNS], ['mata', BUSHES], ['brote', SAPLINGS], ['piedra', STONES]] as const) {
     for (const [f, a] of Object.entries(table)) out.push([`${name} ${Feature[+f]}`, a!]);
   }
@@ -64,11 +66,19 @@ describe('Los dibujos del mundo', () => {
     }
   });
 
-  it('cada suelo tiene 3 o 4 variantes (el autor), y no hay dos iguales', () => {
-    for (const [t, tiles] of Object.entries(TERRAIN_TILES)) {
+  it('cada suelo tiene 3 o 4 variantes (el autor), y no hay dos iguales; tambien las del voxel', () => {
+    for (const [t, tiles] of [...Object.entries(TERRAIN_TILES), ...Object.entries(VOXEL_TILES)]) {
       expect(tiles.length, Terrain[+t]).toBeGreaterThanOrEqual(3);
       expect(tiles.length, Terrain[+t]).toBeLessThanOrEqual(4);
       expect(new Set(tiles.map((a) => a.rows.join(''))).size, Terrain[+t]).toBe(tiles.length);
+    }
+  });
+
+  it('las caras del voxel miden 12 × 12: la mitad de las de bloque, a la misma densidad (el autor, 2026-10-20)', () => {
+    expect(VOXEL_PX * 2).toBe(WORLD_PX);
+    expect(Object.keys(VOXEL_TILES).sort()).toEqual(Object.keys(TERRAIN_TILES).sort());
+    for (const tiles of Object.values(VOXEL_TILES)) {
+      for (const a of tiles) expect([a.rows[0]!.length, a.rows.length]).toEqual([VOXEL_PX, VOXEL_PX]);
     }
   });
 

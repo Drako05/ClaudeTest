@@ -84,7 +84,7 @@ function spots(page) {
 
 /** Las pasadas que van con el reloj manual. `desktop` se queda con el de verdad a proposito: alguna tiene que probar el bucle real. */
 const MANUAL_PASSES = new Set([
-  'lifePass', 'reliefPass', 'faunaPass', 'devToolsPass', 'stationsPass', 'resourcesPass', 'highRefreshPass', 'mobilePass',
+  'lifePass', 'reliefPass', 'faunaPass', 'devToolsPass', 'stationsPass', 'resourcesPass', 'highRefreshPass', 'mobilePass', 'digPass',
 ]);
 /** Si la pasada en curso va con el reloj manual; lo pone el bucle de pasadas. */
 let manualPass = false;
@@ -3405,8 +3405,52 @@ async function faunaPass(browser, baseUrl) {
   await page.close();
 }
 
+/**
+ * Romper el terreno (el autor, 2026-10-20): cada golpe da a cada voxel de 0,5
+ * que toca, que aguanta 3 y se rompe solo, con la mano vacia. Los numeros los
+ * miden los tests del nucleo (`voxel-edit.test.ts`); aqui, que el golpe llega
+ * al terreno y que el dibujo se rehace solo en su terreno.
+ */
+async function digPass(browser, baseUrl) {
+  console.log('\n== romper el terreno ==');
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watchProblems(page, 'romper');
+
+  await open(page, baseUrl);
+  // Mirando unos 50 grados abajo, el sector entra en el suelo de delante.
+  await look(page, 0, 260);
+  await elapse(page, 300);
+  const before = await state(page);
+  console.log(`  mirada ${before.lookZ.toFixed(2)}, ${before.triangles} triangulos`);
+  check(before.lookZ < -0.6, `la mirada no bajo lo bastante: ${before.lookZ.toFixed(2)}`);
+  check(before.voxelHits === 0 && before.voxelsBroken === 0, 'el terreno ya estaba golpeado al empezar');
+
+  await strike(page);
+  await elapse(page, 260);
+  await strike(page);
+  await elapse(page, 260);
+  const twice = await state(page);
+  console.log(`  dos golpes: ${twice.voxelHits} voxeles tocados, ${twice.voxelsBroken} rotos`);
+  check(twice.voxelHits >= 2, `los golpes no llegaron al terreno: ${twice.voxelHits}`);
+  check(twice.voxelsBroken === 0, `un voxel se rompio antes del tercer golpe: ${twice.voxelsBroken}`);
+  check(twice.terrainRebuilds === before.terrainRebuilds, 'se rehizo el terreno sin romper nada');
+
+  await strike(page);
+  await elapse(page, 260);
+  const third = await state(page);
+  console.log(`  al tercero: ${third.voxelsBroken} rotos, terreno rehecho ${third.terrainRebuilds - before.terrainRebuilds} veces, ` +
+    `${third.triangles} triangulos`);
+  check(third.voxelsBroken > 0, 'al tercer golpe no se rompio ningun voxel');
+  check(third.terrainRebuilds > before.terrainRebuilds, 'se rompio terreno y su malla no se rehizo');
+  check(third.triangles !== before.triangles, 'se rompio terreno y la malla no cambio');
+  check(third.reticle !== null, 'tras romper, la reticula no marca nada');
+  await shot(page, '3d-20-romper.png');
+
+  await page.close();
+}
+
 const only = process.argv[2];
-const passes = { desktopPass, resourcesPass, stationsPass, mobilePass, devToolsPass, lifePass, reliefPass, highRefreshPass, faunaPass };
+const passes = { desktopPass, resourcesPass, stationsPass, mobilePass, devToolsPass, lifePass, reliefPass, highRefreshPass, faunaPass, digPass };
 try {
   // Pedir una pasada que no existe no puede salir en verde: con la CI
   // repartida en una casilla por pasada, una errata en el nombre seria una

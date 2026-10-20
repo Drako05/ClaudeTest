@@ -102,7 +102,7 @@ a proposito: el contenedor muere con la sesion y la skill tiene que crecer.
 **La CI va repartida** (`.github/workflows/ci.yml`): un trabajo para typecheck
 y tests, y una **matriz con una maquina por pasada del humo** —`desktop`,
 `resources`, `stations`, `mobile`, `devTools`, `life`, `relief`,
-`highRefresh`, `fauna`— mas los gestos y el barrido en pixeles (`slash`, que desde que
+`highRefresh`, `fauna`, `dig`— mas los gestos y el barrido en pixeles (`slash`, que desde que
 corre aqui **falla** si la vista normal, la camara baja o la primera persona
 bajan de 20 pixeles aclarados, o la estocada de 500; los fallos que tuvo daban
 0, 2 y 13. La vista que gira cerca estuvo sin puerta —en la CI dio 46, 12 y
@@ -222,10 +222,11 @@ Con `hz` 60 cada frame lleva un tick, como un jugador a 60 Hz.
 
 `npm run smoke` construye el cliente y lo juega en Chromium headless leyendo el
 estado real por `window.__verdant`. Los tests unitarios no detectan que el juego
-no arranque; esto si. Hace nueve pasadas —escritorio, recursos (comer, sembrar,
+no arranque; esto si. Hace diez pasadas —escritorio, recursos (comer, sembrar,
 minar), estaciones (mesa, horno, fundir, asar, comer carne y ropa), movil con
 toques sinteticos, panel de desarrollo, muerte y noche, relieve, pantalla de
-144 Hz y fauna (dibujo, paseo y caza)—; si tocas
+144 Hz, fauna (dibujo, paseo y caza) y romper el terreno (`dig`, desde el
+2026-10-20)—; si tocas
 los controles, todas tienen que seguir
 pasando. Una sola se corre con `node tools/smoke.mjs <nombre>` tras `npm run
 build`, por ejemplo `node tools/smoke.mjs mobile`.

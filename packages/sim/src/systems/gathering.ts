@@ -51,6 +51,8 @@ import {
   rayBox,
   rayOrientedBox,
   strike,
+  type Solid,
+  type Voxel,
   STRIKE_RANGE,
   type Hitbox,
   type Offset,
@@ -60,6 +62,7 @@ import {
 } from '../aim.js';
 import { bodyBoxes, bodyOf, BODY_RADIUS, featureBox, objectBase, type OrientedBox } from '../boxes.js';
 export { STATION_BOXES } from '../boxes.js';
+import { VOXEL, VOXELS_PER_TILE } from '../relief.js';
 import { treeTrunkAt } from '../trunk.js';
 import type { EntityStore } from '../entities.js';
 import type { Bundle, Inventory } from '../inventory.js';
@@ -117,6 +120,8 @@ export type Blocked = 'needPickaxe' | 'needBetterPickaxe';
  */
 export class WorkState {
   readonly damage = new Map<number, { feature: Feature; work: number; tick: number; x: number; y: number }>();
+  /** El de cada voxel del terreno golpeado, por `x,y,z` de voxel. */
+  readonly voxelDamage = new Map<string, { work: number; tick: number; x: number; y: number; z: number }>();
   readonly branches = new Map<number, { taken: number; tick: number }>();
 }
 
@@ -130,6 +135,26 @@ export function forgetUnloadedDamage(work: WorkState, world: World): void {
   for (const [key, d] of work.damage) {
     if (!world.isLoaded(toChunkCoord(d.x), toChunkCoord(d.y))) work.damage.delete(key);
   }
+  for (const [key, d] of work.voxelDamage) {
+    const tx = Math.floor(d.x / VOXELS_PER_TILE);
+    const ty = Math.floor(d.y / VOXELS_PER_TILE);
+    if (!world.isLoaded(toChunkCoord(tx), toChunkCoord(ty))) work.voxelDamage.delete(key);
+  }
+}
+
+/**
+ * Los golpes que aguanta un voxel del terreno antes de romperse, con cualquier
+ * cosa en la mano: **3** (el autor, 2026-10-20: «pegar con cualquier cosa
+ * rompe el terreno. el terreno aguanta 3 golpes antes de romperse»). Cada
+ * golpe suma 1, lleve lo que lleve.
+ */
+export const VOXEL_WORK = 3;
+
+/** Daño acumulado de un voxel del terreno ahora mismo, de 0 a `VOXEL_WORK`. */
+export function voxelDamageAt(work: WorkState, x: number, y: number, z: number, tick: number): number {
+  const d = work.voxelDamage.get(`${x},${y},${z}`);
+  if (!d || tick - d.tick > DAMAGE_DECAY_TICKS) return 0;
+  return d.work;
 }
 
 /**
@@ -171,6 +196,11 @@ export function branchesLeft(work: WorkState, x: number, y: number, tick: number
  */
 export const hitboxAt = featureBox;
 
+/** El terreno del mundo, voxel a voxel, para los rayos (`aim.ts`). */
+export function solidOf(world: World): Solid {
+  return (vx, vy, vz) => world.isSolidVoxel(vx, vy, vz);
+}
+
 /** Los ojos de la entidad: el origen del golpe. */
 function eyeOf(store: EntityStore, id: number): Vec3 {
   return { x: store.x[id], y: store.y[id], z: store.z[id] + EYE_HEIGHT };
@@ -186,7 +216,7 @@ export function strikeOf(world: World, store: EntityStore, id: number): Strike {
     store.facingX[id],
     store.facingY[id],
     store.lookZ[id],
-    (x, y) => world.groundHeightAt(x, y),
+    solidOf(world),
     (tx, ty) => hitboxAt(world, tx, ty),
     store.lookRoll[id],
   );
@@ -212,7 +242,7 @@ export function preciseTarget(world: World, store: EntityStore, id: number): (Of
     store.facingX[id],
     store.facingY[id],
     store.lookZ[id],
-    (x, y) => world.groundHeightAt(x, y),
+    solidOf(world),
     (tx, ty) => hitboxAt(world, tx, ty),
   );
 }
@@ -227,7 +257,7 @@ export function targetTile(world: World, store: EntityStore, id: number): Offset
     store.facingX[id],
     store.facingY[id],
     store.lookZ[id],
-    (x, y) => world.groundHeightAt(x, y),
+    solidOf(world),
   );
 }
 
@@ -252,6 +282,11 @@ export interface Swing {
   broke: boolean;
   /** Los animales que alcanzo, y si murieron. */
   animals: AnimalHit[];
+  /**
+   * Los voxeles del terreno que golpeo, y si se rompieron. No dan particulas,
+   * ni impacto, ni botin (el autor, 2026-10-20).
+   */
+  voxels: Array<Voxel & { broken: boolean }>;
   /**
    * Donde toco el golpe cada cosa que se puede romper —feature o animal—: el
    * punto de su caja que alcanzo su rayo mas corto. Ahi dibuja el cliente el
@@ -303,7 +338,7 @@ function animalsInReach(
   const rays = precise
     ? (() => {
         const dir = lookVector(store.facingX[id], store.facingY[id], store.lookZ[id]);
-        const hit = groundHit(origin, dir, STRIKE_RANGE, (x, y) => world.groundHeightAt(x, y));
+        const hit = groundHit(origin, dir, STRIKE_RANGE, solidOf(world));
         return [{ dir, length: hit ? hit.t : STRIKE_RANGE }];
       })()
     : strikeOf(world, store, id).rays;
@@ -388,7 +423,7 @@ export function tryHarvestArea(
   precise = false,
   animals: Iterable<number> = [],
 ): Swing {
-  const swing: Swing = { results: [], hits: [], blocked: null, broke: false, animals: [], impacts: [] };
+  const swing: Swing = { results: [], hits: [], blocked: null, broke: false, animals: [], impacts: [], voxels: [] };
   const held = inventory.held();
   const stats = held === null ? null : toolStats(held);
   const weapon = inventory.weapon();
@@ -400,6 +435,7 @@ export function tryHarvestArea(
   // primer objetivo de la mira, sea un animal o un objeto del mundo.
   const beasts = animalsInReach(world, store, id, animals, precise);
   let tiles: Array<Offset & { at: Vec3 }>;
+  let voxels: readonly Voxel[];
   if (precise) {
     const tile = preciseTarget(world, store, id);
     tiles = tile ? [tile] : [];
@@ -408,8 +444,14 @@ export function tryHarvestArea(
       else tiles = [];
       beasts.length = Math.min(beasts.length, 1);
     }
+    // El terreno corta el rayo central: si hay objeto o animal, esta antes.
+    const dir = lookVector(store.facingX[id], store.facingY[id], store.lookZ[id]);
+    const ground = tiles.length + beasts.length === 0 ? groundHit(eyeOf(store, id), dir, STRIKE_RANGE, solidOf(world)) : null;
+    voxels = ground ? [ground.voxel] : [];
   } else {
-    tiles = strikeOf(world, store, id).targets.slice();
+    const swept = strikeOf(world, store, id);
+    tiles = swept.targets.slice();
+    voxels = swept.voxels;
   }
   for (const { id: a, at } of beasts) {
     // El impacto, en el punto donde el golpe toca su caja: lo dibuja el
@@ -456,6 +498,23 @@ export function tryHarvestArea(
     work.damage.delete(key);
     work.branches.delete(key);
     swing.results.push(result);
+  }
+
+  // El terreno (el autor, 2026-10-20): cada voxel que toca el golpe recibe uno,
+  // y al tercero se rompe. Gasta lo de la mano, como todo lo que se toca. El
+  // fondo del agua corta el golpe, pero no se rompe: ni se cuenta.
+  for (const v of voxels) {
+    if (world.isTerrainSolidAt(Math.floor(v.x / VOXELS_PER_TILE), Math.floor(v.y / VOXELS_PER_TILE))) continue;
+    touchedTile = true;
+    const key = `${v.x},${v.y},${v.z}`;
+    const done = voxelDamageAt(work, v.x, v.y, v.z, tick) + 1;
+    if (done < VOXEL_WORK) {
+      work.voxelDamage.set(key, { work: done, tick, x: v.x, y: v.y, z: v.z });
+      swing.voxels.push({ x: v.x, y: v.y, z: v.z, broken: false });
+      continue;
+    }
+    work.voxelDamage.delete(key);
+    swing.voxels.push({ x: v.x, y: v.y, z: v.z, broken: world.breakVoxel(v.x, v.y, v.z) });
   }
 
   const touchedBeast = beasts.length > 0;
@@ -689,7 +748,7 @@ export function aimedSurface(world: World, store: EntityStore, id: number): Surf
     store.facingX[id],
     store.facingY[id],
     store.lookZ[id],
-    (x, y) => world.groundHeightAt(x, y),
+    solidOf(world),
   );
 }
 
@@ -732,7 +791,7 @@ export function tryPlace(world: World, store: EntityStore, id: number, inventory
     y <= Math.floor(py + BODY_RADIUS);
   if (touches) return null;
   inventory.spendInHand();
-  world.setFeature(x, y, feature);
+  world.setFeature(x, y, feature, at.z + VOXEL);
   // Su cara principal, hacia quien la pone (pedido del autor, 2026-10-02).
   world.setStationFacing(x, y, facingToward(x, y, px, py));
   return { x, y, z: Math.max(at.z, objectBase(world, x, y, feature)) };
@@ -795,7 +854,7 @@ export function tryPlant(
     if (sapling === Feature.None) continue;
 
     inventory.remove(seed, 1);
-    world.plantSapling(x, y, sapling);
+    world.plantSapling(x, y, sapling, (aimedSurface(world, store, id)?.point.z ?? Infinity) + VOXEL);
     return sapling;
   }
   return null;

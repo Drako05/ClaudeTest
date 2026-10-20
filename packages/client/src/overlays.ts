@@ -67,50 +67,47 @@ function pushTileEdge(out: number[], world: World, wx: number, wy: number, ax: n
   }
 }
 
-/** Empuja las aristas de la casilla (wx, wy) a su altura. */
-function pushSquare(out: number[], world: World, wx: number, wy: number): void {
-  for (const [ax, ay, bx, by] of SQUARE) pushTileEdge(out, world, wx, wy, ax, ay, bx, by);
-}
-
 /**
- * Empuja el contorno de la cara de voxel de una pared que toca la mirada: la del
- * plano (x o y multiplo de 0,5) mas cercano al punto tocado, de medio bloque de
- * ancho y de alto, separada un pelo hacia el lado de quien mira.
+ * Empuja el contorno de la cara de voxel que toca la mirada (el voxel es la
+ * unidad del terreno: el autor, 2026-10-20), de medio bloque de lado y
+ * separada un pelo hacia fuera, hacia quien mira.
  */
-function pushWallFace(out: number[], world: World, s: Surface): void {
-  const { point, tile, front } = s;
-  const snap = (v: number) => Math.round(v / VOXEL) * VOXEL;
-  const alongX = Math.abs(point.x - snap(point.x)) < Math.abs(point.y - snap(point.y));
-  const dirX = alongX ? Math.sign(front.x - tile.x) : 0;
-  const dirY = alongX ? 0 : Math.sign(front.y - tile.y);
-  // La columna de la pared: un pelo detras de la cara, hacia la casilla tocada.
-  const top = world.groundHeightAt(point.x - dirX * 0.01, point.y - dirY * 0.01);
-  const z0 = Math.min(Math.floor((point.z + 1e-6) / VOXEL) * VOXEL, top - VOXEL);
-  const z1 = z0 + VOXEL;
-  const corners: Array<[number, number]> = [];
-  if (alongX) {
-    const x = snap(point.x) + dirX * LIFT;
-    const y = Math.floor(point.y / VOXEL) * VOXEL;
-    corners.push([x, y], [x, y + VOXEL]);
-  } else {
-    const y = snap(point.y) + dirY * LIFT;
-    const x = Math.floor(point.x / VOXEL) * VOXEL;
-    corners.push([x, y], [x + VOXEL, y]);
-  }
-  const [[ax, ay], [bx, by]] = corners;
-  out.push(ax, z0, ay, bx, z0, by, bx, z0, by, bx, z1, by, bx, z1, by, ax, z1, ay, ax, z1, ay, ax, z0, ay);
+function pushVoxelFace(out: number[], s: Surface): void {
+  const { voxel: v, normal: n } = s;
+  // En el nucleo: x, y en el plano y z la altura. El plano de la cara, en su
+  // eje; las otras dos, el lado del voxel.
+  const lo = [v.x * VOXEL, v.y * VOXEL, v.z * VOXEL];
+  const hi = lo.map((c) => c + VOXEL);
+  const normal = [n.x, n.y, n.z];
+  const axis = normal.findIndex((c) => c !== 0);
+  if (axis < 0) return;
+  const plane = (normal[axis]! > 0 ? hi[axis]! : lo[axis]!) + normal[axis]! * LIFT;
+  const [u, w] = [0, 1, 2].filter((a) => a !== axis) as [number, number];
+  const corner = (cu: number, cw: number): number[] => {
+    const p = [0, 0, 0];
+    p[axis] = plane;
+    p[u] = cu;
+    p[w] = cw;
+    // A three.js: la altura va en `y`.
+    return [p[0]!, p[2]!, p[1]!];
+  };
+  const ring = [corner(lo[u]!, lo[w]!), corner(hi[u]!, lo[w]!), corner(hi[u]!, hi[w]!), corner(lo[u]!, hi[w]!)];
+  for (let i = 0; i < 4; i++) out.push(...ring[i]!, ...ring[(i + 1) % 4]!);
 }
 
 export class Overlays {
   /**
-   * Donde toca la mirada: la casilla de suelo, o la cara de la pared (pedido
-   * del autor, 2026-09-30). Es donde se sembraria o se colocaria algo. Los
-   * objetos al alcance ya no se marcan: lo pidio tambien el autor.
+   * Donde toca la mirada: la cara de arriba de un voxel, o la de una pared
+   * (pedido del autor, 2026-09-30; por voxel desde el 2026-10-20). Es donde se
+   * sembraria o se colocaria algo. Los objetos al alcance ya no se marcan: lo
+   * pidio tambien el autor.
    */
   private readonly plant = lines(0xb8f28a, 0.45);
   private readonly wall = lines(0xffffff, 0.5);
   private readonly grids = new Map<string, LineSegments>();
   private readonly borders = new Map<string, { mesh: LineSegments; segments: number; misplaced: number }>();
+  /** La `terrainRevision` de cada chunk con la que se hicieron su rejilla y su contorno. */
+  private readonly revs = new Map<string, number>();
 
   constructor(private readonly scene: Scene) {
     scene.add(this.plant, this.wall);
@@ -121,8 +118,7 @@ export class Overlays {
     const floor: number[] = [];
     const wall: number[] = [];
     const s = aimedSurface(state.world, state.entities, state.playerId);
-    if (s?.top) pushSquare(floor, state.world, s.tile.x, s.tile.y);
-    else if (s) pushWallFace(wall, state.world, s);
+    if (s) pushVoxelFace(s.top ? floor : wall, s);
     setPositions(this.plant, floor);
     setPositions(this.wall, wall);
   }
@@ -137,7 +133,8 @@ export class Overlays {
    * Pone al dia las vistas de depuracion para los chunks mallados.
    *
    * Se construyen una vez por chunk y se guardan; al apagar la vista se
-   * destruyen para no pagar memoria por algo invisible.
+   * destruyen para no pagar memoria por algo invisible. Y se rehacen cuando
+   * cambia el terreno del chunk (un voxel roto), que es por donde van.
    */
   syncDebug(
     world: World,
@@ -146,6 +143,19 @@ export class Overlays {
     showBiomes: boolean,
   ): void {
     const keys = new Set(chunks.map(([cx, cy]) => `${cx},${cy}`));
+    for (const [cx, cy] of chunks) {
+      const key = `${cx},${cy}`;
+      const rev = world.getChunk(cx, cy).terrainRevision;
+      if (this.revs.get(key) === rev) continue;
+      this.revs.set(key, rev);
+      const grid = this.grids.get(key);
+      if (grid) this.drop(grid);
+      this.grids.delete(key);
+      const border = this.borders.get(key);
+      if (border) this.drop(border.mesh);
+      this.borders.delete(key);
+    }
+    for (const key of this.revs.keys()) if (!keys.has(key)) this.revs.delete(key);
 
     for (const [key, mesh] of this.grids) {
       if (showChunks && keys.has(key)) continue;
@@ -171,6 +181,7 @@ export class Overlays {
     for (const view of this.borders.values()) this.drop(view.mesh);
     this.grids.clear();
     this.borders.clear();
+    this.revs.clear();
   }
 
   /** Segmentos de contorno de bioma trazados. Para la prueba de humo. */

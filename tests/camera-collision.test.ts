@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { Ground, Hitbox } from '@verdant/sim';
+import type { Hitbox, Solid } from '@verdant/sim';
+import { heightField } from './ground.js';
 import { CAMERA_MARGIN, cameraClearance } from '../packages/client/src/camera-collision.js';
 
 /**
@@ -13,7 +14,7 @@ const BACK = (() => {
   const n = Math.hypot(d.x, d.y, d.z);
   return { x: d.x / n, y: d.y / n, z: d.z / n };
 })();
-const flat: Ground = () => 0;
+const flat: Solid = heightField(() => 0);
 const none = () => null;
 
 function box(cx: number, cy: number, half: number, z0: number, z1: number): Hitbox {
@@ -27,7 +28,7 @@ describe('colision de la camara', () => {
 
   it('se para antes de una pared', () => {
     // Un bloque de 5 de alto a partir de x = -3.
-    const wall: Ground = (x) => (x < -3 ? 5 : 0);
+    const wall = heightField((x) => (x < -3 ? 5 : 0));
     const d = cameraClearance(PIVOT, BACK, 20, wall, none);
     const hit = 3.5 / Math.abs(BACK.x); // distancia a lo largo del rayo hasta x = -3
     expect(d).toBeCloseTo(hit - CAMERA_MARGIN, 3);

@@ -246,28 +246,30 @@ describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {
     expect(inv.wear[inv.selected]).toBe(40 - 4);
 
     // El hacha no sirve con la roca, pero se gasta en ella: todo golpe que
-    // toca algo gasta (el autor, 2026-10-04).
-    w.setFeature(tx + 1, ty, Feature.RockNode);
-    expect(swing(state, 1, 0, 30).blocked).toBe('needPickaxe');
+    // toca algo gasta (el autor, 2026-10-04). Al oeste: al este, los golpes
+    // de antes, mirando abajo, ya cavaron el suelo (el autor, 2026-10-20: el
+    // golpe rompe el terreno que toca), y la roca quedaria en el hoyo.
+    w.setFeature(tx - 1, ty, Feature.RockNode);
+    expect(swing(state, -1, 0, 30).blocked).toBe('needPickaxe');
     expect(inv.wear[inv.selected]).toBe(40 - 5);
 
     // 4. El pico: roca en 3, carbon en 4, cobre en 5; el hierro pide uno mejor.
     toHand(Resource.StonePickaxe, 1);
     const mine = (f: Feature, hits: number, item: Resource) => {
-      w.setFeature(tx + 1, ty, f);
+      w.setFeature(tx - 1, ty, f);
       const before = inv.count(item);
-      for (let i = 0; i < hits - 1; i++) swing(state, 1, 0, 30);
-      expect(w.featureAt(tx + 1, ty)).toBe(f);
-      swing(state, 1, 0, 30);
-      expect(w.featureAt(tx + 1, ty)).toBe(Feature.None);
+      for (let i = 0; i < hits - 1; i++) swing(state, -1, 0, 30);
+      expect(w.featureAt(tx - 1, ty)).toBe(f);
+      swing(state, -1, 0, 30);
+      expect(w.featureAt(tx - 1, ty)).toBe(Feature.None);
       expect(inv.count(item)).toBeGreaterThan(before);
     };
     mine(Feature.RockNode, 3, Resource.Stone);
     mine(Feature.CoalNode, 4, Resource.Coal);
     mine(Feature.CopperNode, 5, Resource.Copper);
-    w.setFeature(tx + 1, ty, Feature.IronNode);
-    for (let i = 0; i < 8; i++) expect(swing(state, 1, 0, 30).blocked).toBe('needBetterPickaxe');
-    expect(w.featureAt(tx + 1, ty)).toBe(Feature.IronNode);
+    w.setFeature(tx - 1, ty, Feature.IronNode);
+    for (let i = 0; i < 8; i++) expect(swing(state, -1, 0, 30).blocked).toBe('needBetterPickaxe');
+    expect(w.featureAt(tx - 1, ty)).toBe(Feature.IronNode);
     // Uno por golpe, tambien los que no pudo con el hierro: 3 + 4 + 5 + 8.
     expect(inv.wear[inv.selected]).toBe(40 - 20);
   });

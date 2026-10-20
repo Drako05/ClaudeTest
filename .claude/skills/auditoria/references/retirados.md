@@ -194,3 +194,10 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 
 - `MINERAL_FACES` — los tres tonos de las vetas de cada mineral, que el generador pintaba sobre una tesela fija por mineral; desde el 2026-10-20 cada mena se pinta en el juego, una por casilla, con sus vetas y sus cristales (`ore-mesh.ts`), y sus colores estan en `ORE_TONES`. Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
 - `STONES\[Feature\.(CoalNode|IronNode|CopperNode)\]` — la piedra fija de cada mineral en `world-art.ts`; desde el 2026-10-20 `STONES` lleva solo la roca, y los minerales la usan debajo de sus vetas. Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
+
+## Romper el terreno (2026-10-20)
+
+- `GROUND_STEP|type Ground = \(|type Ground,|type Ground \}` — el suelo como una altura por punto (`Ground`) y el rayo que lo buscaba a pasos de 0,05 con 20 biseciones; desde el 2026-10-20 el terreno entra voxel a voxel (`Solid`) y el rayo lo recorre cara a cara (`groundHit`). Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `una sola tapa|una tapa de 1 × 1|un cuarto en la de cada columna|la de cada columna, su cuarto` — la tapa de 1 × 1 de una casilla llana y el cuarto de tesela de 24 en la de cada columna; desde el 2026-10-20 cada cara de voxel lleva su tesela de 12 × 12 (`VOXEL_TILES`). Permitido en: `docs/historia.md`, `docs/arte.md`, `docs/relieve.md` (cuentan como era), `.claude/skills/auditoria/references/retirados.md`.
+- `columnTopFor\(state\.world, chunk|columnTopFor\(world, chunk` — el techo de una columna leido del chunk y, fuera de el, del generador sin lo roto; desde el 2026-10-20, `columnTopFor(world, vx, vy)` sobre `World.columnTopPeek`. Permitido en: `.claude/skills/auditoria/references/retirados.md`.
+- `terrainVariant\(seed, wx, wy` — la variante del suelo por casilla; desde el 2026-10-20, por voxel y cara (`terrainVariant(seed, vx, vy, vz, face, count)`). Permitido en: `.claude/skills/auditoria/references/retirados.md`.

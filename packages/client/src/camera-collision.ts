@@ -16,7 +16,7 @@
  * afirmarlo en Node. Coordenadas del nucleo: `z` es la altura.
  */
 
-import { groundHit, rayBox, type Ground, type Hitbox, type Vec3 } from '@verdant/sim';
+import { groundHit, rayBox, type Hitbox, type Solid, type Vec3 } from '@verdant/sim';
 
 /** Cuanto se queda la camara antes de lo que la para. **Deduccion mia.** */
 export const CAMERA_MARGIN = 0.3;
@@ -31,10 +31,10 @@ export function cameraClearance(
   pivot: Vec3,
   dir: Vec3,
   maxDist: number,
-  ground: Ground,
+  solid: Solid,
   boxAt: (tx: number, ty: number) => Hitbox | null,
 ): number {
-  const hit = rayHit(pivot, dir, maxDist, ground, boxAt);
+  const hit = rayHit(pivot, dir, maxDist, solid, boxAt);
   if (hit >= maxDist) return maxDist;
   return Math.max(CAMERA_MIN, hit - CAMERA_MARGIN);
 }
@@ -49,10 +49,10 @@ export function rayHit(
   pivot: Vec3,
   dir: Vec3,
   maxDist: number,
-  ground: Ground,
+  solid: Solid,
   boxAt: (tx: number, ty: number) => Hitbox | null,
 ): number {
-  let hit = groundHit(pivot, dir, maxDist, ground)?.t ?? maxDist;
+  let hit = groundHit(pivot, dir, maxDist, solid)?.t ?? maxDist;
 
   // Los hitboxes viven dentro de su casilla, asi que basta mirar las casillas
   // que cruza la proyeccion del rayo (Amanatides-Woo), y solo hasta el suelo.

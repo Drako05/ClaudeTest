@@ -31,6 +31,43 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
+## Tanda en curso: romper el terreno, voxel a voxel (2026-10-20)
+
+**Lo que pidio el autor**, literal y con sus cuatro respuestas, en
+`docs/relieve.md`, «Romper el terreno». En corto: el voxel de 0,5 es la unidad
+del terreno; cada golpe da a cada voxel que toca (en barrido, todos los que
+tocan sus rayos), que aguanta 3 con cualquier cosa y se rompe sin particulas
+ni botin; debajo, mas del mismo suelo, sin fondo; nada cae, tampoco los
+objetos; el agua no se mueve; el daño se olvida a los 3 s; gasta un uso; cada
+cara de voxel con su tesela de 12 × 12; sin pistas del daño (otra tanda).
+
+**Hecho** (el plan, aprobado por el autor como plan):
+- **El nucleo**: el overlay del terreno (`World.broken`, `breakVoxel`,
+  `isSolidVoxel` como unica fuente de verdad; regla 4), los rayos voxel a voxel
+  (`groundHit`, `Solid`; regla 12), el daño por voxel (`VOXEL_WORK`,
+  `voxelDamage`), la fisica con suelo y techo por voxel (`floorBelow`,
+  `ceilingAbove`, `ceilingOver`, `blocked`; regla 21), y la base fija de los
+  objetos (`objectBaseAt`, `bases`).
+- **El dibujo**: caras de voxel con teselas de 12 × 12 (`voxel-art.ts`,
+  generadas por `tools/pixel-mundo.ts`), rehacer solo el terreno de un chunk
+  (`terrainRevision`), la reticula por cara de voxel, y la rejilla y los
+  bordes de bioma que se rehacen con el terreno.
+- **Pruebas**: `tests/voxel-edit.test.ts` (17), `tests/terrain-mesh.test.ts`
+  reescrito, la pasada `dig` del humo (tambien en la matriz de la CI) y 21
+  mutaciones, que caen todas en local.
+
+**Medido**: de 1,6 a 1,9 veces los triangulos, y unos 15 ms por chunk al
+rehacer su terreno (`docs/relieve.md`). El tick, en su presupuesto.
+
+**Espera al autor**:
+- **Las teselas de 12 × 12**: son *deduccion* hasta que las vea (hoja
+  `?mundo=1`, arriba del todo, y en el juego). Si las da por buenas, **las de
+  24 del suelo** (`TERRAIN_TILES`) quedan sin uso en el juego y se retiran.
+- **El coste en el movil**, con los numeros de arriba.
+- Las deducciones, en `docs/juicio.md`, filas «Romper el terreno».
+
+---
+
 ## Auditoria al cerrar el pixelart del mundo (2026-10-19)
 
 **El alcance**: de `78bead8` a `4151766`: los arreglos de despues de la
@@ -570,7 +607,7 @@ importa con fotogramas largos.
 
 - **Las rampas**, a revisar al ver el relieve nuevo.
 - La estetica del HUD, la fauna, las especies de costa, el subsuelo, y la
-  construccion y destruccion del terreno. (El encuadre de las cimas era cosa
+  construccion del terreno (la destruccion empezo el 2026-10-20, arriba). (El encuadre de las cimas era cosa
   del isometrico y se fue con el; el crafteo ya esta en marcha.)
 - **Titulos internos en los documentos grandes** (el autor, 2026-10-19):
   `controles.md`, `recoleccion.md` y `reglas.md` pasan de 20 KB con uno a

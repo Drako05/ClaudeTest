@@ -28,6 +28,7 @@ import {
   type Animal,
   type World,
 } from '@verdant/sim';
+import { withVoxels } from './ground.js';
 
 /**
  * Un mundo hecho a mano: lo unico que miran el choque de un animal y su andar
@@ -39,7 +40,7 @@ function fakeWorld(
   floor: (x: number, y: number) => number = () => 0,
   objects: (tx: number, ty: number) => Feature = () => Feature.None,
 ): World {
-  return {
+  return withVoxels({
     seed: 1,
     isSolidAt: solid,
     isTerrainSolidAt: solid,
@@ -47,7 +48,7 @@ function fakeWorld(
     // La altura de la columna de 0,5, en medios bloques, de la misma funcion.
     columnTop: (vx: number, vy: number) => floor((vx + 0.5) / 2, (vy + 0.5) / 2) * 2,
     featureAt: objects,
-  } as unknown as World;
+  }) as unknown as World;
 }
 
 /** Un animal suelto, con los pies en (`x`, `y`) y mirando a (`fx`, `fy`). */

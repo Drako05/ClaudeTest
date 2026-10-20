@@ -52,6 +52,7 @@ import {
   lookVector,
   gazeTarget,
   groundHit,
+  solidOf,
   periodOf,
   WANDER_PERIOD_TICKS,
   sectorRays,
@@ -64,6 +65,7 @@ import {
   WATER_SURFACE,
   dropFloor,
   type GameState,
+  type Chunk,
 } from '@verdant/sim';
 import { DevTools } from './devtools.js';
 import { Effects, SLASH_FP_HALF_WIDTH, SLASH_HALF_WIDTH, slashEdge, STAB_SCREEN, stabLine } from './effects.js';
@@ -479,13 +481,13 @@ function waterAt(px: number, py: number): void {
 
 /**
  * El suelo en pixelart (el autor, 2026-10-19): todas las teselas en un atlas,
- * un material para todos los chunks. Cada casilla toma la de su suelo en la
- * variante que le toque (`terrainVariant`).
+ * un material para todos los chunks. Cada cara de voxel toma la de su suelo en
+ * la variante que le toque (`terrainVariant`; por voxel desde el 2026-10-20).
  */
 const atlas = terrainAtlas();
 const terrainMaterial = new MeshLambertMaterial({ map: pixelTexture(atlas.canvas, false), vertexColors: true });
-const tileOf: TerrainTile = (terrain, wx, wy) =>
-  atlas.rect(terrain, terrainVariant(seed, wx, wy, atlas.variants(terrain)));
+const tileOf: TerrainTile = (terrain, vx, vy, vz, face) =>
+  atlas.rect(terrain, terrainVariant(seed, vx, vy, vz, face, atlas.variants(terrain)));
 
 /**
  * El punto del mundo que se ve en `at` de la pantalla de PRIMERA PERSONA
@@ -541,7 +543,7 @@ function aimAt(p: { x: number; y: number }): Aim {
     from,
     dir,
     TAP_RAY_MAX,
-    (x, y) => state.world.groundHeightAt(x, y),
+    solidOf(state.world),
     (tx, ty) => hitboxAt(state.world, tx, ty),
   );
   const e = state.entities;
@@ -565,7 +567,7 @@ function aimAt(p: { x: number; y: number }): Aim {
   const base = rollFor({ x: dx / len, y: dy / len, z: dz / len }, { x: camRight.x, y: camRight.y, z: 0 });
   if (camera.projection === 'primera') return { ...aim, aimRoll: base };
   const eye = { x: e.x[id], y: e.y[id], z: e.z[id] + EYE_HEIGHT };
-  const ground = (x: number, y: number) => state.world.groundHeightAt(x, y);
+  const ground = solidOf(state.world);
   // Uno de cada ocho rayos basta para ver la forma (los dos bordes, el centro
   // y dos intermedios), y cuesta una sexta parte.
   const look = (roll: number) =>
@@ -588,21 +590,24 @@ function toScreen(p: { x: number; y: number; z: number }): { x: number; y: numbe
 let lastTapAim: Aim | null = null;
 
 interface ChunkView {
-  readonly mesh: Mesh;
+  mesh: Mesh;
   readonly props: import('three').Object3D[];
+  /** Donde caen las sombras de sus objetos, para rehacerlas sobre el terreno nuevo. */
+  readonly spots: ShadowSpot[];
   /** Todas las sombras del chunk en una malla. Null si no hay ninguna. */
-  readonly shadows: Mesh | null;
-  readonly triangles: number;
+  shadows: Mesh | null;
+  triangles: number;
   revision: number;
+  /** La `terrainRevision` del chunk con la que se hizo su terreno. */
+  terrainRevision: number;
 }
 
-const views = new Map<string, ChunkView>();
-let triangles = 0;
-
-function buildChunk(cx: number, cy: number): ChunkView {
-  const chunk = state.world.getChunk(cx, cy);
+/**
+ * El terreno de un chunk, en una malla. Lo rehace solo un voxel roto (el autor,
+ * 2026-10-20), sin tocar sus objetos.
+ */
+function terrainMeshOf(chunk: Chunk): { mesh: Mesh; triangles: number } {
   const data = chunkMesh(state.world, chunk, tileOf);
-
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
   geometry.setAttribute('color', new BufferAttribute(data.colors, 3));
@@ -611,6 +616,36 @@ function buildChunk(cx: number, cy: number): ChunkView {
   geometry.computeVertexNormals();
   const mesh = new Mesh(geometry, terrainMaterial);
   scene.add(mesh);
+  return { mesh, triangles: data.triangles };
+}
+
+/**
+ * Todas las sombras del chunk en una malla: una draw call en vez de una por
+ * elemento. Cada una cae sobre la MISMA superficie que dibuja el terreno,
+ * columna por columna, aunque asome a un chunk vecino. Ver `shadows.ts`.
+ */
+function shadowsOf(spots: ShadowSpot[]): Mesh | null {
+  const shadows = buildShadows(spots, (vx, vy) => columnTopFor(state.world, vx, vy));
+  if (shadows) scene.add(shadows);
+  return shadows;
+}
+
+function disposeShadows(view: ChunkView): void {
+  if (!view.shadows) return;
+  scene.remove(view.shadows);
+  view.shadows.geometry.dispose();
+  (view.shadows.material as MeshBasicMaterial).dispose();
+  view.shadows = null;
+}
+
+const views = new Map<string, ChunkView>();
+let triangles = 0;
+/** Cuantas veces se ha rehecho solo el terreno de un chunk (un voxel roto), para el humo. */
+let terrainRebuilds = 0;
+
+function buildChunk(cx: number, cy: number): ChunkView {
+  const chunk = state.world.getChunk(cx, cy);
+  const { mesh, triangles } = terrainMeshOf(chunk);
 
   // Las features, leidas del mundo EFECTIVO y no del potencial del generador:
   // es la regla 4, y aqui vale igual que en el isometrico.
@@ -646,12 +681,28 @@ function buildChunk(cx: number, cy: number): ChunkView {
       }
     }
   }
-  // Todas las sombras del chunk en una malla: una draw call en vez de una por
-  // elemento. Cada una cae sobre la MISMA superficie que dibuja el terreno,
-  // columna por columna, aunque asome a un chunk vecino. Ver `shadows.ts`.
-  const shadows = buildShadows(spots, (vx, vy) => columnTopFor(state.world, chunk, vx, vy));
-  if (shadows) scene.add(shadows);
-  return { mesh, props, shadows, triangles: data.triangles, revision: chunk.revision };
+  return {
+    mesh,
+    props,
+    spots,
+    shadows: shadowsOf(spots),
+    triangles,
+    revision: chunk.revision,
+    terrainRevision: chunk.terrainRevision,
+  };
+}
+
+/** Rehace el terreno de un chunk ya dibujado, y las sombras que caen en el. */
+function rebuildTerrain(view: ChunkView, chunk: Chunk): void {
+  scene.remove(view.mesh);
+  view.mesh.geometry.dispose();
+  const { mesh, triangles } = terrainMeshOf(chunk);
+  view.mesh = mesh;
+  view.triangles = triangles;
+  disposeShadows(view);
+  view.shadows = shadowsOf(view.spots);
+  view.terrainRevision = chunk.terrainRevision;
+  terrainRebuilds++;
 }
 
 function syncChunks(): void {
@@ -666,7 +717,11 @@ function syncChunks(): void {
       const key = `${cx},${cy}`;
       wanted.add(key);
       const existing = views.get(key);
-      if (existing && existing.revision === state.world.getChunk(cx, cy).revision) continue;
+      const chunk = state.world.getChunk(cx, cy);
+      if (existing && existing.revision === chunk.revision) {
+        if (existing.terrainRevision !== chunk.terrainRevision) rebuildTerrain(existing, chunk);
+        continue;
+      }
       if (existing) dispose(key, existing);
       views.set(key, buildChunk(cx, cy));
     }
@@ -689,11 +744,7 @@ function dispose(key: string, view: ChunkView): void {
     scene.remove(prop);
     billboards.release(prop);
   }
-  if (view.shadows) {
-    scene.remove(view.shadows);
-    view.shadows.geometry.dispose();
-    (view.shadows.material as MeshBasicMaterial).dispose();
-  }
+  disposeShadows(view);
   views.delete(key);
 }
 
@@ -718,6 +769,8 @@ function restart(): void {
   feedBase = state.inventory.totals();
   gathered = 0;
   animalsKilled = 0;
+  voxelHits = 0;
+  voxelsBroken = 0;
   jumps = 0;
   airPeak = 0;
   // Se reinicia con un clic o con R, que son gestos: se aprovecha para volver a
@@ -794,6 +847,9 @@ const tapSeq = new TapSequencer<Aim>(ACTION_REPEAT_TICKS);
 let gathered = 0;
 /** Animales muertos en esta partida. Para la prueba de humo. */
 let animalsKilled = 0;
+/** Golpes a voxeles del terreno y voxeles rotos en esta partida. Para la prueba de humo. */
+let voxelHits = 0;
+let voxelsBroken = 0;
 
 /**
  * Un frame del bucle, en el instante `now` (ms). Lo llama el navegador por
@@ -966,7 +1022,7 @@ function runFrame(now: number, draw: boolean): void {
             intent.aimX,
             intent.aimY,
             intent.aimZ,
-            (x, y) => state.world.groundHeightAt(x, y),
+            solidOf(state.world),
             (tx, ty) => hitboxAt(state.world, tx, ty),
           )
         : null;
@@ -1034,6 +1090,12 @@ function runFrame(now: number, draw: boolean): void {
     // Un animal no suelta fragmentos, ni golpeado ni al morir (decision del
     // autor, 2026-10-03): solo su impacto.
     for (const hit of state.lastAnimalHits) if (hit.killed) animalsKilled++;
+    // El terreno no suelta nada al golpearlo ni al romperse (el autor,
+    // 2026-10-20): solo se cuenta.
+    for (const v of state.lastVoxelHits) {
+      voxelHits++;
+      if (v.broken) voxelsBroken++;
+    }
     for (const hit of state.lastHarvest) {
       // La rama de un arbol a mano no lo derriba: sus esquirlas ya salieron.
       if (!hit.felled) continue;
@@ -1116,7 +1178,7 @@ function runFrame(now: number, draw: boolean): void {
   // mismo terreno y los mismos hitboxes que el golpe. Los ejes de three.js
   // (`y` arriba) pasan a los del nucleo (`z` arriba). La colision sale de los
   // ojos, que suben un escalon con el cuerpo, tick a tick.
-  const ground = (x: number, y: number) => state.world.groundHeightAt(x, y);
+  const ground = solidOf(state.world);
   const boxAt = (tx: number, ty: number) => hitboxAt(state.world, tx, ty);
   camera.follow(px, ph, py, w, h, (from, back, want) =>
     cameraClearance({ x: from.x, y: from.z, z: from.y }, { x: back.x, y: back.z, z: back.y }, want, ground, boxAt),
@@ -1348,11 +1410,17 @@ Object.defineProperty(window, '__verdant', {
       // Lo suelto: lo que dice el nucleo y lo que se dibuja.
       drops: [...state.world.drops.values()].map((d) => ({
         id: d.id, item: d.item, count: d.count, x: d.x, y: d.y, z: d.z, resting: d.resting,
-        floor: dropFloor(state.world, d.x, d.y),
+        floor: dropFloor(state.world, d.x, d.y, d.z),
       })),
       dropsInScene: dropsView.count,
       dropsPlaced: dropsView.placed,
       animalsKilled,
+      /** Golpes a voxeles del terreno y voxeles rotos, acumulados; y los chunks cuyo terreno se rehizo por ellos. */
+      voxelHits,
+      voxelsBroken,
+      terrainRebuilds,
+      /** Si el voxel (`vx`, `vy`, `vz`) de 0,5 es terreno (`World.isSolidVoxel`). */
+      voxelAt: (vx: number, vy: number, vz: number) => state.world.isSolidVoxel(vx, vy, vz),
       faunaSizes: faunaView.sizes,
       faunaYaws: faunaView.yaws,
       /** Las diez especies en sus tres etapas, en un lienzo: para mirar el dibujo (con su caja, `boxes`). */

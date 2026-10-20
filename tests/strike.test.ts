@@ -13,9 +13,10 @@ import {
   trunkRange,
   trunkWidthFor,
   bucketBlocks,
-  type Ground,
   type Hitbox,
+  type Solid,
 } from '@verdant/sim';
+import { heightField } from './ground.js';
 
 /**
  * El golpe (regla 12): un sector plano de 3 bloques y 90 grados en el plano de
@@ -23,7 +24,7 @@ import {
  * del autor. Geometria pura: suelo y cajas de mentira.
  */
 const EYE = { x: 0.5, y: 0.5, z: EYE_HEIGHT };
-const flat: Ground = () => 0;
+const flat: Solid = heightField(() => 0);
 const down = (deg: number): number => Math.sin((-deg * Math.PI) / 180);
 const up = (deg: number): number => Math.sin((deg * Math.PI) / 180);
 
@@ -39,7 +40,7 @@ function boxes(...list: Hitbox[]) {
 }
 
 /** Si el golpe mirando al este con esa inclinacion toca alguna caja. */
-function hits(lookZ: number, ground: Ground, ...list: Hitbox[]): number {
+function hits(lookZ: number, ground: Solid, ...list: Hitbox[]): number {
   return strike(EYE, 1, 0, lookZ, ground, boxes(...list)).targets.length;
 }
 
@@ -132,7 +133,7 @@ describe('el golpe toca hitboxes', () => {
 
   it('el terreno lo corta: un arbol detras de una pared de 2 no cae; detras de un escalon de 1, si', () => {
     const tree = box(2.5, 0.5, 0.1, 0, 4);
-    const wall = (h: number): Ground => (x) => (x >= 1.5 && x < 2 ? h : 0);
+    const wall = (h: number): Solid => heightField((x) => (x >= 1.5 && x < 2 ? h : 0));
     expect(hits(0, wall(2), tree)).toBe(0);
     expect(hits(0, wall(1), tree)).toBe(1);
   });
@@ -170,14 +171,14 @@ describe('donde se siembra', () => {
   });
 
   it('en la cara de una pared, no; en la cima del escalon, si', () => {
-    const step: Ground = (x) => (x >= 1 ? 1.6 : 0);
-    // A 40 grados hacia abajo entra en el bloque de 1,6 por su costado, a 1,33
+    const step = heightField((x) => (x >= 1 ? 1.5 : 0));
+    // A 40 grados hacia abajo entra en el bloque de 1,5 por su costado, a 1,33
     // de altura: no se siembra en una pared.
     expect(plantTile(EYE, 1, 0, down(40), step)).toBeNull();
     // Muy hacia abajo, cae en el suelo propio antes de la pared.
     expect(plantTile(EYE, 1, 0, down(75), step)).toEqual({ x: 0, y: 0 });
     // Con un escalon bajo, la mirada cae en su cima.
-    const low: Ground = (x) => (x >= 1 ? 0.5 : 0);
+    const low = heightField((x) => (x >= 1 ? 0.5 : 0));
     expect(plantTile(EYE, 1, 0, down(45), low)).toEqual({ x: 1, y: 0 });
   });
 });

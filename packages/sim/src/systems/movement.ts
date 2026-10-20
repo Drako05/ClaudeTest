@@ -26,7 +26,7 @@
 
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
-import { BODY_RADIUS, bodyOf, groundRound, squareFloor } from '../boxes.js';
+import { BODY_RADIUS, bodyOf, ceilingOver, groundRound, squareFloor } from '../boxes.js';
 import { ANIMAL_JUMP_MARGIN, applyVertical, jumpSpeedFor, STEP_UP, takeOff } from './jump.js';
 
 /** Medio ancho del cuerpo del jugador, en tiles: su huella. Vive en `boxes.ts`. */
@@ -88,9 +88,11 @@ export function collides(world: World, cx: number, cy: number, half = BODY_RADIU
  *
  * La altura se mide con la **caja entera** (el autor, 2026-10-10: «todas las
  * cajas chocan con el terreno en todo momento»): lo mas alto que toca la
- * huella, terreno o caja, no puede pasar de los pies mas `margin`. Las cajas
- * que empiezan por encima de lo alto del cuerpo no estorban: son techo. Y
- * `keep` dice donde puede estar: a un animal, solo en su bioma.
+ * huella, terreno o caja, no puede pasar de los pies mas `margin`. Y donde
+ * quedarian los pies, el cuerpo entero tiene que caber debajo de lo que haya
+ * encima (`ceilingOver`): desde los voxeles (el autor, 2026-10-20) hay terreno
+ * en el aire, y un escalon con techo encima no se sube. Y `keep` dice donde
+ * puede estar: a un animal, solo en su bioma.
  */
 function blocked(
   world: World,
@@ -109,7 +111,10 @@ function blocked(
   // huella: un tronco, una roca o una mesa estorban de lado como una pared, y
   // lo que no pasa del salto se sube saltando (decisiones del autor,
   // 2026-09-30 y 2026-10-05).
-  return squareFloor(world, cx, cy, half, feet + bodyOf(store, id).height) > feet + margin;
+  const floor = squareFloor(world, cx, cy, half, feet + margin);
+  if (floor > feet + margin) return true;
+  const z = Math.max(feet, floor);
+  return ceilingOver(world, cx, cy, half, z) < z + bodyOf(store, id).height - 1e-9;
 }
 
 /**
@@ -559,7 +564,7 @@ function tryJump(
   const px = store.x[id] + store.facingX[id] * d;
   const py = store.y[id] + store.facingY[id] * d;
   if (collides(world, px, py, body.half) || (keep && !keep(px, py))) return false;
-  const rise = squareFloor(world, px, py, body.half) - z;
+  const rise = squareFloor(world, px, py, body.half, z + ANIMAL_JUMP_UP + body.height) - z;
   if (rise <= STEP_UP + 1e-6 || rise > ANIMAL_JUMP_UP + 1e-6) return false;
   const speed = jumpSpeedFor(rise + ANIMAL_JUMP_MARGIN);
   const launch = () => {

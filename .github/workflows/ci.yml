@@ -42,7 +42,7 @@ jobs:
         # eran ~15 minutos y marcaba lo que tardaba la CI (2026-10-10). Si se
         # anade una pasada al humo o una parte al barrido, va aqui tambien: el
         # escaner de la auditoria lo cruza.
-        pasada: [desktop, resources, stations, mobile, devTools, life, relief, highRefresh, fauna, gestures, slash-normal, slash-baja, slash-cerca, slash-primera, slash-estocada]
+        pasada: [desktop, resources, stations, mobile, devTools, life, relief, highRefresh, fauna, dig, gestures, slash-normal, slash-baja, slash-cerca, slash-primera, slash-estocada]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/preparar

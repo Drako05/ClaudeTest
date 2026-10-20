@@ -13,7 +13,7 @@
  */
 
 import { TICK_DT } from '@verdant/shared';
-import { BODY_RADIUS, footing, squareFloor } from '../boxes.js';
+import { BODY_RADIUS, footing, PLAYER_HEIGHT, squareFloor } from '../boxes.js';
 import type { EntityStore } from '../entities.js';
 import type { World } from '../world.js';
 import { GRAVITY, JUMP_SPEED, STEP_UP } from './jump.js';
@@ -77,7 +77,7 @@ export function autoJumpDue(
     const px = store.x[id] + dirX * s;
     const py = store.y[id] + dirY * s;
     if (collides(world, px, py)) return false;
-    const floor = squareFloor(world, px, py, BODY_RADIUS);
+    const floor = squareFloor(world, px, py, BODY_RADIUS, feet + JUMP_HEIGHT + PLAYER_HEIGHT);
     if (floor - walked <= STEP_UP) {
       // Se llega andando: el siguiente escalon se mide desde este.
       walked = floor;

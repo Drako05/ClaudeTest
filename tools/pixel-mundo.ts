@@ -127,54 +127,61 @@ function lit(a: Art, extra = '', keep = ''): string {
 
 // ------------------------------------------------------------------ suelo
 
-const wrap = (n: number) => ((n % PX) + PX) % PX;
+/** El modulo de una tesela de lado `S`: las teselas casan consigo mismas. */
+const wrapIn = (S: number) => (n: number) => ((n % S) + S) % S;
+/** `k` cosas por tesela de 24, repartidas por area en una de lado `S` (al menos una). */
+const per = (k: number, S: number) => (S === PX ? k : Math.max(1, Math.round((k * S * S) / (PX * PX))));
+/** Un largo de 24, a escala en una de lado `S` (al menos 2). */
+const span = (k: number, S: number) => (S === PX ? k : Math.max(2, Math.round((k * S) / PX)));
 
 /** Hierba: base, manchas de ruido, y briznas de luz con su sombra. */
-function grassTile(seed: number, tones: string[]): Art {
+function grassTile(seed: number, tones: string[], S = PX): Art {
+  const wrap = wrapIn(S);
   const rng = mulberry32(seed);
-  const noise = periodicNoise(rng, PX, 4);
-  const g = blank(PX, PX, 'b');
+  const noise = periodicNoise(rng, S, 4);
+  const g = blank(S, S, 'b');
   const all: number[] = [];
-  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(noise(x, y));
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) all.push(noise(x, y));
   const low = quantile(all, 0.16);
-  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) if (noise(x, y) < low) g[y]![x] = 'c';
-  for (let k = 0; k < 34; k++) {
-    const x = Math.floor(rng() * PX);
-    const y = Math.floor(rng() * PX);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (noise(x, y) < low) g[y]![x] = 'c';
+  for (let k = 0; k < per(34, S); k++) {
+    const x = Math.floor(rng() * S);
+    const y = Math.floor(rng() * S);
     g[wrap(y)]![x] = 'a';
     g[wrap(y + 1)]![x] = 'a';
     if (rng() < 0.6) g[wrap(y + 2)]![wrap(x + 1)] = 'c';
   }
-  for (let k = 0; k < 7; k++) {
-    const x = Math.floor(rng() * PX);
-    const y = Math.floor(rng() * PX);
+  for (let k = 0; k < per(7, S); k++) {
+    const x = Math.floor(rng() * S);
+    const y = Math.floor(rng() * S);
     if (g[y]![x] === 'c') g[y]![x] = 'd';
   }
   return { grid: g, palette: pal(['abcd', tones]) };
 }
 
 /** Piedra: manchas de dos ruidos y grietas cortas con su canto de luz. */
-function stoneGrid(seed: number): Grid {
+function stoneGrid(seed: number, S = PX): Grid {
+  const wrap = wrapIn(S);
   const rng = mulberry32(seed);
-  const noise = periodicNoise(rng, PX, 6);
-  const fine = periodicNoise(rng, PX, 3);
-  const g = blank(PX, PX, 'b');
+  const noise = periodicNoise(rng, S, 6);
+  const fine = periodicNoise(rng, S, 3);
+  const g = blank(S, S, 'b');
   const v = (x: number, y: number) => noise(x, y) * 0.75 + fine(x, y) * 0.25;
   const all: number[] = [];
-  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(v(x, y));
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) all.push(v(x, y));
   const hi = quantile(all, 0.78);
   const lo = quantile(all, 0.24);
-  for (let y = 0; y < PX; y++) {
-    for (let x = 0; x < PX; x++) {
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
       if (v(x, y) >= hi) g[y]![x] = 'a';
       else if (v(x, y) < lo) g[y]![x] = 'c';
     }
   }
-  for (let k = 0; k < 3; k++) {
-    let x = Math.floor(rng() * PX);
-    let y = Math.floor(rng() * PX);
+  for (let k = 0; k < per(3, S); k++) {
+    let x = Math.floor(rng() * S);
+    let y = Math.floor(rng() * S);
     g[wrap(y - 1)]![wrap(x - 1)] = 'a';
-    const len = 4 + Math.floor(rng() * 5);
+    const len = span(4 + Math.floor(rng() * 5), S);
     for (let s = 0; s < len; s++) {
       g[wrap(y)]![wrap(x)] = 'd';
       x += rng() < 0.6 ? 1 : 0;
@@ -188,45 +195,47 @@ function stoneGrid(seed: number): Grid {
  * Un suelo de grano: base, manchas suaves de sombra y de luz, granos sueltos
  * y ondas (la arena, la nieve, el fondo del agua).
  */
-function grainTile(seed: number, tones: string[], opts: { ripples: number; grains: number; patch: number }): Art {
+function grainTile(seed: number, tones: string[], opts: { ripples: number; grains: number; patch: number }, S = PX): Art {
+  const wrap = wrapIn(S);
   const rng = mulberry32(seed);
-  const noise = periodicNoise(rng, PX, 6);
-  const g = blank(PX, PX, 'b');
+  const noise = periodicNoise(rng, S, 6);
+  const g = blank(S, S, 'b');
   const all: number[] = [];
-  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(noise(x, y));
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) all.push(noise(x, y));
   const lo = quantile(all, opts.patch);
   const hi = quantile(all, 1 - opts.patch * 0.6);
-  for (let y = 0; y < PX; y++) {
-    for (let x = 0; x < PX; x++) {
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
       if (noise(x, y) < lo) g[y]![x] = 'c';
       else if (noise(x, y) >= hi) g[y]![x] = 'a';
     }
   }
-  for (let k = 0; k < opts.ripples; k++) {
-    const y0 = Math.floor(rng() * PX);
-    const x0 = Math.floor(rng() * PX);
-    const len = 6 + Math.floor(rng() * 6);
+  for (let k = 0; k < (S === PX ? opts.ripples : Math.ceil(opts.ripples / 2)); k++) {
+    const y0 = Math.floor(rng() * S);
+    const x0 = Math.floor(rng() * S);
+    const len = span(6 + Math.floor(rng() * 6), S);
     for (let i = 0; i < len; i++) {
       const y = wrap(y0 + Math.round(Math.sin(i / 2.2) * 0.8));
       g[y]![wrap(x0 + i)] = 'a';
       g[wrap(y + 1)]![wrap(x0 + i)] = 'c';
     }
   }
-  for (let k = 0; k < opts.grains; k++) {
-    const x = Math.floor(rng() * PX);
-    const y = Math.floor(rng() * PX);
+  for (let k = 0; k < per(opts.grains, S); k++) {
+    const x = Math.floor(rng() * S);
+    const y = Math.floor(rng() * S);
     g[y]![x] = rng() < 0.5 ? 'a' : 'd';
   }
   return { grid: g, palette: pal(['abcd', tones]) };
 }
 
 /** El suelo del bosque: verde oscuro con musgo, y pinocha caida. */
-function forestFloor(seed: number, tones: string[], litter: string[]): Art {
-  const art = grassTile(seed, tones);
+function forestFloor(seed: number, tones: string[], litter: string[], S = PX): Art {
+  const wrap = wrapIn(S);
+  const art = grassTile(seed, tones, S);
   const rng = mulberry32(seed ^ 0x51);
-  for (let k = 0; k < 9; k++) {
-    const x = Math.floor(rng() * PX);
-    const y = Math.floor(rng() * PX);
+  for (let k = 0; k < per(9, S); k++) {
+    const x = Math.floor(rng() * S);
+    const y = Math.floor(rng() * S);
     const dir = rng() < 0.5 ? 1 : -1;
     art.grid[y]![x] = 'e';
     art.grid[wrap(y + 1)]![wrap(x + dir)] = 'f';
@@ -236,17 +245,18 @@ function forestFloor(seed: number, tones: string[], litter: string[]): Art {
 }
 
 /** La tundra: pardo verdoso, con manchas de musgo y matas de hierba rala. */
-function tundraTile(seed: number, tones: string[], moss: string[]): Art {
-  const art = grainTile(seed, tones, { ripples: 0, grains: 10, patch: 0.18 });
+function tundraTile(seed: number, tones: string[], moss: string[], S = PX): Art {
+  const wrap = wrapIn(S);
+  const art = grainTile(seed, tones, { ripples: 0, grains: 10, patch: 0.18 }, S);
   const rng = mulberry32(seed ^ 0x77);
-  const noise = periodicNoise(rng, PX, 8);
+  const noise = periodicNoise(rng, S, S % 8 ? 6 : 8);
   const all: number[] = [];
-  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) all.push(noise(x, y));
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) all.push(noise(x, y));
   const hi = quantile(all, 0.9);
-  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) if (noise(x, y) >= hi) art.grid[y]![x] = rng() < 0.7 ? 'e' : 'f';
-  for (let k = 0; k < 6; k++) {
-    const x = Math.floor(rng() * PX);
-    const y = Math.floor(rng() * PX);
+  for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (noise(x, y) >= hi) art.grid[y]![x] = rng() < 0.7 ? 'e' : 'f';
+  for (let k = 0; k < per(6, S); k++) {
+    const x = Math.floor(rng() * S);
+    const y = Math.floor(rng() * S);
     art.grid[y]![x] = 'a';
     art.grid[wrap(y - 1)]![x] = 'a';
     art.grid[wrap(y + 1)]![wrap(x + 1)] = 'd';
@@ -257,6 +267,7 @@ function tundraTile(seed: number, tones: string[], moss: string[]): Art {
 
 /** La superficie del agua: crestas de ola de luz con su sombra debajo. */
 function waterSurface(tones: string[]): Art {
+  const wrap = wrapIn(PX);
   const rng = mulberry32(0xa9a);
   const noise = periodicNoise(rng, PX, 8);
   const g = blank(PX, PX, 'b');
@@ -655,6 +666,24 @@ const terrain: [Terrain, string, Art[]][] = [
   [Terrain.DeepWater, 'Fondo del agua honda', [0xd01, 0xd02, 0xd03].map((s) => grainTile(s, T(Terrain.DeepWater), { ripples: 1, grains: 6, patch: 0.25 }))],
 ];
 
+/**
+ * Los suelos a la medida del voxel (el autor, 2026-10-20: el voxel de 0,5 es la
+ * unidad del terreno, y cada cara lleva su tesela entera de 12 × 12): los
+ * mismos pinceles y colores, a la misma densidad, con las cosas repartidas por
+ * area (*deduccion*). Semillas propias: no son un cuarto de las de 24.
+ */
+const VOXEL_PX = PX / 2;
+const voxelTerrain: [Terrain, string, Art[]][] = [
+  [Terrain.Grass, 'Hierba', [0x6b1, 0x6b2, 0x6b3, 0x6b4].map((s) => grassTile(s, T(Terrain.Grass), VOXEL_PX))],
+  [Terrain.Forest, 'Bosque', [0xf11, 0xf12, 0xf13].map((s) => forestFloor(s, T(Terrain.Forest), ['#5e4a2c', '#3e301c'], VOXEL_PX))],
+  [Terrain.Sand, 'Arena', [0x5b1, 0x5b2, 0x5b3].map((s) => grainTile(s, T(Terrain.Sand), { ripples: 2, grains: 14, patch: 0.15 }, VOXEL_PX))],
+  [Terrain.Rock, 'Roca', [0x7e1, 0x7e2, 0x7e3].map((s) => ({ grid: stoneGrid(s, VOXEL_PX), palette: pal(['abcd', T(Terrain.Rock)]) }))],
+  [Terrain.Snow, 'Nieve', [0x5f1, 0x5f2, 0x5f3].map((s) => grainTile(s, SNOW, { ripples: 1, grains: 8, patch: 0.2 }, VOXEL_PX))],
+  [Terrain.Tundra, 'Tundra', [0x7f1, 0x7f2, 0x7f3].map((s) => tundraTile(s, T(Terrain.Tundra), ['#6f7448', '#585c38'], VOXEL_PX))],
+  [Terrain.Water, 'Fondo del agua', [0xb11, 0xb12, 0xb13].map((s) => grainTile(s, T(Terrain.Water), { ripples: 2, grains: 8, patch: 0.2 }, VOXEL_PX))],
+  [Terrain.DeepWater, 'Fondo del agua honda', [0xd11, 0xd12, 0xd13].map((s) => grainTile(s, T(Terrain.DeepWater), { ripples: 1, grains: 6, patch: 0.25 }, VOXEL_PX))],
+];
+
 const look = (f: Feature) => LOOKS[f]!;
 // El roble y la mata de la pradera, con los colores de las referencias del
 // autor (2026-10-19); lo demas vivo, con `ramp` desde el suyo.
@@ -806,3 +835,27 @@ export const STATION_ART: Readonly<Partial<Record<Feature, { top: WorldArt; side
 const target = process.env.PIXEL_MUNDO_SALIDA ?? new URL('../packages/client/src/world-art.ts', import.meta.url);
 writeFileSync(target, out);
 console.log(`escrito: ${target}`);
+
+const voxelOut = `/**
+ * Los suelos del terreno, una tesela de 12 × 12 por cara de voxel de 0,5 (el
+ * autor, 2026-10-20: el voxel es la unidad del terreno, no un cuarto de bloque).
+ * La misma densidad que el resto del mundo, 24 pixeles por bloque.
+ *
+ * **Lo genero \`tools/pixel-mundo.ts\`** y se puede retocar aqui a mano; volver
+ * a correr el generador pisa los retoques.
+ */
+
+import { Terrain } from '@verdant/shared';
+import type { WorldArt } from './world-art.js';
+
+/** Pixeles de arte por cara de voxel. */
+export const VOXEL_PX = ${VOXEL_PX};
+
+/** Las variantes de cada suelo: el juego elige una por voxel y cara, con la semilla. */
+export const VOXEL_TILES: Readonly<Record<Terrain, readonly WorldArt[]>> = {
+${voxelTerrain.map(([t, name, arts]) => `  // ${name}\n  [Terrain.${Terrain[t]}]: [\n${arts.map((a) => `  ${lit(a)},`).join('\n')}\n  ],`).join('\n')}
+};
+`;
+const voxelTarget = process.env.PIXEL_MUNDO_VOXELES ?? new URL('../packages/client/src/voxel-art.ts', import.meta.url);
+writeFileSync(voxelTarget, voxelOut);
+console.log(`escrito: ${voxelTarget}`);

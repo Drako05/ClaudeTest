@@ -35,8 +35,10 @@ segmento caiga fuera de su chunk. La geometria del contorno vive aparte en
 de la costura con `world.gen` para no registrar chunks por mirar.
 
 **La mirada es la de la camara, asi que la reticula tambien.** Marca **donde
-toca la mirada**: en verde la casilla de suelo, y en blanco la cara de la pared
-si toca un costado del terreno (pedido del autor, 2026-09-30). Sale de
+toca la mirada**: en verde la cara de arriba del voxel de suelo, y en blanco
+la de la pared si toca un costado del terreno, o la de abajo de lo que quedo
+en el aire (pedido del autor, 2026-09-30; por voxel desde el 2026-10-20,
+*deduccion*: el voxel es la unidad del terreno). Sale de
 `aimSurface`, lo mismo que decide donde se siembra y se coloca. Hasta entonces
 marcaba tambien los objetos que el golpe alcanzaba; el autor lo quito.
 

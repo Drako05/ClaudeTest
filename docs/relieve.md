@@ -90,3 +90,53 @@ pero quieto, como quieto; y cada salto que despega cuesta `JUMP_HUNGER`, un 0,25
 Lo de «avanzando» se mide en el tick comparando la posicion antes y despues de
 moverse (deduccion mia: empujar contra una pared no es correr). Todo respeta
 `survivalFrozen`, y `skipTime` gasta como quieto.
+
+## Romper el terreno (2026-10-20)
+
+El autor: «quiero que el mundo realmente se entienda como creado por bloques
+de 0.5m. quiero que cada golpe impacte realmente a cada bloque de 0.5m y lo
+pueda destruir de forma independiente. por ahora, lo que hay debajo de un
+bloque es otro de su mismo tipo hasta el fondo. los bloques de 0.5 ya no se
+deben ver como pertenecientes a un bloque de 1m, sino como que ellos mismos
+son la unidad fundamental de terreno. por el momento detendremos la gravedad
+para los bloques, ya nada cae si no tiene algo debajo. por el momento, pegar
+con cualquier cosa rompe el terreno. el terreno aguanta 3 golpes antes de
+romperse y no suelta partículas ni botín.» Y contesto a cuatro preguntas:
+
+- **Barrido: cada voxel que toca recibe su golpe**, uno aunque entren varios
+  rayos (no solo el mas cercano ni solo el del centro).
+- **Un objeto cuyo apoyo se rompe se queda flotando.**
+- **Ninguna pista del daño** hasta que se rompe («agregaremos esas pistas
+  visuales en otra tanda»).
+- **Gasta un uso** de la herramienta, como todo golpe que toca algo.
+- Y despues: **cada cara de voxel con su tesela de 12 × 12** (no la de 24
+  reducida ni un cuarto de ella), **sin fondo**, **el agua no se mueve** (el
+  fondo de una casilla de agua no se rompe) y **el daño se olvida a los 3 s**,
+  como el de los objetos.
+
+Como esta hecho:
+- **El dato** (regla 4): lo roto vive fuera del chunk, por chunk, columna y
+  altura (`World.broken`); el terreno es lo que dio el generador menos eso
+  (`isSolidVoxel`). **Debajo de un voxel hay otro del mismo suelo hasta el
+  fondo**, y no hay fondo: el tipo es el `Terrain` de su casilla.
+- **Nada cae**: ni el terreno —lo que queda en el aire se queda— ni los
+  objetos. Lo generado se apoya en lo que dio el generador
+  (`World.objectBaseAt`, `potentialTop`), y lo que aparece despues —un brote,
+  una estacion— guarda donde quedo al aparecer; si cambia en su sitio con la
+  misma regla de apoyo (un brote que madura), conserva su base. Lo suelto del
+  suelo si cae: es un cuerpo.
+- **Los cuerpos si caen** (la gravedad de los cuerpos no se toca): se cae a un
+  hoyo, y la cabeza choca con lo que quedo en el aire (regla 21).
+- **El nacimiento, la conectividad y las sondas** miden el mundo generado
+  (`potentialTop`): son de la generacion, no de lo que se rompio.
+- **El dibujo**: cada cara de un voxel que da al aire, con su tesela entera
+  (`terrain-mesh.ts`, ver `docs/arte.md`). Un voxel roto rehace solo el
+  terreno de su chunk y, en el borde, el de la vecina (`terrainRevision`), no
+  sus objetos.
+
+**Lo que cuesta** (medido en los 49 chunks alrededor del nacimiento de tres
+semillas): **de 1,6 a 1,9 veces los triangulos** (270.000-330.000 a
+507.000-543.000), porque una casilla llana ya no sale con una tapa de 1 × 1
+sino con cuatro; y **unos 15 ms por chunk** al rehacer su terreno tras romper
+un voxel (de unos 9 a unos 15 por chunk al mallarlo). Lo que se haga para el
+movil lo decide el autor a la vista de esto (pendiente desde los voxeles).

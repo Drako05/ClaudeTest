@@ -56,10 +56,11 @@ export const DROP_LIFE_TICKS = 2 * DAY_TICKS;
 /**
  * El suelo de un monton: el de su huella, terreno o caja solida (`squareFloor`,
  * como el de un cuerpo), y sobre el agua, su superficie: lo que cae al agua
- * flota en ella. **Deduccion mia.**
+ * flota en ella. **Deduccion mia.** Con `at`, la altura del monton: el terreno
+ * que empieza por encima de el es techo, no suelo (bajo un voladizo).
  */
-export function dropFloor(world: World, x: number, y: number): number {
-  const floor = squareFloor(world, x, y, DROP_HALF);
+export function dropFloor(world: World, x: number, y: number, at = Infinity): number {
+  const floor = squareFloor(world, x, y, DROP_HALF, at + 2 * DROP_HALF);
   return world.isTerrainSolidAt(x, y) ? Math.max(floor, WATER_SURFACE) : floor;
 }
 
@@ -116,10 +117,10 @@ export function scatterLoot(world: World, loot: readonly Bundle[], from: LootSou
     const x = from.x + cos * out;
     const y = from.y + sin * out;
     // Pegado a una pared mas alta, nace encima de ella.
-    const z = Math.max(from.z, dropFloor(world, x, y));
+    const z = Math.max(from.z, dropFloor(world, x, y, from.z));
     const tx = x + cos * reach;
     const ty = y + sin * reach;
-    const time = flightTicks(SCATTER_UP, z - (dropFloor(world, tx, ty) + DROP_FLOAT), TICK_DT) * TICK_DT;
+    const time = flightTicks(SCATTER_UP, z - (dropFloor(world, tx, ty, z) + DROP_FLOAT), TICK_DT) * TICK_DT;
     const side = reach / time;
     world.drops.add({
       item: b.item,
@@ -190,7 +191,7 @@ function fall(world: World, d: Drop, dt: number): void {
     const nx = d.x + d.vx * dt;
     const ny = d.y + d.vy * dt;
     // Contra una pared mas alta que el, se para en seco y cae.
-    if (dropFloor(world, nx, ny) > d.z) {
+    if (dropFloor(world, nx, ny, d.z) > d.z) {
       d.vx = 0;
       d.vy = 0;
     } else {
@@ -199,7 +200,7 @@ function fall(world: World, d: Drop, dt: number): void {
     }
   }
   d.z += d.vz * dt;
-  const rest = dropFloor(world, d.x, d.y) + DROP_FLOAT;
+  const rest = dropFloor(world, d.x, d.y, d.z) + DROP_FLOAT;
   if (d.z <= rest && d.vz <= 0) {
     d.z = rest;
     d.vx = 0;

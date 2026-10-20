@@ -24,6 +24,7 @@ import {
   type HarvestResult,
   type AnimalHit,
   type Hit,
+  type Swing,
   type Opened,
   type Placed,
   type Used,
@@ -91,6 +92,8 @@ export interface GameState {
   lastAnimalHits: AnimalHit[];
   /** Donde toco el ultimo golpe cada cosa que se puede romper: el impacto. */
   lastImpacts: Vec3[];
+  /** Los voxeles del terreno que golpeo el ultimo golpe, y si se rompieron. */
+  lastVoxelHits: Swing['voxels'];
 }
 
 /**
@@ -131,6 +134,7 @@ export function createGame(seed: number, startTick: number = DEFAULT_START_TICK)
     fauna: new Map(),
     lastAnimalHits: [],
     lastImpacts: [],
+    lastVoxelHits: [],
   };
 
   streamChunks(state);
@@ -171,6 +175,7 @@ export function step(state: GameState, intent: Intent): void {
   state.lastCrafted = -1;
   state.lastAnimalHits = [];
   state.lastImpacts = [];
+  state.lastVoxelHits = [];
 
   // El tiempo avanza antes que nada: el resto del tick actua sobre el mundo tal
   // y como esta AHORA, con la vegetacion ya puesta al dia.
@@ -258,6 +263,7 @@ export function step(state: GameState, intent: Intent): void {
       state.lastBroke = swing.broke;
       state.lastAnimalHits = swing.animals;
       state.lastImpacts = swing.impacts;
+      state.lastVoxelHits = swing.voxels;
       // Lo que murio deja de ser una entidad: su muerte ya esta en el overlay.
       for (const hit of swing.animals) {
         if (!hit.killed) continue;

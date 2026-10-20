@@ -6,19 +6,19 @@
  * es un lujo: si la malla mintiera sobre el mundo, el personaje andaria por
  * encima o por debajo de lo que pisa.
  *
- * El terreno son **voxeles de 0,5** (el autor, 2026-10-06): columnas de medio
- * bloque de lado, solidas hasta su altura, sin rampas. La malla es una tapa por
- * columna y una pared por cada vecina que quede mas abajo. Una casilla cuyas
- * cuatro columnas estan a la misma altura sale con **una sola tapa** de 1 × 1:
- * el terreno llano, que es casi todo, cuesta lo mismo que antes de los voxeles.
+ * El terreno son **voxeles de 0,5** (el autor, 2026-10-06), y **el voxel es su
+ * unidad** (el autor, 2026-10-20: «los bloques de 0.5 ya no se deben ver como
+ * pertenecientes a un bloque de 1m»). La malla es una cara por cada lado de un
+ * voxel solido que da a uno vacio: arriba, a los lados y, bajo lo que quedo en
+ * el aire, abajo. Lo vacio es lo que esta sobre el techo de su columna y lo
+ * roto (`World.breakVoxel`).
  *
- * **El color es una textura en pixelart** (el autor, 2026-10-19: caras de 24 ×
- * 24 por bloque y voxeles de 12 × 12; guia de arte, directriz 7): cada casilla
- * toma la tesela de su suelo, en la variante que le toque, entera en su tapa
- * de 1 × 1 o un cuarto en la de cada columna. Las paredes, **del mismo
- * material, mas oscuras** (el autor), van en caras de un voxel, cada una con su
- * cuarto de tesela alineado con el mundo, para que una pared alta repita la
- * textura bloque a bloque en vez de estirarla.
+ * **El color es una textura en pixelart** (guia de arte, directriz 7: 24
+ * pixeles por bloque): **cada cara de voxel lleva su tesela entera de 12 × 12**
+ * (`voxel-art.ts`), la del suelo de su casilla, en la variante que le toque a
+ * esa cara de ese voxel. Lo de debajo es del mismo suelo hasta el fondo (el
+ * autor). Los lados, **del mismo material, mas oscuros** (el autor), y lo de
+ * abajo, mas aun (*deduccion*).
  *
  * Ejes: `x` e `y` del mundo van a `x` y `z`, y la altura a `y`, que es el
  * convenio de three.js.
@@ -40,36 +40,40 @@ export interface MeshData {
   readonly triangles: number;
 }
 
+/** Una cara de un voxel: hacia donde mira. */
+export enum Face {
+  Top,
+  Bottom,
+  East,
+  West,
+  South,
+  North,
+}
+
 /**
- * Los cuatro lados de una columna: hacia donde esta la vecina, y las dos
- * esquinas del borde comun, en fracciones de la columna, en orden antihorario
- * visto desde fuera para que la normal de la pared mire hacia la vecina.
+ * Los cuatro lados de una columna: hacia donde esta la vecina, su cara, y las
+ * dos esquinas del borde comun, en fracciones de la columna, en orden
+ * antihorario visto desde fuera para que la normal de la pared mire hacia la
+ * vecina.
  */
-const SIDES: ReadonlyArray<{ dx: number; dy: number; a: [number, number]; b: [number, number] }> = [
-  { dx: 1, dy: 0, a: [1, 0], b: [1, 1] },
-  { dx: -1, dy: 0, a: [0, 1], b: [0, 0] },
-  { dx: 0, dy: 1, a: [1, 1], b: [0, 1] },
-  { dx: 0, dy: -1, a: [0, 0], b: [1, 0] },
+const SIDES: ReadonlyArray<{ dx: number; dy: number; face: Face; a: [number, number]; b: [number, number] }> = [
+  { dx: 1, dy: 0, face: Face.East, a: [1, 0], b: [1, 1] },
+  { dx: -1, dy: 0, face: Face.West, a: [0, 1], b: [0, 0] },
+  { dx: 0, dy: 1, face: Face.South, a: [1, 1], b: [0, 1] },
+  { dx: 0, dy: -1, face: Face.North, a: [0, 0], b: [1, 0] },
 ];
 
 /**
  * El techo de una columna de 0,5 (en coordenadas de voxel), en el mundo, sin
- * generar nada nuevo.
- *
- * Fuera del chunk se pregunta al GENERADOR y no al mundo: `world.columnTop`
- * llamaria a `getChunk` y registraria el chunk vecino, con lo que dibujar
- * alteraria las cuentas de bioma. Es el mismo cuidado que tiene
- * `biome-edges.ts`. Tambien lo usan las sombras (`main.ts` se lo pasa a
- * `buildShadows` como su `surface`), para caer sobre la superficie que se
- * dibuja y no sobre otra cuenta parecida.
+ * generar nada nuevo (`World.columnTopPeek`): fuera de un chunk cargado se
+ * pregunta al generador, que es puro, y no a `getChunk`, que registraria el
+ * chunk vecino, con lo que dibujar alteraria las cuentas de bioma. Es el mismo
+ * cuidado que tiene `biome-edges.ts`. Lo roto cuenta, tambien en la vecina.
+ * Tambien lo usan las sombras (`main.ts` se lo pasa a `buildShadows` como su
+ * `surface`), para caer sobre la superficie que se dibuja.
  */
-export function columnTopFor(world: World, chunk: Chunk, vx: number, vy: number): number {
-  const lx = vx - chunk.cx * CHUNK_COLUMNS;
-  const ly = vy - chunk.cy * CHUNK_COLUMNS;
-  if (lx >= 0 && lx < CHUNK_COLUMNS && ly >= 0 && ly < CHUNK_COLUMNS) {
-    return topOf(chunk.height[ly * CHUNK_COLUMNS + lx]);
-  }
-  return topOf(world.gen.columnTopAt(vx, vy));
+export function columnTopFor(world: World, vx: number, vy: number): number {
+  return topOf(world.columnTopPeek(vx, vy));
 }
 
 /** Donde cae una tesela en el atlas: `u0, v0` su esquina de arriba a la izquierda en la imagen. */
@@ -81,30 +85,54 @@ export interface TileRect {
 }
 
 /**
- * La variante de suelo de una casilla, de `0` a `count - 1` (el autor,
- * 2026-10-19: 3-4 dibujos por suelo, elegidos por casilla con la semilla).
- * De la casilla y no del azar vivo, como el giro de las aspas: el chunk se
- * redibuja a menudo y el suelo no puede cambiar de dibujo al volver (regla 2).
+ * La variante de suelo de una cara de voxel, de `0` a `count - 1` (el autor,
+ * 2026-10-19: 3-4 dibujos por suelo, elegidos con la semilla; desde el
+ * 2026-10-20, por voxel y cara). Del sitio y no del azar vivo, como el giro de
+ * las aspas: el chunk se redibuja a menudo y el suelo no puede cambiar de
+ * dibujo al volver (regla 2).
  */
-export function terrainVariant(seed: number, wx: number, wy: number, count: number): number {
-  return Math.min(count - 1, Math.floor(hash2DFloat(seed ^ 0x5eed7e11, wx, wy) * count));
+export function terrainVariant(seed: number, vx: number, vy: number, vz: number, face: Face, count: number): number {
+  const h = hash2DFloat(seed ^ 0x5eed7e11 ^ Math.imul(vz * 8 + face, 0x9e3779b1), vx, vy);
+  return Math.min(count - 1, Math.floor(h * count));
 }
 
-/** La tesela de una casilla: la de su suelo, en la variante que le toque. */
-export type TerrainTile = (terrain: Terrain, wx: number, wy: number) => TileRect;
+/** La tesela de una cara de voxel: la del suelo de su casilla, en la variante que le toque. */
+export type TerrainTile = (terrain: Terrain, vx: number, vy: number, vz: number, face: Face) => TileRect;
 
 /** Lo oscuras que se ven las paredes frente a su tapa: con luz cenital se leerian del mismo color. */
 export const WALL_LIGHT: readonly [number, number, number] = [0.72, 0.72, 0.74];
+/** Y lo de debajo de lo que quedo en el aire, a la sombra. **Deduccion mia.** */
+export const UNDER_LIGHT: readonly [number, number, number] = [0.55, 0.55, 0.58];
 const LID_LIGHT: readonly [number, number, number] = [1, 1, 1];
 
-/** La malla de un chunk: las tapas de sus columnas y sus paredes. */
+/**
+ * Las esquinas de una tesela entera, en el orden en que se dan las de una
+ * pared: arriba a la izquierda, a la derecha, y abajo. Las de una tapa: la
+ * imagen va con el este a la derecha y el sur abajo. Las de abajo, igual vista
+ * desde abajo.
+ */
+const WHOLE: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [1, 0],
+  [1, 1],
+  [0, 1],
+];
+const LID_CORNERS: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [0, 1],
+  [1, 1],
+  [1, 0],
+];
+const UNDER_CORNERS = WHOLE;
+
+/** La malla de un chunk: cada cara de sus voxeles que da al aire. */
 export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): MeshData {
   const positions: number[] = [];
   const colors: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
-  const baseX = chunk.cx * CHUNK_SIZE;
-  const baseY = chunk.cy * CHUNK_SIZE;
+  const baseX = chunk.cx * CHUNK_COLUMNS;
+  const baseY = chunk.cy * CHUNK_COLUMNS;
 
   /**
    * Anade un cuadrilatero como dos triangulos: sus esquinas, su luz y donde
@@ -114,7 +142,7 @@ export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): Mesh
     p: readonly (readonly [number, number, number])[],
     rgb: readonly [number, number, number],
     tile: TileRect,
-    corners: readonly (readonly [number, number])[],
+    corners: readonly (readonly [number, number])[] = WHOLE,
   ): void => {
     const base = positions.length / 3;
     p.forEach(([x, y, z], i) => {
@@ -125,81 +153,65 @@ export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): Mesh
     indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
   };
 
-  /**
-   * Una tapa horizontal de `x0, y0` a `x1, y1` a la altura `h`, mirando al
-   * cielo, con el trozo de su tesela que le toca por su sitio en la casilla
-   * (`fx, fy`): la imagen va con el este a la derecha y el sur abajo.
-   */
-  const lid = (x0: number, y0: number, x1: number, y1: number, h: number, tile: TileRect, fx: number, fy: number) =>
-    quad(
-      [
-        [x0, h, y0],
-        [x0, h, y1],
-        [x1, h, y1],
-        [x1, h, y0],
-      ],
-      LID_LIGHT,
-      tile,
-      [
-        [fx, fy],
-        [fx, fy + (y1 - y0)],
-        [fx + (x1 - x0), fy + (y1 - y0)],
-        [fx + (x1 - x0), fy],
-      ],
-    );
+  /** Si el voxel es solido: dentro del chunk, de su dato; fuera, sin generar nada. */
+  const own = (vx: number, vy: number) => chunk.height[(vy - baseY) * CHUNK_COLUMNS + (vx - baseX)]!;
+  const inside = (vx: number, vy: number) =>
+    vx >= baseX && vx < baseX + CHUNK_COLUMNS && vy >= baseY && vy < baseY + CHUNK_COLUMNS;
+  const solid = (vx: number, vy: number, vz: number): boolean =>
+    inside(vx, vy) ? vz < own(vx, vy) && !world.brokenAt(vx, vy)?.has(vz) : world.isSolidVoxelPeek(vx, vy, vz);
+  /** El techo que dio el generador a la columna, para saber desde donde mirar. */
+  const potential = (vx: number, vy: number): number =>
+    inside(vx, vy) ? own(vx, vy) : world.gen.columnTopAt(vx, vy);
 
-  for (let ly = 0; ly < CHUNK_SIZE; ly++) {
-    for (let lx = 0; lx < CHUNK_SIZE; lx++) {
-      const wx = baseX + lx;
-      const wy = baseY + ly;
-      const terrain = chunk.terrain[ly * CHUNK_SIZE + lx] as Terrain;
-      const tile = tileOf(terrain, wx, wy);
+  for (let ly = 0; ly < CHUNK_COLUMNS; ly++) {
+    for (let lx = 0; lx < CHUNK_COLUMNS; lx++) {
+      const vx = baseX + lx;
+      const vy = baseY + ly;
+      const terrain = chunk.terrain[Math.floor(ly / VOXELS_PER_TILE) * CHUNK_SIZE + Math.floor(lx / VOXELS_PER_TILE)] as Terrain;
+      const top = own(vx, vy);
+      const gone = world.brokenAt(vx, vy);
+      const x0 = vx * VOXEL;
+      const y0 = vy * VOXEL;
+      const x1 = x0 + VOXEL;
+      const y1 = y0 + VOXEL;
 
-      const tops: number[] = [];
-      for (let s = 0; s < VOXELS_PER_TILE * VOXELS_PER_TILE; s++) {
-        const cx = (lx * VOXELS_PER_TILE + (s % VOXELS_PER_TILE));
-        const cy = (ly * VOXELS_PER_TILE + Math.floor(s / VOXELS_PER_TILE));
-        tops.push(topOf(chunk.height[cy * CHUNK_COLUMNS + cx]));
-      }
-      const flat = tops.every((t) => t === tops[0]);
-      if (flat) lid(wx, wy, wx + 1, wy + 1, tops[0], tile, 0, 0);
-
-      for (let s = 0; s < tops.length; s++) {
-        const sx = s % VOXELS_PER_TILE;
-        const sy = Math.floor(s / VOXELS_PER_TILE);
-        const vx = wx * VOXELS_PER_TILE + sx;
-        const vy = wy * VOXELS_PER_TILE + sy;
-        const x0 = wx + sx * VOXEL;
-        const y0 = wy + sy * VOXEL;
-        const top = tops[s];
-        if (!flat) lid(x0, y0, x0 + VOXEL, y0 + VOXEL, top, tile, sx * VOXEL, sy * VOXEL);
-        for (const side of SIDES) {
-          const below = columnTopFor(world, chunk, vx + side.dx, vy + side.dy);
-          if (below >= top) continue;
-          // A lo ancho, la mitad de la tesela que toca por su sitio en la
-          // casilla; a lo alto, una cara por voxel: la mitad de arriba de la
-          // tesela si acaba en un bloque entero, la de abajo si a medio.
-          const across = (side.dx !== 0 ? sy : sx) * VOXEL;
-          for (let z = top; z > below; z -= VOXEL) {
-            const fy = ((z % 1) + 1) % 1 === 0 ? 0 : VOXEL;
-            quad(
-              [
-                [x0 + side.a[0] * VOXEL, z, y0 + side.a[1] * VOXEL],
-                [x0 + side.b[0] * VOXEL, z, y0 + side.b[1] * VOXEL],
-                [x0 + side.b[0] * VOXEL, z - VOXEL, y0 + side.b[1] * VOXEL],
-                [x0 + side.a[0] * VOXEL, z - VOXEL, y0 + side.a[1] * VOXEL],
-              ],
-              WALL_LIGHT,
-              tile,
-              [
-                [across, fy],
-                [across + VOXEL, fy],
-                [across + VOXEL, fy + VOXEL],
-                [across, fy + VOXEL],
-              ],
-            );
-          }
+      // Arriba: el voxel de su techo y el de debajo de cada hueco. Abajo: el
+      // de encima de cada hueco, si es solido (lo que quedo en el aire).
+      const lid = (z: number) => {
+        if (!solid(vx, vy, z) || solid(vx, vy, z + 1)) return;
+        const h = (z + 1) * VOXEL;
+        quad([[x0, h, y0], [x0, h, y1], [x1, h, y1], [x1, h, y0]], LID_LIGHT, tileOf(terrain, vx, vy, z, Face.Top), LID_CORNERS);
+      };
+      lid(top - 1);
+      if (gone) {
+        for (const g of gone) {
+          lid(g - 1);
+          const z = g + 1;
+          if (z >= top || !solid(vx, vy, z)) continue;
+          const h = z * VOXEL;
+          quad([[x0, h, y0], [x1, h, y0], [x1, h, y1], [x0, h, y1]], UNDER_LIGHT, tileOf(terrain, vx, vy, z, Face.Bottom), UNDER_CORNERS);
         }
+      }
+
+      // A los lados: donde esta columna tiene voxel y la vecina no. Por encima
+      // de lo que dio el generador a la vecina, y en sus huecos.
+      for (const side of SIDES) {
+        const nx = vx + side.dx;
+        const ny = vy + side.dy;
+        const wall = (z: number) => {
+          if (!solid(vx, vy, z) || solid(nx, ny, z)) return;
+          const zt = (z + 1) * VOXEL;
+          const zb = z * VOXEL;
+          const ax = x0 + side.a[0] * VOXEL;
+          const ay = y0 + side.a[1] * VOXEL;
+          const bx = x0 + side.b[0] * VOXEL;
+          const by = y0 + side.b[1] * VOXEL;
+          quad([[ax, zt, ay], [bx, zt, by], [bx, zb, by], [ax, zb, ay]], WALL_LIGHT, tileOf(terrain, vx, vy, z, side.face));
+        };
+        const from = potential(nx, ny);
+        for (let z = from; z < top; z++) wall(z);
+        const nGone = world.brokenAt(nx, ny);
+        if (nGone) for (const g of nGone) if (g < from) wall(g);
       }
     }
   }
