@@ -25,7 +25,7 @@ export interface RockMesh {
   readonly indices: Uint32Array;
 }
 
-const LIGHT = { top: 1, lit: 0.95, shade: 0.74 };
+const LIGHT = { top: 1, lit: 0.95, shade: 0.74, under: 0.55 };
 
 /**
  * Las caras posibles de un voxel: hacia donde mira (en voxeles), su luz, y
@@ -34,6 +34,8 @@ const LIGHT = { top: 1, lit: 0.95, shade: 0.74 };
  */
 const FACES: readonly { d: Voxel; light: number; corners: readonly (readonly [number, number, number])[] }[] = [
   { d: [0, 0, 1], light: LIGHT.top, corners: [[0, 1, 0], [1, 1, 0], [1, 1, 1], [0, 1, 1]] },
+  // La de abajo: solo la de una mena con hueco debajo (`covered`).
+  { d: [0, 0, -1], light: LIGHT.under, corners: [[0, 0, 1], [1, 0, 1], [1, 0, 0], [0, 0, 0]] },
   { d: [-1, 0, 0], light: LIGHT.lit, corners: [[0, 1, 0], [0, 1, 1], [0, 0, 1], [0, 0, 0]] },
   { d: [0, -1, 0], light: LIGHT.lit, corners: [[1, 1, 0], [0, 1, 0], [0, 0, 0], [1, 0, 0]] },
   { d: [1, 0, 0], light: LIGHT.shade, corners: [[1, 1, 1], [1, 1, 0], [1, 0, 0], [1, 0, 1]] },
@@ -55,9 +57,15 @@ export function turnVoxels(voxels: readonly Voxel[], turn: number): Voxel[] {
  * huella de 1 × 1. Cada cara lleva el cuarto de tesela que le toca por su
  * sitio en la roca, para que la piedra case de un voxel al siguiente.
  */
-export function rockMesh(shape: readonly Voxel[], turn: number): RockMesh {
+export function rockMesh(
+  shape: readonly Voxel[],
+  turn: number,
+  covered?: (e: number, s: number, z: number) => boolean,
+): RockMesh {
   const voxels = turnVoxels(shape, turn);
-  const has = (x: number, y: number, z: number) => voxels.some(([a, b, c]) => a === x && b === y && c === z);
+  // Sin `covered` (la roca), la cara de abajo no se ve: se apoya en el suelo.
+  const has = (x: number, y: number, z: number) =>
+    voxels.some(([a, b, c]) => a === x && b === y && c === z) || (covered ? covered(x, y, z) : false);
   const positions: number[] = [];
   const uvs: number[] = [];
   const colors: number[] = [];
@@ -65,13 +73,14 @@ export function rockMesh(shape: readonly Voxel[], turn: number): RockMesh {
   const V = 0.5;
   for (const [e, s, z] of voxels) {
     for (const face of FACES) {
+      if (face.d[2] < 0 && !covered) continue;
       if (has(e + face.d[0], s + face.d[1], z + face.d[2])) continue;
       const base = positions.length / 3;
       // El cuarto de tesela: a lo ancho, por su sitio en la huella; a lo alto,
       // la mitad de arriba para el voxel de arriba.
       const across = face.d[0] !== 0 ? s : e;
       const fx = (across % 2) * V;
-      const fy = face.d[2] !== 0 ? (s % 2) * V : (1 - (z % 2)) * V;
+      const fy = face.d[2] !== 0 ? (s % 2) * V : (1 - (((z % 2) + 2) % 2)) * V;
       face.corners.forEach(([cx, cy, cz], i) => {
         positions.push((e + cx) * V - 0.5, (z + cy) * V, (s + cz) * V - 0.5);
         colors.push(face.light, face.light, face.light);

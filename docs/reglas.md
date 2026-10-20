@@ -195,22 +195,43 @@ se carga en cada llamada, asi que alli queda solo el enunciado.
     todo tiene gravedad; la caida solo se ve, el nucleo la pone en su sitio).
     Desde los voxeles que se rompen, «su suelo» es el de debajo de donde toco
     la mirada (`floorBelow`), no el techo de la columna: en un tunel, el del
-    tunel.
+    tunel. **Y va en la rejilla de 0,5** (el autor, 2026-10-20: «el mundo ya
+    no es una cuadrícula de 1m, sino de 0.5m»): la caja de 1 × 1 se centra en
+    la esquina de voxel mas cercana a donde toca la mirada, y en un costado,
+    medio bloque por fuera de la cara (*deduccion*). Sigue siendo el objeto de
+    una casilla, la de su esquina noroeste, corrido 0 o 0,5 en cada eje
+    (`World.stationOffsetAt`); las demas que pisa quedan **cubiertas**
+    (`isCovered`): ahi no se pone, no se siembra ni brota nada. Se pone si
+    ninguna de sus casillas tiene objeto, esta cubierta o es agua, y si no
+    pisa al jugador. Los bucles de las cajas miran una casilla mas al oeste y
+    al norte (`SHIFT`, `boxes.ts`).
+
+    **Cada rayo da solo a lo primero que toca** (el autor, 2026-10-20: «no se
+    puede golpear terreno que está detrás de otra cosa desde la vista del
+    jugador»; y eligio que valga para todo): un voxel del terreno, la caja de
+    un objeto o la de un animal (`StrikeRay`). Lo de detras no se golpea: de
+    dos arboles en fila cae el de delante, y el barrido que se dibuja se corta
+    igual.
 
     **El terreno tambien se golpea** (el autor, 2026-10-20): «quiero que cada
     golpe impacte realmente a cada bloque de 0.5m y lo pueda destruir de forma
     independiente». Los rayos van por el terreno **voxel a voxel**
     (`groundHit`, un recorrido por las caras que cruza, exacto), y cada uno da
-    el voxel en que entra. En barrido, **cada voxel en que entra algun rayo
-    recibe un golpe**, uno aunque entren varios (`Strike.voxels`); en preciso,
-    el del rayo central, si no hay antes un objeto o un animal. **Aguanta 3
-    golpes, con cualquier cosa en la mano** (`VOXEL_WORK`: cada golpe suma 1,
-    lleve lo que lleve), y al tercero se rompe para siempre. **Sin particulas
-    ni botin**; el daño **se olvida a los 3 s** sin golpe y al descargar su
-    chunk, como el de los objetos; y **gasta un uso** de lo que se lleva, como
-    todo golpe que toca algo. El fondo de una casilla de agua corta el golpe
-    pero no se rompe: el agua no se mueve. Lo que pide el autor y lo que se
-    dedujo, en `docs/relieve.md`, «Romper el terreno».
+    el voxel en que entra. En barrido, **cada voxel que es lo primero de algun
+    rayo recibe un golpe**, uno aunque entren varios (`Strike.voxels`); en
+    preciso, el del rayo central, si no hay antes un objeto o un animal.
+    **Cada voxel pide su herramienta** (`voxelWorkOf`, el autor, 2026-10-20):
+    **la roca, pico; lo maleable —arena, hierba, bosque, tundra y nieve—,
+    pala**; 3 de trabajo, y **el poder resta** (piedra 3 golpes, cobre 2,
+    hierro 1). A mano no se rompe nada; con otra herramienta, tampoco, y el
+    golpe gasta igual (`needShovel`, `needPickaxe`). Un voxel de **mena** pide
+    lo de su mena (`workOf`: carbon 4, cobre 5, hierro 6 y pico de cobre) y
+    al romperse suelta 0-1 de su mineral, el carbon 1-2 (`oreVoxelLoot`).
+    **Sin particulas**; el daño **se olvida a los 3 s** sin golpe y al
+    descargar su chunk, como el de los objetos; y **gasta un uso** de lo que se
+    lleva, como todo golpe que toca algo. El fondo de una casilla de agua corta
+    el golpe pero no se rompe: el agua no se mueve. Lo que pide el autor y lo
+    que se dedujo, en `docs/relieve.md`, «Romper el terreno».
 
 21. **La altura estorba, y estorba con UNA regla: no se entra donde el suelo
     esta por encima de los pies.** De ahi salen las tres cosas a la vez y sin

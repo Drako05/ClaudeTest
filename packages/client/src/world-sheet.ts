@@ -9,7 +9,7 @@
  */
 
 import { Feature, Terrain, TERRAIN_NAMES } from '@verdant/shared';
-import { TREE_TRUNKS } from '@verdant/sim';
+import { oreFormation, TREE_TRUNKS } from '@verdant/sim';
 import {
   BUSHES,
   CROWNS,
@@ -310,7 +310,7 @@ export function showWorldSheet(): number {
   count += group(
     sheet,
     'Menas: la textura de una (×3); cada casilla tiene la suya',
-    ([Feature.CoalNode, Feature.IronNode, Feature.CopperNode] as const).map((f) => figure(NAMES[f] ?? '', zoom(artCanvas(oreModel(f, 1, 0, 0, 0).art), 3))),
+    ([Feature.CoalNode, Feature.IronNode, Feature.CopperNode] as const).map((f) => figure(NAMES[f] ?? '', zoom(artCanvas(oreModel(f, 1, 0, 0, oreFormation(1, 0, 0)).art), 3))),
   );
   count += group(sheet, 'El jugador (×3) y las estaciones: sus caras ×3 y en perspectiva', [
     figure('Jugador', zoom(artCanvas(PLAYER), 3)),

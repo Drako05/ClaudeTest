@@ -12,6 +12,12 @@
  * - **Sin cristales donde se tocan dos voxeles de la mena**, «solo dentro de
  *   la formacion»: hacia fuera de la casilla salen siempre.
  *
+ * Desde el 2026-10-20 la mena es **una formacion de voxeles del terreno** (el
+ * autor: uno abajo, el 2 × 2 en medio y tres arriba; `ore-shape.ts`), que se
+ * pican uno a uno. Se dibujan **los que quedan**, y una cara tapada por el
+ * terreno (`covered`) no lleva ni piedra ni cristales: solo se ve lo que da al
+ * aire, tambien por debajo si se cavo.
+ *
  * La piedra es la de la roca del juego (`STONES[RockNode]`), con las vetas
  * pintadas encima. Cada mena lleva **su propia textura**: la tesela con sus
  * vetas y, al lado, los dibujos de sus cristales. Y una sola malla, piedra y
@@ -25,8 +31,8 @@
 import { Feature } from '@verdant/shared';
 import { hash2D, mulberry32 } from '@verdant/sim';
 import { ORE_TONES } from './palette.js';
-import { rockMesh, turnVoxels, type RockMesh, type Voxel } from './rock-mesh.js';
-import { ROCK_SHAPE, STONES, WORLD_PX, type WorldArt } from './world-art.js';
+import { rockMesh, type RockMesh, type Voxel } from './rock-mesh.js';
+import { STONES, WORLD_PX, type WorldArt } from './world-art.js';
 
 /** Lo que mide un voxel, en bloques, y su cara en pixeles de arte. */
 const V = 0.5;
@@ -86,15 +92,23 @@ const SIDES: readonly [Voxel, Vec][] = [
 ];
 
 /**
- * La mena de esa casilla. `turn` es su cuarto de vuelta (0-3), el mismo que la
- * roca: la forma gira con la casilla.
+ * La mena de esa casilla: los voxeles que le quedan, [este, sur, altura desde
+ * su base] (`ore-shape.ts`), y `covered`, si hay terreno en un voxel de fuera
+ * de la formacion (en las mismas coordenadas). Su pie, en el centro de la
+ * casilla a la altura de la base.
  */
-export function oreModel(feature: Feature, seed: number, tx: number, ty: number, turn: number): OreModel {
+export function oreModel(
+  feature: Feature,
+  seed: number,
+  tx: number,
+  ty: number,
+  voxels: readonly Voxel[],
+  covered: (e: number, s: number, z: number) => boolean = () => false,
+): OreModel {
   const ore = ORE_TONES[feature];
   if (!ore) throw new Error(`${Feature[feature]} no es un mineral`);
   const r = mulberry32(hash2D(seed ^ 0x0e5ca1, tx, ty));
-  const voxels = turnVoxels(ROCK_SHAPE, turn);
-  const has = (x: number, y: number, z: number) => voxels.some(([a, b, c]) => a === x && b === y && c === z);
+  const has = (x: number, y: number, z: number) => voxels.some(([a, b, c]) => a === x && b === y && c === z) || covered(x, y, z);
 
   const crystals: Crystal[] = [];
   const crowns: { wanted: number; placed: number; overlap: number }[] = [];
@@ -106,6 +120,8 @@ export function oreModel(feature: Feature, seed: number, tx: number, ty: number,
     const cx = (e + 0.5) * V - 0.5;
     const cz = (s + 0.5) * V - 0.5;
     if (!has(e, s, z + 1)) crowns.push(crown(r, voxel, [cx, (z + 1) * V, cz], crystals));
+    // Y abajo, si se cavo debajo: «la misma flor colgando de la de abajo».
+    if (!has(e, s, z - 1)) crowns.push(crown(r, voxel, [cx, z * V, cz], crystals, true));
     for (const [d, n] of SIDES) {
       if (has(e + d[0], s + d[1], z + d[2])) continue;
       // Un punto de la cara: `u` de lado a lado y `v` de abajo arriba, en
@@ -135,7 +151,7 @@ export function oreModel(feature: Feature, seed: number, tx: number, ty: number,
   if (ore.accent) palette.v = ore.accent;
   const art: WorldArt = { rows: rows.map((row) => row.join('')), palette };
 
-  return { art, mesh: geometry(turn, crystals, slots, height), crystals, crowns, sideOverlaps };
+  return { art, mesh: geometry(voxels, covered, crystals, slots, height), crystals, crowns, sideOverlaps };
 }
 
 /**
@@ -153,7 +169,7 @@ export function oreModel(feature: Feature, seed: number, tx: number, ty: number,
  *    bases se pisan hasta un 40 % (`CROWN_OVERLAP`) de sus dos medias bases.
  * 8. De 0 a 2 brotes sueltos de 3 x 3, cerca del borde (0,36-0,44).
  */
-function crown(r: () => number, voxel: Voxel, center: Vec, out: Crystal[]) {
+function crown(r: () => number, voxel: Voxel, center: Vec, out: Crystal[], down = false) {
   const report = { wanted: 0, placed: 0, overlap: 0 };
   const placed: [number, number, number][] = []; // [x, z, media base]
   /** Lo que se pisa con el mas pisado (0 si no toca a ninguno), o null si pasa del tope. */
@@ -171,7 +187,10 @@ function crown(r: () => number, voxel: Voxel, center: Vec, out: Crystal[]) {
     report.placed++;
     report.overlap = Math.max(report.overlap, o);
     placed.push([x, z, w / 2 / N]);
-    out.push({ kind: 'corona', voxel, face: [0, 0, 1], base: [center[0] + x * V, center[1], center[2] + z * V], dir, w, h, spin: r() * Math.PI });
+    // Colgando de la cara de abajo, la misma flor del reves (la regla aprobada).
+    const face: Voxel = down ? [0, 0, -1] : [0, 0, 1];
+    const grow: Vec = down ? [dir[0], -dir[1], dir[2]] : dir;
+    out.push({ kind: 'corona', voxel, face, base: [center[0] + x * V, center[1], center[2] + z * V], dir: grow, w, h, spin: r() * Math.PI });
   };
   const count = 5 + Math.floor(r() * 3);
   report.wanted = count;
@@ -342,8 +361,14 @@ function pack(crystals: readonly Crystal[]): [number, number][] {
  * con el pie hundido un poco en la piedra. Los cristales no llevan la luz de
  * las caras: brillan igual por todos lados, como en el boceto.
  */
-function geometry(turn: number, crystals: readonly Crystal[], slots: readonly [number, number][], height: number): RockMesh {
-  const rock = rockMesh(ROCK_SHAPE, turn);
+function geometry(
+  voxels: readonly Voxel[],
+  covered: (e: number, s: number, z: number) => boolean,
+  crystals: readonly Crystal[],
+  slots: readonly [number, number][],
+  height: number,
+): RockMesh {
+  const rock = rockMesh(voxels, 0, covered);
   const positions = [...rock.positions];
   const colors = [...rock.colors];
   const indices = [...rock.indices];

@@ -7,12 +7,11 @@ import {
   hitboxAt,
   step,
   topOf,
-  VOXEL_WORK,
   VOXELS_PER_TILE,
   World,
   type GameState,
 } from '@verdant/sim';
-import { CHUNK_SIZE, emptyIntent, Feature, Resource, Terrain } from '@verdant/shared';
+import { CHUNK_SIZE, emptyIntent, Feature, Resource, Terrain, ToolKind, toolStats, voxelWorkOf } from '@verdant/shared';
 
 /**
  * La destruccion del terreno (el autor, 2026-10-20): el voxel de 0,5 es la
@@ -21,8 +20,8 @@ import { CHUNK_SIZE, emptyIntent, Feature, Resource, Terrain } from '@verdant/sh
  * cosa en la mano; sin particulas ni botin.
  */
 
-/** El jugador en su nacimiento, un rellano llano de 3x3, con el alrededor despejado. */
-function atSpawn(seed = 12345): { state: GameState; tx: number; ty: number; h: number } {
+/** El jugador en su nacimiento, un rellano llano de 3x3, con el alrededor despejado. Con la semilla 7, de hierba: se cava con pala. */
+function atSpawn(seed = 7): { state: GameState; tx: number; ty: number; h: number } {
   const state = createGame(seed);
   const e = state.entities;
   const id = state.playerId;
@@ -245,10 +244,40 @@ describe('un escalon con techo encima solo se sube si se cabe', () => {
   });
 });
 
+/** Pone `tool` en la mano. */
+function hold(state: GameState, tool: Resource): void {
+  const inv = state.inventory;
+  inv.add(tool, 1);
+  inv.select(inv.items.indexOf(tool));
+  expect(inv.held()).toBe(tool);
+}
+
+describe('que rompe cada suelo (el autor, 2026-10-20)', () => {
+  it('la roca, el pico; lo maleable, la pala; el agua, nada; con 3 de trabajo', () => {
+    expect(voxelWorkOf(Terrain.Rock)).toEqual({ tool: ToolKind.Pickaxe, tier: 1, work: 3 });
+    for (const t of [Terrain.Sand, Terrain.Grass, Terrain.Forest, Terrain.Tundra, Terrain.Snow]) {
+      expect(voxelWorkOf(t), Terrain[t]).toEqual({ tool: ToolKind.Shovel, tier: 1, work: 3 });
+    }
+    expect(voxelWorkOf(Terrain.Water)).toBeNull();
+    expect(voxelWorkOf(Terrain.DeepWater)).toBeNull();
+  });
+
+  it('las palas: tres tiers, como el hacha y el pico', () => {
+    const tiers: [Resource, Resource][] = [
+      [Resource.StoneShovel, Resource.StonePickaxe],
+      [Resource.CopperShovel, Resource.CopperPickaxe],
+      [Resource.IronShovel, Resource.IronPickaxe],
+    ];
+    for (const [shovel, pick] of tiers) {
+      expect(toolStats(shovel)).toEqual({ ...toolStats(pick)!, kind: ToolKind.Shovel });
+    }
+  });
+});
+
 describe('el golpe rompe el terreno (el autor, 2026-10-20)', () => {
-  it(`el barrido da a cada voxel que toca, una vez; al ${VOXEL_WORK}.º se rompe`, () => {
+  it('el barrido da a cada voxel que toca, una vez; con la pala de piedra, al 3.º se rompe', () => {
     const { state } = atSpawn();
-    expect(VOXEL_WORK).toBe(3);
+    hold(state, Resource.StoneShovel);
     const first = swing(state, 1, 0, 60);
     expect(first.length).toBeGreaterThan(1);
     const keys = first.map((v) => `${v.x},${v.y},${v.z}`);
@@ -267,25 +296,40 @@ describe('el golpe rompe el terreno (el autor, 2026-10-20)', () => {
     expect(state.world.drops.size).toBe(0);
   });
 
-  it('con cualquier cosa en la mano son tres, y cada golpe gasta un uso', () => {
-    for (const tool of [Resource.StoneAxe, Resource.StonePickaxe]) {
+  it('el poder resta: con la de cobre, dos golpes; con la de hierro, uno; y cada golpe gasta un uso', () => {
+    for (const [tool, hits] of [[Resource.CopperShovel, 2], [Resource.IronShovel, 1]] as const) {
       const { state } = atSpawn();
+      hold(state, tool);
       const inv = state.inventory;
-      inv.add(tool, 1);
-      inv.select(inv.items.indexOf(tool));
-      expect(inv.held()).toBe(tool);
       const wear = inv.wear[inv.selected];
       const a = swing(state, 1, 0, 60);
-      swing(state, 1, 0, 60);
-      expect(a.every((v) => state.world.isSolidVoxel(v.x, v.y, v.z))).toBe(true);
-      swing(state, 1, 0, 60);
-      expect(a.every((v) => !state.world.isSolidVoxel(v.x, v.y, v.z))).toBe(true);
-      expect(inv.wear[inv.selected]).toBe(wear - 3);
+      for (let i = 1; i < hits; i++) {
+        expect(a.every((v) => state.world.isSolidVoxel(v.x, v.y, v.z)), Resource[tool]).toBe(true);
+        swing(state, 1, 0, 60);
+      }
+      expect(a.every((v) => !state.world.isSolidVoxel(v.x, v.y, v.z)), Resource[tool]).toBe(true);
+      expect(inv.wear[inv.selected]).toBe(wear - hits);
+    }
+  });
+
+  it('sin pala no se rompe lo maleable: a mano, con hacha o con pico; y el golpe gasta igual', () => {
+    for (const tool of [null, Resource.StoneAxe, Resource.IronPickaxe]) {
+      const { state } = atSpawn();
+      if (tool !== null) hold(state, tool);
+      const inv = state.inventory;
+      const wear = inv.wear[inv.selected];
+      let a = swing(state, 1, 0, 60);
+      expect(a.length).toBeGreaterThan(0);
+      for (let i = 0; i < 4; i++) a = swing(state, 1, 0, 60);
+      expect(a.every((v) => state.world.isSolidVoxel(v.x, v.y, v.z) && !v.broken)).toBe(true);
+      expect(state.lastBlocked).toBe('needShovel');
+      if (tool !== null) expect(inv.wear[inv.selected]).toBe(wear - 5);
     }
   });
 
   it('el daño se olvida a los 3 s sin golpe', () => {
     const { state } = atSpawn();
+    hold(state, Resource.StoneShovel);
     const a = swing(state, 1, 0, 60);
     swing(state, 1, 0, 60);
     for (let i = 0; i <= DAMAGE_DECAY_TICKS; i++) step(state, emptyIntent());
@@ -295,9 +339,21 @@ describe('el golpe rompe el terreno (el autor, 2026-10-20)', () => {
 
   it('en preciso, solo el voxel del centro de la mira; con un objeto delante, ninguno', () => {
     const { state, tx, ty } = atSpawn();
+    hold(state, Resource.StoneShovel);
     expect(swing(state, 1, 0, 60, true)).toHaveLength(1);
     state.world.setFeature(tx + 1, ty, Feature.RockNode);
     expect(swing(state, 1, 0, 40, true)).toHaveLength(0);
+  });
+
+  it('el terreno tapado por un objeto no se golpea', () => {
+    const { state } = atSpawn();
+    hold(state, Resource.StoneShovel);
+    const open = swing(state, 1, 0, 40).length;
+    const fresh = atSpawn();
+    hold(fresh.state, Resource.StoneShovel);
+    fresh.state.world.setFeature(fresh.tx + 1, fresh.ty, Feature.Workbench);
+    const covered = swing(fresh.state, 1, 0, 40);
+    expect(covered.length).toBeLessThan(open);
   });
 
   it('mirando al frente en llano no toca el suelo', () => {

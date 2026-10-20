@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Feature } from '@verdant/shared';
+import { oreFormation } from '@verdant/sim';
 import { CROWN_OVERLAP, oreModel, type OreModel } from '../packages/client/src/ore-mesh.js';
 import { debrisPalette, ORE_TONES } from '../packages/client/src/palette.js';
 import { rockMesh, turnVoxels } from '../packages/client/src/rock-mesh.js';
@@ -14,6 +15,8 @@ import { ROCK_SHAPE, WORLD_PX } from '../packages/client/src/world-art.js';
  */
 
 const ORES = [Feature.CoalNode, Feature.IronNode, Feature.CopperNode] as const;
+/** La forma de la roca posada en el suelo: lo de debajo es terreno. */
+const ground = (_e: number, _s: number, z: number) => z < 0;
 const DEG = 180 / Math.PI;
 /** El lado de un voxel, en bloques, y su cara en pixeles de arte. */
 const V = 0.5;
@@ -22,7 +25,7 @@ const N = WORLD_PX * V;
 /** Muchas menas: casillas y giros variados. */
 function many(count = 120): OreModel[] {
   const out: OreModel[] = [];
-  for (let i = 0; i < count; i++) out.push(oreModel(ORES[i % 3]!, 0x5eed + (i >> 4), i * 7 - 300, i * 13 + 11, i % 4));
+  for (let i = 0; i < count; i++) out.push(oreModel(ORES[i % 3]!, 0x5eed + (i >> 4), i * 7 - 300, i * 13 + 11, turnVoxels(ROCK_SHAPE, i % 4), ground));
   return out;
 }
 
@@ -38,18 +41,18 @@ function byFace(model: OreModel) {
 
 describe('Una mena por casilla', () => {
   it('la misma casilla da siempre la misma mena, y dos casillas, dos distintas', () => {
-    const a = oreModel(Feature.CopperNode, 42, 10, -3, 2);
-    const b = oreModel(Feature.CopperNode, 42, 10, -3, 2);
+    const a = oreModel(Feature.CopperNode, 42, 10, -3, turnVoxels(ROCK_SHAPE, 2), ground);
+    const b = oreModel(Feature.CopperNode, 42, 10, -3, turnVoxels(ROCK_SHAPE, 2), ground);
     expect([...a.mesh.positions]).toEqual([...b.mesh.positions]);
     expect(a.art).toEqual(b.art);
-    const c = oreModel(Feature.CopperNode, 42, 11, -3, 2);
+    const c = oreModel(Feature.CopperNode, 42, 11, -3, turnVoxels(ROCK_SHAPE, 2), ground);
     expect([...c.mesh.positions]).not.toEqual([...a.mesh.positions]);
     expect(c.art.rows).not.toEqual(a.art.rows);
   });
 
   it('cada mineral se pinta con sus colores, sobre la piedra de la roca', () => {
     for (const f of ORES) {
-      const { palette } = oreModel(f, 7, 0, 0, 0).art;
+      const { palette } = oreModel(f, 7, 0, 0, turnVoxels(ROCK_SHAPE, 0), ground).art;
       const ore = ORE_TONES[f]!;
       expect([palette.i, palette.j, palette.k, palette.l, palette.s]).toEqual([...ore.tones, ore.shine]);
       expect(palette.b).toBe('#84848e');
@@ -70,8 +73,8 @@ describe('Una mena por casilla', () => {
 
   it('la malla: la piedra de la roca tal cual, y todo dentro de la textura', () => {
     for (const turn of [0, 1, 2, 3]) {
-      const m = oreModel(Feature.IronNode, 3, 5, 5, turn);
-      const rock = rockMesh(ROCK_SHAPE, turn);
+      const m = oreModel(Feature.IronNode, 3, 5, 5, turnVoxels(ROCK_SHAPE, turn), ground);
+      const rock = rockMesh(turnVoxels(ROCK_SHAPE, turn), 0, ground);
       expect([...m.mesh.positions.slice(0, rock.positions.length)]).toEqual([...rock.positions]);
       expect([...m.mesh.colors.slice(0, rock.colors.length)]).toEqual([...rock.colors]);
       for (const uv of m.mesh.uvs) {
@@ -90,7 +93,7 @@ describe('Sin cristales donde se tocan los voxeles de la mena', () => {
   it('ninguno sale de una cara tapada por otro voxel, y cada cara al aire lleva los suyos', () => {
     for (let i = 0; i < 40; i++) {
       const turn = i % 4;
-      const m = oreModel(ORES[i % 3]!, 9, i * 5, -i, turn);
+      const m = oreModel(ORES[i % 3]!, 9, i * 5, -i, turnVoxels(ROCK_SHAPE, turn), ground);
       const voxels = new Set(turnVoxels(ROCK_SHAPE, turn).map((v) => v.join(',')));
       for (const c of m.crystals) {
         const [e, s, z] = c.voxel;
@@ -220,5 +223,27 @@ describe('Cuanto pesa una mena', () => {
     }
     // Y gira con la casilla: la forma no es la misma en los cuatro giros.
     expect(turnVoxels(ROCK_SHAPE, 1).map(String).sort()).not.toEqual(turnVoxels(ROCK_SHAPE, 0).map(String).sort());
+  });
+});
+
+describe('La mena en el terreno (el autor, 2026-10-20: voxeles que se pican)', () => {
+  it('ni piedra ni cristales donde la tapa el terreno; y bajo un hueco, la flor colgando', () => {
+    for (let i = 0; i < 30; i++) {
+      const shape = oreFormation(11, i, -2 * i);
+      // Enterrada hasta su nivel de arriba, como la pone el generador.
+      const buried = (_e: number, _s: number, z: number) => z <= -1;
+      const m = oreModel(ORES[i % 3]!, 11, i, -2 * i, shape, buried);
+      const has = (x: number, y: number, z: number) => shape.some(([a, b, c]) => a === x && b === y && c === z) || buried(x, y, z);
+      for (const c of m.crystals) {
+        const [e, s, z] = c.voxel;
+        const [de, ds, dz] = c.face;
+        expect(has(e + de, s + ds, z + dz)).toBe(false);
+      }
+      // El voxel de abajo, enterrado del todo, no lleva nada.
+      expect(m.crystals.some((c) => c.voxel[2] === -2)).toBe(false);
+      // Sin lo de abajo (se cavo), lo que queda en el aire cuelga su flor.
+      const dug = oreModel(ORES[i % 3]!, 11, i, -2 * i, shape.filter(([, , z]) => z === 0), () => false);
+      expect(dug.crystals.some((c) => c.face[2] === -1 && c.dir[1] < 0)).toBe(true);
+    }
   });
 });

@@ -20,7 +20,7 @@ import {
   Resource,
   Terrain,
 } from '@verdant/shared';
-import { topOf, voxelOf, VOXELS_PER_TILE, type GameState, type WorldGen } from '@verdant/sim';
+import { isOre, oreOnTop, topOf, voxelOf, VOXELS_PER_TILE, type GameState, type WorldGen } from '@verdant/sim';
 
 /**
  * Donde ponerse en una casilla para pisar su columna de esquina, la que mide
@@ -37,6 +37,24 @@ function flatTop(gen: WorldGen, x: number, y: number): number | null {
     if (gen.columnTopAt(vx, vy) !== h) return null;
   }
   return h;
+}
+
+/**
+ * El suelo de la casilla de una mena, si era llana antes de que la mena
+ * asomara su nivel de arriba (`ore-shape.ts`): su base. Si no, `null`.
+ */
+function oreGround(gen: WorldGen, x: number, y: number): number | null {
+  let ground: number | null = null;
+  for (let s = 0; s < VOXELS_PER_TILE * VOXELS_PER_TILE; s++) {
+    if (oreOnTop(gen.seed, x, y, s & 1, s >> 1)) continue;
+    ground = gen.columnTopAt(x * VOXELS_PER_TILE + (s & 1), y * VOXELS_PER_TILE + (s >> 1));
+  }
+  if (ground === null) return null;
+  for (let s = 0; s < VOXELS_PER_TILE * VOXELS_PER_TILE; s++) {
+    if (!oreOnTop(gen.seed, x, y, s & 1, s >> 1)) continue;
+    if (gen.columnTopAt(x * VOXELS_PER_TILE + (s & 1), y * VOXELS_PER_TILE + (s >> 1)) !== ground + 1) return null;
+  }
+  return ground;
 }
 
 /** El punto mas alto que se encuentre cerca. La prueba de humo sube ahi. */
@@ -229,7 +247,8 @@ function reachSpot(
       const standTerrain = gen.terrainAt(sx, sy);
       if (isTerrainSolid(standTerrain)) continue;
       if (blocksBody(gen.featureAt(sx, sy, standTerrain))) continue;
-      const top = flatTop(gen, x, y);
+      // Una mena asoma medio bloque sobre su suelo (2026-10-20): cuenta el suelo.
+      const top = isOre(feature) ? oreGround(gen, x, y) : flatTop(gen, x, y);
       if (top === null || flatTop(gen, sx, sy) !== top) continue;
 
       best = {

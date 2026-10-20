@@ -197,7 +197,14 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 
 ## Romper el terreno (2026-10-20)
 
-- `GROUND_STEP|type Ground\b|: Ground\b|Ground =` — el suelo como una altura por punto (`Ground`) y el rayo que lo buscaba a pasos de 0,05 con 20 biseciones; desde el 2026-10-20 el terreno entra voxel a voxel (`Solid`) y el rayo lo recorre cara a cara (`groundHit`). Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `GROUND_STEP|type Ground = \(|type Ground,|type Ground \}` — el suelo como una altura por punto (`Ground`) y el rayo que lo buscaba a pasos de 0,05 con 20 biseciones; desde el 2026-10-20 el terreno entra voxel a voxel (`Solid`) y el rayo lo recorre cara a cara (`groundHit`). Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
 - `una sola tapa|una tapa de 1 × 1|un cuarto en la de cada columna|la de cada columna, su cuarto` — la tapa de 1 × 1 de una casilla llana y el cuarto de tesela de 24 en la de cada columna; desde el 2026-10-20 cada cara de voxel lleva su tesela de 12 × 12 (`VOXEL_TILES`). Permitido en: `docs/historia.md`, `docs/arte.md`, `docs/relieve.md` (cuentan como era), `.claude/skills/auditoria/references/retirados.md`.
 - `columnTopFor\(state\.world, chunk|columnTopFor\(world, chunk` — el techo de una columna leido del chunk y, fuera de el, del generador sin lo roto; desde el 2026-10-20, `columnTopFor(world, vx, vy)` sobre `World.columnTopPeek`. Permitido en: `.claude/skills/auditoria/references/retirados.md`.
 - `terrainVariant\(seed, wx, wy` — la variante del suelo por casilla; desde el 2026-10-20, por voxel y cara (`terrainVariant(seed, vx, vy, vz, face, count)`). Permitido en: `.claude/skills/auditoria/references/retirados.md`.
+
+## La pala, lo primero que toca y las menas de voxeles (2026-10-20)
+
+- `VOXEL_WORK|con cualquier cosa (en la mano )?(rompe|son tres)|pegar con cualquier cosa` — el terreno que se rompia con cualquier cosa en 3 golpes; desde el 2026-10-20, la roca con pico y lo maleable con pala, con el poder restando (`voxelWorkOf`). Permitido en: `docs/historia.md`, `docs/relieve.md` (cita al autor), `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `oreModel\([^()]*, (turn|\d)\)|caja de choque (de la mena )?sigue de 0,9` — la mena como roca de forma fija (`ROCK_SHAPE` girada) con su caja de 0,9 × 1,0; desde el 2026-10-20, ocho voxeles del terreno (`ore-shape.ts`), sin caja. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `docs/juicio.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `cuatro herramientas de la mesa caben|cuatro recetas no caben` — el recetario de la mesa sin barra; desde las palas son seis y se desliza. Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `la hoja de los 70` — la hoja de iconos de 70 (con 30 objetos); desde las palas, 73 y 33. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.

@@ -24,8 +24,8 @@
  * convenio de three.js.
  */
 
-import { CHUNK_SIZE, type Terrain } from '@verdant/shared';
-import { CHUNK_COLUMNS, hash2DFloat, topOf, VOXEL, VOXELS_PER_TILE, type Chunk, type World } from '@verdant/sim';
+import { CHUNK_SIZE, Feature, type Terrain } from '@verdant/shared';
+import { CHUNK_COLUMNS, hash2DFloat, oreIn, topOf, VOXEL, VOXELS_PER_TILE, type Chunk, type World } from '@verdant/sim';
 
 /** Geometria lista para subir a la GPU, en arrays planos. */
 export interface MeshData {
@@ -174,11 +174,13 @@ export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): Mesh
       const y0 = vy * VOXEL;
       const x1 = x0 + VOXEL;
       const y1 = y0 + VOXEL;
+      // Un voxel de mena es terreno solido, pero lo dibuja su mena (`ore-mesh.ts`).
+      const ore = (z: number) => oreIn(chunk, world.seed, vx, vy, z) !== Feature.None;
 
       // Arriba: el voxel de su techo y el de debajo de cada hueco. Abajo: el
       // de encima de cada hueco, si es solido (lo que quedo en el aire).
       const lid = (z: number) => {
-        if (!solid(vx, vy, z) || solid(vx, vy, z + 1)) return;
+        if (!solid(vx, vy, z) || solid(vx, vy, z + 1) || ore(z)) return;
         const h = (z + 1) * VOXEL;
         quad([[x0, h, y0], [x0, h, y1], [x1, h, y1], [x1, h, y0]], LID_LIGHT, tileOf(terrain, vx, vy, z, Face.Top), LID_CORNERS);
       };
@@ -187,7 +189,7 @@ export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): Mesh
         for (const g of gone) {
           lid(g - 1);
           const z = g + 1;
-          if (z >= top || !solid(vx, vy, z)) continue;
+          if (z >= top || !solid(vx, vy, z) || ore(z)) continue;
           const h = z * VOXEL;
           quad([[x0, h, y0], [x1, h, y0], [x1, h, y1], [x0, h, y1]], UNDER_LIGHT, tileOf(terrain, vx, vy, z, Face.Bottom), UNDER_CORNERS);
         }
@@ -199,7 +201,7 @@ export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): Mesh
         const nx = vx + side.dx;
         const ny = vy + side.dy;
         const wall = (z: number) => {
-          if (!solid(vx, vy, z) || solid(nx, ny, z)) return;
+          if (!solid(vx, vy, z) || solid(nx, ny, z) || ore(z)) return;
           const zt = (z + 1) * VOXEL;
           const zb = z * VOXEL;
           const ax = x0 + side.a[0] * VOXEL;

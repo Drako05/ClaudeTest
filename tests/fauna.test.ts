@@ -467,13 +467,16 @@ describe('Fauna: cazar', () => {
     const tx = Math.floor(entities.x[id]);
     const ty = Math.floor(entities.y[id]);
     world.setFeature(tx, ty, Feature.RockNode);
-    // Se apunta al techo de la roca, bajo las patas: desde que todas sus cajas
-    // chocan (2026-10-10), el animal se sube a ella si asoma medio bloque, y
-    // apuntando a su tronco el barrido pasaba por encima de la roca.
+    // Se apunta a media altura de la roca, bajo las patas: desde que todas sus
+    // cajas chocan (2026-10-10), el animal se sube a ella si asoma medio
+    // bloque, y apuntando a su tronco el barrido pasaba por encima de la roca.
+    // Y desde que cada rayo da solo a lo primero que toca (el autor,
+    // 2026-10-20), al techo de la roca lo tapaba el animal: el sector la toca
+    // por su cara y al animal por encima.
     const rock = hitboxAt(world, tx, ty)!;
     const dx = (rock.x0 + rock.x1) / 2 - entities.x[playerId];
     const dy = (rock.y0 + rock.y1) / 2 - entities.y[playerId];
-    const dz = rock.z1 - (entities.z[playerId] + EYE_HEIGHT);
+    const dz = (rock.z0 + rock.z1) / 2 - (entities.z[playerId] + EYE_HEIGHT);
     const intent = { ...emptyIntent(), aimX: dx, aimY: dy, aimZ: dz / Math.hypot(dx, dy, dz), harvest: true, precise: false };
     const full = entities.maxHealth[id];
     step(state, intent);

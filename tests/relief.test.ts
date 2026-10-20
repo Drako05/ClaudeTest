@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isOre,
   canClimbTo,
   HALF_STEP,
   heightFrom,
@@ -15,7 +16,7 @@ import {
   World,
   WorldGen,
 } from '@verdant/sim';
-import { Terrain } from '@verdant/shared';
+import { Feature, Terrain } from '@verdant/shared';
 
 /**
  * El relieve, en voxeles de 0,5 (el autor, 2026-10-06): columnas de medio bloque
@@ -113,6 +114,8 @@ describe('La altura es otra forma de escribir la elevacion', () => {
       for (let x = -80; x < 80; x += 3) {
         if (gen.tileTopAt(x, y) < 0) continue;
         if ([[0, 0], [1, 0], [0, 1], [1, 1]].some(([dx, dy]) => gen.isOutcrop(x + dx, y + dy))) continue;
+        // Una mena levanta su nivel de arriba sobre el relieve (2026-10-20).
+        if (isOre(gen.featureAt(x, y, gen.terrainAt(x, y)))) continue;
         const r = (dx: number, dy: number) => gen.reliefAt(x + dx, y + dy);
         expect(gen.columnTopAt(x * 2 + 1, y * 2)).toBe(heightFrom((r(0, 0) + r(1, 0)) / 2));
         expect(gen.columnTopAt(x * 2 + 1, y * 2 + 1)).toBe(heightFrom((r(0, 0) + r(1, 0) + r(0, 1) + r(1, 1)) / 4));
@@ -259,6 +262,9 @@ describe('El mundo con relieve sigue siendo explorable', () => {
         for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
           const there = world.columnTop(vx + dx, vy + dy);
           if (there < 0) continue;
+          // Las menas asoman medio bloque sobre el suelo, y eso no es relieve.
+          const oreAround = [vx, vx + dx].some((x) => [vy, vy + dy].some((y) => world.oreAt(x, y, Math.max(here, there) - 1) !== Feature.None));
+          if (oreAround) continue;
           expect(Math.abs(there - here), `escalon de ${there - here} en llano, en (${vx}, ${vy})`).toBeLessThanOrEqual(WALK_HALVES);
           checked++;
         }

@@ -45,7 +45,7 @@ describe('Los iconos de los objetos', () => {
   const all = Array.from({ length: RESOURCE_COUNT }, (_, i) => itemArt(i as Resource));
 
   it('hay uno por objeto, de 24 × 24, con caracteres de la paleta comun', () => {
-    expect(all.length).toBe(30);
+    expect(all.length).toBe(33);
     all.forEach((art, i) => {
       expect(art.palette).toBe(ITEM_PALETTE);
       wellFormed(art, `objeto ${i}`);

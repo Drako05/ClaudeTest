@@ -145,6 +145,34 @@ describe('el golpe toca hitboxes', () => {
     expect(targets.map((t) => [t.x, t.y])).toEqual([[1, 0], [2, 1]]);
   });
 
+  it('cada rayo da solo a lo primero que toca: dos arboles en fila, solo el de delante (el autor, 2026-10-20)', () => {
+    const near = box(1.5, 0.5, 0.4, 0, 4);
+    const behind = box(2.5, 0.5, 0.1, 0, 4);
+    // Solo, el de detras cae; con uno ancho delante que lo tapa entero, no.
+    expect(strike(EYE, 1, 0, 0, flat, boxes(behind)).targets).toHaveLength(1);
+    const { targets } = strike(EYE, 1, 0, 0, flat, boxes(near, behind));
+    expect(targets.map((t) => [t.x, t.y])).toEqual([[1, 0]]);
+  });
+
+  it('el terreno de detras de una caja no se golpea', () => {
+    const open = strike(EYE, 1, 0, down(50), flat, boxes()).voxels.length;
+    expect(open).toBeGreaterThan(0);
+    // Una caja ancha y baja justo delante: tapa el suelo de detras.
+    const wall = box(1.5, 0.5, 0.45, 0, 1.6);
+    const covered = strike(EYE, 1, 0, down(50), flat, boxes(wall));
+    expect(covered.targets).toHaveLength(1);
+    expect(covered.voxels.length).toBeLessThan(open);
+    for (const ray of covered.rays) expect(ray.tile !== null && ray.voxel !== null).toBe(false);
+  });
+
+  it('un cuerpo tambien para el golpe: el arbol de detras no cae', () => {
+    const tree = box(2.5, 0.5, 0.1, 0, 4);
+    const body = { id: 7, boxes: [{ cx: 1.5, cy: 0.5, cz: 1, ux: 1, uy: 0, hl: 0.4, hw: 0.6, hh: 1 }] };
+    const hit = strike(EYE, 1, 0, 0, flat, boxes(tree), 0, [body]);
+    expect(hit.bodies.map((b) => b.id)).toEqual([7]);
+    expect(hit.targets).toHaveLength(0);
+  });
+
   it('los rayos que entran en el suelo se cortan donde entran', () => {
     const { rays } = strike(EYE, 1, 0, down(33), flat, boxes());
     const mid = rays[(STRIKE_RAYS - 1) / 2];

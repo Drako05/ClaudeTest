@@ -31,7 +31,48 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## Tanda en curso: romper el terreno, voxel a voxel (2026-10-20)
+## Tanda en curso: la pala, lo primero que toca, las menas de voxeles y la rejilla de 0,5 (2026-10-20)
+
+**Lo que pidio el autor**, con sus respuestas, en `docs/relieve.md`, «La pala,
+lo primero que toca y las menas», y en la regla 12 (colocar en la rejilla de
+0,5). El plan, aprobado como plan.
+
+**Hecho**:
+- **El golpe se para en lo primero** (`strike`, `StrikeRay`): voxel, caja o
+  cuerpo; los animales del barrido salen de ahi (`strikeOf` con `animals`).
+- **La pala** (`ToolKind.Shovel`, tres tiers, recetas al final de `RECIPES`,
+  iconos) y **`voxelWorkOf`**: roca, pico; lo maleable, pala; el poder resta;
+  `needShovel`. `VOXEL_WORK` retirado.
+- **Las menas, ocho voxeles** (`ore-shape.ts`, `Chunk.oreBase`, `World.oreAt`,
+  `oreFormationAt`), sin caja, con botin por voxel (`oreVoxelLoot`); su malla,
+  de lo que queda y sin cristales donde la tapa el terreno, rehecha con el.
+- **Las estaciones en la rejilla de 0,5** (`placeStation`, `stationOffsetAt`,
+  `isCovered`, `footprintTiles`, `SHIFT`).
+- Tests: `ore-voxels.test.ts` (nuevo), y lo de la pala, la rejilla y la
+  oclusion en `voxel-edit`, `stations`, `strike`, `terrain-mesh` y
+  `ore-mesh`; los que creaban menas con `setFeature` pican ahora una generada
+  (`oreSite`, `strikeDown` en `tests/ground.ts`). Humo: `dig` fabrica un pico
+  desde el panel (a mano la roca no se rompe), `resources` pica una mena, y el
+  recetario cuenta 3 de mano y 6 en la mesa. 23 mutaciones; caen todas en
+  local.
+- **Dejado**: que las menas se rehagan al romper un voxel no tiene comprobacion
+  en el humo: la vida rehace chunks mientras se pica y la medida no podia
+  fallar (se quito). Se ve en la captura.
+
+**Espera al autor**: las deducciones nuevas, en `docs/juicio.md` (filas
+«Menas de voxeles», «Pala» y «Rejilla de 0,5»), y que la mesa ya no quepa sin
+barra.
+
+## Tanda hecha: romper el terreno, voxel a voxel (2026-10-20)
+
+**Dada por buena por el autor** (2026-10-20): «Las texturas que hiciste están
+bien, en otra tanda perfeccionamos el arte»; el coste, «de momento no se siente
+la carga en fps, en alguna futura tanda de optimización vemos si tocamos
+algo»; y aprobo mis tres deducciones (sin destello al golpear terreno, lo que
+se pone se apoya bajo donde toca la mirada, y renacer mira el terreno
+generado). Commit `1e9af1f`, con la CI y el despliegue en verde. **Las teselas
+de 24 del suelo** (`TERRAIN_TILES`) siguen sin uso en el juego: retirarlas es
+cosa de la tanda de arte. Pasa a `docs/historia.md` con la auditoria.
 
 **Lo que pidio el autor**, literal y con sus cuatro respuestas, en
 `docs/relieve.md`, «Romper el terreno». En corto: el voxel de 0,5 es la unidad
@@ -59,12 +100,8 @@ cara de voxel con su tesela de 12 × 12; sin pistas del daño (otra tanda).
 **Medido**: de 1,6 a 1,9 veces los triangulos, y unos 15 ms por chunk al
 rehacer su terreno (`docs/relieve.md`). El tick, en su presupuesto.
 
-**Espera al autor**:
-- **Las teselas de 12 × 12**: son *deduccion* hasta que las vea (hoja
-  `?mundo=1`, arriba del todo, y en el juego). Si las da por buenas, **las de
-  24 del suelo** (`TERRAIN_TILES`) quedan sin uso en el juego y se retiran.
-- **El coste en el movil**, con los numeros de arriba.
-- Las deducciones, en `docs/juicio.md`, filas «Romper el terreno».
+Siguen a su juicio las demas deducciones de esta tanda, en `docs/juicio.md`,
+filas «Romper el terreno».
 
 ---
 
