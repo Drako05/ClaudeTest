@@ -90,6 +90,15 @@ de pixelart (a otro fichero, sale identico); las pasadas `mobile` y `dig`.
   pega al primero, pero la linea que se dibuja sigue hasta el terreno o el
   objeto de detras.
 
+**Un fallo suelto en la CI de `main`, sin causa encontrada**: la pasada
+`desktop` cayo una vez en «el registro no va encima de INVENTARIO» (run
+39472539170, una maquina lenta: la pasada tardo 411 s). La linea «+5 Bayas»
+ya estaba fuera de la pagina en el primer fotograma tras nacer (`y0` 0,
+`alive` false), y su vida no puede acabar en un fotograma (`dt` con tope de
+0,25 s). Paso en `pruebas` con el mismo arbol y al relanzarlo. La auditoria no
+toca el registro. Si vuelve, se mira que quita la linea antes de su primer
+fotograma.
+
 **Dejado a proposito** (sin medida que lo pida, lente K5): rehacer solo las
 menas cercanas al voxel roto, y ahorrar las claves de texto al mirar el
 terreno roto. Y unas duplicaciones pequeñas (la altura de la mena en el
