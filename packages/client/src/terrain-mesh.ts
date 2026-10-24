@@ -25,12 +25,14 @@
  */
 
 import { CHUNK_SIZE, Feature, type Terrain } from '@verdant/shared';
-import { CHUNK_COLUMNS, hash2DFloat, oreIn, topOf, VOXEL, VOXELS_PER_TILE, type Chunk, type World } from '@verdant/sim';
+import { CHUNK_COLUMNS, hash2DFloat, NO_ORE, oreIn, topOf, VOXEL, VOXELS_PER_TILE, type Chunk, type World } from '@verdant/sim';
 
 /** Geometria lista para subir a la GPU, en arrays planos. */
 export interface MeshData {
   /** `x, y, z` por vertice. */
   readonly positions: Float32Array;
+  /** `x, y, z` por vertice: hacia donde mira su cara, de largo 1. */
+  readonly normals: Float32Array;
   /** `r, g, b` por vertice, de 0 a 1: la luz que oscurece la textura (las paredes). */
   readonly colors: Float32Array;
   /** `u, v` por vertice, en el atlas del suelo. */
@@ -125,32 +127,97 @@ const LID_CORNERS: readonly (readonly [number, number])[] = [
 ];
 const UNDER_CORNERS = WHOLE;
 
+/**
+ * Los arrays donde `chunkMesh` va escribiendo, que se reusan de un chunk al
+ * siguiente y crecen al doble si no caben: un chunk de relieve lleva unos 20.000
+ * vertices. Al terminar se copia lo escrito, del tamano justo.
+ */
+let scratchVertices = 1 << 15;
+let scratchPositions = new Float32Array(scratchVertices * 3);
+let scratchNormals = new Float32Array(scratchVertices * 3);
+let scratchColors = new Float32Array(scratchVertices * 3);
+let scratchUvs = new Float32Array(scratchVertices * 2);
+let scratchIndices = new Uint32Array((scratchVertices / 4) * 6);
+
+function growScratch(): void {
+  const grow = <T extends Float32Array | Uint32Array>(a: T, size: number): T => {
+    const b = new (a.constructor as new (n: number) => T)(size);
+    b.set(a);
+    return b;
+  };
+  scratchVertices *= 2;
+  scratchPositions = grow(scratchPositions, scratchVertices * 3);
+  scratchNormals = grow(scratchNormals, scratchVertices * 3);
+  scratchColors = grow(scratchColors, scratchVertices * 3);
+  scratchUvs = grow(scratchUvs, scratchVertices * 2);
+  scratchIndices = grow(scratchIndices, (scratchVertices / 4) * 6);
+}
+
+/** Hacia donde mira cada cara, en los ejes de three.js. */
+const NORMALS: Readonly<Record<Face, readonly [number, number, number]>> = {
+  [Face.Top]: [0, 1, 0],
+  [Face.Bottom]: [0, -1, 0],
+  [Face.East]: [1, 0, 0],
+  [Face.West]: [-1, 0, 0],
+  [Face.South]: [0, 0, 1],
+  [Face.North]: [0, 0, -1],
+};
+
 /** La malla de un chunk: cada cara de sus voxeles que da al aire. */
 export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): MeshData {
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
+  let vertices = 0;
+  let indexCount = 0;
   const baseX = chunk.cx * CHUNK_COLUMNS;
   const baseY = chunk.cy * CHUNK_COLUMNS;
+  // Es lo que mas se repite al cruzar un borde de chunk (tanda movil 1,
+  // 2026-10-24), asi que nada se crea por columna ni por cara: las funciones son
+  // del chunk y la columna en curso va en variables. Y sin nada roto en el chunk
+  // ni en sus vecinos, lo roto no se pregunta.
+  const anyBroken =
+    world.hasBroken(chunk.cx, chunk.cy) ||
+    world.hasBroken(chunk.cx + 1, chunk.cy) ||
+    world.hasBroken(chunk.cx - 1, chunk.cy) ||
+    world.hasBroken(chunk.cx, chunk.cy + 1) ||
+    world.hasBroken(chunk.cx, chunk.cy - 1);
 
   /**
-   * Anade un cuadrilatero como dos triangulos: sus esquinas, su luz y donde
-   * cae cada esquina en su tesela, en fracciones (`0, 0` arriba a la izquierda).
+   * Una esquina de un cuadrilatero: donde esta, su cara, su luz y donde cae en
+   * su tesela, en fracciones.
    */
-  const quad = (
-    p: readonly (readonly [number, number, number])[],
+  const vertex = (
+    x: number,
+    y: number,
+    z: number,
+    face: Face,
     rgb: readonly [number, number, number],
     tile: TileRect,
-    corners: readonly (readonly [number, number])[] = WHOLE,
+    corner: readonly [number, number],
   ): void => {
-    const base = positions.length / 3;
-    p.forEach(([x, y, z], i) => {
-      positions.push(x, y, z);
-      colors.push(rgb[0], rgb[1], rgb[2]);
-      uvs.push(tile.u0 + (tile.u1 - tile.u0) * corners[i]![0], tile.v0 + (tile.v1 - tile.v0) * corners[i]![1]);
-    });
-    indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    if (vertices === scratchVertices) growScratch();
+    const i3 = vertices * 3;
+    const n = NORMALS[face];
+    scratchPositions[i3] = x;
+    scratchPositions[i3 + 1] = y;
+    scratchPositions[i3 + 2] = z;
+    scratchNormals[i3] = n[0];
+    scratchNormals[i3 + 1] = n[1];
+    scratchNormals[i3 + 2] = n[2];
+    scratchColors[i3] = rgb[0];
+    scratchColors[i3 + 1] = rgb[1];
+    scratchColors[i3 + 2] = rgb[2];
+    scratchUvs[vertices * 2] = tile.u0 + (tile.u1 - tile.u0) * corner[0];
+    scratchUvs[vertices * 2 + 1] = tile.v0 + (tile.v1 - tile.v0) * corner[1];
+    vertices++;
+  };
+  /** Cierra las cuatro ultimas esquinas en dos triangulos. */
+  const close = (): void => {
+    const base = vertices - 4;
+    scratchIndices[indexCount++] = base;
+    scratchIndices[indexCount++] = base + 1;
+    scratchIndices[indexCount++] = base + 2;
+    scratchIndices[indexCount++] = base;
+    scratchIndices[indexCount++] = base + 2;
+    scratchIndices[indexCount++] = base + 3;
   };
 
   /** Si el voxel es solido: dentro del chunk, de su dato; fuera, sin generar nada. */
@@ -158,32 +225,71 @@ export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): Mesh
   const inside = (vx: number, vy: number) =>
     vx >= baseX && vx < baseX + CHUNK_COLUMNS && vy >= baseY && vy < baseY + CHUNK_COLUMNS;
   const solid = (vx: number, vy: number, vz: number): boolean =>
-    inside(vx, vy) ? vz < own(vx, vy) && !world.brokenAt(vx, vy)?.has(vz) : world.isSolidVoxelPeek(vx, vy, vz);
+    inside(vx, vy)
+      ? vz < own(vx, vy) && !(anyBroken && world.brokenAt(vx, vy)?.has(vz))
+      : world.isSolidVoxelPeek(vx, vy, vz);
   /** El techo que dio el generador a la columna, para saber desde donde mirar. */
   const potential = (vx: number, vy: number): number =>
     inside(vx, vy) ? own(vx, vy) : world.gen.columnTopAt(vx, vy);
 
+  // La columna en curso.
+  let vx = 0;
+  let vy = 0;
+  let terrain = 0 as Terrain;
+  let hasOre = false;
+  let x0 = 0;
+  let y0 = 0;
+  let x1 = 0;
+  let y1 = 0;
+
+  // Un voxel de mena es terreno solido, pero lo dibuja su mena (`ore-mesh.ts`).
+  const ore = (z: number) => hasOre && oreIn(chunk, world.seed, vx, vy, z) !== Feature.None;
+
+  // Arriba: el voxel de su techo y el de debajo de cada hueco.
+  const lid = (z: number): void => {
+    if (!solid(vx, vy, z) || solid(vx, vy, z + 1) || ore(z)) return;
+    const h = (z + 1) * VOXEL;
+    const tile = tileOf(terrain, vx, vy, z, Face.Top);
+    vertex(x0, h, y0, Face.Top, LID_LIGHT, tile, LID_CORNERS[0]!);
+    vertex(x0, h, y1, Face.Top, LID_LIGHT, tile, LID_CORNERS[1]!);
+    vertex(x1, h, y1, Face.Top, LID_LIGHT, tile, LID_CORNERS[2]!);
+    vertex(x1, h, y0, Face.Top, LID_LIGHT, tile, LID_CORNERS[3]!);
+    close();
+  };
+
+  // A un lado: donde esta columna tiene voxel y la vecina no.
+  const wall = (side: (typeof SIDES)[number], nx: number, ny: number, z: number): void => {
+    if (!solid(vx, vy, z) || solid(nx, ny, z) || ore(z)) return;
+    const zt = (z + 1) * VOXEL;
+    const zb = z * VOXEL;
+    const ax = x0 + side.a[0] * VOXEL;
+    const ay = y0 + side.a[1] * VOXEL;
+    const bx = x0 + side.b[0] * VOXEL;
+    const by = y0 + side.b[1] * VOXEL;
+    const tile = tileOf(terrain, vx, vy, z, side.face);
+    vertex(ax, zt, ay, side.face, WALL_LIGHT, tile, WHOLE[0]!);
+    vertex(bx, zt, by, side.face, WALL_LIGHT, tile, WHOLE[1]!);
+    vertex(bx, zb, by, side.face, WALL_LIGHT, tile, WHOLE[2]!);
+    vertex(ax, zb, ay, side.face, WALL_LIGHT, tile, WHOLE[3]!);
+    close();
+  };
+
   for (let ly = 0; ly < CHUNK_COLUMNS; ly++) {
     for (let lx = 0; lx < CHUNK_COLUMNS; lx++) {
-      const vx = baseX + lx;
-      const vy = baseY + ly;
-      const terrain = chunk.terrain[Math.floor(ly / VOXELS_PER_TILE) * CHUNK_SIZE + Math.floor(lx / VOXELS_PER_TILE)] as Terrain;
+      vx = baseX + lx;
+      vy = baseY + ly;
+      const tileIdx = Math.floor(ly / VOXELS_PER_TILE) * CHUNK_SIZE + Math.floor(lx / VOXELS_PER_TILE);
+      terrain = chunk.terrain[tileIdx] as Terrain;
+      hasOre = chunk.oreBase[tileIdx] !== NO_ORE;
       const top = own(vx, vy);
-      const gone = world.brokenAt(vx, vy);
-      const x0 = vx * VOXEL;
-      const y0 = vy * VOXEL;
-      const x1 = x0 + VOXEL;
-      const y1 = y0 + VOXEL;
-      // Un voxel de mena es terreno solido, pero lo dibuja su mena (`ore-mesh.ts`).
-      const ore = (z: number) => oreIn(chunk, world.seed, vx, vy, z) !== Feature.None;
+      const gone = anyBroken ? world.brokenAt(vx, vy) : undefined;
+      x0 = vx * VOXEL;
+      y0 = vy * VOXEL;
+      x1 = x0 + VOXEL;
+      y1 = y0 + VOXEL;
 
-      // Arriba: el voxel de su techo y el de debajo de cada hueco. Abajo: el
-      // de encima de cada hueco, si es solido (lo que quedo en el aire).
-      const lid = (z: number) => {
-        if (!solid(vx, vy, z) || solid(vx, vy, z + 1) || ore(z)) return;
-        const h = (z + 1) * VOXEL;
-        quad([[x0, h, y0], [x0, h, y1], [x1, h, y1], [x1, h, y0]], LID_LIGHT, tileOf(terrain, vx, vy, z, Face.Top), LID_CORNERS);
-      };
+      // Arriba, y abajo: el de encima de cada hueco, si es solido (lo que
+      // quedo en el aire).
       lid(top - 1);
       if (gone) {
         for (const g of gone) {
@@ -191,39 +297,36 @@ export function chunkMesh(world: World, chunk: Chunk, tileOf: TerrainTile): Mesh
           const z = g + 1;
           if (z >= top || !solid(vx, vy, z) || ore(z)) continue;
           const h = z * VOXEL;
-          quad([[x0, h, y0], [x1, h, y0], [x1, h, y1], [x0, h, y1]], UNDER_LIGHT, tileOf(terrain, vx, vy, z, Face.Bottom), UNDER_CORNERS);
+          const tile = tileOf(terrain, vx, vy, z, Face.Bottom);
+          vertex(x0, h, y0, Face.Bottom, UNDER_LIGHT, tile, UNDER_CORNERS[0]!);
+          vertex(x1, h, y0, Face.Bottom, UNDER_LIGHT, tile, UNDER_CORNERS[1]!);
+          vertex(x1, h, y1, Face.Bottom, UNDER_LIGHT, tile, UNDER_CORNERS[2]!);
+          vertex(x0, h, y1, Face.Bottom, UNDER_LIGHT, tile, UNDER_CORNERS[3]!);
+          close();
         }
       }
 
-      // A los lados: donde esta columna tiene voxel y la vecina no. Por encima
-      // de lo que dio el generador a la vecina, y en sus huecos.
-      for (const side of SIDES) {
+      // A los lados: por encima de lo que dio el generador a la vecina, y en
+      // sus huecos.
+      for (let s = 0; s < SIDES.length; s++) {
+        const side = SIDES[s]!;
         const nx = vx + side.dx;
         const ny = vy + side.dy;
-        const wall = (z: number) => {
-          if (!solid(vx, vy, z) || solid(nx, ny, z) || ore(z)) return;
-          const zt = (z + 1) * VOXEL;
-          const zb = z * VOXEL;
-          const ax = x0 + side.a[0] * VOXEL;
-          const ay = y0 + side.a[1] * VOXEL;
-          const bx = x0 + side.b[0] * VOXEL;
-          const by = y0 + side.b[1] * VOXEL;
-          quad([[ax, zt, ay], [bx, zt, by], [bx, zb, by], [ax, zb, ay]], WALL_LIGHT, tileOf(terrain, vx, vy, z, side.face));
-        };
         const from = potential(nx, ny);
-        for (let z = from; z < top; z++) wall(z);
-        const nGone = world.brokenAt(nx, ny);
-        if (nGone) for (const g of nGone) if (g < from) wall(g);
+        for (let z = from; z < top; z++) wall(side, nx, ny, z);
+        const nGone = anyBroken ? world.brokenAt(nx, ny) : undefined;
+        if (nGone) for (const g of nGone) if (g < from) wall(side, nx, ny, g);
       }
     }
   }
 
   return {
-    positions: new Float32Array(positions),
-    colors: new Float32Array(colors),
-    uvs: new Float32Array(uvs),
-    indices: new Uint32Array(indices),
-    triangles: indices.length / 3,
+    positions: scratchPositions.slice(0, vertices * 3),
+    normals: scratchNormals.slice(0, vertices * 3),
+    colors: scratchColors.slice(0, vertices * 3),
+    uvs: scratchUvs.slice(0, vertices * 2),
+    indices: scratchIndices.slice(0, indexCount),
+    triangles: indexCount / 3,
   };
 }
 

@@ -11,96 +11,72 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
-## Auditoria al cerrar la pala y las menas de voxeles (2026-10-20)
+## Tanda movil 1: los tirones al cruzar de chunk (2026-10-24) — HECHA
 
-**El alcance**: de `4151766` a `8e9269e`: el boceto de los minerales, las
-menas al juego, romper el terreno y la tanda de la pala, enteros en
-`docs/historia.md`. Con la lente nueva, **K, buenas practicas** (pedida por el
-autor este dia).
+**Lo que vio el autor**, en su telefono (MediaTek Dimensity 7020): ~42 fps de
+media, que caen a ~32 justo al cruzar la frontera de un chunk y a ~20 en la
+esquina de cuatro.
 
-**Corregido:**
-- **El compilador, mas estricto** (lente K): `noUnusedLocals` y
-  `noUnusedParameters`, encendidos. Sacaron 16 restos sin uso: imports de
-  modelos sustituidos (en la recoleccion, `treeTrunkAt`, `rayBox`,
-  `stationHeight`…), un parametro `world` que los efectos ya no leian, la
-  constante `SQUARE` de las casillas y un indice suelto en los bordes de
-  bioma. Y el escaner vigila que sigan encendidos (categoria «Practicas»).
-- **La camara atravesaba media estacion** corrida medio bloque: buscaba cada
-  caja solo en su casilla. Ahora mira tambien las vecinas al oeste y al norte;
-  igual el modo TAP, que usa el mismo rayo. Con su test.
-- **El barrido se dibujaba mas largo que el golpe**: se volvia a medir
-  despues del paso, cuando lo roto ya no cortaba su rayo. Ahora el nucleo
-  cuenta los rayos del golpe (`lastStrikeRays`) y el cliente los dibuja.
-- **Lo que solo sostenian los tests**: los escombros de una mena (no se
-  rompe ninguna con escombros desde que son terreno) y `Surface.front` (lo que
-  se coloca va delante de la cara, desde la rejilla de 0,5). Fuera, con sus
-  textos.
-- **Tests que no decian lo que afirmaban**: las reglas de los cristales se
-  median sobre la roca de siete voxeles, que ya no es una mena: ahora sobre la
-  formacion de ocho, enterrada y cavada. «Requieren herramientas para
-  recolectarse» ya no miraba que se recolectara: ahora, el carbon que suelta.
-  «Una casilla cubierta» no se probaba; «la generacion sigue pura» comparaba
-  un chunk consigo mismo (ahora, con otro generado despues de sus vecinos); y
-  el preciso a 40 grados sin su control.
-- **Comentarios y documentos del modelo viejo**: el terreno «con cualquier
-  cosa», las menas con caja y con escombros (`docs/arte.md`,
-  `docs/efectos.md`, `docs/juicio.md`), el golpe «cortado por el terreno»
-  (`aim.ts`, `strikeOf`), lo que pesa una mena (medido otra vez: enterrada,
-  400 vertices; cavada, 880), las palas en la guia de arte y en las leyes.
-- **Numeros sin nombre**: `ORE_SALT`, `BODY_REACH`, y `VOXELS_PER_TILE` en
-  vez de un `* 2`.
+**La causa**: `syncChunks` construia de golpe, en un frame, todo lo que entra
+al cambiar de chunk: 7 chunks en un borde recto y 13 en una esquina (la ventana
+es de 7 × 7). Y tiraba en el acto lo que salia, asi que ir y volver por la
+frontera los rehacia una y otra vez. El contador de FPS es la media de un
+segundo, asi que esas caidas son un frame de varios cientos de ms diluido.
 
-**Mutado** (caen las 5 en local): la camara sin vecinas, el barrido sin los
-rayos del golpe, colocar sobre lo cubierto, la mena sin botin y los cristales
-bajo tierra.
+**Medido en el PC** (humo, Chromium sin GPU, los 49 chunks del arranque):
+construir un chunk costaba **~9 ms**, y el 74 % era la malla del terreno
+(`chunkMesh`). Del desglose (`frame-probe.ts`) y un perfil salio que la malla
+creaba cierres y arrays por cada columna y cada cara, preguntaba lo roto con
+claves de texto en cada consulta y calculaba las normales despues.
 
-**Ejecutado**: el escaner y su autoprueba; typecheck y los 650 tests;
-`npm run shots`, `tools/analyze-world.ts` (en su presupuesto) y el generador
-de pixelart (a otro fichero, sale identico); las pasadas `mobile` y `dig`.
+**Hecho (sin cambiar nada de lo que se ve):**
+- **El peor frame, por partes, en el panel de desarrollo** (`docs/devtools.md`).
+- **La malla, 3,2 veces mas rapida** en el navegador (325 → 102 ms los 49
+  chunks): escribe en arrays que se reusan, no crea nada por columna, escribe
+  las normales (identicas a las de three.js, con su test) y solo pregunta lo
+  roto si el chunk o sus vecinos tienen algo roto (`World.hasBroken`). Un chunk
+  entero cuesta ahora **~4,4 ms** en el PC.
+- **Lo que entra se reparte en varios frames**: el anillo 1 se construye en el
+  acto; el resto, del mas cercano al mas lejano, con **4 ms por frame** y
+  siempre uno como poco. Y **lo que sale se guarda oculto hasta el anillo 4**.
+  Las cifras son deduccion (`docs/juicio.md`).
+- El humo (pasada `devTools`) cruza un borde, comprueba que lo lejano no entra
+  todo en un frame y que la cola se vacia, y vuelve: sin rehacer nada.
 
-**Para ti** (cambian lo que hace el juego; no se tocaron):
-- **Las menas aun cuentan como solidas para nacer y medir el mundo**
-  (`blocksBody`): sin caja, se pisan, pero el nacimiento y la conectividad las
-  evitan. Quitarlas cambia donde se nace en algunas semillas.
-- **Lo que vuela hacia ti atraviesa el terreno**: desde que no se suelta por
-  distancia, persigue en linea recta aunque haya una pared en medio. Y si
-  mueres con algo volando, se queda quieto en el aire hasta que caduca.
-- **La estocada del preciso no se para en un animal**: la simulacion si le
-  pega al primero, pero la linea que se dibuja sigue hasta el terreno o el
-  objeto de detras.
+**Medido por el autor en su telefono** (el mismo dia, «Peor frame», varios
+cruces): **borde recto, 30-60 ms; esquina de cuatro chunks, 50-90 ms**. Y en
+sus palabras, **«no fue perceptible ningun tiron»**. Antes, esos cruces bajaban
+la media de un segundo a 32 y a 20 fps.
 
-**Un fallo suelto en la CI de `main`, sin causa encontrada**: la pasada
-`desktop` cayo una vez en «el registro no va encima de INVENTARIO» (run
-39472539170, una maquina lenta: la pasada tardo 411 s). La linea «+5 Bayas»
-ya estaba fuera de la pagina en el primer fotograma tras nacer (`y0` 0,
-`alive` false), y su vida no puede acabar en un fotograma (`dt` con tope de
-0,25 s). Paso en `pruebas` con el mismo arbol y al relanzarlo. La auditoria no
-toca el registro. Si vuelve, se mira que quita la linea antes de su primer
-fotograma.
+**Segunda parte, en la misma subida** (decision del autor: «los fps siguen
+bajando al cruzar» y quiere subir la media):
+- **Cada chunk lejano en dos frames**: el terreno con sus menas, y en otro
+  frame los objetos y las sombras (`buildTerrain` / `finishChunk`). La cola es
+  de pasos, con el mismo presupuesto. **Medido por el autor: 30-40 ms en un
+  borde y ~60 en una esquina** (eran 30-60 y 50-90).
+- **Selector de resolucion** en el panel (2x · 1,5x · 1x) con las llamadas de
+  dibujo, triangulos y pixeles (`docs/devtools.md`). **Medido por el autor: los
+  FPS, practicamente iguales a 2x que a 1x**: al movil no le pesan los pixeles
+  sino las llamadas.
+- En ortografica el autor ve aparecer el anillo de fuera; «no es problema de
+  momento».
 
-**Volvio el 2026-10-24** (run 40057853752, rama `claude/wonderful-dirac-s8oi52`,
-el mismo arbol que paso en `pruebas`, y el cambio no tocaba el cliente), con
-otra cara: «el registro de objetos no anoto lo recolectado: []», aunque el
-inventario si tenia lo recogido (10 de un objeto, 3 de otro). Y por eso, despues,
-«no hay una pila de bayas con que probar el menu». Ya son dos veces: es un fallo
-del registro, no de la maquina, y esta por mirar.
+**Tercera parte, tambien en la misma subida: los objetos agrupados.** Las
+aspas y las rocas de cada chunk van en un `InstancedMesh` por especie
+(`prop-batch.ts`): en los 49 chunks del humo, **6.694 objetos en 682 piezas de
+escena**, que antes eran una por objeto. Las estaciones y las menas siguen
+sueltas. Una captura del nacimiento antes y despues, con el reloj manual,
+difiere en 211 de 921.600 pixeles, todos en el canto de abajo de las rocas,
+donde su cara inferior empata en profundidad con el suelo y el orden de dibujo
+decide: antes salian alli unas rayitas claras y ahora no. **Medido por el
+autor: la media sube de 42 a 48 fps**; «no es una mejoria tan dramatica, pero
+es considerable», y se seguira optimizando en tandas futuras.
 
-**Y una tercera, el mismo dia** (run 40067714483, en `pruebas`, con vite 8):
-«no hay una pila de bayas con que probar el menu», con el inventario con 1 y
-2 de dos objetos y sin bayas. Relanzada, paso; y paso en las dos tandas
-siguientes del mismo cambio.
-
-**Dejado a proposito** (sin medida que lo pida, lente K5): rehacer solo las
-menas cercanas al voxel roto, y ahorrar las claves de texto al mirar el
-terreno roto. Y unas duplicaciones pequeñas (la altura de la mena en el
-generador, el bucle de bajar por lo roto), que se juntan cuando se toquen.
-
-**Escapes** (fase 6): el 48 (lo sorteado de cada pieza, de un flujo comun) a
-un principio nuevo, G8; el 49 (dos numeros con una relacion, cada uno por su
-lado) a otro, A4; el 50 a B3, afinado; el 51 a K1; y el P9 (un `stash` que se
-llevo tests sin commit) a Q4.
-
----
+**Verificado en local**: typecheck, 655 tests, las 8 mutaciones de la ronda
+(a mano: `mutar.mjs` no arranca `npm` en Windows) y el humo entero, con los dos
+fallos de `escritorio` que ya habia antes de la tanda («el anillo del hambre no
+bajo», «no hay una pila de bayas») y una vez el destello de una pestana en la
+pasada del movil, que sola paso tres veces de tres.
 
 ## Vite 8 y las herramientas en Windows (2026-10-24) — HECHA
 

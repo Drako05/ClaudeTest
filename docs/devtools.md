@@ -85,3 +85,28 @@ columna de OTROS, una llave inglesa bajo el bioma (`#devToggle`, pedido del
 autor, 2026-10-05), y se abre al lado de la columna, como el HUD: abajo a la
 izquierda pisaria el joystick. El boton se enciende mientras el panel esta
 abierto, se haya abierto con el, con F3 o con `?dev=1` (`DevTools.onToggle`).
+
+## El peor frame (tanda movil 1, 2026-10-24)
+
+El grupo **«Peor frame (5 s)»** dice cuanto trabajo llevo el frame mas caro de
+los ultimos cinco segundos y en que se fue, en ms del hilo principal:
+`nucleo` (los ticks del frame, y al cambiar de chunk su carga), `malla`
+(el terreno de los chunks nuevos), `objetos` (aspas, rocas y estaciones),
+`menas`, `sombras`, `fauna` y `gpu` (la llamada a `render`, que es donde
+three.js sube la geometria nueva). Y cuantos chunks se construyeron en el.
+Lo lleva `frame-probe.ts`.
+
+Existe porque el contador de FPS es la media de un segundo y un tiron se
+diluye en ella: un frame de 300 ms en un segundo a 42 fps sale como «32». Para
+medir el tiron en el telefono se abre el panel (la llave inglesa), se cruza un
+borde de chunk (con «Bordes de chunk» puesto se ve donde esta) y se lee la
+linea antes de cinco segundos. El humo lee lo mismo en `__verdant.framePeak`.
+
+Debajo, **«Resolucion»**: lo que costo dibujar el ultimo frame (llamadas de
+dibujo, triangulos y pixeles del lienzo) y tres botones, **2x · 1,5x · 1x**, los
+pixeles de lienzo por pixel CSS, con el tope de la pantalla. 2x es la de
+siempre. Sirve para saber que le pesa al movil: si a 1x los FPS suben mucho, los
+pixeles; si apenas cambian, las llamadas. **Se recuerda** (`localStorage`) y,
+a diferencia de la velocidad, **no vuelve a 2x al cerrar el panel**: es para
+jugar con ella y comparar. El humo la prueba en la pasada del movil, que es la
+unica con pantalla de mas de 1x.

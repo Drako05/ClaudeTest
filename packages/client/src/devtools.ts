@@ -25,6 +25,14 @@ const JUMPS: ReadonlyArray<readonly [string, number]> = [
 /** Lineas visibles del registro antes de descartar las mas viejas. */
 const LOG_LIMIT = 12;
 
+/**
+ * Pixeles de lienzo por pixel CSS que se pueden elegir, con el tope de la
+ * pantalla (tanda movil 1, 2026-10-24): para medir si al movil le pesan los
+ * pixeles o las llamadas de dibujo. El primero es el de siempre.
+ */
+export const RESOLUTIONS: readonly number[] = [2, 1.5, 1];
+const RESOLUTION_STORAGE_KEY = 'verdant.resolucion';
+
 export interface DevActions {
   /** Salta el tiempo indicado en ticks del mundo. */
   onSkip: (ticks: number) => void;
@@ -35,6 +43,8 @@ export interface DevActions {
    * materiales, no herramientas, para que fabricar se siga probando de verdad.
    */
   onKit: (kit: 'piedra' | 'metal' | 'cocina') => void;
+  /** Cambia los pixeles de lienzo por pixel CSS (`RESOLUTIONS`). */
+  onResolution: (ratio: number) => void;
 }
 
 export class DevTools {
@@ -43,6 +53,14 @@ export class DevTools {
   private logList: HTMLElement | null = null;
   private speedLabel: HTMLElement | null = null;
   private statusLabel: HTMLElement | null = null;
+  private peakLabel: HTMLElement | null = null;
+  private drawLabel: HTMLElement | null = null;
+
+  /**
+   * La resolucion elegida. Se recuerda y NO vuelve a su sitio al cerrar el
+   * panel, a diferencia de la velocidad: es para jugar con ella y comparar.
+   */
+  resolution = RESOLUTIONS[0]!;
 
   /** Multiplicador aplicado al tiempo. Cero equivale a pausa. */
   speed = 1;
@@ -71,6 +89,12 @@ export class DevTools {
       start = new URLSearchParams(window.location.search).get('dev') === '1';
     } catch {
       // Sin acceso a la URL: se activa solo con F3.
+    }
+    try {
+      const stored = Number(window.localStorage.getItem(RESOLUTION_STORAGE_KEY));
+      if (RESOLUTIONS.includes(stored)) this.resolution = stored;
+    } catch {
+      // Sin almacenamiento: la de siempre.
     }
 
     window.addEventListener('keydown', (e) => {
@@ -129,7 +153,9 @@ export class DevTools {
    * un recurso aparece sola. A cambio, solo se ve lo que se refleja en el
    * inventario o en el hambre.
    */
-  observe(inventory: readonly number[], hunger: number, biome: number): void {
+  observe(inventory: readonly number[], hunger: number, biome: number, peak: string, draw: string): void {
+    if (this.peakLabel && this.peakLabel.textContent !== peak) this.peakLabel.textContent = peak;
+    if (this.drawLabel && this.drawLabel.textContent !== draw) this.drawLabel.textContent = draw;
     if (!this.enabled) {
       this.lastInventory = [...inventory];
       this.lastHunger = hunger;
@@ -170,6 +196,9 @@ export class DevTools {
       ['survival', this.freezeSurvival],
     ] as Array<[string, boolean]>) {
       this.root?.querySelector(`[data-toggle="${key}"]`)?.classList.toggle('on', on);
+    }
+    for (const button of Array.from(this.root?.querySelectorAll('[data-res]') ?? [])) {
+      button.classList.toggle('on', Number((button as HTMLElement).dataset.res) === this.resolution);
     }
     const speedButtons = this.root?.querySelectorAll('[data-speed]');
     for (const button of Array.from(speedButtons ?? [])) {
@@ -215,6 +244,15 @@ export class DevTools {
         <span class="devLabel">Pisando <b id="devBiome">—</b></span>
       </div>
       <div class="devGroup">
+        <span class="devLabel">Peor frame (5 s) <b id="devPeak">—</b></span>
+        <p class="devNote">Trabajo del hilo principal, en ms: nucleo, malla, objetos,
+          menas, sombras, fauna y gpu (la subida de lo nuevo).</p>
+        <span class="devLabel">Resolucion <b id="devDraw">—</b></span>
+        <div class="devRow">
+          ${RESOLUTIONS.map((r) => `<button class="btn" data-res="${r}" type="button"><span>${String(r).replace('.', ',')}x</span></button>`).join('')}
+        </div>
+      </div>
+      <div class="devGroup">
         <span class="devLabel">Registro</span>
         <pre id="devLog"></pre>
       </div>`;
@@ -224,12 +262,22 @@ export class DevTools {
     this.logList = root.querySelector('#devLog');
     this.speedLabel = root.querySelector('#devSpeed');
     this.statusLabel = root.querySelector('#devBiome');
+    this.peakLabel = root.querySelector('#devPeak');
+    this.drawLabel = root.querySelector('#devDraw');
 
     root.addEventListener('click', (e) => {
       const button = (e.target as HTMLElement).closest('button');
       if (!button) return;
 
-      if (button.dataset.speed) {
+      if (button.dataset.res) {
+        this.resolution = Number(button.dataset.res);
+        try {
+          window.localStorage.setItem(RESOLUTION_STORAGE_KEY, String(this.resolution));
+        } catch {
+          // Sin almacenamiento: vale para esta partida.
+        }
+        this.actions.onResolution(this.resolution);
+      } else if (button.dataset.speed) {
         this.speed = Number(button.dataset.speed);
         this.paused = false;
       } else if (button.dataset.kit) {
