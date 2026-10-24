@@ -32,85 +32,6 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
-## Tanda siguiente, para la primera sesion local: CI sin duplicados y lo pesado dos veces por semana
-
-**Aprobado por el autor el 2026-10-24, para que lo ejecute la primera sesion
-local** (no la de la nube que lo escribio):
-
-- **1a**: la CI deja de correr en las ramas `claude/…`.
-- **1b**: en `main`, cada push corre solo typecheck y tests, porque el mismo
-  arbol ya paso la CI completa en `pruebas`.
-- **La CI completa y la auditoria, martes y sabado a las 3:00 de Colombia**
-  (America/Bogota, UTC-5 todo el ano: 08:00 UTC).
-- **La auditoria, en la nube, y directo a `main` si sale verde**, sin esperar
-  al autor.
-
-**1. `.github/workflows/ci.yml`**
-- `on`: `push` solo a `['main', 'pruebas']`, `pull_request`,
-  `schedule: - cron: '0 8 * * 2,6'` (martes y sabado, 08:00 UTC = 3:00
-  Bogota) y `workflow_dispatch`.
-- El trabajo `navegador`:
-  `if: github.event_name != 'push' || github.ref != 'refs/heads/main'`. Asi
-  un push a `main` lo salta, y lo corren entero `pruebas`, los PR, el
-  calendario y el lanzamiento a mano.
-- `todo` («CI completa»): hoy exige `navegador = success`. Que acepte
-  `skipped` **solo** si es un push a `main`; en cualquier otro caso un
-  `skipped` es rojo.
-- En la cabecera, el porque y la fecha, como sus otros comentarios. La linea
-  `pasada: [...]` no cambia, asi que el cruce del escaner
-  (`escaner.mjs`, `matrix`) sigue valiendo.
-
-**2. La auditoria programada**
-- Su guion, en el repo: `.claude/skills/auditoria/references/programada.md`,
-  porque la tarea programada solo dira «sigue ese fichero». Dice:
-  1. Sin commits desde «Ultima auditoria» (arriba en este fichero), termina
-     sin cambios.
-  2. Si los hay, `/auditoria` desde ese commit, con su proceso entero. Lo
-     que cambia lo que hace el juego no se toca: va a «Para ti», como hoy.
-  3. Lo verifica en `pruebas` (`tools/a-pruebas.sh` y
-     `tools/esperar-ci.sh`). Si sale verde, empuja a `main`. Si sale rojo,
-     tiene un solo intento de arreglo; si sigue rojo, **`main` no se toca** y
-     el resumen de la sesion dice que fallo.
-  4. `FIRMA`, con las lineas de atribucion de esa sesion.
-- La tarea programada, en la nube de Claude Code: una sesion nueva por
-  disparo, sobre este repo, `CRON_TZ=America/Bogota 0 3 * * 2,6`, con
-  avisos al movil y por correo, y el prompt «Lee y sigue
-  `.claude/skills/auditoria/references/programada.md`». La herramienta
-  (`create_trigger`) esta en las sesiones de la nube. Si la local no la tiene,
-  la crea el autor desde claude.ai/code (tareas programadas) con ese prompt, o
-  se crea desde una sesion en la nube.
-
-**3. Los documentos que dejan de ser verdad**
-- `CLAUDE.md`, «Antes de dar algo por bueno»: el paso 5, con la CI de `main`
-  ligera. «Al cerrar cada tanda, la auditoria» pasa a «corre sola martes y
-  sabado a las 3:00 de Bogota, y cuando el autor la pida». La regla de
-  `retirados.md` se queda.
-- `docs/pruebas.md`: «El procedimiento, paso a paso», el parrafo de la
-  auditoria, y que corre la CI en cada disparo.
-- `.claude/skills/auditoria/SKILL.md`: la `description` («Usala SIEMPRE al
-  cerrar una tanda») y «como minimo al cerrar cada tanda».
-- `retirados.md`: «la auditoria al cerrar cada tanda», retirada (escape 19).
-- Esta seccion, a «HECHA» y de ahi a `docs/historia.md`.
-
-**4. Verificar**
-1. En local: typecheck, tests y lo que corre `a-pruebas.sh` (las
-   herramientas y el escaner).
-2. En `pruebas`: «CI completa» corre entera y sale verde.
-3. Push a `main`: solo «Typecheck y tests», `navegador` saltado y «CI
-   completa» **verde**.
-4. `ci.yml` lanzado a mano en `main` (`workflow_dispatch`): corre entera. Es
-   el camino del calendario.
-5. Un push a una rama `claude/…` ya no dispara la CI.
-6. La tarea de auditoria lanzada una vez a mano: sin commits nuevos, termina
-   sin cambios.
-
-**5. Avisar al autor**: GitHub retrasa a veces lo programado en punto. Los
-correos de un rojo programado van a quien toco el cron por ultima vez, que es
-su cuenta. Y el fallo suelto del registro (abajo) puede dar algun rojo
-programado.
-
----
-
 ## El norte del proyecto: sin motor grafico (2026-10-24)
 
 El autor quiere desarrollar Verdant en serio y se planteo pasar a Unity o
@@ -139,8 +60,9 @@ publicaba. Y **el movil va peor tanda a tanda**, sin nada que lo vigile.
 - **Medir el movil en un telefono de verdad** antes de optimizar: que lo frena
   (las ~700 draw calls de `docs/arte.md`, el relleno, la geometria, el hilo
   principal).
-- **Que la CI no corra en las ramas `claude/…`**: aprobado, con la CI
-  completa y la auditoria dos veces por semana. Ver la tanda siguiente.
+- **Que la CI no corra en las ramas `claude/…`**: hecho el 2026-10-24, con
+  la CI completa dos veces por semana (`docs/historia.md`). **Falta la tarea
+  programada de la auditoria en la nube**, que espera tu confirmacion.
 - **El empaquetado**: Tauri o Electron para Steam y Capacitor para movil. Se
   decide cerca del lanzamiento.
 
