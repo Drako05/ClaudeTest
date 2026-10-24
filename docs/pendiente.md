@@ -142,6 +142,11 @@ inventario si tenia lo recogido (10 de un objeto, 3 de otro). Y por eso, despues
 «no hay una pila de bayas con que probar el menu». Ya son dos veces: es un fallo
 del registro, no de la maquina, y esta por mirar.
 
+**Y una tercera, el mismo dia** (run 40067714483, en `pruebas`, con vite 8):
+«no hay una pila de bayas con que probar el menu», con el inventario con 1 y
+2 de dos objetos y sin bayas. Relanzada, paso; y paso en las dos tandas
+siguientes del mismo cambio.
+
 **Dejado a proposito** (sin medida que lo pida, lente K5): rehacer solo las
 menas cercanas al voxel roto, y ahorrar las claves de texto al mirar el
 terreno roto. Y unas duplicaciones pequeñas (la altura de la mena en el

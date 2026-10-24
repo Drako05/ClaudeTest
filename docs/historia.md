@@ -11,6 +11,17 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Vite 8 y las herramientas en Windows (2026-10-24) — HECHA
+
+El autor trabaja en local, en Windows, y alli el procedimiento no corria entero; y la copia local tenia vite 8.3.5 y vitest 5.0.5 sin commit. El autor decidio adoptarlos en el repo, en la misma tanda.
+
+- **Vite 8, vitest 5 y `vite-node` 6**: `vite-node` va explicito porque vitest 5 ya no lo trae, y sin el `npx` lo bajaria en cada uso (`analyze-world.ts`, `pixel-mundo.ts`). La configuracion del cliente no cambio: el build sale sin avisos, 864 KB (gzip 228). Los tests, 87 s en la CI frente a 161 con vitest 2.
+- **Los tests largos**: vitest 2 no hacia caer un test sincrono que pasara de sus 5 s, y vitest 5 si. Los que simulan dias de juego siempre tardaron 20-60 s (`simulation.test.ts`, 160 s en la CI con vitest 2), y en la CI variaban mucho: el de hambre, 35 s una vez y 62 otra. Primero se les dio un limite por test (60 s) y cayeron igual; el autor eligio un **limite global de 2 min** (`vitest.config.ts`): 649 de los 650 tests son sincronos, y en esos el limite no corta un cuelgue.
+- **Todo el texto en LF** (`.gitattributes`): con CRLF `mutar.mjs --comprobar` no encontraba los `de` de varias lineas y `a-pruebas.sh` abortaba. Y **el escaner de la auditoria estaba ciego en Windows**: 0 terminos retirados (no leia los patrones) y 34 nombres citados falsos; en LF, 18 retirados (todos de historia) y 0.
+- **`esperar-ci.sh` con `awk`**, sin `grep -P`, que en Git Bash no acepta el locale y daba por acabadas tandas recien nacidas.
+- **`npm ci` falla con `EPERM` con `npm run dev` abierto** (el servidor coge el binario de rolldown): anotado en `docs/pruebas.md`.
+- **Verificado**: en local, typecheck, los 650 tests, `mutar.mjs --comprobar`, `analyze-world.ts`, el build y la pasada `devTools`. En `pruebas` (`3e542ff`): «CI completa» (18), «Mutaciones completas» y el despliegue, en verde, con `a-pruebas.sh` y `esperar-ci.sh` enteros, sin nada a mano. El fallo suelto del registro salio una vez por el camino (`docs/pendiente.md`).
+
 ## La CI sin duplicados y lo pesado dos veces por semana (2026-10-24) — HECHA
 
 **Aprobado por el autor el 2026-10-24, para que lo ejecute la primera sesion
@@ -91,7 +102,7 @@ programado.
 ### Lo hecho (2026-10-24)
 
 - **Verificado**: en `pruebas` (`b49c9b1`), «CI completa» entera (18 trabajos), «Mutaciones completas» y el despliegue, en verde. Push a `main` (`e7acc57`): solo «Typecheck y tests», el navegador saltado y «CI completa» verde. `ci.yml` a mano en `main`: entera, 18 en verde. Un push a `claude/prueba-sin-ci` no disparo la CI (la rama se borro despues).
-- **La tarea programada de la nube**: la sesion local no pudo crearla (la API pide el id del entorno de la nube, que desde local no se ve). La creo una sesion en la nube con la confirmacion del autor: «Auditoria programada de Verdant» (`trig_01S6VhivcyEtANcMTaHA7Gnu`), `CRON_TZ=America/Bogota 0 3 * * 2,6`, avisos al movil y por correo, y la correccion automatica de PR apagada a proposito (la auditoria no abre PR: empuja a `pruebas` y a `main`). Su primer disparo, el sabado 2026-10-24 a las 3:06; la prueba a mano del paso 4.6 no se hizo.
+- **La tarea programada de la nube**: la sesion local no pudo crearla (la API pide el id del entorno de la nube, que desde local no se ve). La creo una sesion en la nube con la confirmacion del autor: «Auditoria programada de Verdant» (trig_01S6VhivcyEtANcMTaHA7Gnu), `CRON_TZ=America/Bogota 0 3 * * 2,6`, avisos al movil y por correo, y la correccion automatica de PR apagada a proposito (la auditoria no abre PR: empuja a `pruebas` y a `main`). Su primer disparo, el sabado 2026-10-24 a las 3:06; la prueba a mano del paso 4.6 no se hizo.
 - **Lo que salio por el camino, en Windows** (el PC del autor): `tools/esperar-ci.sh` da «HAY ROJO» en el acto, porque `grep -P` no acepta el locale; con `LC_ALL=C.UTF-8` va bien. `node tools/mutar.mjs --comprobar` falla con `core.autocrlf=true` (un `de` de varias lineas en CRLF), y por eso `tools/a-pruebas.sh` aborta: se hizo a mano. Y siete tests largos se pasan de los 5 s de vitest en local; en la CI pasan.
 
 ## La pala, lo primero que toca, las menas de voxeles y la rejilla de 0,5 (2026-10-20) — HECHA

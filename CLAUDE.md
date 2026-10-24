@@ -194,7 +194,7 @@ mirar la CI sin gastar, las mutaciones, la matriz, la auditoria— esta en
 `docs/pruebas.md`, «El procedimiento, paso a paso»: **leelo antes de la primera
 ronda de cada sesion.**
 
-1. **En local**: `npm run typecheck && npm test` (~20 s) y **solo la pasada que
+1. **En local**: `npm run typecheck && npm test` (~2 min) y **solo la pasada que
    se toca** (`npm run build && node tools/smoke.mjs <pasada>`).
 2. **La ronda de mutaciones** en `tools/mutaciones.mjs`: cada comprobacion
    nueva, con lo que la rompe. Si no cae, no comprueba nada.

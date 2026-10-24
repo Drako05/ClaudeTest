@@ -22,7 +22,9 @@ que tarde la casilla mas lenta, mutaciones incluidas (llego a 15 minutos con
 probar**: `deploy.yml` publica el juego en cada push a `main` sin esperar a la
 CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
 
-1. **En local, mientras se trabaja**: `npm run typecheck && npm test` (~20 s) y
+1. **En local, mientras se trabaja**: `npm run typecheck && npm test` (~2 min: 106 s en el PC del autor, 87 en la CI;
+   los que simulan dias de juego tardan 20-60 s, y el limite es de 2 min,
+   `vitest.config.ts`) y
    **solo la pasada que se esta escribiendo o tocando**
    (`npm run build && node tools/smoke.mjs <pasada>`), las veces que haga falta.
 2. **La ronda de mutaciones** en `tools/mutaciones.mjs`: cada comprobacion
@@ -68,6 +70,16 @@ CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
    espera** (decision del autor, 2026-09-29): se informa al autor en el acto,
    diciendo que esta en marcha, y se mira **al empezar el siguiente turno**; si
    salio en rojo, se dice y se arregla antes que nada.
+
+**En Windows** (el PC del autor, 2026-10-24) los guiones van por Git Bash, y
+tres cosas lo rompian. **Todo el texto va en LF** (`.gitattributes`, que gana a
+`core.autocrlf`): con CRLF `mutar.mjs --comprobar` no encontraba los `de` de
+varias lineas, y por eso abortaba `a-pruebas.sh`; y el escaner de la auditoria
+quedaba ciego, sin leer `retirados.md` y con decenas de avisos falsos.
+`esperar-ci.sh` va con `awk` y no con `grep -P`, que ahi no acepta el locale y
+daba por acabadas tandas recien nacidas. Y **`npm ci` falla con `EPERM`
+mientras `npm run dev` esta abierto**, porque el servidor tiene cogido el
+binario de rolldown: se cierra antes, o se usa `npm install`.
 
 El humo completo en local (`npm run smoke`, mas `gestures` y `slash` entero) queda para
 cuando la CI no este disponible. La rama `pruebas` se queda en el remoto para

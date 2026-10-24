@@ -11,5 +11,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Hay tests que simulan dias de juego y tardan 20-60 s, segun la maquina.
+    // Vitest 2 no hacia caer un test sincrono que pasara de su limite;
+    // vitest 5 si (2026-10-24). Y en un test sincrono el limite no corta un
+    // cuelgue —el bucle bloquea igual—, asi que solo haria caer los lentos.
+    testTimeout: 120_000,
   },
 });
