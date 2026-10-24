@@ -23,9 +23,19 @@ export function now(): number {
   return manual ?? performance.now();
 }
 
-/** Pasa al reloj manual, parado donde iba el de verdad. */
+/** Si el reloj es el manual de las pruebas. */
+export function isManual(): boolean {
+  return manual !== null;
+}
+
+/**
+ * Pasa al reloj manual, parado en cero. No donde iba el de verdad: eso
+ * dependia de cuanto tardo en cargar la pagina, y el balanceo de los montones
+ * salia distinto en una maquina lenta (2026-10-24). Todo lo que lo lee lo
+ * compara consigo mismo.
+ */
 export function startManualClock(): void {
-  manual = performance.now();
+  manual = 0;
 }
 
 /** Adelanta el reloj manual. */

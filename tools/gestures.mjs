@@ -4,16 +4,19 @@
  * `tests/gestures.test.ts` afirma la regla; esto comprueba que la regla llega
  * viva hasta el lienzo. Son dos capas distintas: la logica pura no sabe nada de
  * `pointerdown`, y el cableado del DOM no sabe nada de duenos de dedos.
+ *
+ * Con los dos relojes fingidos (`tools/lib/navegador.mjs`, 2026-10-24): los
+ * dedos son de verdad —toques de CDP por la tuberia de gestos del navegador—,
+ * pero el tiempo lo pone la prueba. Un toque de 100 ms dura 100 ms aunque la
+ * maquina tarde un segundo en atenderlo, y el sostenido del ojo salta a los
+ * 500 ms exactos. `SMOKE_RELOJ=real` corre con los de verdad.
  */
 import { chromium } from 'playwright';
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { draw, elapse, prepare, serve, until } from './lib/navegador.mjs';
 
-const file = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
-const html = await readFile(file);
-const server = createServer((_, res) => { res.setHeader('content-type', 'text/html'); res.end(html); });
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
+const MANUAL = process.env.SMOKE_RELOJ !== 'real';
+const { server, baseUrl } = await serve();
+const clockMode = MANUAL ? '&reloj=manual' : '';
 
 let failures = 0;
 const check = (ok, msg) => { if (!ok) { failures++; console.log(`  FALLO: ${msg}`); } };
@@ -23,8 +26,10 @@ const page = await browser.newPage({
   viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
 });
 page.on('pageerror', (e) => { failures++; console.log(`  EXCEPCION: ${e}`); });
-await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904&view=perspectiva`, { waitUntil: 'load' });
-await page.waitForTimeout(2500);
+await prepare(page, { fake: MANUAL });
+await page.goto(`${baseUrl}/?seed=3351842904&view=perspectiva${clockMode}`, { waitUntil: 'load' });
+await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+await elapse(page, 2500);
 
 /** Un gesto multitáctil crudo, que es lo único que reproduce dos pulgares. */
 async function touches(points) {
@@ -49,7 +54,7 @@ for (let i = 1; i <= 24; i++) {
     { type: 'pointermove', id: 2, x: 300 - i * 5, y: 400 + i * 2 },
   ]);
 }
-await page.waitForTimeout(500);
+await elapse(page, 500);
 const after = await page.evaluate(() => window.__verdant);
 
 console.log(`  distancia ${before.distance.toFixed(2)} -> ${after.distance.toFixed(2)}`);
@@ -60,7 +65,7 @@ check(Math.abs(after.yaw - before.yaw) > 0.05, 'la camara no giro');
 check(Math.hypot(after.x - before.x, after.y - before.y) > 0.5, 'el personaje no anduvo');
 
 await touches([{ type: 'pointerup', id: 1, x: 128, y: 652 }, { type: 'pointerup', id: 2, x: 180, y: 448 }]);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 
 // Y ahora una pinza de verdad: dos dedos, los dos en zona de camara.
 const preZoom = await page.evaluate(() => window.__verdant);
@@ -71,7 +76,7 @@ for (let i = 1; i <= 14; i++) {
     { type: 'pointermove', id: 4, x: 260 + i * 8, y: 300 },
   ]);
 }
-await page.waitForTimeout(400);
+await elapse(page, 400);
 const postZoom = await page.evaluate(() => window.__verdant);
 await touches([{ type: 'pointerup', id: 3, x: 88, y: 300 }, { type: 'pointerup', id: 4, x: 372, y: 300 }]);
 
@@ -91,17 +96,24 @@ const btn = await page.evaluate(() => {
   const r = document.getElementById('action').getBoundingClientRect();
   return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
 });
-const real = (type, points) =>
-  cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map((p) => ({ x: p.x, y: p.y, id: 7 })) });
+// Cada toque lleva la hora del reloj de la pagina: el navegador decide con ella
+// si dos toques seguidos son un gesto (un toque, un doble toque, un arrastre),
+// y con la hora de verdad dos toques que la prueba separa 300 ms le llegaban
+// pegados.
+const clockBase = Date.now() / 1000 - (await page.evaluate(() => performance.now())) / 1000;
+const real = async (type, points) => {
+  const timestamp = clockBase + (await page.evaluate(() => performance.now())) / 1000;
+  return cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points.map((p) => ({ x: p.x, y: p.y, id: 7 })), timestamp });
+};
 const preHold = await page.evaluate(() => window.__verdant);
 await real('touchStart', [btn]);
-await page.waitForTimeout(400);
+await elapse(page, 400);
 const heldStill = await page.evaluate(() => window.__verdant);
 for (let i = 1; i <= 16; i++) await real('touchMove', [{ x: btn.x - i * 10, y: btn.y - i * 2 }]);
-await page.waitForTimeout(700);
+await elapse(page, 700);
 const dragged = await page.evaluate(() => window.__verdant);
 await real('touchEnd', []);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const released = await page.evaluate(() => window.__verdant);
 const turned = dragged.yaw - heldStill.yaw;
 const kept = dragged.sent.harvest - heldStill.sent.harvest;
@@ -111,7 +123,7 @@ check(Math.abs(turned) > 0.1, 'arrastrar el dedo de la accion no giro la camara'
 check(kept > 0, 'la accion dejo de repetir mientras se arrastraba el dedo');
 check(dragged.distance === heldStill.distance, 'arrastrar el dedo de la accion cambio el zoom');
 // Y al soltar, la accion se detiene de verdad.
-await page.waitForTimeout(800);
+await elapse(page, 800);
 const stopped = await page.evaluate(() => window.__verdant);
 check(stopped.sent.harvest === released.sent.harvest, 'la accion siguio repitiendo tras soltar el dedo');
 
@@ -131,23 +143,23 @@ async function ensureOthers() {
   const o = await center('others');
   await real('touchStart', [o]);
   await real('touchEnd', []);
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
 }
 await ensureOthers();
 const eye = await center('proj');
 async function holdEye(ms) {
   await ensureOthers();
   await real('touchStart', [eye]);
-  await page.waitForTimeout(ms);
+  await elapse(page, ms);
   const during = await probe();
   await real('touchEnd', []);
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   return during;
 }
 async function tapReal(p) {
   await real('touchStart', [p]);
   await real('touchEnd', []);
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
 }
 const offFp = await holdEye(1300);
 check(offFp.projection !== 'primera' && !offFp.fovPanel, 'sostener el ojo fuera de la primera persona abrio la barra');
@@ -157,15 +169,14 @@ for (let i = 0; i < 3 && (await probe()).projection !== 'primera'; i++) {
   await tapReal(eye);
 }
 check((await probe()).projection === 'primera', 'tocar el ojo no llevo a la primera persona');
-// Un toque corto: 100 ms y soltar ANTES de leer el estado. Con los 0,5 s que
-// abren la barra hay poco margen en headless, que va a ~5 FPS: un fotograma
-// retrasa el soltar hasta 200 ms, y leer el estado con el dedo puesto tarda
-// otro tanto. Con 300 ms caia a veces.
+// Un toque corto: 100 ms y soltar ANTES de leer el estado. Con el reloj de
+// verdad competia con los 0,5 s que abren la barra y caia a veces en headless;
+// con el fingido, entre tocar y soltar pasan 100 ms aunque la maquina tarde.
 await ensureOthers();
 await real('touchStart', [eye]);
-await page.waitForTimeout(100);
+await elapse(page, 100);
 await real('touchEnd', []);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const early = await probe();
 check(!early.fovPanel, 'un toque corto en el ojo ya abrio la barra');
 check(early.projection === 'perspectiva', 'un toque corto en el ojo no cambio de vista');
@@ -184,11 +195,12 @@ const from = { x: bar.left + (bar.right - bar.left) * 0.4, y: bar.y };
 await real('touchStart', [from]);
 for (let i = 1; i <= 10; i++) await real('touchMove', [{ x: from.x + ((bar.right - from.x) * i) / 10, y: bar.y }]);
 await real('touchEnd', []);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const slid = await probe();
 console.log(`  angulo con el dedo: ${afterHold.fpFov} -> ${slid.fpFov}, barra abierta: ${slid.fovPanel}`);
 check(slid.fpFov > afterHold.fpFov && slid.fov === slid.fpFov, 'arrastrar la barra no cambio el angulo');
 check(slid.fovPanel, 'arrastrar la barra la cerro');
+await draw(page);
 await page.screenshot({ path: 'screenshots/movil-angulo.png' });
 await tapReal({ x: 200, y: 420 });
 check(!(await probe()).fovPanel, 'tocar el mundo no cerro la barra');
@@ -207,10 +219,10 @@ await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
 for (const id of ['use', 'jump']) {
   const at = await center(id);
   await real('touchStart', [at]);
-  await page.waitForTimeout(80);
+  await elapse(page, 80);
   const lit = await page.evaluate((i) => document.getElementById(i).classList.contains('pressed'), id);
   await real('touchEnd', []);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const off = await page.evaluate((i) => !document.getElementById(i).classList.contains('pressed'), id);
   console.log(`  ${id}: encendido al tocar ${lit}, apagado al soltar ${off}`);
   check(lit && off, `el boton ${id} no se enciende al tocarlo o no se apaga al soltar`);
@@ -225,10 +237,10 @@ const mode0 = await probe();
 const icon0 = await shownIcon();
 // Con el dedo puesto se enciende, y al soltar se apaga (pedido del autor).
 await real('touchStart', [modeBtn]);
-await page.waitForTimeout(80);
+await elapse(page, 80);
 const litHeld = await modeLit();
 await real('touchEnd', []);
-await page.waitForTimeout(400);
+await elapse(page, 400);
 const litAfter = await modeLit();
 const mode1 = await probe();
 const icon1 = await shownIcon();
@@ -250,15 +262,15 @@ await real('touchStart', [spot]);
 // Se espera a que llegue el primer golpe del sostenido, no un tiempo fijo:
 // en una maquina cargada, a los 500 ms aun podia no haberse procesado
 // (escape 13: nada de mirar dentro de una ventana de tiempo).
-await page.waitForFunction((n) => window.__verdant.sent.tapHarvest > n, inTap.sent.tapHarvest, { timeout: 5000 }).catch(() => {});
+await until(page, (n) => window.__verdant.sent.tapHarvest > n, inTap.sent.tapHarvest, { timeout: 5000 }).catch(() => {});
 const heldTap = await probe();
 for (let i = 1; i <= 16; i++) {
   await real('touchMove', [{ x: spot.x + i * 10, y: spot.y }]);
-  await page.waitForTimeout(50);
+  await elapse(page, 50);
 }
 const draggedTap = await probe();
 await real('touchEnd', []);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const tapTurn = draggedTap.yaw - heldTap.yaw;
 const tapWhileDrag = draggedTap.sent.tapHarvest - heldTap.sent.tapHarvest;
 console.log(`  TAP con el dedo: entrada ${inTap.tapInput}, mantener ${heldTap.sent.tapHarvest - inTap.sent.tapHarvest} ataques, ` +
@@ -273,10 +285,11 @@ check(!(await probe()).tapInput, 'el boton ENTRADA no volvio a MIRA');
 // cerrado, arrastrar una casilla a otra y a la barra con el abierto, y mantener
 // una receta 1 s para fabricarla (decisiones del autor). Con materiales del
 // panel de desarrollo.
-await page.goto(`http://127.0.0.1:${server.address().port}/?seed=3351842904&dev=1&view=perspectiva`, { waitUntil: 'load' });
-await page.waitForFunction(() => window.__verdant && window.__verdant.tick > 0, null, { timeout: 30000 });
+await page.goto(`${baseUrl}/?seed=3351842904&dev=1&view=perspectiva${clockMode}`, { waitUntil: 'load' });
+await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
+await elapse(page, 500);
 await page.evaluate(() => document.querySelector('[data-kit="piedra"]').click());
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const at = (sel) => page.evaluate((q) => {
   const r = document.querySelector(q).getBoundingClientRect();
   return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
@@ -285,7 +298,7 @@ async function dragReal(from, to) {
   await real('touchStart', [from]);
   for (let i = 1; i <= 10; i++) await real('touchMove', [{ x: from.x + ((to.x - from.x) * i) / 10, y: from.y + ((to.y - from.y) * i) / 10 }]);
   await real('touchEnd', []);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
 }
 const items = (p) => p.slots.map((s) => s.item);
 // Inventario cerrado: dentro de la barra se intercambia; al vacio se tira, sin
@@ -312,7 +325,7 @@ check(!barStow.inventoryOpen && barStow.slots[stowFrom].item === -1 && barStow.i
   'soltar la barra sobre INVENTARIO no la guardo fuera de la barra');
 // Lo tirado y lo guardado se reponen: lo que sigue (mover, fabricar) los usa.
 await page.evaluate(() => document.querySelector('[data-kit="piedra"]').click());
-await page.waitForTimeout(300);
+await elapse(page, 300);
 // Inventario abierto: de una casilla a otra, y de la rejilla a la barra.
 const invBtn = await center('invOpen');
 await tapReal(invBtn);
@@ -322,9 +335,9 @@ const atkAt = await center('action');
 const atkFree = await page.evaluate((p) => !!document.elementFromPoint(p.x, p.y)?.closest('#action'), atkAt);
 const beforeAtk = await probe();
 await real('touchStart', [atkAt]);
-await page.waitForTimeout(600);
+await elapse(page, 600);
 await real('touchEnd', []);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const afterAtk = await probe();
 console.log(`  ATAQUE con el inventario abierto: boton a tiro ${atkFree}, golpes ${beforeAtk.sent.harvest} -> ${afterAtk.sent.harvest}`);
 check(atkFree, 'el panel tapa el boton de ataque: la comprobacion no probaria nada');
@@ -352,9 +365,9 @@ await tapReal(await slotAt(filled + 1));
 const shortTap = await menuOf();
 const fillAt = await slotAt(filled + 1);
 await real('touchStart', [fillAt]);
-await page.waitForFunction(() => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
+await until(page, () => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
 await real('touchEnd', []);
-await page.waitForTimeout(200);
+await elapse(page, 200);
 const held = await menuOf();
 await tapReal(await slotAt(otherFilled + 1));
 const tappedOut = await menuOf();
@@ -367,13 +380,23 @@ check(!tappedOut.open && pickedAfter === otherFilled, `tocar otra casilla no cer
 // de cada evento, no cuando corre el plazo (la CI de pruebas del 2026-10-19,
 // con la pagina ocupada). Se suelta con la hora de los 0,1 s, pero llega
 // despues de que el plazo abra el menu.
+//
+// Con el reloj fingido la hora de un evento es la del reloj al atenderlo
+// (Playwright la reescribe), asi que el soltar se atiende a los 0,3 s y su
+// hora se pone a mano a los 0,1 de haber tocado: es justo «un toque de 0,1 s
+// atendido tarde».
 const lateAt = await slotAt(filled + 1);
-const t0 = Date.now() / 1000;
-await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: lateAt.x, y: lateAt.y, id: 7 }], timestamp: t0 });
-await page.waitForFunction(() => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
+await page.evaluate(() => {
+  addEventListener('pointerdown', (e) => { window.__lateDown = e.timeStamp; }, { capture: true, once: true });
+  addEventListener('pointerup', (e) => {
+    Object.defineProperty(e, 'timeStamp', { value: window.__lateDown + 100 });
+  }, { capture: true, once: true });
+});
+await real('touchStart', [lateAt]);
+await until(page, () => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
 const lateHeld = (await menuOf()).open;
-await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [], timestamp: t0 + 0.1 });
-await page.waitForTimeout(300);
+await real('touchEnd', []);
+await elapse(page, 300);
 const lateTap = await menuOf();
 const latePicked = await page.evaluate(() => [...document.querySelectorAll('#invGrid .slot')].findIndex((el) => el.classList.contains('picked')));
 console.log(`  toque atendido tarde: menu ${lateHeld} -> ${lateTap.open}, elegida ${latePicked + 1}`);
@@ -384,12 +407,12 @@ const dragFrom = await slotAt(otherFilled + 1);
 const dragTo = await slotAt(emptyCell + 1);
 const movesHeld = (await probe()).itemsSent.move;
 await real('touchStart', [dragFrom]);
-await page.waitForFunction(() => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
+await until(page, () => window.__verdant.itemMenu.open, null, { timeout: 3000 }).catch(() => {});
 const heldOpen = (await menuOf()).open;
 for (let i = 1; i <= 10; i++) await real('touchMove', [{ x: dragFrom.x + ((dragTo.x - dragFrom.x) * i) / 10, y: dragFrom.y + ((dragTo.y - dragFrom.y) * i) / 10 }]);
 const whileDrag = (await menuOf()).open;
 await real('touchEnd', []);
-await page.waitForTimeout(400);
+await elapse(page, 400);
 const heldDrag = await probe();
 check(heldOpen && !whileDrag && heldDrag.itemsSent.move === movesHeld + 1,
   `mantener y arrastrar no cerro el menu o no movio: abierto ${heldOpen}, arrastrando ${whileDrag}, movimientos ${movesHeld} -> ${heldDrag.itemsSent.move}`);
@@ -402,12 +425,13 @@ const result = await page.evaluate(() => {
 });
 const beforeHold = await probe();
 await real('touchStart', [result]);
-await page.waitForTimeout(2000);
+await elapse(page, 2000);
 await real('touchEnd', []);
-await page.waitForTimeout(400);
+await elapse(page, 400);
 const afterHold2 = await probe();
 console.log(`  fabricar manteniendo: ${beforeHold.inventory[11]} -> ${afterHold2.inventory[11]} picos`);
 check(afterHold2.inventory[11] === beforeHold.inventory[11] + 1, 'mantener la receta 1 s con el dedo no fabrico');
+await draw(page);
 await page.screenshot({ path: 'screenshots/movil-recetas.png' });
 
 // La mesa y la ropa con el dedo (tanda 2): fabricar la mesa, llevarla a la
@@ -415,12 +439,12 @@ await page.screenshot({ path: 'screenshots/movil-recetas.png' });
 // y ponersela arrastrandola desde la barra a su hueco de PERSONAJE, que es como
 // se hace en el movil (las paginas del panel van de una en una).
 await page.evaluate(() => document.querySelector('[data-kit="metal"]').click());
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const holdTouch = async (p) => {
   await real('touchStart', [p]);
-  await page.waitForTimeout(2000);
+  await elapse(page, 2000);
   await real('touchEnd', []);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
 };
 const tabNamed = (name) => page.evaluate((n) => {
   const t = Array.from(document.querySelectorAll('#recipeTabs .slot')).find((el) => el.dataset.category === n);
@@ -448,12 +472,12 @@ const aimed = await probe();
 console.log(`  mirando abajo: lookZ ${aimed.lookZ.toFixed(2)}, sembraria en ${JSON.stringify(aimed.plantTile)}`);
 const useBtn = await center('use');
 await tapReal(useBtn);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const benchPlaced = await probe();
 console.log(`  USAR con la mesa: estaciones ${JSON.stringify(benchPlaced.stationTiles)}`);
 check(benchPlaced.stationTiles.some((t) => t.feature === 24), 'USAR con el dedo no puso la mesa');
 await tapReal(useBtn);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const benchOpen = await probe();
 check(benchOpen.inventoryOpen && benchOpen.panelStation === 1 && benchOpen.inventoryPage === 'recetas',
   `USAR mirando la mesa no abrio sus recetas: ${benchOpen.inventoryOpen} ${benchOpen.panelStation} ${benchOpen.inventoryPage}`);
@@ -484,13 +508,13 @@ check(outside !== null, 'no hay un punto del mundo fuera del inventario para toc
 const o0 = await probe();
 check(o0.inventoryOpen, 'el inventario no estaba abierto para probar el toque fuera');
 if (outside) await tapReal(outside);
-await page.waitForTimeout(300);
+await elapse(page, 300);
 const o1 = await probe();
 await tapReal(invBtn);
 const atkBtn = await center('action');
 const o2 = await probe();
 await tapReal(atkBtn);
-await page.waitForTimeout(400);
+await elapse(page, 400);
 const o3 = await probe();
 await tapReal(invBtn);
 await tapReal(await at('#invTabs button:nth-child(3)'));
@@ -502,6 +526,7 @@ check(!o1.inventoryOpen && o1.yaw === o0.yaw && o1.sent.harvest === o0.sent.harv
 check(o2.inventoryOpen && !o3.inventoryOpen && o3.sent.harvest === o2.sent.harvest,
   'tocar ATAQUE con el inventario abierto no lo cerro, o ataco');
 check(o4.inventoryOpen, 'tocar dentro del panel cerro el inventario');
+await draw(page);
 await page.screenshot({ path: 'screenshots/movil-personaje-ropa.png' });
 
 // La barra deslizable (pedido del autor, 2026-09-30): en un telefono mas bajo
@@ -509,7 +534,7 @@ await page.screenshot({ path: 'screenshots/movil-personaje-ropa.png' });
 // no arrastra ninguna casilla.
 await tapReal(await at('#invTabs button:nth-child(2)'));
 await page.setViewportSize({ width: 375, height: 640 });
-await page.waitForTimeout(400);
+await elapse(page, 400);
 const railAt = () => page.evaluate(() => {
   const g = document.getElementById('invGrid');
   const rail = g.parentElement.querySelector('.rail');
@@ -539,12 +564,12 @@ const ring = await page.evaluate(() => {
   const c = g.children[5].getBoundingClientRect();
   return { x: c.left + 3, y: c.top + c.height / 2 };
 });
-await page.waitForTimeout(150);
+await elapse(page, 150);
 const ringBefore = await probe();
 await real('touchStart', [ring]);
 for (let i = 1; i <= 12; i++) await real('touchMove', [{ x: ring.x, y: ring.y - i * 10 }]);
 await real('touchEnd', []);
-await page.waitForTimeout(400);
+await elapse(page, 400);
 const ringScroll = await page.evaluate(() => document.getElementById('invGrid').scrollTop);
 const ringAfter = await probe();
 console.log(`  dedo en el anillo: deslizado 0 -> ${ringScroll}, movimientos ${ringBefore.itemsSent.move} -> ${ringAfter.itemsSent.move}`);
@@ -560,7 +585,7 @@ const cut = await page.evaluate(() => {
   const c = g.children[0].getBoundingClientRect();
   return { x: c.x + c.width / 2, y: c.bottom - 8, hidden: g.getBoundingClientRect().top + g.clientTop - c.top };
 });
-await page.waitForTimeout(150);
+await elapse(page, 150);
 await tapReal({ x: cut.x, y: cut.y });
 const shownCell = await page.evaluate(() => {
   const g = document.getElementById('invGrid');
@@ -570,6 +595,7 @@ const shownCell = await page.evaluate(() => {
 console.log(`  casilla cortada: tapada ${cut.hidden.toFixed(1)} px -> ${shownCell.off.toFixed(1)} px, deslizada a ${shownCell.scroll}`);
 check(cut.hidden > 5 && shownCell.picked && shownCell.off <= 0.5, `elegir la casilla cortada no la dejo entera a la vista: ${JSON.stringify({ cut, shownCell })}`);
 
+await draw(page);
 await page.screenshot({ path: 'screenshots/movil-gestos.png' });
 await browser.close();
 server.close();

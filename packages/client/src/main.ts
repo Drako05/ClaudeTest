@@ -150,6 +150,13 @@ const NEAR_RADIUS = 1;
  * tiron que el autor medio en su telefono.
  */
 const BUILD_BUDGET_MS = 4;
+/**
+ * Lo que cuenta cada paso de un chunk contra ese presupuesto con el reloj
+ * manual de las pruebas, en vez de medirlo: con el reloj real cuantos caben en
+ * un frame lo decidia la maquina, y una muy rapida los metia todos (2026-10-24).
+ * ~2 ms es lo medido en PC: un chunk entero, ~4,4 ms, en dos pasos.
+ */
+const MANUAL_STEP_MS = 2;
 
 /** Techo de tiempo por frame. Sin esto, una pausa larga de la pestana dispara
  *  cientos de ticks de golpe y el juego se congela intentando ponerse al dia. */
@@ -883,6 +890,7 @@ function syncChunks(): void {
   const start = performance.now();
   let far = 0;
   let half = 0;
+  const spent = () => (clock.isManual() ? far * MANUAL_STEP_MS : performance.now() - start);
   chunksPending = 0;
   for (const s of steps) {
     const key = `${s.cx},${s.cy}`;
@@ -891,7 +899,7 @@ function syncChunks(): void {
       else views.set(key, buildChunk(s.cx, s.cy));
       continue;
     }
-    if (far > 0 && performance.now() - start >= BUILD_BUDGET_MS) {
+    if (far > 0 && spent() >= BUILD_BUDGET_MS) {
       chunksPending += s.view ? 1 : 2;
       continue;
     }
@@ -1514,6 +1522,8 @@ Object.defineProperty(window, '__verdant', {
     const biome = state.world.biomeAt(tx, ty);
     return {
       tick: state.tick,
+      /** Fotogramas dibujados: que el bucle de verdad dibuja solo. */
+      framesDrawn: renderer.info.render.frame,
       seed: state.world.seed,
       clock: clockLabel(state.tick),
       /** Opacidad de la vela de la noche. Cero a pleno dia. */

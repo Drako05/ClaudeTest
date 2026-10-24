@@ -27,6 +27,10 @@ CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
    `vitest.config.ts`) y
    **solo la pasada que se esta escribiendo o tocando**
    (`npm run build && node tools/smoke.mjs <pasada>`), las veces que haga falta.
+   Para varias, o todas, **`node tools/humo.mjs [nombres]`** las corre a la
+   vez (desde el 2026-10-24); y **`node tools/determinismo.mjs <nombres>`**
+   comprueba que una comprobacion nueva no depende de la velocidad de la
+   maquina. Las dos, en «El reloj manual», abajo.
 2. **La ronda de mutaciones** en `tools/mutaciones.mjs`: cada comprobacion
    nueva, con lo que la rompe (ver abajo).
 3. **`tools/a-pruebas.sh "que se prueba"`**, con `FIRMA` puesta a las lineas de
@@ -204,37 +208,92 @@ diera la maquina, porque a 5 FPS cada frame corria una docena de ticks. Con
 `__reloj.dibujar()` hace un fotograma para una captura (`clock.ts`, `main.ts`).
 Con `hz` 60 cada frame lleva un tick, como un jugador a 60 Hz.
 
-- **En `smoke.mjs`** las pasadas de `MANUAL_PASSES` abren con el reloj manual.
-  Los ayudantes valen para los dos relojes: `elapse(page, ms)` avanza el juego
-  (con el de verdad, espera), `until` es el `waitForFunction` que avanza
-  mientras espera, `shot` dibuja antes de capturar, y `waitForLoop` y `hold`
-  van por `elapse`. Una espera AL JUEGO es `elapse`; una a la interfaz con
-  temporizadores del navegador (gestos, destellos) sigue con `waitForTimeout`.
-  `SMOKE_RELOJ=real node tools/smoke.mjs <pasada>` corre con el de verdad,
-  para comparar.
+**Y el reloj de la interfaz, tambien fingido** (desde el 2026-10-24). En el PC
+del autor `escritorio` caia en dos comprobaciones que en la CI pasaban: el
+anillo del hambre (`Math.ceil`, que solo baja de 100 tras ~10 s de juego) y la
+pila de bayas, porque cuanto se andaba y se recogia lo decidia la maquina. El
+autor: «Trata que nada dependa de que tan rapido corre la maquina donde se
+ejecuta». Asi que **todas las pruebas de navegador van con dos relojes que solo
+mueve la prueba** (`tools/lib/navegador.mjs`, comun a `smoke.mjs`,
+`gestures.mjs` y `slash.mjs`):
+
+- **el del juego**, el reloj manual de arriba;
+- **el de la interfaz**, el de Playwright (`page.clock`, instalado y parado
+  antes de abrir): `setTimeout`, `requestAnimationFrame`, `performance.now`,
+  `Date` y la hora de cada evento son los suyos. El destello de un boton
+  (150 ms), el sostenido de TAP (300 ms), el del ojo (500 ms) y el menu de una
+  casilla (300 ms) saltan cuando la prueba deja pasar ese tiempo, y no cuando
+  la maquina llega.
+
+**Una espera es siempre una de estas**, y ninguna decide un resultado con el
+reloj de la pared:
+
+- `elapse(page, ms)`: pasan `ms` en los dos relojes, alternados de 100 en 100
+  ms para que un temporizador de interfaz que salta a mitad mueva el juego desde
+  ahi;
+- `uiRun(page, ms)`: solo la interfaz (lo que dura un dedo antes de soltar);
+- `until(page, fn)`: una condicion, dejando pasar el tiempo mientras;
+- `settle(page, fn)` (`smoke.mjs`): una promesa de la pagina que espera a un
+  fotograma o a un `setTimeout`.
+
+Lo unico que queda con tiempo real son **topes** (cargar la pagina, «no se
+cumplio en 30 s») y dos cosas que el navegador hace con su propio reloj, que
+Playwright no finge; a esas se las espera por condicion. Una es el `:active`
+de un toque (`uiQuiet`, antes de medir el estandar de los botones). La otra es
+el reconocimiento de gestos, al que cada toque de CDP de `gestures` le pasa la
+hora del reloj fingido. Sin ella, dos toques que la prueba separa 300 ms le
+llegaban pegados, y el segundo no era un clic.
+
+Y dos ajustes que salieron al pasar `desktop` y `gestures`. Antes de cada
+`click`/`tap` de Playwright pasan 200 ms de interfaz: lo que tarda un dedo en
+ir de un boton a otro. Sin ellos, la luz del anterior seguia encendida y su
+icono, bajado 2 px, tapaba el siguiente. Y en `devTools`, con el reloj manual,
+el presupuesto de chunks por frame no se mide: **cada paso cuenta 2 ms**
+(`MANUAL_STEP_MS`, `main.ts`). Con `performance.now()` parado no se gastaria
+nunca, y con el de verdad una maquina muy rapida metia los 7 en un frame.
+
+**Que el bucle de verdad del navegador corre** —avanza la simulacion y
+dibuja— lo mira la primera pagina de `desktop`, la unica con los relojes de
+verdad. No pide ni velocidad ni fotogramas por segundo: espera a 60 ticks y 2
+fotogramas (`framesDrawn`).
+
+**Las herramientas**:
+
+- **`node tools/humo.mjs [nombres]`** corre a la vez las pruebas que se le
+  pidan, o todas las de la matriz, una por cada dos nucleos, y resume los
+  `FALLO` y la duracion de cada una. La salida entera queda en
+  `screenshots/humo/`.
+- **`node tools/determinismo.mjs [nombres]`** corre cada una dos veces, normal
+  y con la CPU del navegador frenada 4 veces (`SMOKE_LENTO`), y compara lo que
+  imprimen linea a linea. Es como se comprueba que una comprobacion nueva no
+  depende de la velocidad.
+- **`SMOKE_LENTO=<n>`** frena la CPU del navegador n veces en cualquiera de
+  ellas.
+- **`SMOKE_RELOJ=real`** corre con los relojes de verdad, para comparar.
+
+- **En `smoke.mjs`**, `shot` dibuja antes de capturar, y `waitForLoop` y
+  `hold` van por `elapse`.
 - **Lo que lee el reloj manual**: lo que el cliente mide dentro del frame —la
   caida de una estacion, la receta mantenida, el catalejo de la rueda—, por
-  `clock.now()`. Lo que va por eventos del navegador sigue con el de verdad, y
-  por eso no todo es exacto: en `fauna` los impactos dibujados dieron 114 y 112
-  en dos corridas. Las posiciones, los ticks y lo demas salieron identicos.
+  `clock.now()`. Arranca en 0 (desde el 2026-10-24): arrancaba donde iba el de
+  verdad, que dependia de cuanto tardaba la pagina en cargar, y de ahi salian
+  los 114 y 112 impactos de `fauna` en dos corridas. Ahora todo sale
+  identico, y lo de los eventos del navegador va con el reloj de la interfaz.
 - **Migradas**: `life`, `relief`, `fauna`, `devTools`, `stations`, `resources`,
   `highRefresh`, que pasa a frames de 1/144 s con `hz` en vez del
   `requestAnimationFrame` fingido (con el de verdad lo sigue usando), y
-  `mobile` (2026-10-13).
-  **Con el reloj de verdad, a proposito**: `desktop`, que tiene que probar el
-  bucle real del navegador, y `gestures`, que mide dedos de verdad.
-- **`mobile` y su toque sostenido**: lo unico de la pasada que va con un
-  temporizador del navegador es reconocer el sostenido de TAP (`HOLD_MS`,
-  300 ms, un `setTimeout` de `controls.ts`), que es interfaz y se queda con el
-  reloj de verdad. Los golpes que salen de el se cuentan en ticks. Asi que la
-  pasada espera primero en tiempo real a que el temporizador se dispare y
-  luego avanza el juego con `until` hasta los tres golpes. Lo demas que
-  esperaba con `waitForTimeout` esperaba al juego —la accion mantenida, el
-  joystick, la pinza y el catalejo, que se aplican en el frame— y va con
-  `elapse`; abrir paneles, pestanas y OTROS sigue con `waitForTimeout`.
-  En local, 11 s frente a 159 con el de verdad, y dos corridas con los mismos
-  numeros. Ahora salen los de un jugador a 60 Hz: 10 acciones en 2,4 s
-  manteniendo, que son las cuatro por segundo (con el de verdad, 23).
+  `mobile` (2026-10-13). Y el 2026-10-24, **`desktop` y `gestures`**, que
+  hasta entonces se quedaban con el de verdad a proposito (el bucle real y los
+  dedos de verdad): el bucle real lo mira ahora la primera pagina de
+  `desktop`, y los dedos siguen siendo de verdad, con la hora fingida.
+  `escritorio` paso de minutos a 15 s, y da lo mismo con la CPU frenada 4
+  veces.
+- **`mobile` y su toque sostenido**: reconocer el sostenido de TAP (`HOLD_MS`,
+  300 ms, un `setTimeout` de `controls.ts`) va con el reloj de la interfaz.
+  Hasta el 2026-10-24 era el de verdad, y la pasada esperaba 450 ms reales
+  antes de avanzar el juego. Ahora `until` deja pasar los dos relojes y salta
+  a los 300 ms de juego, como jugando. Los numeros son los de un jugador a
+  60 Hz: 10 acciones en 2,4 s manteniendo, que son las cuatro por segundo.
 - **`slash`, tambien con el reloj manual**: cada captura dibuja antes
   (`capture`) y se **recorta a la caja que mide**, porque la de pantalla
   entera costaba 1,4-6 s sin GPU y la recortada ~0,2. El primer golpe se dibuja

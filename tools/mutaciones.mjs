@@ -11,23 +11,20 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: tanda movil 1, los tirones al cruzar de chunk (2026-10-24).
+ * Ronda: pruebas que no dependen de la velocidad de la maquina (2026-10-24).
  */
 export default [
-  // Todo lo que entra al cruzar un borde se construye en el mismo frame, como antes.
-  { nombre: 'chunks: sin presupuesto', fichero: 'packages/client/src/main.ts', de: '    if (far > 0 && performance.now() - start >= BUILD_BUDGET_MS) {', a: '    if (false) {', prueba: 'smoke:devTools' },
-  // Lo que sale se tira en el acto: volver a la frontera lo rehace.
-  { nombre: 'chunks: sin histeresis', fichero: 'packages/client/src/main.ts', de: 'const KEEP_RADIUS = RADIUS + 1;', a: 'const KEEP_RADIUS = RADIUS;', prueba: 'smoke:devTools' },
-  // Un chunk lejano se construye entero en un frame, sin partir en dos.
-  { nombre: 'chunks: de una vez', fichero: 'packages/client/src/main.ts', de: '      const view = buildTerrain(s.cx, s.cy);', a: '      const view = buildChunk(s.cx, s.cy);', prueba: 'smoke:devTools' },
-  // El selector de resolucion no cambia nada.
-  { nombre: 'resolucion: no se aplica', fichero: 'packages/client/src/main.ts', de: '  onResolution: (ratio) => renderer.setPixelRatio(Math.min(window.devicePixelRatio, ratio)),', a: '  onResolution: () => {},', prueba: 'smoke:mobile' },
-  // Cada objeto va solo a la escena, como antes de agruparlos.
-  { nombre: 'objetos: sin agrupar', fichero: 'packages/client/src/main.ts', de: '  for (const batch of batchProps(loose)) {', a: '  for (const batch of loose.flatMap((m) => batchProps([m]))) {', prueba: 'smoke:devTools' },
-  // Las instancias no llevan la posicion ni el giro de su objeto.
-  { nombre: 'objetos: giro perdido', fichero: 'packages/client/src/prop-batch.ts', de: '        mesh.updateMatrix();\n', a: '', prueba: 'test:tests/prop-batch.test.ts' },
-  // La cara de abajo mira hacia arriba.
-  { nombre: 'malla: normal de abajo', fichero: 'packages/client/src/terrain-mesh.ts', de: '[Face.Bottom]: [0, -1, 0],', a: '[Face.Bottom]: [0, 1, 0],', prueba: 'test:tests/terrain-mesh.test.ts' },
-  // La malla no mira lo roto de la vecina del oeste: el hoyo del borde se queda sin pared.
-  { nombre: 'malla: lo roto de la vecina', fichero: 'packages/client/src/terrain-mesh.ts', de: '    world.hasBroken(chunk.cx - 1, chunk.cy) ||\n', a: '', prueba: 'test:tests/terrain-mesh.test.ts' },
+  // El anillo del hambre se queda en 100: el hambre que marca no es la del juego.
+  { nombre: 'hambre: el anillo no se mueve', fichero: 'packages/client/src/hud.ts', de: "ring.setAttribute('aria-valuenow', String(Math.ceil(value)));", a: "ring.setAttribute('aria-valuenow', '100');", prueba: 'smoke:desktop' },
+  // Una mata no suelta bayas: no hay pila de dos con que probar el menu.
+  { nombre: 'bayas: la mata no da', fichero: 'packages/shared/src/index.ts', de: '      const n = rare ? 8 : 4;', a: '      const n = 0;', prueba: 'smoke:desktop' },
+  // Sin bucle de verdad: el juego solo correria con el reloj manual.
+  { nombre: 'bucle: no corre solo', fichero: 'packages/client/src/main.ts', de: '} else {\n  requestAnimationFrame(frame);\n}', a: '} else {\n}', prueba: 'smoke:desktop' },
+  // La luz de un boton tocado se apaga en el acto, sin sus 150 ms.
+  { nombre: 'destello: se apaga en el acto', fichero: 'packages/client/src/press-light.ts', de: '    }, Math.max(0, FLASH_MS - (performance.now() - press.since)));', a: '    }, 0);', prueba: 'smoke:mobile' },
+  // El sostenido del ojo salta a los 50 ms: un toque corto de 100 abre la barra.
+  // Con el reloj de verdad esto competia con la velocidad de la maquina.
+  { nombre: 'ojo: sostenido demasiado corto', fichero: 'packages/client/src/fov-panel.ts', de: 'export const HOLD_MS = 500;', a: 'export const HOLD_MS = 50;', prueba: 'gestures' },
+  // Todo lo que entra al cruzar un borde se construye en el mismo frame.
+  { nombre: 'chunks: sin presupuesto', fichero: 'packages/client/src/main.ts', de: '    if (far > 0 && spent() >= BUILD_BUDGET_MS) {', a: '    if (false) {', prueba: 'smoke:devTools' },
 ];

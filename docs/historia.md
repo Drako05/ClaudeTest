@@ -11,6 +11,50 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Pruebas que no dependen de la maquina (2026-10-24) — HECHA
+
+**Lo que vio el autor**: en su PC, la pasada `escritorio` caia en dos
+comprobaciones («el anillo del hambre no bajo», «no hay una pila de bayas…»)
+que en la CI pasaban. El autor: una prueba que da distinto en local y en la CI
+igual puede pasar en local y caer en la CI; «Trata que nada dependa de que tan
+rapido corre la maquina donde se ejecuta», y herramientas nuevas si agilizan.
+
+**La causa**: `desktop` y `gestures` seguian con el reloj de verdad, y los
+temporizadores de la interfaz de todas las pasadas tambien. El anillo marca
+`Math.ceil(hambre)`, que solo baja de 100 tras ~10 s de juego, y el PC del
+autor llegaba antes a mirarlo. Las bayas, porque `harvestUntil` paraba en la
+primera cosa recogida y la pila dependia de lo que el iman cogiera despues.
+Habia mas: un toque corto del ojo que competia con su temporizador de 500 ms
+(ya habia caido una vez en la CI), el destello de una pestana, y el
+presupuesto de chunks, que en una maquina muy rapida dejaba entrar los 7 en un
+frame.
+
+**Lo hecho**: los dos relojes fingidos (`tools/lib/navegador.mjs`; el detalle,
+en `docs/pruebas.md`, «Y el reloj de la interfaz, tambien fingido»). En cifras:
+
+- toda espera es `elapse`, `uiRun`, `until` o `settle`;
+- `desktop` y `gestures`, con el reloj manual y el de Playwright;
+- el bucle de verdad, en una comprobacion corta sin plazo;
+- la hora del reloj fingido en los toques de CDP;
+- 2 ms por paso de chunk con el reloj manual;
+- el anillo, tras 20 s de juego, exacto;
+- las bayas, hasta una pila de 2.
+
+Y tres herramientas: `tools/humo.mjs` (todas a la vez), `tools/determinismo.mjs`
+(normal frente a 4 veces mas lenta) y `mutar.mjs`, que ya corre en Windows.
+
+**Medido en el PC del autor**: las 16 pruebas de la matriz en verde en ~90 s
+con `tools/humo.mjs`, frente a ~22 min en serie; `escritorio` sola, 15 s. **Las
+16 dan la misma salida, linea a linea, normal y con la CPU frenada 4 veces**
+(`tools/determinismo.mjs`). Para llegar ahi hubo que quitar tres cosas mas:
+
+- el reloj manual arrancaba donde iba el de verdad, asi que dependia de cuanto
+  tardaba la pagina en cargar; ahora arranca en 0. De ahi venian el balanceo
+  de los montones y los 114 frente a 112 impactos de `fauna`, que se daban por
+  inevitables;
+- el humo imprimia la semilla al azar del reinicio;
+- y cuantos fotogramas dibujaba el bucle de verdad.
+
 ## Tanda movil 1: los tirones al cruzar de chunk (2026-10-24) — HECHA
 
 **Lo que vio el autor**, en su telefono (MediaTek Dimensity 7020): ~42 fps de

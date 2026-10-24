@@ -26,9 +26,8 @@
  */
 
 import { chromium } from 'playwright';
-import { createServer } from 'node:http';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { draw, elapse as elapseOn, prepare, serve, uiRun } from './lib/navegador.mjs';
 import { inflateSync } from 'node:zlib';
 import { SLASH_PARTS, SLASH_VIEWS } from './slash-partes.mjs';
 
@@ -83,14 +82,7 @@ const FULL_WIDTH = { x0: 0, y0: 60, x1: 1280, y1: 540 };
 const LIFT = 12;
 const rose = (before, after) => after - before >= Math.max(1, Math.min(LIFT, (255 - before) / 2));
 
-const file = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
-const html = await readFile(file);
-const server = createServer((_, res) => {
-  res.setHeader('content-type', 'text/html');
-  res.end(html);
-});
-await new Promise((r) => server.listen(0, '127.0.0.1', r));
-const port = server.address().port;
+const { server, baseUrl } = await serve();
 
 const browser = await chromium.launch();
 // `hasTouch` sin `isMobile`: hace falta un dedo de verdad para que aparezca el
@@ -126,9 +118,12 @@ page.on('pageerror', (e) => problems.push(String(e)));
 // Y con el reloj manual (`?reloj=manual`, `docs/pruebas.md`): el juego avanza
 // cuando se le pide (`elapse`) y se dibuja cuando se captura (`capture`). Antes
 // el paseo acababa donde lo dejaba la velocidad de la maquina y cada vista
-// costaba ~40 s por rumbo en la CI. `SMOKE_RELOJ=real` usa el de verdad.
+// costaba ~40 s por rumbo en la CI. Y la interfaz, con el reloj fingido de
+// Playwright (`tools/lib/navegador.mjs`, 2026-10-24). `SMOKE_RELOJ=real` usa
+// los de verdad.
 const MANUAL = process.env.SMOKE_RELOJ !== 'real';
-await page.goto(`http://127.0.0.1:${port}/?seed=12345&view=perspectiva&fauna=0&efectos=barrido${MANUAL ? '&reloj=manual' : ''}`, { waitUntil: 'load' });
+await prepare(page, { fake: MANUAL });
+await page.goto(`${baseUrl}/?seed=12345&view=perspectiva&fauna=0&efectos=barrido${MANUAL ? '&reloj=manual' : ''}`, { waitUntil: 'load' });
 await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
 await elapse(3500);
 
@@ -142,7 +137,7 @@ console.log(`nace en ${spawn.x.toFixed(1)}, ${spawn.y.toFixed(1)}`);
 // cada boton va fijado por su cuenta, y Playwright lo daba siempre por oculto.
 const padBefore = await page.isVisible('#action');
 await page.touchscreen.tap(WIDTH / 2, HEIGHT / 2);
-await page.waitForTimeout(300);
+await uiRun(page, 300);
 const padAfter = await page.isVisible('#action');
 console.log(`racimo del pulgar: ${padBefore ? 'visible' : 'oculto'} al cargar, ${padAfter ? 'visible' : 'oculto'} tras tocar`);
 if (!padAfter) {
@@ -441,10 +436,9 @@ async function drag(dx, dy) {
   await elapse(700);
 }
 
-/** Deja correr el juego: con el reloj manual lo avanza sin dibujar, con el de verdad espera. */
-async function elapse(ms) {
-  if (MANUAL) await page.evaluate((m) => window.__reloj.avanzar(m), ms);
-  else await page.waitForTimeout(ms);
+/** Deja pasar el tiempo (`tools/lib/navegador.mjs`): el juego sin dibujar, y la interfaz con el. */
+function elapse(ms) {
+  return elapseOn(page, ms);
 }
 
 /**
@@ -453,7 +447,7 @@ async function elapse(ms) {
  * manual, dibujando antes: sin bucle no hay fotograma nuevo.
  */
 async function capture(box) {
-  if (MANUAL) await page.evaluate(() => window.__reloj.dibujar());
+  await draw(page);
   return page.screenshot({ clip: { x: box.x0, y: box.y0, width: box.x1 - box.x0, height: box.y1 - box.y0 } });
 }
 
@@ -501,7 +495,7 @@ async function probe() {
   // recortar.
   for (let t = 0; t < 700; t += 50) {
     await elapse(50);
-    if (MANUAL) await page.evaluate(() => window.__reloj.dibujar());
+    await draw(page);
   }
   await page.mouse.up();
   await elapse(400);
