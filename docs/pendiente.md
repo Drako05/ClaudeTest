@@ -61,8 +61,8 @@ publicaba. Y **el movil va peor tanda a tanda**, sin nada que lo vigile.
   (las ~700 draw calls de `docs/arte.md`, el relleno, la geometria, el hilo
   principal).
 - **Que la CI no corra en las ramas `claude/…`**: hecho el 2026-10-24, con
-  la CI completa dos veces por semana (`docs/historia.md`). **Falta la tarea
-  programada de la auditoria en la nube**, que espera tu confirmacion.
+  la CI completa y la auditoria programada dos veces por semana
+  (`docs/historia.md`).
 - **El empaquetado**: Tauri o Electron para Steam y Capacitor para movil. Se
   decide cerca del lanzamiento.
 
