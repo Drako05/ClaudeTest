@@ -32,6 +32,41 @@ reescribio: cada seccion se movio entera y literal.**
 
 ---
 
+## El norte del proyecto: sin motor grafico (2026-10-24)
+
+El autor quiere desarrollar Verdant en serio y se planteo pasar a Unity o
+Unreal. **Decidido por el autor:**
+
+- **Sin motor grafico**, y sin probar Godot: se sigue con TypeScript y
+  three.js. Objetivos: **PC primero** (lanzamiento), luego movil; consolas,
+  despues del lanzamiento. **El multijugador pesa tanto como el solitario**
+  («como Minecraft»). El equipo: el autor solo, con agentes.
+- **Se trabaja en local**, en su PC, con recarga en caliente (`CLAUDE.md`,
+  «Arranque»).
+- **Version de pruebas publicada en `/pruebas/`** (`deploy.yml`,
+  `docs/pruebas.md`).
+
+**Lo que motivo la revision, medido:** el ciclo «tanda pedida → jugarla» no lo
+frena escribir codigo, sino la CI (7-9 min por pasada, y el mismo commit corria
+dos o tres veces: `pruebas`, la rama `claude/…` y `main`) y que solo `main` se
+publicaba. Y **el movil va peor tanda a tanda**, sin nada que lo vigile.
+
+**Abierto, para el autor:**
+- **Rust para el nucleo**: propuesto **no portarlo ahora**. El tick de la
+  simulacion no es lo que frena el movil; lo es el dibujo. El cliente sigue en
+  TypeScript, y el servidor del multijugador en Node puede importar el mismo
+  `packages/sim`, que es lo que promete la regla 1. Rust queda como la salida ya
+  prevista (el umbral de 8 ms), modulo a modulo detras de la misma interfaz.
+- **Medir el movil en un telefono de verdad** antes de optimizar: que lo frena
+  (las ~700 draw calls de `docs/arte.md`, el relleno, la geometria, el hilo
+  principal).
+- **Que la CI no corra en las ramas `claude/…`** (`ci.yml` corre en `'**'`).
+  Propuesto, no aprobado.
+- **El empaquetado**: Tauri o Electron para Steam y Capacitor para movil. Se
+  decide cerca del lanzamiento.
+
+---
+
 ## Auditoria al cerrar la pala y las menas de voxeles (2026-10-20)
 
 **El alcance**: de `4151766` a `8e9269e`: el boceto de los minerales, las
@@ -89,6 +124,15 @@ de pixelart (a otro fichero, sale identico); las pasadas `mobile` y `dig`.
 - **La estocada del preciso no se para en un animal**: la simulacion si le
   pega al primero, pero la linea que se dibuja sigue hasta el terreno o el
   objeto de detras.
+
+**Un fallo suelto en la CI de `main`, sin causa encontrada**: la pasada
+`desktop` cayo una vez en «el registro no va encima de INVENTARIO» (run
+39472539170, una maquina lenta: la pasada tardo 411 s). La linea «+5 Bayas»
+ya estaba fuera de la pagina en el primer fotograma tras nacer (`y0` 0,
+`alive` false), y su vida no puede acabar en un fotograma (`dt` con tope de
+0,25 s). Paso en `pruebas` con el mismo arbol y al relanzarlo. La auditoria no
+toca el registro. Si vuelve, se mira que quita la linea antes de su primer
+fotograma.
 
 **Dejado a proposito** (sin medida que lo pida, lente K5): rehacer solo las
 menas cercanas al voxel roto, y ahorrar las claves de texto al mirar el

@@ -3,7 +3,9 @@
 Prototipo de sandbox de supervivencia con mundo procedural infinito, pensado
 para crecer hacia multijugador online y, mas adelante, una version nativa.
 
-**Jugar: https://drako05.github.io/ClaudeTest/**
+**Jugar: https://drako05.github.io/ClaudeTest/** — y la tanda que se esta
+probando, en **https://drako05.github.io/ClaudeTest/pruebas/** (la rama
+`pruebas`; puede estar rota).
 
 Un mundo con relieve y camara libre en 3D. Arranca **en primera persona**, que es
 la vista que eligio el autor; el ojo de la esquina superior derecha recorre
