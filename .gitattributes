@@ -1,0 +1,8 @@
+# Todo el texto en LF, tambien en Windows, donde git lo pasa a CRLF por
+# defecto (`core.autocrlf`): las mutaciones buscan textos de varias lineas
+# (`tools/mutaciones.mjs`) y con CRLF no aparecen, y los `.sh` no corren
+# (2026-10-24).
+* text=auto eol=lf
+
+*.png binary
+*.pdf binary
