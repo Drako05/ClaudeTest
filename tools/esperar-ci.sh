@@ -26,8 +26,10 @@ while :; do
   tandas=$(gh api "repos/$slug/actions/runs?head_sha=$sha&per_page=20" \
     --jq '.workflow_runs[] | [.name, .status, (.conclusion // "-"), .id, .run_started_at, .updated_at] | @tsv')
   # Hecho cuando hay al menos una tanda y ninguna sigue en marcha. Las del
-  # mismo push nacen juntas, asi que no se da por acabada a medio crear.
-  if [ -n "$tandas" ] && ! grep -qvP '^[^\t]*\tcompleted\t' <<<"$tandas"; then
+  # mismo push nacen juntas, asi que no se da por acabada a medio crear. Con
+  # `awk` y no `grep -P`, que en el Git Bash de Windows no acepta el locale y
+  # daba por acabadas tandas recien nacidas (2026-10-24).
+  if [ -n "$tandas" ] && ! awk -F'\t' '$2 != "completed"' <<<"$tandas" | grep -q .; then
     break
   fi
   if [ "$SECONDS" -ge "$limite" ]; then

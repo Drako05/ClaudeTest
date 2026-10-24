@@ -11,6 +11,89 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## La CI sin duplicados y lo pesado dos veces por semana (2026-10-24) — HECHA
+
+**Aprobado por el autor el 2026-10-24, para que lo ejecute la primera sesion
+local** (no la de la nube que lo escribio):
+
+- **1a**: la CI deja de correr en las ramas `claude/…`.
+- **1b**: en `main`, cada push corre solo typecheck y tests, porque el mismo
+  arbol ya paso la CI completa en `pruebas`.
+- **La CI completa y la auditoria, martes y sabado a las 3:00 de Colombia**
+  (America/Bogota, UTC-5 todo el ano: 08:00 UTC).
+- **La auditoria, en la nube, y directo a `main` si sale verde**, sin esperar
+  al autor.
+
+**1. `.github/workflows/ci.yml`**
+- `on`: `push` solo a `['main', 'pruebas']`, `pull_request`,
+  `schedule: - cron: '0 8 * * 2,6'` (martes y sabado, 08:00 UTC = 3:00
+  Bogota) y `workflow_dispatch`.
+- El trabajo `navegador`:
+  `if: github.event_name != 'push' || github.ref != 'refs/heads/main'`. Asi
+  un push a `main` lo salta, y lo corren entero `pruebas`, los PR, el
+  calendario y el lanzamiento a mano.
+- `todo` («CI completa»): hoy exige `navegador = success`. Que acepte
+  `skipped` **solo** si es un push a `main`; en cualquier otro caso un
+  `skipped` es rojo.
+- En la cabecera, el porque y la fecha, como sus otros comentarios. La linea
+  `pasada: [...]` no cambia, asi que el cruce del escaner
+  (`escaner.mjs`, `matrix`) sigue valiendo.
+
+**2. La auditoria programada**
+- Su guion, en el repo: `.claude/skills/auditoria/references/programada.md`,
+  porque la tarea programada solo dira «sigue ese fichero». Dice:
+  1. Sin commits desde «Ultima auditoria» (arriba en este fichero), termina
+     sin cambios.
+  2. Si los hay, `/auditoria` desde ese commit, con su proceso entero. Lo
+     que cambia lo que hace el juego no se toca: va a «Para ti», como hoy.
+  3. Lo verifica en `pruebas` (`tools/a-pruebas.sh` y
+     `tools/esperar-ci.sh`). Si sale verde, empuja a `main`. Si sale rojo,
+     tiene un solo intento de arreglo; si sigue rojo, **`main` no se toca** y
+     el resumen de la sesion dice que fallo.
+  4. `FIRMA`, con las lineas de atribucion de esa sesion.
+- La tarea programada, en la nube de Claude Code: una sesion nueva por
+  disparo, sobre este repo, `CRON_TZ=America/Bogota 0 3 * * 2,6`, con
+  avisos al movil y por correo, y el prompt «Lee y sigue
+  `.claude/skills/auditoria/references/programada.md`». La herramienta
+  (`create_trigger`) esta en las sesiones de la nube. Si la local no la tiene,
+  la crea el autor desde claude.ai/code (tareas programadas) con ese prompt, o
+  se crea desde una sesion en la nube.
+
+**3. Los documentos que dejan de ser verdad**
+- `CLAUDE.md`, «Antes de dar algo por bueno»: el paso 5, con la CI de `main`
+  ligera. «Al cerrar cada tanda, la auditoria» pasa a «corre sola martes y
+  sabado a las 3:00 de Bogota, y cuando el autor la pida». La regla de
+  `retirados.md` se queda.
+- `docs/pruebas.md`: «El procedimiento, paso a paso», el parrafo de la
+  auditoria, y que corre la CI en cada disparo.
+- `.claude/skills/auditoria/SKILL.md`: la `description` («Usala SIEMPRE al
+  cerrar una tanda») y «como minimo al cerrar cada tanda».
+- `retirados.md`: «la auditoria al cerrar cada tanda», retirada (escape 19).
+- Esta seccion, a «HECHA» y de ahi a `docs/historia.md`.
+
+**4. Verificar**
+1. En local: typecheck, tests y lo que corre `a-pruebas.sh` (las
+   herramientas y el escaner).
+2. En `pruebas`: «CI completa» corre entera y sale verde.
+3. Push a `main`: solo «Typecheck y tests», `navegador` saltado y «CI
+   completa» **verde**.
+4. `ci.yml` lanzado a mano en `main` (`workflow_dispatch`): corre entera. Es
+   el camino del calendario.
+5. Un push a una rama `claude/…` ya no dispara la CI.
+6. La tarea de auditoria lanzada una vez a mano: sin commits nuevos, termina
+   sin cambios.
+
+**5. Avisar al autor**: GitHub retrasa a veces lo programado en punto. Los
+correos de un rojo programado van a quien toco el cron por ultima vez, que es
+su cuenta. Y el fallo suelto del registro (abajo) puede dar algun rojo
+programado.
+
+### Lo hecho (2026-10-24)
+
+- **Verificado**: en `pruebas` (`b49c9b1`), «CI completa» entera (18 trabajos), «Mutaciones completas» y el despliegue, en verde. Push a `main` (`e7acc57`): solo «Typecheck y tests», el navegador saltado y «CI completa» verde. `ci.yml` a mano en `main`: entera, 18 en verde. Un push a `claude/prueba-sin-ci` no disparo la CI (la rama se borro despues).
+- **La tarea programada de la nube**: la sesion local no pudo crearla (la API pide el id del entorno de la nube, que desde local no se ve). La creo una sesion en la nube con la confirmacion del autor: «Auditoria programada de Verdant» (`trig_01S6VhivcyEtANcMTaHA7Gnu`), `CRON_TZ=America/Bogota 0 3 * * 2,6`, avisos al movil y por correo, y la correccion automatica de PR apagada a proposito (la auditoria no abre PR: empuja a `pruebas` y a `main`). Su primer disparo, el sabado 2026-10-24 a las 3:06; la prueba a mano del paso 4.6 no se hizo.
+- **Lo que salio por el camino, en Windows** (el PC del autor): `tools/esperar-ci.sh` da «HAY ROJO» en el acto, porque `grep -P` no acepta el locale; con `LC_ALL=C.UTF-8` va bien. `node tools/mutar.mjs --comprobar` falla con `core.autocrlf=true` (un `de` de varias lineas en CRLF), y por eso `tools/a-pruebas.sh` aborta: se hizo a mano. Y siete tests largos se pasan de los 5 s de vitest en local; en la CI pasan.
+
 ## La pala, lo primero que toca, las menas de voxeles y la rejilla de 0,5 (2026-10-20) — HECHA
 
 **Cerrada por el autor** el 2026-10-20: «Tus consideraciones sobre la colocación de bloques estan bien y los errores están solucionados. Hemos terminado.» Commit `8e9269e`, con la CI y el despliegue en verde; cerrada con la auditoria de ese dia, en `docs/pendiente.md`.
