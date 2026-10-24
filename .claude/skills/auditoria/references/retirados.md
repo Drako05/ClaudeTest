@@ -202,6 +202,11 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 - `columnTopFor\(state\.world, chunk|columnTopFor\(world, chunk` — el techo de una columna leido del chunk y, fuera de el, del generador sin lo roto; desde el 2026-10-20, `columnTopFor(world, vx, vy)` sobre `World.columnTopPeek`. Permitido en: `.claude/skills/auditoria/references/retirados.md`.
 - `terrainVariant\(seed, wx, wy` — la variante del suelo por casilla; desde el 2026-10-20, por voxel y cara (`terrainVariant(seed, vx, vy, vz, face, count)`). Permitido en: `.claude/skills/auditoria/references/retirados.md`.
 
+## La CI sin duplicados y lo pesado dos veces por semana (2026-10-24)
+
+- `auditoria al cerrar cada tanda|al cerrar cada tanda, la auditoria|como minimo al cerrar cada tanda|SIEMPRE al cerrar una tanda` — la auditoria a mano al cerrar cada tanda; desde el 2026-10-24 corre sola martes y sabado a las 3:00 de Bogota (`references/programada.md`) y cuando el autor la pida. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `branches: \['\*\*'\]|en .main. cada push corre entero` — la CI en todas las ramas y entera en cada push a `main`; desde el 2026-10-24 solo `main` y `pruebas`, y en `main` solo el nucleo. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
+
 ## La pala, lo primero que toca y las menas de voxeles (2026-10-20)
 
 - `VOXEL_WORK|con cualquier cosa (en la mano )?(rompe|son tres)|pegar con cualquier cosa` — el terreno que se rompia con cualquier cosa en 3 golpes; desde el 2026-10-20, la roca con pico y lo maleable con pala, con el poder restando (`voxelWorkOf`). Permitido en: `docs/historia.md`, `docs/relieve.md` (cita al autor), `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
