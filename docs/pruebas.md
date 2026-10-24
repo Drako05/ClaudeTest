@@ -69,6 +69,16 @@ CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
    diciendo que esta en marcha, y se mira **al empezar el siguiente turno**; si
    salio en rojo, se dice y se arregla antes que nada.
 
+**En Windows** (el PC del autor, 2026-10-24) los guiones van por Git Bash, y
+tres cosas lo rompian. **Todo el texto va en LF** (`.gitattributes`, que gana a
+`core.autocrlf`): con CRLF `mutar.mjs --comprobar` no encontraba los `de` de
+varias lineas, y por eso abortaba `a-pruebas.sh`; y el escaner de la auditoria
+quedaba ciego, sin leer `retirados.md` y con decenas de avisos falsos.
+`esperar-ci.sh` va con `awk` y no con `grep -P`, que ahi no acepta el locale y
+daba por acabadas tandas recien nacidas. Y **`npm ci` falla con `EPERM`
+mientras `npm run dev` esta abierto**, porque el servidor tiene cogido el
+binario de rolldown: se cierra antes, o se usa `npm install`.
+
 El humo completo en local (`npm run smoke`, mas `gestures` y `slash` entero) queda para
 cuando la CI no este disponible. La rama `pruebas` se queda en el remoto para
 siempre —el proxy no deja borrar ramas, y no hace falta— y un push nuevo cancela

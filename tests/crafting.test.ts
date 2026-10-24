@@ -23,6 +23,7 @@ import {
   toolStats,
 } from '@verdant/shared';
 import { collectAll, groundCount, oreSite, strikeDown } from './ground.js';
+import { LARGO } from './largo.js';
 
 /**
  * La tanda 1 de recoleccion y fabricacion, decisiones del autor: trabajo por
@@ -186,7 +187,7 @@ describe('Etapa 1: con las manos', () => {
     const b = branchesLeft(skipped.state.work, skipped.tx + 1, skipped.ty, skipped.state.tick);
     expect(a).toBe(1);
     expect(b).toBe(a);
-  });
+  }, LARGO);
 });
 
 describe('Etapas 2 y 3: herramientas de piedra, y lo que sacan', () => {

@@ -205,6 +205,7 @@ test que afirma que la tecla vieja ya no hace nada, por ejemplo).
 ## La CI sin duplicados y lo pesado dos veces por semana (2026-10-24)
 
 - `auditoria al cerrar cada tanda|al cerrar cada tanda, la auditoria|como minimo al cerrar cada tanda|SIEMPRE al cerrar una tanda` — la auditoria a mano al cerrar cada tanda; desde el 2026-10-24 corre sola martes y sabado a las 3:00 de Bogota (`references/programada.md`) y cuando el autor la pida. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
+- `grep -qvP` — la espera de `esperar-ci.sh` con `grep -P`, que en el Git Bash de Windows no acepta el locale; desde el 2026-10-24, con `awk`. Permitido en: `docs/historia.md`, `.claude/skills/auditoria/references/retirados.md`.
 - `branches: \['\*\*'\]|en .main. cada push corre entero` — la CI en todas las ramas y entera en cada push a `main`; desde el 2026-10-24 solo `main` y `pruebas`, y en `main` solo el nucleo. Permitido en: `docs/historia.md`, `docs/pendiente.md`, `.claude/skills/auditoria/references/retirados.md`.
 
 ## La pala, lo primero que toca y las menas de voxeles (2026-10-20)

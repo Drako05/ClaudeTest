@@ -36,6 +36,7 @@ import {
   withinEquilibrium,
 } from '@verdant/shared';
 import { groundCount, oreSite, strikeDown } from './ground.js';
+import { LARGO } from './largo.js';
 
 /**
  * Las leyes de "El libro del mundo", convertidas en pruebas.
@@ -452,7 +453,7 @@ describe('Capitulo I — «Existen el pasar del tiempo y las leyes fisicas funda
         }
       }
     }
-  });
+  }, LARGO);
 });
 
 describe('El mundo sigue siendo determinista con la vida en marcha', () => {

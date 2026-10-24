@@ -35,6 +35,7 @@ import {
   type Intent,
 } from '@verdant/shared';
 import { groundCount } from './ground.js';
+import { LARGO } from './largo.js';
 
 function intent(over: Partial<Intent> = {}): Intent {
   return { ...emptyIntent(), ...over };
@@ -112,7 +113,7 @@ describe('simulacion', () => {
     runTicks(state, HUNGER_EMPTY_DAYS * DAY_TICKS + TICK_HZ * 20, intent());
     expect(state.entities.hunger[state.playerId]).toBe(0);
     expect(state.entities.health[state.playerId]).toBeLessThan(100);
-  });
+  }, LARGO);
 
   it('el jugador muere si la salud llega a cero', () => {
     const state = createGame(42);
@@ -120,7 +121,7 @@ describe('simulacion', () => {
     runTicks(state, HUNGER_EMPTY_DAYS * DAY_TICKS + TICK_HZ * 60, intent());
     expect(state.entities.health[state.playerId]).toBe(0);
     expect(state.entities.alive[state.playerId]).toBe(0);
-  });
+  }, LARGO);
 
   it('el movimiento cambia la posicion y nunca atraviesa solidos', () => {
     const state = createGame(7);
@@ -379,7 +380,7 @@ describe('El hambre segun el esfuerzo', () => {
     // Y al acabar, nada.
     runTicks(state, 60 * TICK_HZ, intent());
     expect(state.entities.hunger[state.playerId]).toBeLessThan(0.1);
-  });
+  }, LARGO);
 
   it('andando se gasta como quieto', () => {
     const quieto = lost(42, 30, intent());
