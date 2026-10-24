@@ -11,6 +11,97 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Auditoria al cerrar la pala y las menas de voxeles (2026-10-20)
+
+**El alcance**: de `4151766` a `8e9269e`: el boceto de los minerales, las
+menas al juego, romper el terreno y la tanda de la pala, enteros en
+`docs/historia.md`. Con la lente nueva, **K, buenas practicas** (pedida por el
+autor este dia).
+
+**Corregido:**
+- **El compilador, mas estricto** (lente K): `noUnusedLocals` y
+  `noUnusedParameters`, encendidos. Sacaron 16 restos sin uso: imports de
+  modelos sustituidos (en la recoleccion, `treeTrunkAt`, `rayBox`,
+  `stationHeight`…), un parametro `world` que los efectos ya no leian, la
+  constante `SQUARE` de las casillas y un indice suelto en los bordes de
+  bioma. Y el escaner vigila que sigan encendidos (categoria «Practicas»).
+- **La camara atravesaba media estacion** corrida medio bloque: buscaba cada
+  caja solo en su casilla. Ahora mira tambien las vecinas al oeste y al norte;
+  igual el modo TAP, que usa el mismo rayo. Con su test.
+- **El barrido se dibujaba mas largo que el golpe**: se volvia a medir
+  despues del paso, cuando lo roto ya no cortaba su rayo. Ahora el nucleo
+  cuenta los rayos del golpe (`lastStrikeRays`) y el cliente los dibuja.
+- **Lo que solo sostenian los tests**: los escombros de una mena (no se
+  rompe ninguna con escombros desde que son terreno) y `Surface.front` (lo que
+  se coloca va delante de la cara, desde la rejilla de 0,5). Fuera, con sus
+  textos.
+- **Tests que no decian lo que afirmaban**: las reglas de los cristales se
+  median sobre la roca de siete voxeles, que ya no es una mena: ahora sobre la
+  formacion de ocho, enterrada y cavada. «Requieren herramientas para
+  recolectarse» ya no miraba que se recolectara: ahora, el carbon que suelta.
+  «Una casilla cubierta» no se probaba; «la generacion sigue pura» comparaba
+  un chunk consigo mismo (ahora, con otro generado despues de sus vecinos); y
+  el preciso a 40 grados sin su control.
+- **Comentarios y documentos del modelo viejo**: el terreno «con cualquier
+  cosa», las menas con caja y con escombros (`docs/arte.md`,
+  `docs/efectos.md`, `docs/juicio.md`), el golpe «cortado por el terreno»
+  (`aim.ts`, `strikeOf`), lo que pesa una mena (medido otra vez: enterrada,
+  400 vertices; cavada, 880), las palas en la guia de arte y en las leyes.
+- **Numeros sin nombre**: `ORE_SALT`, `BODY_REACH`, y `VOXELS_PER_TILE` en
+  vez de un `* 2`.
+
+**Mutado** (caen las 5 en local): la camara sin vecinas, el barrido sin los
+rayos del golpe, colocar sobre lo cubierto, la mena sin botin y los cristales
+bajo tierra.
+
+**Ejecutado**: el escaner y su autoprueba; typecheck y los 650 tests;
+`npm run shots`, `tools/analyze-world.ts` (en su presupuesto) y el generador
+de pixelart (a otro fichero, sale identico); las pasadas `mobile` y `dig`.
+
+**Para ti** (cambian lo que hace el juego; no se tocaron):
+- **Las menas aun cuentan como solidas para nacer y medir el mundo**
+  (`blocksBody`): sin caja, se pisan, pero el nacimiento y la conectividad las
+  evitan. Quitarlas cambia donde se nace en algunas semillas.
+- **Lo que vuela hacia ti atraviesa el terreno**: desde que no se suelta por
+  distancia, persigue en linea recta aunque haya una pared en medio. Y si
+  mueres con algo volando, se queda quieto en el aire hasta que caduca.
+- **La estocada del preciso no se para en un animal**: la simulacion si le
+  pega al primero, pero la linea que se dibuja sigue hasta el terreno o el
+  objeto de detras.
+
+**Un fallo suelto en la CI de `main`, sin causa encontrada**: la pasada
+`desktop` cayo una vez en «el registro no va encima de INVENTARIO» (run
+39472539170, una maquina lenta: la pasada tardo 411 s). La linea «+5 Bayas»
+ya estaba fuera de la pagina en el primer fotograma tras nacer (`y0` 0,
+`alive` false), y su vida no puede acabar en un fotograma (`dt` con tope de
+0,25 s). Paso en `pruebas` con el mismo arbol y al relanzarlo. La auditoria no
+toca el registro. Si vuelve, se mira que quita la linea antes de su primer
+fotograma.
+
+**Volvio el 2026-10-24** (run 40057853752, rama `claude/wonderful-dirac-s8oi52`,
+el mismo arbol que paso en `pruebas`, y el cambio no tocaba el cliente), con
+otra cara: «el registro de objetos no anoto lo recolectado: []», aunque el
+inventario si tenia lo recogido (10 de un objeto, 3 de otro). Y por eso, despues,
+«no hay una pila de bayas con que probar el menu». Ya son dos veces: es un fallo
+del registro, no de la maquina, y esta por mirar.
+
+**Y una tercera, el mismo dia** (run 40067714483, en `pruebas`, con vite 8):
+«no hay una pila de bayas con que probar el menu», con el inventario con 1 y
+2 de dos objetos y sin bayas. Relanzada, paso; y paso en las dos tandas
+siguientes del mismo cambio.
+
+**Dejado a proposito** (sin medida que lo pida, lente K5): rehacer solo las
+menas cercanas al voxel roto, y ahorrar las claves de texto al mirar el
+terreno roto. Y unas duplicaciones pequeñas (la altura de la mena en el
+generador, el bucle de bajar por lo roto), que se juntan cuando se toquen.
+
+**Escapes** (fase 6): el 48 (lo sorteado de cada pieza, de un flujo comun) a
+un principio nuevo, G8; el 49 (dos numeros con una relacion, cada uno por su
+lado) a otro, A4; el 50 a B3, afinado; el 51 a K1; y el P9 (un `stash` que se
+llevo tests sin commit) a Q4.
+
+---
+
 ## Vite 8 y las herramientas en Windows (2026-10-24) — HECHA
 
 El autor trabaja en local, en Windows, y alli el procedimiento no corria entero; y la copia local tenia vite 8.3.5 y vitest 5.0.5 sin commit. El autor decidio adoptarlos en el repo, en la misma tanda.

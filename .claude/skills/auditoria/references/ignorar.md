@@ -24,6 +24,7 @@ Formato (el escaner lo lee):
 - `pixi.js` — la biblioteca del isometrico, que se retiro. En: `docs/pendiente.md`, `docs/juicio.md`, `docs/historia.md`.
 - `highRefresh` — prefijo de la pasada `highRefreshPass` del humo, como se escribe en la linea de ordenes. En: `docs/pruebas.md`.
 - `devTools` — prefijo de la pasada `devToolsPass`, que es el nombre de su casilla en la matriz de CI. En: `docs/pruebas.md`, `docs/pendiente.md`, `docs/historia.md`.
+- `dist/index.html` — la salida del build del cliente (`packages/client/dist/`), que no se versiona. En: `packages/client/vite.config.ts`.
 
 ## Historia que se cuenta a proposito
 
