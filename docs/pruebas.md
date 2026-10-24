@@ -22,7 +22,9 @@ que tarde la casilla mas lenta, mutaciones incluidas (llego a 15 minutos con
 probar**: `deploy.yml` publica el juego en cada push a `main` sin esperar a la
 CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
 
-1. **En local, mientras se trabaja**: `npm run typecheck && npm test` (~20 s) y
+1. **En local, mientras se trabaja**: `npm run typecheck && npm test` (~2 min: 106 s en el PC del autor, 87 en la CI;
+   los que simulan dias de juego tardan 20-60 s, y el limite es de 2 min,
+   `vitest.config.ts`) y
    **solo la pasada que se esta escribiendo o tocando**
    (`npm run build && node tools/smoke.mjs <pasada>`), las veces que haga falta.
 2. **La ronda de mutaciones** en `tools/mutaciones.mjs`: cada comprobacion

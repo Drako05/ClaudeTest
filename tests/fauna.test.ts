@@ -51,7 +51,6 @@ import {
   type Intent,
 } from '@verdant/shared';
 import { groundCount } from './ground.js';
-import { LARGO } from './largo.js';
 
 /**
  * La fauna de la primera tanda (plan aprobado por el autor, 2026-10-02): diez
@@ -234,7 +233,7 @@ describe('Fauna: aparicion', () => {
       expect(Math.abs(stages[st] / total - STAGE_SHARE[st])).toBeLessThan(0.04);
     }
     expect(Math.abs(males / total - 0.5)).toBeLessThan(0.04);
-  }, LARGO);
+  });
 });
 
 describe('Fauna: deambular', () => {
@@ -335,7 +334,7 @@ describe('Fauna: lo que estorba no los deja clavados', () => {
     expect(count.stuck / count.all).toBeLessThan(0.2);
     expect(count.smallStuck / count.small).toBeLessThan(0.05);
     expect(count.sunk).toBe(0);
-  }, LARGO);
+  });
 });
 
 describe('Fauna: cazar', () => {
