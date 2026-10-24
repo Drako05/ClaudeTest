@@ -10,12 +10,17 @@
  * redireccion conserva la consulta y el ancla, para que `/3d/?seed=123` siga
  * abriendo ese mundo.
  *
+ * Y **`/pruebas/`, la version de la rama `pruebas`**, si `PRUEBAS_DIST` apunta
+ * a su `dist` ya construido (decision del autor, 2026-10-24: se juega la tanda
+ * mientras su CI corre). Es el mismo HTML de una pieza, asi que tampoco tiene
+ * rutas que romper en un subdirectorio. Sin la variable, el sitio sale sin ella.
+ *
  * Va en un script y no en el workflow para poder correrlo igual en local: un
  * sitio que solo se sabe montar dentro de CI no se puede comprobar antes de
  * publicarlo.
  */
 
-import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -45,10 +50,23 @@ async function main() {
   await mkdir(join(SITE, '3d'), { recursive: true });
   await writeFile(join(SITE, '3d', 'index.html'), REDIRECT);
 
+  const pruebas = process.env.PRUEBAS_DIST;
+  if (pruebas) {
+    try {
+      await stat(join(pruebas, 'index.html'));
+    } catch {
+      console.error(`Falta ${join(pruebas, 'index.html')}: PRUEBAS_DIST tiene que ser un dist construido`);
+      process.exit(1);
+    }
+    await mkdir(join(SITE, 'pruebas'), { recursive: true });
+    await copyFile(join(pruebas, 'index.html'), join(SITE, 'pruebas', 'index.html'));
+  }
+
   const size = (await stat(join(SITE, 'index.html'))).size;
   console.log(`sitio en ${SITE}`);
   console.log(`  raiz: ${(await readdir(SITE)).join(', ')} (index.html ${size} bytes)`);
   console.log('  /3d/: redireccion a la raiz');
+  if (pruebas) console.log(`  /pruebas/: ${pruebas}`);
 }
 
 main();

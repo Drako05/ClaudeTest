@@ -5,7 +5,14 @@ Esto es el resumen operativo.
 
 ## Arranque de una sesion nueva
 
-**El contenedor es efimero y se reaprovisiona entre sesiones.** Puede tocarte
+**Se trabaja en local, en el PC del autor** (decision del autor, 2026-10-24):
+`npm run dev` recarga el juego en segundos con cada cambio, y
+`npm run dev -w @verdant/client -- --host` lo abre tambien en el movil por la
+red de casa (`npm run dev -- --host` no sirve: npm se queda el `--host`). El
+humo necesita una vez `npx playwright install chromium`. Lo de abajo vale para
+cuando la sesion corre en la nube.
+
+En la nube, **el contenedor es efimero y se reaprovisiona entre sesiones.** Puede tocarte
 empezar con el repo literalmente vacio: sin ficheros, sin refs, solo un `.git`
 con el remoto puesto. Paso antes de una tanda, asi que no es teorico y no es
 sintoma de nada roto.
@@ -26,7 +33,10 @@ trabajo va a `main`.
 **Ojo con Pages**, que es donde se tropezo la mudanza: desde que ramas se puede
 desplegar lo decide el entorno `github-pages` (Settings → Environments), con
 una lista de ramas que se fija al configurar Pages y **no sigue a la rama por
-defecto**. Si un `deploy` muere en un segundo sin ejecutar un paso, es eso.
+defecto**. Si un `deploy` muere en un segundo sin ejecutar un paso, es eso. En
+esa lista van `main` y `pruebas`: desde el 2026-10-24 cada despliegue publica
+las dos, `main` en la raiz y `pruebas` en **`/pruebas/`**, para que el autor
+juegue la tanda mientras corre su CI.
 
 Y el proxy git de la sesion deja empujar pero **no borrar ramas**: responde 403,
 y un 403 del proxy no se reintenta ni se esquiva. Borrar una rama remota es
@@ -191,7 +201,9 @@ ronda de cada sesion.**
 3. **`tools/a-pruebas.sh "que se prueba"`**, con `FIRMA` puesta a las lineas
    de atribucion de la sesion.
 4. **Esperar las dos tandas en verde**: «CI completa» y «Mutaciones completas».
-   Lo que falle se arregla y se vuelve al 3.
+   Mientras, el push a `pruebas` ya se publica en
+   `https://drako05.github.io/ClaudeTest/pruebas/`: se le pasa al autor para
+   que la juegue. Lo que falle se arregla y se vuelve al 3.
 5. **Solo entonces**, commit y push a `main`. Esa CI **confirma, pero no se
    espera**: se avisa al autor y se mira **al empezar el siguiente turno**.
 

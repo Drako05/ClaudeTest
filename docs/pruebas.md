@@ -50,6 +50,15 @@ CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
    en cola —son unos 30 trabajos para 20 maquinas— se sigue con otra cosa,
    como la documentacion. Lo que falle se arregla y se vuelve al 3.
 
+   **El mismo push a `pruebas` se publica en `/pruebas/`**
+   (`https://drako05.github.io/ClaudeTest/pruebas/`, decision del autor,
+   2026-10-24): `deploy.yml` construye las dos ramas en cada despliegue,
+   `main` en la raiz y `pruebas` ahi, sin esperar a la CI. Se le pasa la
+   direccion al autor en cuanto se empuja, para que juegue la tanda mientras
+   la CI la verifica; `VERDANT_URL=…/pruebas npm run smoke` la comprueba ya
+   publicada. Comparte origen con la raiz, asi que tambien su `localStorage`:
+   lo que la version de pruebas guarde, lo lee la de `main`.
+
    Hasta el 2026-10-10 esto se decia «sin `gh` ni API» y se esperaba con un
    temporizador fijo de 5 minutos; en este entorno `gh api` ya funciona.
 5. **Solo entonces**, commit y push a `main`. Esa CI **confirma, pero no se

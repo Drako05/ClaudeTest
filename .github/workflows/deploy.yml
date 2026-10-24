@@ -1,8 +1,15 @@
 name: Deploy a GitHub Pages
 
+# Un solo sitio con dos juegos: `main` en la raiz y `pruebas` en `/pruebas/`
+# (decision del autor, 2026-10-24: jugar la tanda mientras su CI corre, sin
+# esperar a llevarla a `main`). Pages publica un unico artefacto por sitio, asi
+# que cada despliegue construye LAS DOS puntas, la empujada y la otra: un push a
+# `pruebas` no puede dejar la raiz sin publicar, ni uno a `main` borrar la
+# version de pruebas. Por eso cancelar el despliegue anterior es seguro: el que
+# queda lleva siempre lo ultimo de las dos ramas.
 on:
   push:
-    branches: ['main']
+    branches: ['main', 'pruebas']
   workflow_dispatch:
 
 permissions:
@@ -18,15 +25,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # Cada rama en su carpeta, con su propio `npm ci`: el lockfile de
+      # `pruebas` puede no ser el de `main`.
       - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: principal
+      - uses: actions/checkout@v4
+        with:
+          ref: pruebas
+          path: prueba
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci
+          cache-dependency-path: |
+            principal/package-lock.json
+            prueba/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: prueba
       # El juego en la raiz, y /3d/ redirigiendo a ella: ahi vivio el 3D
-      # mientras convivio con el isometrico. Ver tools/build-pages.mjs.
-      - run: npm run build:pages
+      # mientras convivio con el isometrico. Y `PRUEBAS_DIST`, el build de
+      # `pruebas`, a `/pruebas/`. Ver tools/build-pages.mjs.
+      - run: npm ci && npm run build:pages
+        working-directory: principal
+        env:
+          PRUEBAS_DIST: ${{ github.workspace }}/prueba/packages/client/dist
       - uses: actions/configure-pages@v5
         with:
           # Crea el sitio de Pages si aun no existe, en vez de fallar pidiendo
@@ -35,14 +59,15 @@ jobs:
           enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: packages/client/dist
+          path: principal/packages/client/dist
 
   deploy:
     needs: build
     # Quien decide desde que ramas se puede desplegar es el ENTORNO
     # `github-pages` (Settings → Environments → github-pages → Deployment
     # branches), no este fichero. Si la rama no esta en su lista, el job muere en
-    # un segundo sin ejecutar un solo paso: esa es la firma.
+    # un segundo sin ejecutar un solo paso: esa es la firma. Tienen que estar
+    # las dos, `main` y `pruebas`.
     #
     # Esa lista se fija al configurar Pages y NO sigue a la rama por defecto.
     # Se aprendio en la mudanza a `main`: con `main` ya por defecto, el entorno
