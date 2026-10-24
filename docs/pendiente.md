@@ -134,6 +134,13 @@ ya estaba fuera de la pagina en el primer fotograma tras nacer (`y0` 0,
 toca el registro. Si vuelve, se mira que quita la linea antes de su primer
 fotograma.
 
+**Volvio el 2026-10-24** (run 40057853752, rama `claude/wonderful-dirac-s8oi52`,
+el mismo arbol que paso en `pruebas`, y el cambio no tocaba el cliente), con
+otra cara: «el registro de objetos no anoto lo recolectado: []», aunque el
+inventario si tenia lo recogido (10 de un objeto, 3 de otro). Y por eso, despues,
+«no hay una pila de bayas con que probar el menu». Ya son dos veces: es un fallo
+del registro, no de la maquina, y esta por mirar.
+
 **Dejado a proposito** (sin medida que lo pida, lente K5): rehacer solo las
 menas cercanas al voxel roto, y ahorrar las claves de texto al mirar el
 terreno roto. Y unas duplicaciones pequeñas (la altura de la mena en el
