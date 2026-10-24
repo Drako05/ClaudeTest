@@ -11,6 +11,50 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Pruebas que no dependen de la maquina (2026-10-24) — HECHA
+
+**Lo que vio el autor**: en su PC, la pasada `escritorio` caia en dos
+comprobaciones («el anillo del hambre no bajo», «no hay una pila de bayas…»)
+que en la CI pasaban. El autor: una prueba que da distinto en local y en la CI
+igual puede pasar en local y caer en la CI; «Trata que nada dependa de que tan
+rapido corre la maquina donde se ejecuta», y herramientas nuevas si agilizan.
+
+**La causa**: `desktop` y `gestures` seguian con el reloj de verdad, y los
+temporizadores de la interfaz de todas las pasadas tambien. El anillo marca
+`Math.ceil(hambre)`, que solo baja de 100 tras ~10 s de juego, y el PC del
+autor llegaba antes a mirarlo. Las bayas, porque `harvestUntil` paraba en la
+primera cosa recogida y la pila dependia de lo que el iman cogiera despues.
+Habia mas: un toque corto del ojo que competia con su temporizador de 500 ms
+(ya habia caido una vez en la CI), el destello de una pestana, y el
+presupuesto de chunks, que en una maquina muy rapida dejaba entrar los 7 en un
+frame.
+
+**Lo hecho**: los dos relojes fingidos (`tools/lib/navegador.mjs`; el detalle,
+en `docs/pruebas.md`, «Y el reloj de la interfaz, tambien fingido»). En cifras:
+
+- toda espera es `elapse`, `uiRun`, `until` o `settle`;
+- `desktop` y `gestures`, con el reloj manual y el de Playwright;
+- el bucle de verdad, en una comprobacion corta sin plazo;
+- la hora del reloj fingido en los toques de CDP;
+- 2 ms por paso de chunk con el reloj manual;
+- el anillo, tras 20 s de juego, exacto;
+- las bayas, hasta una pila de 2.
+
+Y tres herramientas: `tools/humo.mjs` (todas a la vez), `tools/determinismo.mjs`
+(normal frente a 4 veces mas lenta) y `mutar.mjs`, que ya corre en Windows.
+
+**Medido en el PC del autor**: las 16 pruebas de la matriz en verde en ~90 s
+con `tools/humo.mjs`, frente a ~22 min en serie; `escritorio` sola, 15 s. **Las
+16 dan la misma salida, linea a linea, normal y con la CPU frenada 4 veces**
+(`tools/determinismo.mjs`). Para llegar ahi hubo que quitar tres cosas mas:
+
+- el reloj manual arrancaba donde iba el de verdad, asi que dependia de cuanto
+  tardaba la pagina en cargar; ahora arranca en 0. De ahi venian el balanceo
+  de los montones y los 114 frente a 112 impactos de `fauna`, que se daban por
+  inevitables;
+- el humo imprimia la semilla al azar del reinicio;
+- y cuantos fotogramas dibujaba el bucle de verdad.
+
 ## Tanda movil 1: los tirones al cruzar de chunk (2026-10-24) — HECHA
 
 **Lo que vio el autor**, en su telefono (MediaTek Dimensity 7020): ~42 fps de
@@ -77,6 +121,97 @@ es considerable», y se seguira optimizando en tandas futuras.
 fallos de `escritorio` que ya habia antes de la tanda («el anillo del hambre no
 bajo», «no hay una pila de bayas») y una vez el destello de una pestana en la
 pasada del movil, que sola paso tres veces de tres.
+
+## Auditoria al cerrar la pala y las menas de voxeles (2026-10-20)
+
+**El alcance**: de `4151766` a `8e9269e`: el boceto de los minerales, las
+menas al juego, romper el terreno y la tanda de la pala, enteros en
+`docs/historia.md`. Con la lente nueva, **K, buenas practicas** (pedida por el
+autor este dia).
+
+**Corregido:**
+- **El compilador, mas estricto** (lente K): `noUnusedLocals` y
+  `noUnusedParameters`, encendidos. Sacaron 16 restos sin uso: imports de
+  modelos sustituidos (en la recoleccion, `treeTrunkAt`, `rayBox`,
+  `stationHeight`…), un parametro `world` que los efectos ya no leian, la
+  constante `SQUARE` de las casillas y un indice suelto en los bordes de
+  bioma. Y el escaner vigila que sigan encendidos (categoria «Practicas»).
+- **La camara atravesaba media estacion** corrida medio bloque: buscaba cada
+  caja solo en su casilla. Ahora mira tambien las vecinas al oeste y al norte;
+  igual el modo TAP, que usa el mismo rayo. Con su test.
+- **El barrido se dibujaba mas largo que el golpe**: se volvia a medir
+  despues del paso, cuando lo roto ya no cortaba su rayo. Ahora el nucleo
+  cuenta los rayos del golpe (`lastStrikeRays`) y el cliente los dibuja.
+- **Lo que solo sostenian los tests**: los escombros de una mena (no se
+  rompe ninguna con escombros desde que son terreno) y `Surface.front` (lo que
+  se coloca va delante de la cara, desde la rejilla de 0,5). Fuera, con sus
+  textos.
+- **Tests que no decian lo que afirmaban**: las reglas de los cristales se
+  median sobre la roca de siete voxeles, que ya no es una mena: ahora sobre la
+  formacion de ocho, enterrada y cavada. «Requieren herramientas para
+  recolectarse» ya no miraba que se recolectara: ahora, el carbon que suelta.
+  «Una casilla cubierta» no se probaba; «la generacion sigue pura» comparaba
+  un chunk consigo mismo (ahora, con otro generado despues de sus vecinos); y
+  el preciso a 40 grados sin su control.
+- **Comentarios y documentos del modelo viejo**: el terreno «con cualquier
+  cosa», las menas con caja y con escombros (`docs/arte.md`,
+  `docs/efectos.md`, `docs/juicio.md`), el golpe «cortado por el terreno»
+  (`aim.ts`, `strikeOf`), lo que pesa una mena (medido otra vez: enterrada,
+  400 vertices; cavada, 880), las palas en la guia de arte y en las leyes.
+- **Numeros sin nombre**: `ORE_SALT`, `BODY_REACH`, y `VOXELS_PER_TILE` en
+  vez de un `* 2`.
+
+**Mutado** (caen las 5 en local): la camara sin vecinas, el barrido sin los
+rayos del golpe, colocar sobre lo cubierto, la mena sin botin y los cristales
+bajo tierra.
+
+**Ejecutado**: el escaner y su autoprueba; typecheck y los 650 tests;
+`npm run shots`, `tools/analyze-world.ts` (en su presupuesto) y el generador
+de pixelart (a otro fichero, sale identico); las pasadas `mobile` y `dig`.
+
+**Para ti** (cambian lo que hace el juego; no se tocaron):
+- **Las menas aun cuentan como solidas para nacer y medir el mundo**
+  (`blocksBody`): sin caja, se pisan, pero el nacimiento y la conectividad las
+  evitan. Quitarlas cambia donde se nace en algunas semillas.
+- **Lo que vuela hacia ti atraviesa el terreno**: desde que no se suelta por
+  distancia, persigue en linea recta aunque haya una pared en medio. Y si
+  mueres con algo volando, se queda quieto en el aire hasta que caduca.
+- **La estocada del preciso no se para en un animal**: la simulacion si le
+  pega al primero, pero la linea que se dibuja sigue hasta el terreno o el
+  objeto de detras.
+
+**Un fallo suelto en la CI de `main`, sin causa encontrada**: la pasada
+`desktop` cayo una vez en «el registro no va encima de INVENTARIO» (run
+39472539170, una maquina lenta: la pasada tardo 411 s). La linea «+5 Bayas»
+ya estaba fuera de la pagina en el primer fotograma tras nacer (`y0` 0,
+`alive` false), y su vida no puede acabar en un fotograma (`dt` con tope de
+0,25 s). Paso en `pruebas` con el mismo arbol y al relanzarlo. La auditoria no
+toca el registro. Si vuelve, se mira que quita la linea antes de su primer
+fotograma.
+
+**Volvio el 2026-10-24** (run 40057853752, rama `claude/wonderful-dirac-s8oi52`,
+el mismo arbol que paso en `pruebas`, y el cambio no tocaba el cliente), con
+otra cara: «el registro de objetos no anoto lo recolectado: []», aunque el
+inventario si tenia lo recogido (10 de un objeto, 3 de otro). Y por eso, despues,
+«no hay una pila de bayas con que probar el menu». Ya son dos veces: es un fallo
+del registro, no de la maquina, y esta por mirar.
+
+**Y una tercera, el mismo dia** (run 40067714483, en `pruebas`, con vite 8):
+«no hay una pila de bayas con que probar el menu», con el inventario con 1 y
+2 de dos objetos y sin bayas. Relanzada, paso; y paso en las dos tandas
+siguientes del mismo cambio.
+
+**Dejado a proposito** (sin medida que lo pida, lente K5): rehacer solo las
+menas cercanas al voxel roto, y ahorrar las claves de texto al mirar el
+terreno roto. Y unas duplicaciones pequeñas (la altura de la mena en el
+generador, el bucle de bajar por lo roto), que se juntan cuando se toquen.
+
+**Escapes** (fase 6): el 48 (lo sorteado de cada pieza, de un flujo comun) a
+un principio nuevo, G8; el 49 (dos numeros con una relacion, cada uno por su
+lado) a otro, A4; el 50 a B3, afinado; el 51 a K1; y el P9 (un `stash` que se
+llevo tests sin commit) a Q4.
+
+---
 
 ## Vite 8 y las herramientas en Windows (2026-10-24) — HECHA
 

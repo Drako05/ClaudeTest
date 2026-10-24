@@ -195,7 +195,11 @@ mirar la CI sin gastar, las mutaciones, la matriz, la auditoria— esta en
 ronda de cada sesion.**
 
 1. **En local**: `npm run typecheck && npm test` (~2 min) y **solo la pasada que
-   se toca** (`npm run build && node tools/smoke.mjs <pasada>`).
+   se toca** (`npm run build && node tools/smoke.mjs <pasada>`); varias a la
+   vez, `node tools/humo.mjs <nombres>`. **Ninguna prueba depende de la
+   velocidad de la maquina** (el autor, 2026-10-24): se espera con los relojes
+   fingidos de `tools/lib/navegador.mjs`, nunca con `waitForTimeout`, y
+   `node tools/determinismo.mjs <nombres>` lo comprueba.
 2. **La ronda de mutaciones** en `tools/mutaciones.mjs`: cada comprobacion
    nueva, con lo que la rompe. Si no cae, no comprueba nada.
 3. **`tools/a-pruebas.sh "que se prueba"`**, con `FIRMA` puesta a las lineas

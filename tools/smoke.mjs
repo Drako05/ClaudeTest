@@ -24,13 +24,12 @@
  * Ojo con los FPS de aqui: se renderiza por software, sin GPU.
  */
 
-import { createServer } from 'node:http';
-import { readFile, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+import { draw, elapse, manual, prepare, serve, uiQuiet, uiRun, until } from './lib/navegador.mjs';
 
-const PAGE = fileURLToPath(new URL('../packages/client/dist/index.html', import.meta.url));
 const SHOTS = fileURLToPath(new URL('../screenshots', import.meta.url));
 const SEED = 12345;
 const DAY_TICKS = 8 * 60 * 60;
@@ -70,56 +69,40 @@ function spots(page) {
 
 // ------------------------------------------------------------------ el reloj
 //
-// Las pasadas migradas abren el juego con `?reloj=manual` (`clock.ts`): el
-// bucle no corre solo, y la prueba lo avanza frame a frame sin dibujar
-// (`window.__reloj`). Sin GPU el headless dibuja a ~5 FPS, y esperar en tiempo
-// real tardaba lo que tardaba y daba lo que daba la maquina: el paseo acababa
-// donde lo dejaba su velocidad. Con el reloj manual cada frame lleva un tick,
-// como un jugador a 60 Hz, y el resultado es el mismo en cualquier maquina.
+// Todas las pasadas abren el juego con los dos relojes fingidos
+// (`tools/lib/navegador.mjs`): el del juego, el reloj manual (`?reloj=manual`,
+// `clock.ts`), y el de la interfaz, el de Playwright (`page.clock`). Nada
+// corre solo: la prueba deja pasar el tiempo con `elapse` o espera a una
+// condicion con `until`, y el resultado es el mismo en cualquier maquina (el
+// autor, 2026-10-24). Que el bucle de verdad del navegador corre lo mira
+// aparte `desktopPass`, sin depender de su velocidad.
 //
-// Los ayudantes de abajo valen para los dos relojes, asi que una pasada se
-// migra anadiendola a `MANUAL_PASSES` y cambiando sus esperas AL JUEGO
-// (`page.waitForTimeout`) por `elapse`. Las esperas a la interfaz con reloj de
-// verdad —destellos, gestos, la pausa— se quedan como estan.
+// `SMOKE_RELOJ=real` corre con los de verdad, para comparar.
 
-/** Las pasadas que van con el reloj manual. `desktop` se queda con el de verdad a proposito: alguna tiene que probar el bucle real. */
-const MANUAL_PASSES = new Set([
-  'lifePass', 'reliefPass', 'faunaPass', 'devToolsPass', 'stationsPass', 'resourcesPass', 'highRefreshPass', 'mobilePass', 'digPass',
-]);
-/** Si la pasada en curso va con el reloj manual; lo pone el bucle de pasadas. */
+/** Si la pasada en curso va con los relojes fingidos; lo pone el bucle de pasadas. */
 let manualPass = false;
-
-/** Si esta pagina va con el reloj manual. */
-const manual = (page) => page.url().includes('reloj=manual');
-
-/**
- * Deja correr el juego `ms` milisegundos: con el reloj manual lo avanza en
- * frames de `1/hz` s (sin dibujar, que es lo que cuesta), y con el de verdad
- * espera.
- */
-async function elapse(page, ms, hz = 60) {
-  if (manual(page)) return page.evaluate(([m, h]) => window.__reloj.avanzar(m, { hz: h }), [ms, hz]);
-  await page.waitForTimeout(ms);
-}
-
-/**
- * Espera a que `fn` (evaluada en la pagina) sea cierta, como `waitForFunction`.
- * Con el reloj manual avanza el juego de 100 en 100 ms mientras tanto, hasta
- * `timeout` ms DE JUEGO; si no llega, lanza como lo haria `waitForFunction`.
- */
-async function until(page, fn, arg, { timeout = 30000 } = {}) {
-  if (!manual(page)) return page.waitForFunction(fn, arg, { timeout });
-  for (let t = 0; ; t += 100) {
-    if (await page.evaluate(fn, arg)) return;
-    if (t >= timeout) throw new Error(`until: no se cumplio en ${timeout} ms de juego: ${fn}`);
-    await elapse(page, 100);
-  }
-}
 
 /** Una captura a fichero. Con el reloj manual, dibuja antes: sin bucle no hay fotograma. */
 async function shot(page, name) {
-  if (manual(page)) await page.evaluate(() => window.__reloj.dibujar());
+  await draw(page);
   await page.screenshot({ path: join(SHOTS, name) });
+}
+
+/**
+ * Lo que una funcion de la pagina devuelve cuando su promesa se cumple, dejando
+ * pasar el tiempo mientras tanto: con los relojes fingidos, una promesa que
+ * espera a un fotograma o a un `setTimeout` no se cumple sola.
+ */
+async function settle(page, fn, arg, { timeout = 30000 } = {}) {
+  let done = false;
+  let value;
+  const pending = page.evaluate(fn, arg).then((v) => {
+    done = true;
+    value = v;
+  });
+  for (let t = 0; !done && t < timeout; t += 50) await elapse(page, 50);
+  await pending;
+  return value;
 }
 
 /**
@@ -141,6 +124,11 @@ function reliefInside(shadow) {
  * Devuelve lo que no cumple.
  */
 async function buttonStandard(page) {
+  // Que se apague la luz del ultimo toque (`press-light.ts`, 150 ms): con el
+  // reloj de la interfaz parado no se apaga sola. Y el `:active` de un toque,
+  // que lo quita el navegador con su propio reloj.
+  await uiRun(page, 200);
+  await uiQuiet(page);
   const INK = 'rgb(232, 238, 247)';
   const BG = 'rgba(8, 14, 28, 0.82)';
   const LIT_INK = 'rgb(244, 249, 255)';
@@ -245,6 +233,7 @@ const VIEW = '&view=perspectiva';
 async function open(page, baseUrl, query) {
   const view = (query ?? '').includes('view=') ? '' : VIEW;
   const clockMode = manualPass ? '&reloj=manual' : '';
+  await prepare(page, { fake: manualPass });
   await page.goto(`${baseUrl}/?seed=${SEED}${query ?? ''}${view}${clockMode}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
   await play(page);
@@ -264,7 +253,7 @@ async function play(page) {
   const s = await state(page);
   if (!s.paused && (!wantsLock(s) || s.pointerLocked)) return;
   await page.mouse.click(CLICK.x, CLICK.y);
-  await page.waitForFunction(
+  await until(page, 
     () => {
       const v = window.__verdant;
       return v && !v.paused && (!(v.mouseMode && !v.inventoryOpen && !v.devOpen) || v.pointerLocked);
@@ -320,7 +309,7 @@ async function toHand(page, item) {
  */
 async function freeCursor(page) {
   await page.keyboard.press('F3');
-  await page.waitForFunction(() => window.__verdant.dev && !window.__verdant.pointerLocked, null, { timeout: 5000 });
+  await until(page, () => window.__verdant.dev && !window.__verdant.pointerLocked, null, { timeout: 5000 });
 }
 
 async function unfree(page) {
@@ -331,7 +320,7 @@ async function unfree(page) {
 
 async function release(page) {
   await page.evaluate(() => document.exitPointerLock());
-  await page.waitForFunction(() => window.__verdant.paused, null, { timeout: 5000 });
+  await until(page, () => window.__verdant.paused, null, { timeout: 5000 });
 }
 
 /**
@@ -504,7 +493,7 @@ async function tapButton(page, selector, type, dx = 0, dy = 0) {
 
 async function tap(page, selector) {
   await tapButton(page, selector, 'touchstart');
-  await page.waitForTimeout(60);
+  await elapse(page, 60);
   await tapButton(page, selector, 'touchend');
 }
 
@@ -517,20 +506,38 @@ async function desktopPass(browser, baseUrl) {
 
   // Sin `?view=` se arranca en primera persona (decision del autor,
   // 2026-10-02). El resto del humo fija la perspectiva.
+  //
+  // Y es la unica pagina del humo con los relojes de verdad: que el bucle del
+  // navegador corre solo —avanza la simulacion y dibuja— no lo puede probar el
+  // reloj manual. Se espera a que pase, sin plazo que dependa de la maquina:
+  // ni cuanto anda, ni cuantos fotogramas por segundo.
   const plain = await browser.newPage({ viewport: { width: 640, height: 360 } });
+  await prepare(plain, { fake: false });
   await plain.goto(`${baseUrl}/?seed=${SEED}`, { waitUntil: 'load' });
   await plain.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
   const startView = (await state(plain)).projection;
-  await plain.close();
   console.log(`  vista de arranque: ${startView}`);
   check(startView === 'primera', `no se arranca en primera persona: ${startView}`);
+  const loop0 = await state(plain);
+  await plain.mouse.click(320, 110);
+  const looped = await plain.waitForFunction(
+    ([t, f]) => window.__verdant.tick >= t + 60 && window.__verdant.framesDrawn >= f + 2,
+    [loop0.tick, loop0.framesDrawn],
+    { timeout: 60000 },
+  ).then(() => true, () => false);
+  // Cuanto avanzo y cuanto dibujo lo decide la maquina: solo se dice si corre.
+  console.log(`  bucle de verdad: ${looped ? 'avanza y dibuja solo' : 'NO corre'}`);
+  check(looped, 'el bucle de verdad del navegador no corre solo: ni avanza la simulacion ni dibuja');
+  await plain.close();
 
   // Arranca en pausa: sin cursor capturado el juego se detiene, con el aviso.
-  await page.goto(`${baseUrl}/?seed=${SEED}${VIEW}`, { waitUntil: 'load' });
+  // Desde aqui, con los relojes fingidos, como el resto del humo.
+  await prepare(page, { fake: manualPass });
+  await page.goto(`${baseUrl}/?seed=${SEED}${VIEW}${manualPass ? '&reloj=manual' : ''}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
-  await page.waitForTimeout(600);
+  await elapse(page, 600);
   const idle = await state(page);
-  await page.waitForTimeout(500);
+  await elapse(page, 500);
   const idleLater = await state(page);
   const idleHint = await page.textContent('#pauseHint');
   console.log(`  al cargar: pausa ${idle.paused}, aviso «${idleHint}», ticks ${idle.tick} -> ${idleLater.tick}`);
@@ -632,7 +639,7 @@ async function desktopPass(browser, baseUrl) {
   // clic va al lienzo y golpea, y en pausa no responde nada.
   await freeCursor(page);
   await page.click('#hudToggle');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   const hud = await page.evaluate(() => ({
     clock: document.getElementById('clock').textContent,
     day: document.getElementById('day').textContent,
@@ -645,7 +652,7 @@ async function desktopPass(browser, baseUrl) {
   check(hud.day === '1', `el HUD no marca el dia 1: ${hud.day}`);
   check(hud.seed === String(SEED), `el HUD no marca la semilla: ${hud.seed}`);
   await mkdir(SHOTS, { recursive: true });
-  await page.screenshot({ path: join(SHOTS, '3d-01-spawn.png') });
+  await shot(page, '3d-01-spawn.png');
   await page.click('#hudToggle');
   check(!(await page.isVisible('#hud')), 'el boton no volvio a cerrar el HUD');
   await unfree(page);
@@ -656,8 +663,15 @@ async function desktopPass(browser, baseUrl) {
   check(walked > 1, `el jugador apenas se movio: ${walked.toFixed(2)} casillas`);
   check(moved.tick > spawn.tick, 'la simulacion no avanzo');
   check(moved.hunger < spawn.hunger, 'el hambre no bajo con el tiempo');
+  // El anillo marca el hambre redondeada hacia arriba (`hud.ts`), asi que solo
+  // baja de 100 tras ~10 s de juego: se dejan pasar 20 desde aqui. Antes se
+  // miraba tras andar, y cuanto se habia andado lo decidia la maquina: en una
+  // rapida el anillo seguia en 100 (2026-10-24).
+  await elapse(page, 20000);
+  const hungerNow = (await state(page)).hunger;
   const hudHunger = await page.evaluate(() => Number(document.getElementById('hungerRing').getAttribute('aria-valuenow')));
-  check(hudHunger < 100, `el anillo del hambre no bajo (${hudHunger})`);
+  console.log(`  hambre tras 20 s mas: ${hungerNow.toFixed(2)}, el anillo marca ${hudHunger}`);
+  check(hudHunger < 100 && hudHunger === Math.ceil(hungerNow), `el anillo del hambre no marca el hambre (${hudHunger} con ${hungerNow})`);
 
   // La mirada es la de la camara (regla 5): el rumbo y la inclinacion del
   // nucleo son los de la camara, y girarla los gira.
@@ -715,7 +729,7 @@ async function desktopPass(browser, baseUrl) {
   // haya algo que golpear o no.
   const beforeClick = await open(page, baseUrl);
   await strike(page);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const afterClick = await state(page);
   check(afterClick.sent.harvest > beforeClick.sent.harvest, 'un clic no acciono');
   check(afterClick.slashesDrawn > beforeClick.slashesDrawn, 'accionar no dibujo ningun barrido');
@@ -752,7 +766,7 @@ async function desktopPass(browser, baseUrl) {
   // delante de la mata: el botin de antes, que el iman va recogiendo monton a
   // monton, no dejaba vaciarse el registro, y se media una linea vieja.
   if (bush) await open(page, baseUrl, `&x=${bush.stand.x}&y=${bush.stand.y}`);
-  await page.waitForFunction(() => document.getElementById('pickupFeed').children.length === 0, null, { timeout: 8000 })
+  await until(page, () => document.getElementById('pickupFeed').children.length === 0, null, { timeout: 8000 })
     .catch(() => {});
   await page.evaluate(() => {
     window.__feedPc = null;
@@ -788,8 +802,11 @@ async function desktopPass(browser, baseUrl) {
     watch.observe(box, { childList: true });
   });
   const feedFrom = sum((await state(page)).inventory);
-  await harvestUntil(page, (s) => sum(s.inventory) > feedFrom);
-  await page.waitForFunction(() => window.__feedPc !== null, null, { timeout: 8000 }).catch(() => {});
+  // Hasta tener una pila de dos bayas o mas, que es con la que se prueba el
+  // menu de una casilla (abajo). Parar en lo primero que llegara dejaba esa
+  // pila a la suerte de lo que el iman recogiera despues (2026-10-24).
+  await harvestUntil(page, (s) => sum(s.inventory) > feedFrom && s.slots.some((c) => c.item === 2 && c.count >= 2));
+  await until(page, () => window.__feedPc !== null, null, { timeout: 8000 }).catch(() => {});
   const feedPc = await page.evaluate(() => window.__feedPc);
   console.log(`  registro en PC: encima de INVENTARIO ${feedPc?.above}, y ${feedPc?.y0.toFixed(1)} -> ${feedPc?.y1.toFixed(1)}`);
   check(feedPc !== null && feedPc.above, `el registro no va encima de INVENTARIO: ${JSON.stringify(feedPc)}`);
@@ -804,7 +821,7 @@ async function desktopPass(browser, baseUrl) {
     new WheelEvent('wheel', { deltaY: d, deltaMode: 0, bubbles: true, cancelable: true })), dy);
   const w0 = await state(page);
   await wheel(100);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   const w1 = await state(page);
   // Dos muescas seguidas: se iluminan las dos casillas por las que pasa, no
   // solo la de llegada (pedido del autor). Se lee el ACUMULADO de casillas
@@ -814,7 +831,10 @@ async function desktopPass(browser, baseUrl) {
   await wheel(-100);
   await wheel(-100);
   const n0 = w0.hotbarPasses.length;
-  await page.waitForFunction((n) => window.__verdant.hotbarPasses.length >= n, n0 + 3, { timeout: 5000 }).catch(() => {});
+  await until(page, (n) => window.__verdant.hotbarPasses.length >= n, n0 + 3, { timeout: 5000 }).catch(() => {});
+  // La luz es de la interfaz, al instante; la seleccion la aplica el nucleo en
+  // un tick.
+  await elapse(page, 200);
   const w2 = await state(page);
   const lit = w2.hotbarPasses.slice(n0);
   const passed = [(w0.selectedSlot + 1) % 5, w0.selectedSlot, (w0.selectedSlot + 4) % 5];
@@ -829,7 +849,7 @@ async function desktopPass(browser, baseUrl) {
   // las encendidas EN CADA FOTOGRAMA, que es lo que se ve, con una muesca por
   // fotograma y veinte fotogramas mas: es un invariante, no una cuenta en una
   // ventana de tiempo (escape 13).
-  const spin = await page.evaluate(() => new Promise((done) => {
+  const spin = await settle(page, () => new Promise((done) => {
     const hotbar = document.getElementById('hotbar');
     const view = document.getElementById('view');
     let max = 0;
@@ -850,7 +870,7 @@ async function desktopPass(browser, baseUrl) {
   // El inventario, con su tecla: E lo abre, muestra lo del juego, y E lo
   // cierra. Abrirlo suelta el cursor y NO pausa (decision del autor).
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   check(await page.isVisible('#invPanel'), 'E no abrio el inventario');
   // La rejilla no repite la luz de la casilla elegida de la barra (pedido del
   // autor, 2026-10-01), aunque su primera fila sean esas casillas.
@@ -880,7 +900,7 @@ async function desktopPass(browser, baseUrl) {
     await page.mouse.click(world.x, world.y);
     await page.mouse.click(world.x, world.y, { button: 'right' });
   }
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const clickedOpen = await state(page);
   check(clickedOpen.sent.harvest === invOpen.sent.harvest && clickedOpen.sent.use === invOpen.sent.use,
     'con el inventario abierto un clic golpeo o uso');
@@ -981,10 +1001,10 @@ async function desktopPass(browser, baseUrl) {
   // La vacia mas lejana de las abiertas: el menu del clic tapa las de al lado.
   const empty = nowSlots.findLastIndex((s, i) => i < 15 && s.item < 0);
   await page.click(`#invGrid .slot:nth-child(${full + 1})`);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   const shown = await desc();
   await page.click(`#invGrid .slot:nth-child(${empty + 1})`);
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   console.log(`  descripcion: «${shown.slice(0, 30)}…» -> «${await desc()}»`);
   check(shown !== '' && (await desc()) === '', 'tocar una casilla vacia no limpio la descripcion');
   // El menu de una casilla (el autor, 2026-10-19): en PC sale con el clic, al
@@ -996,7 +1016,7 @@ async function desktopPass(browser, baseUrl) {
   if (berrySlot >= 0) {
     const cellSel = `#invGrid .slot:nth-child(${berrySlot + 1})`;
     await page.click(cellSel);
-    await page.waitForTimeout(200);
+    await elapse(page, 200);
     const menu = (await state(page)).itemMenu;
     const [cellR, menuR] = await page.evaluate((q) => [
       document.querySelector(q).getBoundingClientRect().toJSON(),
@@ -1014,7 +1034,7 @@ async function desktopPass(browser, baseUrl) {
     check(radius === '8px', `los botones del menu no tienen las esquinas redondeadas: ${radius}`);
     // Un clic en otra casilla cierra el menu y la elige: no se lo traga.
     await page.click(`#invGrid .slot:nth-child(${empty + 1})`);
-    await page.waitForTimeout(200);
+    await elapse(page, 200);
     const closed = (await state(page)).itemMenu;
     check(!closed.open && (await desc()) === '', `el clic fuera no cerro el menu o no hizo lo suyo: ${JSON.stringify(closed)}`);
     // Dividir: el selector empieza en 0; +5 (como mucho la pila menos 1) y
@@ -1023,9 +1043,9 @@ async function desktopPass(browser, baseUrl) {
     const n = Math.min(5, before[berrySlot].count - 1);
     const free = before.findIndex((s) => s.item < 0);
     await page.click(cellSel);
-    await page.waitForTimeout(150);
+    await elapse(page, 150);
     await page.click('#itemMenu [data-option="split"]');
-    await page.waitForTimeout(150);
+    await elapse(page, 150);
     const qty0 = await page.inputValue('#splitQty');
     await page.click('#splitAsk [data-add="5"]');
     const qty5 = await page.inputValue('#splitQty');
@@ -1040,9 +1060,9 @@ async function desktopPass(browser, baseUrl) {
     // 2026-10-19).
     const outside = async (option, box) => {
       await page.click(`#invGrid .slot:nth-child(${free + 1})`);
-      await page.waitForTimeout(150);
+      await elapse(page, 150);
       await page.click(`#itemMenu [data-option="${option}"]`);
-      await page.waitForTimeout(150);
+      await elapse(page, 150);
       const open = await page.isVisible(box);
       await page.click('.invPage[data-page="personaje"] h2');
       await elapse(page, 200);
@@ -1060,7 +1080,7 @@ async function desktopPass(browser, baseUrl) {
     check(radiusAsk === '8px', `los botones de los avisos no tienen las esquinas redondeadas: ${radiusAsk}`);
     // Destruir: pide confirmar, y hasta entonces no borra nada.
     await page.click(`#invGrid .slot:nth-child(${free + 1})`);
-    await page.waitForTimeout(150);
+    await elapse(page, 150);
     await page.click('#itemMenu [data-option="destroy"]');
     await elapse(page, 200);
     const asked = await state(page);
@@ -1081,12 +1101,12 @@ async function desktopPass(browser, baseUrl) {
       HTMLCanvasElement.prototype.requestPointerLock = () => {};
     });
     await page.click(cellSel);
-    await page.waitForTimeout(150);
+    await elapse(page, 150);
     const openBefore = (await state(page)).itemMenu.open;
     await page.keyboard.press('KeyE');
-    await page.waitForTimeout(200);
+    await elapse(page, 200);
     await page.keyboard.press('KeyE');
-    await page.waitForTimeout(200);
+    await elapse(page, 200);
     await page.evaluate(() => { HTMLCanvasElement.prototype.requestPointerLock = window.__lockBackup; });
     const reopened = await state(page);
     check(!reopened.paused && !reopened.pointerLocked, `cerrar y abrir el panel dejo el juego en pausa o capturado: ${JSON.stringify([reopened.paused, reopened.pointerLocked])}`);
@@ -1107,11 +1127,11 @@ async function desktopPass(browser, baseUrl) {
     };
   });
   await page.keyboard.down('Escape');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   const escDownCalls = await page.evaluate(() => window.__lockCalls);
   const escDown = await state(page);
   await page.keyboard.up('Escape');
-  await page.waitForFunction(() => window.__verdant.pointerLocked, null, { timeout: 3000 }).catch(() => {});
+  await until(page, () => window.__verdant.pointerLocked, null, { timeout: 3000 }).catch(() => {});
   const escClosed = await state(page);
   const escLockCalls = await page.evaluate(() => window.__lockCalls);
   check(!(await page.isVisible('#invPanel')), 'Esc no cerro el inventario');
@@ -1126,7 +1146,7 @@ async function desktopPass(browser, baseUrl) {
   // Se suelta en el mismo instante en que llega, como haria el Esc de Chrome:
   // soltarla desde aqui tarda mas de un segundo en este navegador lento.
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   await page.evaluate(() => {
     window.__dropped = false;
     window.__unlockSeen = false;
@@ -1142,7 +1162,7 @@ async function desktopPass(browser, baseUrl) {
     });
   });
   await page.keyboard.press('Escape');
-  await page.waitForFunction(() => window.__unlockSeen, null, { timeout: 8000 }).catch(() => {});
+  await until(page, () => window.__unlockSeen, null, { timeout: 8000 }).catch(() => {});
   const dropped = await state(page);
   const dropSeen = await page.evaluate(() => window.__unlockSeen);
   await page.evaluate(() => { HTMLCanvasElement.prototype.requestPointerLock = window.__lockBackup; });
@@ -1150,22 +1170,22 @@ async function desktopPass(browser, baseUrl) {
   check(dropSeen && !dropped.paused && dropped.cursorFree, `una captura de Esc soltada enseguida pauso el juego (vista ${dropSeen})`);
   const clickFrom = await state(page);
   await page.mouse.click(CLICK.x, CLICK.y);
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const clicked = await state(page);
   check(clicked.pointerLocked && clicked.sent.harvest === clickFrom.sent.harvest,
     'tras soltarse la captura de Esc, el primer clic no capturo o golpeo');
   // Y al reabrirlo no queda nada seleccionado.
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   check((await desc()) === '' && (await page.locator('#invGrid .slot.picked').count()) === 0,
     'al reabrir el inventario seguia seleccionada la casilla de antes');
   // Una casilla de la barra tocada con el inventario abierto no se queda con
   // el foco al cerrarlo con E: con el foco, Chrome le pintaba su contorno
   // blanco (lo vio el autor, 2026-10-02).
   await page.click('#hotbar .slot:nth-child(2)');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const focused = await page.evaluate(() => {
     const a = document.activeElement;
     return a && a !== document.body ? `${a.tagName}#${a.id}.${a.className}` : null;
@@ -1174,7 +1194,7 @@ async function desktopPass(browser, baseUrl) {
   check(focused === null, `un boton se quedo con el foco tras cerrar el inventario: ${focused}`);
   check(!(await page.isVisible('#invPanel')), 'E no volvio a cerrar el inventario');
   // Y los efectos se apagan solos.
-  await page.waitForTimeout(1800);
+  await elapse(page, 1800);
   const settled = await state(page);
   check(
     settled.effects.particles === 0 && settled.effects.slashes === 0,
@@ -1184,10 +1204,10 @@ async function desktopPass(browser, baseUrl) {
   // Zoom con + y -.
   const z0 = (await state(page)).distance;
   for (let i = 0; i < 4; i++) await page.keyboard.press('Minus');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const z1 = (await state(page)).distance;
   for (let i = 0; i < 6; i++) await page.keyboard.press('Equal');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const z2 = (await state(page)).distance;
   console.log(`  zoom: ${z0.toFixed(1)} -> ${z1.toFixed(1)} -> ${z2.toFixed(1)}`);
   check(z1 > z0, `- no alejo la camara (${z0} -> ${z1})`);
@@ -1197,7 +1217,7 @@ async function desktopPass(browser, baseUrl) {
   await freeCursor(page);
   await page.click('#statsToggle');
   check(await page.isVisible('#statsPanel'), 'el panel del entorno no se desplego');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const bars = await page.evaluate(() => ({
     biome: document.querySelectorAll('#biomeBars .statRow').length,
     chunk: document.querySelectorAll('#chunkBars .statRow').length,
@@ -1230,22 +1250,22 @@ async function desktopPass(browser, baseUrl) {
   check(keyLabels.every((k) => k.text === KEYS[k.id] && k.corner),
     `un boton de PC no lleva su tecla abajo a la izquierda: ${JSON.stringify(keyLabels)}`);
   await page.keyboard.press('KeyI');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const hudByKey = await page.isVisible('#hud');
   await page.keyboard.press('KeyI');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   check(hudByKey && !(await page.isVisible('#hud')), 'la I no abrio y cerro la informacion');
   await page.keyboard.press('KeyB');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const statsByKey = await page.isVisible('#statsPanel');
   await page.keyboard.press('KeyB');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   check(statsByKey && !(await page.isVisible('#statsPanel')), 'la B no abrio y cerro el panel del bioma');
 
   // CTRL ya no suelta el cursor (retirado por el autor, 2026-10-02): mantenerlo
   // deja el cursor capturado y el juego en marcha.
   await page.keyboard.down('Control');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const ctrlHeld = await state(page);
   await page.keyboard.up('Control');
   console.log(`  CTRL: capturado ${ctrlHeld.pointerLocked}, pausa ${ctrlHeld.paused}`);
@@ -1255,21 +1275,21 @@ async function desktopPass(browser, baseUrl) {
     getComputedStyle(document.querySelector('#modeBar .mode-precise')).display !== 'none');
   const m0 = await state(page);
   await page.keyboard.press('Tab');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   const m1 = await state(page);
   const icon1 = await modeIcon();
   // En tercera persona la estocada hace el mismo recorrido que en primera:
   // nace a un bloque de los ojos, no lejos del jugador (lo vio el autor,
   // 2026-10-01; nacia en la pantalla de la camara, que va detras).
   await strike(page);
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const stabbed = await state(page);
   const st = stabbed.lastStab;
   const stabFrom = st ? Math.hypot(st.from.x - st.eye.x, st.from.y - st.eye.y, st.from.z - st.eye.z) : Infinity;
   console.log(`  estocada en ${stabbed.projection}: nace a ${stabFrom.toFixed(2)} de los ojos`);
   check(stabbed.projection !== 'primera' && stabFrom < 1.5, `en tercera persona la estocada nace lejos de los ojos: ${stabFrom}`);
   await page.keyboard.press('Tab');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   const m2 = await state(page);
   console.log(`  TAB: preciso ${m0.precise} -> ${m1.precise} -> ${m2.precise}`);
   check(!m0.precise && m1.precise && !m2.precise && icon1 && !(await modeIcon()), 'TAB no alterna el modo de golpe o su icono');
@@ -1278,7 +1298,7 @@ async function desktopPass(browser, baseUrl) {
   check(await page.isVisible('#hotbar'), 'la barra de la mano no se ve en PC');
   const beforeSelect = await state(page);
   await page.keyboard.press('Digit3');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   const selected = await state(page);
   check(selected.itemsSent.select > beforeSelect.itemsSent.select, 'la tecla 3 no llego a la Intent');
   check(selected.selectedSlot === 2, `la tecla 3 no eligio la casilla 3 (${selected.selectedSlot})`);
@@ -1286,7 +1306,7 @@ async function desktopPass(browser, baseUrl) {
 
   // La carrera, con su estado en la ayuda.
   await page.keyboard.press('ShiftLeft');
-  await page.waitForTimeout(150);
+  await elapse(page, 150);
   const runLabel = await page.evaluate(
     () => getComputedStyle(document.getElementById('runState'), '::after').content,
   );
@@ -1297,15 +1317,15 @@ async function desktopPass(browser, baseUrl) {
   // suelta en un navegador de verdad; en headless se suelta a mano.
   const inGame = await state(page);
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   await page.keyboard.press('KeyE');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   const closed = await state(page);
   check(closed.pointerLocked || closed.paused, 'al cerrar el inventario ni se capturo el cursor ni se pauso');
   if (closed.paused) await play(page);
   await release(page);
   const esc = await state(page);
-  await page.waitForTimeout(500);
+  await elapse(page, 500);
   const escLater = await state(page);
   const escHint = await page.textContent('#pauseHint');
   console.log(`  soltar el cursor: pausa ${esc.paused}, aviso «${escHint}», ticks ${esc.tick} -> ${escLater.tick}`);
@@ -1324,14 +1344,14 @@ async function desktopPass(browser, baseUrl) {
   }
   await page.mouse.move(CLICK.x, CLICK.y);
   await page.mouse.wheel(0, 240);
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const frozen1 = { ...(await state(page)), ...(await frozenUi()) };
   const pausedMoved = ['inventoryOpen', 'projection', 'precise', 'running', 'selectedSlot', 'dev', 'distance', 'hud', 'stats']
     .filter((k) => JSON.stringify(frozen0[k]) !== JSON.stringify(frozen1[k]));
   console.log(`  en pausa, teclas y rueda: ${pausedMoved.length ? 'cambio ' + pausedMoved.join(', ') : 'nada cambio'}`);
   check(frozen1.paused && pausedMoved.length === 0, `en pausa las teclas o la rueda hicieron algo: ${pausedMoved.join(', ')}`);
   await strike(page);
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const resumed = await state(page);
   check(resumed.pointerLocked && !resumed.paused, 'un clic en la pantalla no reanudo');
   check(resumed.sent.harvest === inGame.sent.harvest, 'el clic que reanuda golpeo');
@@ -1343,7 +1363,23 @@ async function desktopPass(browser, baseUrl) {
   // mutacion no caia), asi que el bucle de dibujo se CONGELA mientras se
   // suelta: solo el oyente del evento puede poner el escudo. Se mira que hay
   // encima de INVENTARIO dentro de ese mismo evento.
-  const shieldAtRelease = await page.evaluate(() => new Promise((resolve) => {
+  //
+  // Con el reloj manual no hay bucle que congelar: entre soltar y el evento no
+  // corre ningun fotograma si la prueba no lo pide, asi que basta con soltar
+  // y mirar. El tope es de tiempo real porque el evento no espera a ningun
+  // reloj fingido; solo decide cuanto se espera, no lo que se mide.
+  const releaseNow = () => new Promise((resolve) => {
+    document.addEventListener('pointerlockchange', function once() {
+      if (document.pointerLockElement) return;
+      document.removeEventListener('pointerlockchange', once);
+      const r = document.getElementById('invOpen').getBoundingClientRect();
+      resolve(!!document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.closest('#pause'));
+    });
+    document.exitPointerLock();
+  });
+  const shieldAtRelease = manual(page)
+    ? await Promise.race([page.evaluate(releaseNow), new Promise((r) => setTimeout(() => r(null), 10000))])
+    : await page.evaluate(() => new Promise((resolve) => {
     const raf = window.requestAnimationFrame;
     const held = [];
     window.requestAnimationFrame = (cb) => { held.push(cb); return 0; };
@@ -1365,25 +1401,25 @@ async function desktopPass(browser, baseUrl) {
       document.exitPointerLock();
     };
     soltar();
-  }));
-  await page.waitForFunction(() => window.__verdant.paused, null, { timeout: 5000 });
+    }));
+  await until(page, () => window.__verdant.paused, null, { timeout: 5000 });
   check(shieldAtRelease === true, `al soltarse el cursor, el escudo de la pausa no estaba ya encima de INVENTARIO (${shieldAtRelease})`);
   const invAt = await page.evaluate(() => {
     const r = document.getElementById('invOpen').getBoundingClientRect();
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
   });
   await page.mouse.click(invAt.x, invAt.y);
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const onButton = await state(page);
   console.log(`  clic sobre INVENTARIO en pausa: inventario ${onButton.inventoryOpen ? 'abierto' : 'cerrado'}, pausa ${onButton.paused}`);
   check(!onButton.inventoryOpen && !onButton.paused, 'en pausa un clic sobre INVENTARIO lo abrio o no reanudo');
   // El panel de desarrollo suelta el cursor pero no pausa.
   await page.keyboard.press('F3');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const devOpen = await state(page);
   check(devOpen.dev && !devOpen.pointerLocked && !devOpen.paused, 'F3 no solto el cursor o puso la pausa');
   await page.keyboard.press('F3');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const devClosed = await state(page);
   check(devClosed.pointerLocked || devClosed.paused, 'al cerrar F3 ni se capturo el cursor ni se pauso');
   // Con el cursor suelto por el juego —aqui, el panel de desarrollo— se pulsan
@@ -1391,12 +1427,12 @@ async function desktopPass(browser, baseUrl) {
   // 2026-10-02).
   if (devClosed.paused) await play(page);
   await page.keyboard.press('F3');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   check((await state(page)).dev && !(await state(page)).paused, 'F3 no abrio el panel para pulsar los botones');
   // El ojo recorre las tres vistas y lo dice con su forma: perspectiva →
   // isometrica (entrecerrado) → primera persona (con mira) → perspectiva.
   await page.click('#proj');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   const orto = await state(page);
   check(orto.projection === 'orto', `el ojo no cambio a isometrica (${orto.projection})`);
   // El raton paso por el ojo en perspectiva: la barra del angulo es solo de la
@@ -1404,7 +1440,7 @@ async function desktopPass(browser, baseUrl) {
   check(orto.fovPanel === false, 'la barra del angulo se abrio fuera de la primera persona');
   check(await page.isVisible('#proj.flat'), 'el ojo no se entrecerro en isometrica');
   await page.click('#proj');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const fp = await state(page);
   check(fp.projection === 'primera', `el ojo no cambio a primera persona (${fp.projection})`);
   check(await page.isVisible('#proj.fp'), 'el ojo no lleva la mira en primera persona');
@@ -1421,7 +1457,7 @@ async function desktopPass(browser, baseUrl) {
   const fovShown = async () => (await state(page)).fovPanel && (await page.isVisible('#fovPanel'));
   await page.mouse.move(CLICK.x, CLICK.y);
   await page.hover('#proj');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   check(await fovShown(), 'pasar el raton por el ojo en primera persona no abrio la barra');
   check((await page.textContent('#fovValue')) === '70°', 'la barra no arranca en 70°');
   await page.locator('#fovRange').fill('90');
@@ -1432,16 +1468,16 @@ async function desktopPass(browser, baseUrl) {
   check(wideLabel === '90°', `el numero de la barra no siguio al angulo (${wideLabel})`);
   await page.screenshot({ path: join(SHOTS, '3d-02c-angulo.png') });
   await page.mouse.move(CLICK.x, CLICK.y);
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   check(await fovShown(), 'la barra se cerro al sacar el raton del ojo');
   await page.keyboard.press('KeyQ');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   check(!(await fovShown()), 'una tecla no cerro la barra del angulo');
   await page.hover('#proj');
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   check(await fovShown(), 'la barra no volvio a abrirse con el raton');
   await strike(page);
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   check(!(await fovShown()), 'un clic fuera no cerro la barra del angulo');
   check(!(await state(page)).paused, 'el clic en la pantalla no reanudo tras la barra');
   // El barrido tiene que llegar a dibujarse tambien desde los ojos. Desde el
@@ -1449,18 +1485,18 @@ async function desktopPass(browser, baseUrl) {
   const fpStart = await open(page, baseUrl);
   await page.keyboard.press('KeyP');
   await page.keyboard.press('KeyP');
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const fpAgain = await state(page);
   check(fpAgain.projection === 'primera', 'P no llevo a la primera persona');
   check(fpAgain.fov === 90, `el angulo elegido no se recordo al recargar (${fpAgain.fov})`);
   await page.evaluate(() => localStorage.removeItem('verdant.fpFov'));
   await strike(page);
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const fpHit = await state(page);
   check(fpHit.slashesDrawn > fpStart.slashesDrawn, 'en primera persona el barrido no se dibujo');
   await page.screenshot({ path: join(SHOTS, '3d-02b-primera-persona.png') });
   await page.keyboard.press('KeyP');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   const back = await state(page);
   check(back.projection === 'perspectiva', 'P no volvio a la perspectiva');
   check(back.playerVisible === true, 'al salir de la primera persona el cuerpo no volvio');
@@ -1909,7 +1945,7 @@ async function stationsPass(browser, baseUrl) {
   const downHeld = await holdQty('-');
   // Apagado al llegar a su tope con el raton puesto, el + no se queda con la
   // luz de pulsado para cuando vuelve a encenderse.
-  await page.waitForTimeout(250);
+  await elapse(page, 250);
   const plusAfter = await page.evaluate(() => {
     const b = document.querySelector('#recipeList .recipe:nth-child(1) .qty button:nth-child(1)');
     return { pressed: b.classList.contains('pressed'), bg: getComputedStyle(b).backgroundColor, any: document.querySelectorAll('.pressed').length };
@@ -2002,7 +2038,7 @@ async function stationsPass(browser, baseUrl) {
   // y la lista se desliza con su barra.
   // La barra se pone al dia en el siguiente fotograma del navegador
   // (`scroll-rail-view.ts`): en la CI se midio antes. Se espera, con tope.
-  await page.waitForFunction(() => {
+  await until(page, () => {
     const rail = document.getElementById('recipeList').parentElement.querySelector('.rail');
     return getComputedStyle(rail).visibility === 'visible';
   }, null, { timeout: 3000 }).catch(() => {});
@@ -2244,7 +2280,7 @@ async function mobilePass(browser, baseUrl) {
   // OTROS despliega el ojo, el HUD y el entorno. La pista de los gestos vive
   // en el HUD.
   await page.tap('#others');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   check(await page.isVisible('#proj') && await page.isVisible('#hudToggle') && await page.isVisible('#statsToggle'),
     'OTROS no desplego el ojo, el HUD y el entorno');
   // En columna, debajo de el, y en ese orden.
@@ -2254,7 +2290,7 @@ async function mobilePass(browser, baseUrl) {
     'OTROS no despliega en columna debajo de el');
   check([eyeR, hudR, envR].every((r) => Math.abs(mid(r) - mid(others)) < 2), 'la columna de OTROS no va alineada bajo el');
   await page.tap('#hudToggle');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   check(await page.isVisible('#hud'), 'tocar el boton no abrio el HUD en el movil');
   check(await page.isVisible('.touch-only'), 'la pista de los gestos no se ve en el movil');
   await page.tap('#hudToggle');
@@ -2265,7 +2301,7 @@ async function mobilePass(browser, baseUrl) {
   const devR = await rect('devToggle');
   check(devR.top >= envR.bottom && Math.abs(mid(devR) - mid(others)) < 2, 'el boton de desarrollo no va bajo el bioma, en la columna');
   await page.tap('#devToggle');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   check(await page.isVisible('#devPanel') && (await state(page)).dev, 'tocar el boton no abrio el panel de desarrollo');
   const devPanelR = await rect('devPanel');
   const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
@@ -2292,7 +2328,7 @@ async function mobilePass(browser, baseUrl) {
   check(resStart.pixelRatio === 2 && wide2.px === wide2.css * 2, `la resolucion de siempre no es 2x: ${resStart.pixelRatio}x, ${wide2.px} px`);
   check((await state(page)).pixelRatio === 1 && wide1.px === wide1.css, `la resolucion 1x no se aplico: ${wide1.px} px de ${wide1.css}`);
   await page.tap('#devToggle');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   check(!(await page.isVisible('#devPanel')) && !(await state(page)).dev, 'tocar otra vez no cerro el panel de desarrollo');
   check((await state(page)).pixelRatio === 1, 'cerrar el panel devolvio la resolucion a la de siempre');
   await page.tap('#devToggle');
@@ -2302,7 +2338,7 @@ async function mobilePass(browser, baseUrl) {
   check((await state(page)).pixelRatio === 2, 'volver a 2x no devolvio la resolucion');
   // El inventario: se abre sin pausar, y sus pestanas cambian de pagina.
   await page.tap('#invOpen');
-  await page.waitForTimeout(200);
+  await elapse(page, 200);
   check(await page.isVisible('#invPanel'), 'tocar el boton no abrio el inventario en el movil');
   check(!(await state(page)).paused, 'abrir el inventario en el movil pauso');
   await shot(page, '3d-04-movil.png');
@@ -2340,9 +2376,9 @@ async function mobilePass(browser, baseUrl) {
   // 150 ms (`press-light.ts`); luego queda la luz de elegida, que es otra.
   await page.tap('#invTabs button:nth-child(3)');
   // A los 60 ms de soltar sigue encendida: un toque no la apaga en el acto.
-  await page.waitForTimeout(60);
+  await elapse(page, 60);
   const tabPressed = await page.evaluate(() => document.querySelector('#invTabs button:nth-child(3)').classList.contains('pressed'));
-  await page.waitForTimeout(400);
+  await elapse(page, 400);
   const tabAfter = await page.evaluate(() => document.querySelector('#invTabs button:nth-child(3)').classList.contains('pressed'));
   check(tabPressed && !tabAfter, `tocar una pestana no la ilumina al tocarla, o no se apaga: ${tabPressed} / ${tabAfter}`);
   await page.tap('#invTabs button:nth-child(2)');
@@ -2355,7 +2391,7 @@ async function mobilePass(browser, baseUrl) {
   // rejilla o la lista de recetas.
   const layout = async (n) => {
     await page.tap(`#invTabs button:nth-child(${n})`);
-    await page.waitForTimeout(100);
+    await elapse(page, 100);
     return page.evaluate(() => {
       const r = (el) => (el ? el.getBoundingClientRect().toJSON() : null);
       const panel = document.getElementById('invPanel');
@@ -2376,7 +2412,7 @@ async function mobilePass(browser, baseUrl) {
   const offPages = [];
   for (const n of [1, 2, 3]) {
     await page.tap(`#invTabs button:nth-child(${n})`);
-    await page.waitForTimeout(100);
+    await elapse(page, 100);
     offPages.push(...(await offGridIcons(page)));
   }
   check(offPages.length === 0, `hay iconos del inventario fuera de un multiplo de 24: ${offPages.join(', ')}`);
@@ -2410,10 +2446,10 @@ async function mobilePass(browser, baseUrl) {
   });
   const railTall = await railOf();
   await page.setViewportSize({ width: 375, height: 640 });
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   const railShort = await railOf();
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.waitForTimeout(300);
+  await elapse(page, 300);
   console.log(`  barra deslizable: 390x844 ${railTall.overflows ? 'desborda' : 'cabe'} (${railTall.shown ? 'se ve' : 'no se ve'}), ` +
     `375x640 ${railShort.overflows ? 'desborda' : 'cabe'} (${railShort.shown ? 'se ve' : 'no se ve'}, mando ${railShort.thumb.height.toFixed(0)} de ${railShort.rail.height.toFixed(0)})`);
   check(!railTall.overflows && !railTall.shown, `con las casillas a la vista, la barra no deberia verse: ${JSON.stringify(railTall)}`);
@@ -2719,12 +2755,10 @@ async function mobilePass(browser, baseUrl) {
   // por segundo.
   // Se espera a que lleguen tres golpes, no un tiempo fijo (escape 13). El
   // sostenido lo reconoce un temporizador del navegador (`HOLD_MS`, 300 ms, en
-  // `controls.ts`), que va con el reloj de verdad aunque el juego no: primero
-  // se le deja dispararse, y luego `until` avanza los ticks en que se cuentan
-  // los golpes.
+  // `controls.ts`), con el reloj de la interfaz; `until` deja pasar los dos
+  // relojes a la vez, asi que salta a los 300 ms de juego, como jugando.
   const h0t = await state(page);
   await pointers(page, [{ type: 'pointerdown', id: 3, ...worldAt }]);
-  if (manual(page)) await page.waitForTimeout(450);
   await until(page, (n) => window.__verdant.sent.tapHarvest >= n, h0t.sent.tapHarvest + 3, { timeout: 8000 }).catch(() => {});
   const h1t = await state(page);
   await pointers(page, [{ type: 'pointerup', id: 3, ...worldAt }]);
@@ -2989,7 +3023,9 @@ async function lifePass(browser, baseUrl) {
   await page.keyboard.press('KeyR');
   const reborn = await waitForLoop(page, 30);
   const urlSeed = new URL(page.url()).searchParams.get('seed');
-  console.log(`  R: semilla ${dead.seed} -> ${reborn.seed} (URL ${urlSeed}), salud ${reborn.health}`);
+  // La semilla nueva es al azar (`randomSeed`): no se imprime, para que dos
+  // corridas se puedan comparar linea a linea (`tools/determinismo.mjs`).
+  console.log(`  R: semilla ${dead.seed} -> otra (${reborn.seed !== dead.seed}, la de la URL ${String(reborn.seed) === urlSeed}), salud ${reborn.health}`);
   check(reborn.alive && reborn.health === 100, 'R no devolvio la vida');
   check(reborn.seed !== dead.seed, 'R no cambio de mundo');
   check(urlSeed === String(reborn.seed), 'la URL no lleva la semilla nueva');
@@ -3185,23 +3221,10 @@ async function reliefPass(browser, baseUrl) {
 
 // ------------------------------------------------------------------------- main
 
-async function serve() {
-  const html = await readFile(PAGE);
-  const server = createServer((req, res) => {
-    if ((req.url ?? '/').split('?')[0] !== '/') {
-      res.writeHead(404).end();
-      return;
-    }
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(html);
-  });
-  await new Promise((r) => server.listen(0, '127.0.0.1', r));
-  return server;
-}
-
 const remote = process.env.VERDANT_URL?.replace(/\/$/, '');
-const server = remote ? null : await serve();
-const baseUrl = remote ?? `http://127.0.0.1:${server.address().port}`;
+const served = remote ? null : await serve();
+const server = served?.server;
+const baseUrl = remote ?? served.baseUrl;
 console.log(`probando ${baseUrl}`);
 
 const proxyUrl = remote ? (process.env.HTTPS_PROXY ?? process.env.https_proxy) : undefined;
@@ -3237,10 +3260,11 @@ async function highRefreshPass(browser, baseUrl) {
   }
   // Arriba al centro: en una ventana pequena la ayuda de teclado tapa el medio.
   const clickAt = { x: 320, y: 110 };
+  await prepare(page, { fake: manualPass });
   await page.goto(`${baseUrl}/?seed=${SEED}${VIEW}${manualPass ? '&reloj=manual' : ''}`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__verdant, null, { timeout: 30000 });
   await page.mouse.click(clickAt.x, clickAt.y);
-  await page.waitForFunction(() => window.__verdant && !window.__verdant.paused, null, { timeout: 5000 });
+  await until(page, () => window.__verdant && !window.__verdant.paused, null, { timeout: 5000 });
   const afterTick = async (t0, n) => {
     if (!manual(page)) {
       return page.waitForFunction(([base, k]) => window.__verdant.tick >= base + k, [t0, n], { timeout: 60000 });
@@ -3548,7 +3572,7 @@ try {
   for (const [name, pass] of Object.entries(passes)) {
     if (only && !name.startsWith(only)) continue;
     // `SMOKE_RELOJ=real` corre todas con el de verdad, para comparar.
-    manualPass = MANUAL_PASSES.has(name) && process.env.SMOKE_RELOJ !== 'real';
+    manualPass = process.env.SMOKE_RELOJ !== 'real';
     const started = Date.now();
     await pass(browser, baseUrl);
     console.log(`  (${name}: ${Math.round((Date.now() - started) / 1000)} s, reloj ${manualPass ? 'manual' : 'de verdad'})`);

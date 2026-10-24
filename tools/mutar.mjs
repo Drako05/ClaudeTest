@@ -72,7 +72,12 @@ if (faltan.length > 0) {
 }
 
 function correr(cmd) {
-  const r = spawnSync(cmd[0], cmd.slice(1), { cwd: ROOT, encoding: 'utf8', timeout: LIMITE_MS, maxBuffer: 64 << 20 });
+  // En Windows `npm` y `npx` son `.cmd`, y sin shell no se pueden lanzar: las
+  // mutaciones no corrian en el PC del autor (2026-10-24).
+  // Por la shell va como una sola orden (sus argumentos son nombres fijos).
+  const shell = process.platform === 'win32' && ['npm', 'npx'].includes(cmd[0]);
+  const opciones = { cwd: ROOT, encoding: 'utf8', timeout: LIMITE_MS, maxBuffer: 64 << 20, shell };
+  const r = shell ? spawnSync(cmd.join(' '), opciones) : spawnSync(cmd[0], cmd.slice(1), opciones);
   return { codigo: r.status ?? (r.signal ? 124 : 1), salida: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 
