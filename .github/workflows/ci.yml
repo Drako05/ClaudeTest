@@ -2,12 +2,22 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: ['main', 'pruebas']
   pull_request:
+  schedule:
+    # Martes y sabado, 08:00 UTC = 3:00 en Bogota (UTC-5 todo el ano).
+    - cron: '0 8 * * 2,6'
+  workflow_dispatch:
 
+# Sin duplicados (decision del autor, 2026-10-24): el mismo commit corria dos o
+# tres veces —`pruebas`, la rama `claude/…` y `main`—, 7-9 minutos cada una.
+# Las ramas `claude/…` ya no la disparan, y un push a `main` corre solo el
+# nucleo, porque ese arbol ya paso la CI completa en `pruebas`. La completa
+# corre tambien martes y sabado y a mano (`workflow_dispatch`).
+#
 # En la rama `pruebas` un push nuevo deja viejo al anterior: se cancela. Ahi se
 # verifica el trabajo antes de llevarlo a `main` (`tools/a-pruebas.sh`). En
-# `main` cada push corre entero.
+# `main` no se cancela nada.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref == 'refs/heads/pruebas' }}
@@ -32,6 +42,9 @@ jobs:
   navegador:
     name: ${{ matrix.pasada }}
     runs-on: ubuntu-latest
+    # Un push a `main` lo salta: lo corren entero `pruebas`, los PR, el
+    # calendario y el lanzamiento a mano.
+    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
     strategy:
       # Un fallo no cancela las demas: se ve de una vez todo lo que falla.
       fail-fast: false
@@ -72,7 +85,9 @@ jobs:
           path: screenshots/
           if-no-files-found: ignore
 
-  # Un unico estado para todo el conjunto: verde solo si todo lo es.
+  # Un unico estado para todo el conjunto: verde solo si todo lo es. El
+  # navegador saltado vale solo en un push a `main`; en cualquier otro caso, un
+  # `skipped` es rojo.
   todo:
     name: CI completa
     runs-on: ubuntu-latest
@@ -80,6 +95,14 @@ jobs:
     if: always()
     steps:
       - name: Comprobar que todo paso
+        env:
+          NUCLEO: ${{ needs.nucleo.result }}
+          NAVEGADOR: ${{ needs.navegador.result }}
+          PUSH_A_MAIN: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
-          test "${{ needs.nucleo.result }}" = success
-          test "${{ needs.navegador.result }}" = success
+          test "$NUCLEO" = success
+          if [ "$PUSH_A_MAIN" = true ]; then
+            test "$NAVEGADOR" = success -o "$NAVEGADOR" = skipped
+          else
+            test "$NAVEGADOR" = success
+          fi

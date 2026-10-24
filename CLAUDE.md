@@ -204,10 +204,14 @@ ronda de cada sesion.**
    Mientras, el push a `pruebas` ya se publica en
    `https://drako05.github.io/ClaudeTest/pruebas/`: se le pasa al autor para
    que la juegue. Lo que falle se arregla y se vuelve al 3.
-5. **Solo entonces**, commit y push a `main`. Esa CI **confirma, pero no se
-   espera**: se avisa al autor y se mira **al empezar el siguiente turno**.
+5. **Solo entonces**, commit y push a `main`. Ahi la CI es **ligera**: solo
+   typecheck y tests, porque el mismo arbol ya paso la completa en `pruebas`
+   (2026-10-24). **Confirma, pero no se espera**: se avisa al autor y se mira
+   **al empezar el siguiente turno**.
 
-**Y al cerrar cada tanda, la auditoria** (`/auditoria`). **Lo que un cambio
+**La CI completa y la auditoria corren solas martes y sabado a las 3:00 de
+Bogota** (`.claude/skills/auditoria/references/programada.md`), y la
+auditoria tambien cuando el autor la pida (`/auditoria`). **Lo que un cambio
 retire —un valor, una tecla, un nombre— entra en
 `.claude/skills/auditoria/references/retirados.md` en ese mismo cambio**
 (escape 19).

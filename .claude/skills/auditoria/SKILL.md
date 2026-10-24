@@ -1,6 +1,6 @@
 ---
 name: auditoria
-description: Auditoria de codigo y documentacion de Verdant — restos de modelos sustituidos, comprobaciones que no pueden fallar, herramientas podridas, codigo muerto, documentacion que contradice al codigo o a si misma, y logica rota en los bordes. Usala SIEMPRE al cerrar una tanda de cambios, y cuando el autor pida auditar, revisar, repasar o limpiar el codigo o la documentacion. Tiene un proceso fijo por fases, un escaner automatico y un registro de escapes que crece con cada fallo que se le paso.
+description: Auditoria de codigo y documentacion de Verdant — restos de modelos sustituidos, comprobaciones que no pueden fallar, herramientas podridas, codigo muerto, documentacion que contradice al codigo o a si misma, y logica rota en los bordes. Corre sola martes y sabado a las 3:00 de Bogota (references/programada.md); usala tambien cuando el autor pida auditar, revisar, repasar o limpiar el codigo o la documentacion. Tiene un proceso fijo por fases, un escaner automatico y un registro de escapes que crece con cada fallo que se le paso.
 ---
 
 # Auditoria de codigo y documentacion
@@ -9,8 +9,9 @@ Una auditoria de este proyecto **no se improvisa**: sigue estas fases en orden,
 con las lentes de `references/lentes.md` y el escaner de `scripts/`. Al
 terminar deja escrito que audito, hasta que commit, y que aprendio.
 
-Se lanza **como minimo al cerrar cada tanda**, antes de dar la tanda por
-entregada, y siempre que el autor lo pida.
+**Corre sola martes y sabado a las 3:00 de Bogota** (decision del autor,
+2026-10-24), en una sesion de la nube que sigue `references/programada.md` y
+lleva a `main` lo que salga verde. Y siempre que el autor lo pida.
 
 ## Principios
 
@@ -147,8 +148,9 @@ until grep -q '^fin:' LOG; do sleep 10; done
 
 1. **Commit y push** de las correcciones, con un mensaje que las cuente. Aqui
    **si se espera la CI** hasta verla en verde, al reves que en el trabajo
-   diario (`CLAUDE.md`): la auditoria cierra una tanda y no se da por cerrada
-   con la CI en marcha.
+   diario (`CLAUDE.md`): la auditoria no se da por cerrada con la CI en
+   marcha. La programada espera la de `pruebas` y empuja a `main` solo si
+   sale verde (`references/programada.md`).
 2. En `docs/pendiente.md`:
    - actualiza **«Ultima auditoria: commit `<hash auditado>`, fecha»**, que
      es el punto de partida de la siguiente;

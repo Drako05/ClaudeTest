@@ -61,7 +61,10 @@ CI, y lo roto llegaria al autor antes que el rojo. De ahi el procedimiento:
 
    Hasta el 2026-10-10 esto se decia «sin `gh` ni API» y se esperaba con un
    temporizador fijo de 5 minutos; en este entorno `gh api` ya funciona.
-5. **Solo entonces**, commit y push a `main`. Esa CI **confirma, pero no se
+5. **Solo entonces**, commit y push a `main`. Desde el 2026-10-24 ahi corre
+   **solo «Typecheck y tests»**: el navegador sale saltado y «CI completa»
+   lo acepta solo en un push a `main`, porque el mismo arbol ya paso entero
+   en `pruebas`. Esa CI **confirma, pero no se
    espera** (decision del autor, 2026-09-29): se informa al autor en el acto,
    diciendo que esta en marcha, y se mira **al empezar el siguiente turno**; si
    salio en rojo, se dice y se arregla antes que nada.
@@ -94,7 +97,18 @@ correra nunca en CI. Las puertas de `slash`, la
 accion compartida y lo que ensenaron el humo y sus fallos estan en
 `docs/pruebas.md`: **leelo antes de escribir o tocar una comprobacion.**
 
-**Y al cerrar cada tanda, la auditoria**: la skill `auditoria`
+**Que corre en cada disparo** (`ci.yml`, decision del autor, 2026-10-24, para
+que el mismo commit no corra dos o tres veces): un push a `pruebas`, un PR, el
+calendario (martes y sabado, 08:00 UTC = 3:00 en Bogota) y el lanzamiento a
+mano (`workflow_dispatch`) corren la CI entera; un push a `main`, solo el
+nucleo; las ramas `claude/…` y las demas, nada. GitHub retrasa a veces lo
+programado en punto, y los correos de un rojo programado van a quien toco el
+cron por ultima vez.
+
+**La auditoria corre sola martes y sabado a las 3:00 de Bogota**, en una
+sesion de la nube que sigue `.claude/skills/auditoria/references/programada.md`
+y lleva a `main` lo que salga verde en `pruebas`; y cuando el autor la pida.
+Es la skill `auditoria`
 (`.claude/skills/auditoria/`, se invoca con `/auditoria`). Tiene un proceso fijo
 por fases, diez lentes, un escaner automatico con autoprueba y un **registro de
 escapes**. Parte del commit que marca «Ultima auditoria» en `docs/pendiente.md`. **Lo
