@@ -2276,9 +2276,30 @@ async function mobilePass(browser, baseUrl) {
   console.log(`  desarrollo en el movil: ${JSON.stringify(devPanelR)}, pisa ${pisados.join(',') || 'nada'}`);
   check(pisados.length === 0, `el panel de desarrollo pisa mandos: ${pisados}`);
   await shot(page, '3d-04b-movil-desarrollo.png');
+  // El selector de resolucion (tanda movil 1, 2026-10-24): en esta pantalla de
+  // 3x, la de siempre es 2x y a 1x el lienzo lleva un pixel por pixel CSS. Y
+  // cerrar el panel no la devuelve a su sitio, a diferencia de la velocidad.
+  const canvasSize = () => page.evaluate(() => {
+    const c = document.getElementById('view');
+    return { px: c.width, css: c.clientWidth };
+  });
+  const resStart = await state(page);
+  const wide2 = await canvasSize();
+  await page.tap('[data-res="1"]');
+  await elapse(page, 100);
+  const wide1 = await canvasSize();
+  console.log(`  resolucion: ${wide2.px} px a ${resStart.pixelRatio}x, ${wide1.px} px a 1x (${wide1.css} CSS)`);
+  check(resStart.pixelRatio === 2 && wide2.px === wide2.css * 2, `la resolucion de siempre no es 2x: ${resStart.pixelRatio}x, ${wide2.px} px`);
+  check((await state(page)).pixelRatio === 1 && wide1.px === wide1.css, `la resolucion 1x no se aplico: ${wide1.px} px de ${wide1.css}`);
   await page.tap('#devToggle');
   await page.waitForTimeout(200);
   check(!(await page.isVisible('#devPanel')) && !(await state(page)).dev, 'tocar otra vez no cerro el panel de desarrollo');
+  check((await state(page)).pixelRatio === 1, 'cerrar el panel devolvio la resolucion a la de siempre');
+  await page.tap('#devToggle');
+  await page.tap('[data-res="2"]');
+  await page.tap('#devToggle');
+  await elapse(page, 100);
+  check((await state(page)).pixelRatio === 2, 'volver a 2x no devolvio la resolucion');
   // El inventario: se abre sin pausar, y sus pestanas cambian de pagina.
   await page.tap('#invOpen');
   await page.waitForTimeout(200);
@@ -2803,24 +2824,50 @@ async function devToolsPass(browser, baseUrl) {
 
   // Y sobreviven a cambiar de chunk, saltando por el camino.
   const chunkOf = (s) => [Math.floor(s.x) >> 5, Math.floor(s.y) >> 5].join(',');
-  let walked = withBorders;
-  for (const key of ['KeyW', 'KeyD', 'KeyS', 'KeyA']) {
-    for (let burst = 0; burst < 3 && chunkOf(walked) === chunkOf(withBorders); burst++) {
-      await page.keyboard.down(key);
-      for (let i = 0; i < 4; i++) {
-        await elapse(page, 650);
-        await page.keyboard.press('Space');
+  const walkUntil = async (from, keys, done) => {
+    let at = from;
+    for (const key of keys) {
+      for (let burst = 0; burst < 3 && !done(at); burst++) {
+        await page.keyboard.down(key);
+        for (let i = 0; i < 4; i++) {
+          await elapse(page, 650);
+          await page.keyboard.press('Space');
+        }
+        await page.keyboard.up(key);
+        at = await waitForLoop(page, 20);
       }
-      await page.keyboard.up(key);
-      walked = await waitForLoop(page, 20);
+      if (done(at)) return { at, key };
     }
-    if (chunkOf(walked) !== chunkOf(withBorders)) break;
-  }
+    return { at, key: null };
+  };
+  const away = await walkUntil(withBorders, ['KeyW', 'KeyD', 'KeyS', 'KeyA'], (s) => chunkOf(s) !== chunkOf(withBorders));
+  const walked = away.at;
   console.log(`  chunk ${chunkOf(withBorders)} -> ${chunkOf(walked)}, segmentos ${walked.borderSegments}`);
   check(chunkOf(walked) !== chunkOf(withBorders), 'el jugador no llego a cambiar de chunk');
   check(walked.borderSegments > 0 && walked.gridChunks > 0, 'los bordes desaparecieron al cambiar de chunk');
   check(walked.misplacedBorders === 0, 'contornos fuera de su chunk tras caminar');
 
+  // Lo que entra al cruzar se construye repartido en varios frames, y lo que sale
+  // se guarda oculto: volver no rehace nada (tanda movil 1, 2026-10-24).
+  console.log(`  chunks: ${walked.chunksShown} dibujados, ${walked.chunksKept} guardados, ${walked.chunksPending} en cola, ` +
+    `${walked.farBuiltPeak} lejanos en un frame; pico ${JSON.stringify(walked.framePeak)}`);
+  check(walked.farBuiltPeak > 0 && walked.farBuiltPeak < 7,
+    `al cruzar un borde se construyeron ${walked.farBuiltPeak} chunks lejanos en un frame: no se reparten`);
+  check(walked.chunksPending === 0 && walked.chunksShown === 49,
+    `la cola de chunks no se vacio: ${walked.chunksShown} dibujados, ${walked.chunksPending} en cola`);
+  check(walked.chunksKept > walked.chunksShown, 'los chunks que salen no se guardan ocultos');
+  // Y cada chunk lejano en dos frames: primero su terreno, luego lo demas.
+  check(walked.halfBuiltPeak > 0, 'los chunks lejanos se construyen enteros en un frame, sin partir');
+  // Los objetos van agrupados por especie: muchas menos cosas en la escena que
+  // objetos dibujados (`prop-batch.ts`).
+  console.log(`  objetos: ${walked.propInstances} dibujados en ${walked.propObjects} piezas de escena`);
+  check(walked.propInstances > 1000 && walked.propObjects * 5 < walked.propInstances,
+    `los objetos no van agrupados: ${walked.propInstances} en ${walked.propObjects} piezas`);
+  const opposite = { KeyW: 'KeyS', KeyS: 'KeyW', KeyA: 'KeyD', KeyD: 'KeyA' }[away.key];
+  const back = (await walkUntil(walked, [opposite, opposite], (s) => chunkOf(s) === chunkOf(withBorders))).at;
+  console.log(`  de vuelta en ${chunkOf(back)}: ${back.chunksBuilt - walked.chunksBuilt} chunks construidos`);
+  check(chunkOf(back) === chunkOf(withBorders), 'el jugador no pudo volver a su chunk');
+  check(back.chunksBuilt === walked.chunksBuilt, `volver a un chunk recien dejado rehizo ${back.chunksBuilt - walked.chunksBuilt} chunks`);
   // Apagarlos los retira.
   await page.click('[data-toggle="chunks"]');
   await page.click('[data-toggle="biomes"]');

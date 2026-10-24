@@ -19,6 +19,7 @@ import {
   BufferGeometry,
   Color,
   DirectionalLight,
+  InstancedMesh,
   Mesh,
   MeshLambertMaterial,
   PlaneGeometry,
@@ -93,6 +94,8 @@ import { artCanvas, pixelTexture, terrainAtlas } from './world-sprites.js';
 import { FovPanel } from './fov-panel.js';
 import { InventoryUi } from './inventory-ui.js';
 import { MouseLook } from './pointer-lock.js';
+import { FrameProbe } from './frame-probe.js';
+import { batchProps, disposeBatch } from './prop-batch.js';
 import { Hud } from './hud.js';
 import { Overlays } from './overlays.js';
 import { BOX_RADIUS, DebugBoxes } from './debug-boxes.js';
@@ -132,6 +135,21 @@ bindPressLight(document);
 
 /** Radio de chunks que se mallan alrededor del jugador. */
 const RADIUS = 3;
+/**
+ * Hasta donde se guarda, oculto, un chunk ya mallado antes de tirarlo: ir y
+ * volver por una frontera no rehace nada. Lo mismo que el nucleo con
+ * `STREAM_RADIUS_CHUNKS`/`PRUNE_RADIUS_CHUNKS` (tanda movil 1, 2026-10-24).
+ */
+const KEEP_RADIUS = RADIUS + 1;
+/** Los chunks a esta distancia o menos se construyen en el acto: son los que se pisan. */
+const NEAR_RADIUS = 1;
+/**
+ * Lo que se puede gastar por frame construyendo los chunks lejanos que entran,
+ * en ms de reloj real. Siempre entra uno, aunque solo ya se pase. Con todo de
+ * golpe, cruzar un borde construia 7 chunks en un frame y una esquina 13: el
+ * tiron que el autor medio en su telefono.
+ */
+const BUILD_BUDGET_MS = 4;
 
 /** Techo de tiempo por frame. Sin esto, una pausa larga de la pestana dispara
  *  cientos de ticks de golpe y el juego se congela intentando ponerse al dia. */
@@ -306,7 +324,7 @@ const dev = new DevTools({
     skipTime(state, ticks);
     // Tras un salto el estado observado cambia de golpe; no tiene sentido
     // registrarlo como si el jugador hubiera recolectado o comido.
-    dev.observe(state.inventory.totals(), state.entities.hunger[state.playerId], 0);
+    dev.observe(state.inventory.totals(), state.entities.hunger[state.playerId], 0, frameProbe.text, drawStats());
   },
   // Lo justo para el hacha y el pico de piedra, o para toda la tanda 2: mesa,
   // horno, cinco lingotes de cobre, tres de hierro, un pico de cada metal, la
@@ -337,7 +355,16 @@ const dev = new DevTools({
           ];
     for (const [item, n] of bundle) state.inventory.add(item, n);
   },
+  onResolution: (ratio) => renderer.setPixelRatio(Math.min(window.devicePixelRatio, ratio)),
 });
+// La que se eligio la ultima vez, si no es la de siempre.
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, dev.resolution));
+
+/** Lo que cuesta dibujar el ultimo frame, para el panel: llamadas, triangulos y pixeles del lienzo. */
+function drawStats(): string {
+  const info = renderer.info.render;
+  return `${info.calls} llamadas · ${(info.triangles / 1000).toFixed(0)}k tri · ${canvas.width}×${canvas.height} px`;
+}
 
 /**
  * El panel en el movil, que no tiene F3 (pedido del autor, 2026-10-05): un
@@ -604,6 +631,16 @@ interface ChunkView {
   revision: number;
   /** La `terrainRevision` del chunk con la que se hizo su terreno. */
   terrainRevision: number;
+  /** Si se dibuja: fuera de `RADIUS` se guarda oculto hasta `KEEP_RADIUS`. */
+  shown: boolean;
+  /**
+   * Si ya lleva sus objetos y sus sombras. Un chunk lejano se construye en dos
+   * frames: el terreno con sus menas (`buildTerrain`) y luego lo demas
+   * (`finishChunk`).
+   */
+  complete: boolean;
+  /** Cuantos objetos dibujan sus `props` (los agrupados cuentan uno a uno). */
+  instances: number;
 }
 
 /**
@@ -611,16 +648,18 @@ interface ChunkView {
  * 2026-10-20), sin tocar sus objetos.
  */
 function terrainMeshOf(chunk: Chunk): { mesh: Mesh; triangles: number } {
-  const data = chunkMesh(state.world, chunk, tileOf);
-  const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
-  geometry.setAttribute('color', new BufferAttribute(data.colors, 3));
-  geometry.setAttribute('uv', new BufferAttribute(data.uvs, 2));
-  geometry.setIndex(new BufferAttribute(data.indices, 1));
-  geometry.computeVertexNormals();
-  const mesh = new Mesh(geometry, terrainMaterial);
-  scene.add(mesh);
-  return { mesh, triangles: data.triangles };
+  return frameProbe.time('malla', () => {
+    const data = chunkMesh(state.world, chunk, tileOf);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(data.positions, 3));
+    geometry.setAttribute('normal', new BufferAttribute(data.normals, 3));
+    geometry.setAttribute('color', new BufferAttribute(data.colors, 3));
+    geometry.setAttribute('uv', new BufferAttribute(data.uvs, 2));
+    geometry.setIndex(new BufferAttribute(data.indices, 1));
+    const mesh = new Mesh(geometry, terrainMaterial);
+    scene.add(mesh);
+    return { mesh, triangles: data.triangles };
+  });
 }
 
 /**
@@ -629,7 +668,7 @@ function terrainMeshOf(chunk: Chunk): { mesh: Mesh; triangles: number } {
  * columna por columna, aunque asome a un chunk vecino. Ver `shadows.ts`.
  */
 function shadowsOf(spots: ShadowSpot[]): Mesh | null {
-  const shadows = buildShadows(spots, (vx, vy) => columnTopFor(state.world, vx, vy));
+  const shadows = frameProbe.time('sombras', () => buildShadows(spots, (vx, vy) => columnTopFor(state.world, vx, vy)));
   if (shadows) scene.add(shadows);
   return shadows;
 }
@@ -646,15 +685,54 @@ const views = new Map<string, ChunkView>();
 let triangles = 0;
 /** Cuantas veces se ha rehecho solo el terreno de un chunk (un voxel roto), para el humo. */
 let terrainRebuilds = 0;
+/** El desglose del peor frame, para el panel y el humo (`frame-probe.ts`). */
+const frameProbe = new FrameProbe();
+/** Chunks terminados, acumulado; y los pasos que esperan su turno. Para el humo. */
+let chunksBuilt = 0;
+let chunksPending = 0;
+/** Lo mas que se ha construido en un frame cruzando un borde, en pasos (sin contar los cercanos). Para el humo. */
+let farBuiltPeak = 0;
+/** Lo mas que se ha dejado a medio hacer (solo terreno) en un frame. Para el humo: sin partir, 0. */
+let halfBuiltPeak = 0;
 
+/** Un chunk entero en el acto: el terreno y lo demas. */
 function buildChunk(cx: number, cy: number): ChunkView {
+  const view = buildTerrain(cx, cy);
+  finishChunk(view, cx, cy);
+  return view;
+}
+
+/** El primer paso de un chunk: su terreno y sus menas, que tapan el hueco que este les deja. */
+function buildTerrain(cx: number, cy: number): ChunkView {
   const chunk = state.world.getChunk(cx, cy);
   const { mesh, triangles } = terrainMeshOf(chunk);
+  return {
+    mesh,
+    props: [],
+    ores: oresOf(chunk),
+    spots: [],
+    shadows: null,
+    triangles,
+    revision: chunk.revision,
+    terrainRevision: chunk.terrainRevision,
+    shown: true,
+    complete: false,
+    instances: 0,
+  };
+}
+
+/** El segundo: sus objetos y sus sombras. */
+function finishChunk(view: ChunkView, cx: number, cy: number): void {
+  const chunk = state.world.getChunk(cx, cy);
+  chunksBuilt++;
+  frameProbe.countChunk();
+  const propsStart = performance.now();
 
   // Las features, leidas del mundo EFECTIVO y no del potencial del generador:
   // es la regla 4, y aqui vale igual que en el isometrico.
-  const props: import('three').Object3D[] = [];
-  const spots: ShadowSpot[] = [];
+  const props = view.props;
+  const spots = view.spots;
+  const loose: Mesh[] = [];
   const scratch = new Uint8Array(CHUNK_SIZE * CHUNK_SIZE);
   state.world.readFeatures(chunk, scratch);
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
@@ -680,22 +758,21 @@ function buildChunk(cx: number, cy: number): ChunkView {
       }
       const prop = billboards.spawn(feature, x, ground, y, seed);
       if (prop) {
-        scene.add(prop);
-        props.push(prop);
+        loose.push(prop);
         if (feature !== Feature.Pebbles) spots.push({ x, z: y, width: billboards.widthOf(feature) });
       }
     }
   }
-  return {
-    mesh,
-    props,
-    ores: oresOf(chunk),
-    spots,
-    shadows: shadowsOf(spots),
-    triangles,
-    revision: chunk.revision,
-    terrainRevision: chunk.terrainRevision,
-  };
+  // Las aspas y las rocas, agrupadas por especie: una llamada de dibujo por
+  // grupo (`prop-batch.ts`). Las estaciones van sueltas: se animan una a una.
+  view.instances = props.length + loose.length;
+  for (const batch of batchProps(loose)) {
+    scene.add(batch);
+    props.push(batch);
+  }
+  frameProbe.add('objetos', performance.now() - propsStart);
+  view.shadows = shadowsOf(spots);
+  view.complete = true;
 }
 
 /**
@@ -704,6 +781,10 @@ function buildChunk(cx: number, cy: number): ChunkView {
  * donde la tapa el terreno.
  */
 function oresOf(chunk: Chunk): import('three').Object3D[] {
+  return frameProbe.time('menas', () => oresIn(chunk));
+}
+
+function oresIn(chunk: Chunk): import('three').Object3D[] {
   const out: import('three').Object3D[] = [];
   for (let ly = 0; ly < CHUNK_SIZE; ly++) {
     for (let lx = 0; lx < CHUNK_SIZE; lx++) {
@@ -746,32 +827,117 @@ function rebuildTerrain(view: ChunkView, chunk: Chunk): void {
   terrainRebuilds++;
 }
 
+/**
+ * Pone al dia los chunks dibujados alrededor del jugador.
+ *
+ * Lo que cambia por un golpe se rehace en el acto: es lo que se esta mirando.
+ * Lo que ENTRA al cruzar un borde va a una cola de pasos, del mas cercano al
+ * mas lejano: cada chunk, primero su terreno y, en otro frame, lo demas
+ * (`buildTerrain`, `finishChunk`). Se gastan `BUILD_BUDGET_MS` por frame y entra
+ * por el anillo de fuera, detras de la niebla. Los cercanos (`NEAR_RADIUS`) y el
+ * mundo recien empezado van enteros. Y lo que sale se guarda oculto hasta
+ * `KEEP_RADIUS`.
+ */
 function syncChunks(): void {
   const px = state.entities.x[state.playerId];
   const py = state.entities.y[state.playerId];
   const cx0 = Math.floor(px / CHUNK_SIZE);
   const cy0 = Math.floor(py / CHUNK_SIZE);
-  const wanted = new Set<string>();
+  const fresh = views.size === 0;
+  const steps: Array<{ cx: number; cy: number; ring: number; dist: number; view: ChunkView | null }> = [];
 
   for (let cy = cy0 - RADIUS; cy <= cy0 + RADIUS; cy++) {
     for (let cx = cx0 - RADIUS; cx <= cx0 + RADIUS; cx++) {
       const key = `${cx},${cy}`;
-      wanted.add(key);
       const existing = views.get(key);
-      const chunk = state.world.getChunk(cx, cy);
-      if (existing && existing.revision === chunk.revision) {
-        if (existing.terrainRevision !== chunk.terrainRevision) rebuildTerrain(existing, chunk);
+      const dx = cx - cx0;
+      const dy = cy - cy0;
+      const step = { cx, cy, ring: Math.max(Math.abs(dx), Math.abs(dy)), dist: dx * dx + dy * dy, view: existing ?? null };
+      if (!existing) {
+        steps.push(step);
         continue;
       }
-      if (existing) dispose(key, existing);
+      const chunk = state.world.getChunk(cx, cy);
+      if (existing.revision === chunk.revision) {
+        if (existing.terrainRevision !== chunk.terrainRevision) {
+          // A medio hacer aun no tiene sus sombras: se rehace entero.
+          if (!existing.complete) {
+            dispose(key, existing);
+            views.set(key, buildChunk(cx, cy));
+            continue;
+          }
+          rebuildTerrain(existing, chunk);
+        }
+        showChunk(existing, true);
+        if (!existing.complete) steps.push(step);
+        continue;
+      }
+      dispose(key, existing);
       views.set(key, buildChunk(cx, cy));
     }
   }
-  for (const [key, view] of views) {
-    if (!wanted.has(key)) dispose(key, view);
+
+  // El segundo paso de un chunk solo esta en la cola si su vista ya existia al
+  // empezar el frame: el que se hace su terreno ahora termina en otro.
+  steps.sort((a, b) => a.dist - b.dist);
+  const start = performance.now();
+  let far = 0;
+  let half = 0;
+  chunksPending = 0;
+  for (const s of steps) {
+    const key = `${s.cx},${s.cy}`;
+    if (fresh || s.ring <= NEAR_RADIUS) {
+      if (s.view) finishChunk(s.view, s.cx, s.cy);
+      else views.set(key, buildChunk(s.cx, s.cy));
+      continue;
+    }
+    if (far > 0 && performance.now() - start >= BUILD_BUDGET_MS) {
+      chunksPending += s.view ? 1 : 2;
+      continue;
+    }
+    far++;
+    if (s.view) {
+      finishChunk(s.view, s.cx, s.cy);
+    } else {
+      const view = buildTerrain(s.cx, s.cy);
+      views.set(key, view);
+      if (!view.complete) {
+        half++;
+        chunksPending++;
+      }
+    }
   }
+  if (far > farBuiltPeak) farBuiltPeak = far;
+  if (half > halfBuiltPeak) halfBuiltPeak = half;
+
   triangles = 0;
-  for (const view of views.values()) triangles += view.triangles;
+  for (const [key, view] of views) {
+    const [cx, cy] = key.split(',').map(Number);
+    const ring = Math.max(Math.abs(cx - cx0), Math.abs(cy - cy0));
+    if (ring > KEEP_RADIUS) {
+      dispose(key, view);
+      continue;
+    }
+    showChunk(view, ring <= RADIUS);
+    if (view.shown) triangles += view.triangles;
+  }
+}
+
+/** Enciende o apaga un chunk guardado, con todo lo suyo. */
+function showChunk(view: ChunkView, shown: boolean): void {
+  if (view.shown === shown) return;
+  view.shown = shown;
+  view.mesh.visible = shown;
+  for (const prop of view.props) prop.visible = shown;
+  for (const ore of view.ores) ore.visible = shown;
+  if (view.shadows) view.shadows.visible = shown;
+}
+
+/** Los chunks que se dibujan, para la rejilla y los bordes de bioma. */
+function shownChunks(): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const [key, view] of views) if (view.shown) out.push(key.split(',').map(Number) as [number, number]);
+  return out;
 }
 
 function dispose(key: string, view: ChunkView): void {
@@ -779,9 +945,13 @@ function dispose(key: string, view: ChunkView): void {
   // El material del suelo es uno para todos los chunks: no se libera.
   view.mesh.geometry.dispose();
   // Los aspas comparten geometria y material con las demas de su especie, asi
-  // que se quitan de la escena pero NO se liberan: siguen en uso. Las menas si,
-  // que cada una lleva lo suyo (`disposeOres`); y las sombras, que son del chunk.
-  for (const prop of view.props) scene.remove(prop);
+  // que se quitan de la escena pero NO se liberan: siguen en uso; de un grupo
+  // solo se suelta su buffer de instancias (`disposeBatch`). Las menas si, que
+  // cada una lleva lo suyo (`disposeOres`); y las sombras, que son del chunk.
+  for (const prop of view.props) {
+    scene.remove(prop);
+    if (prop instanceof InstancedMesh) disposeBatch(prop);
+  }
   disposeOres(view);
   disposeShadows(view);
   views.delete(key);
@@ -897,6 +1067,7 @@ let voxelsBroken = 0;
  * ella es lo que cuesta.
  */
 function runFrame(now: number, draw: boolean): void {
+  frameProbe.begin();
   const raw = (now - last) / 1000;
   last = now;
   // El peor frame se mide SIN recortar: recortarlo ocultaria justo el tiron.
@@ -975,6 +1146,8 @@ function runFrame(now: number, draw: boolean): void {
   let asked = accumulator >= TICK_DT ? items.take() : null;
   // Se copia cada frame: asi reiniciar o abrir el panel se resuelve solo.
   state.survivalFrozen = dev.survivalFrozen;
+  // El nucleo y lo que cada tick dispara aqui; al cambiar de chunk, su carga.
+  const ticksStart = performance.now();
   while (accumulator >= TICK_DT) {
     intent.jump = jump;
     jump = false;
@@ -1152,6 +1325,7 @@ function runFrame(now: number, draw: boolean): void {
     }
     accumulator -= TICK_DT;
   }
+  frameProbe.add('nucleo', performance.now() - ticksStart);
 
   // Los efectos avanzan una sola vez por frame, y su propia regla les garantiza
   // un fotograma de vida por corto que sea: un barrido dura 0.22 s y en una
@@ -1189,7 +1363,7 @@ function runFrame(now: number, draw: boolean): void {
   overlays.updateReticle(state);
   overlays.syncDebug(
     state.world,
-    [...views.keys()].map((k) => k.split(',').map(Number) as [number, number]),
+    shownChunks(),
     dev.showChunkBorders,
     dev.showBiomeBorders,
   );
@@ -1225,7 +1399,7 @@ function runFrame(now: number, draw: boolean): void {
   );
   // La fauna, cada modelo en sus pies —interpolados, como el jugador— y
   // girado con su rumbo.
-  if (showFauna) faunaView.update(state.fauna, state.entities, drawnAt);
+  if (showFauna) frameProbe.time('fauna', () => faunaView.update(state.fauna, state.entities, drawnAt));
   // Lo suelto, mirando a la camara y con su vaiven.
   dropsView.update(state.world.drops, alpha, clock.now() / 1000);
   if (player) {
@@ -1234,7 +1408,7 @@ function runFrame(now: number, draw: boolean): void {
     // colision deja la camara pegada al personaje, que llenaria la pantalla.
     player.visible = camera.projection !== 'primera' && camera.camDistance >= HIDE_PLAYER_BELOW;
   }
-  if (draw) renderer.render(scene, camera.active);
+  if (draw) frameProbe.time('gpu', () => renderer.render(scene, camera.active));
 
   // Muerto, el cursor se suelta para poder pulsar «Reiniciar»; el aviso de
   // pausa no se pinta encima de esa pantalla.
@@ -1258,8 +1432,11 @@ function runFrame(now: number, draw: boolean): void {
       state.inventory.totals(),
       state.entities.hunger[state.playerId],
       state.world.biomeAt(Math.floor(px), Math.floor(py)),
+      frameProbe.text,
+      drawStats(),
     );
   }
+  frameProbe.end();
 }
 
 function frame(now: number): void {
@@ -1550,6 +1727,27 @@ Object.defineProperty(window, '__verdant', {
       fps,
       /** Frame mas lento del ultimo segundo: es lo que delata un tiron. */
       worstFrameMs,
+      /** El peor frame de los ultimos 5 s, por partes (`frame-probe.ts`). */
+      framePeak: frameProbe.peak,
+      /** Chunks mallados: los que se dibujan, los guardados ocultos y los que esperan en la cola. */
+      chunksShown: shownChunks().length,
+      chunksKept: views.size,
+      chunksPending,
+      /**
+       * Chunks terminados, acumulado; lo mas que entro de los lejanos en un
+       * frame, en pasos; y lo mas que quedo a medio hacer (solo terreno) en uno.
+       */
+      chunksBuilt,
+      farBuiltPeak,
+      halfBuiltPeak,
+      /**
+       * Los objetos de los chunks dibujados: los que van a la escena (un grupo
+       * por especie y estacion a estacion) y cuantos dibujan entre todos.
+       */
+      propObjects: [...views.values()].filter((v) => v.shown).reduce((n, v) => n + v.props.length, 0),
+      propInstances: [...views.values()].filter((v) => v.shown).reduce((n, v) => n + v.instances, 0),
+      /** Pixeles de lienzo por pixel CSS, el del selector de resolucion (`devtools.ts`). */
+      pixelRatio: renderer.getPixelRatio(),
       triangles,
       spots: () => ({
         relief: reliefAround(state),

@@ -486,6 +486,14 @@ export class World {
   }
 
   /**
+   * Si hay algo roto en el chunk (`cx`, `cy`). La malla lo mira una vez por
+   * chunk y, sin nada roto, se ahorra preguntar columna a columna.
+   */
+  hasBroken(cx: number, cy: number): boolean {
+    return (this.broken.get(chunkKey(cx, cy))?.size ?? 0) > 0;
+  }
+
+  /**
    * Rompe el voxel (`vx`, `vy`, `vz`) para siempre (el autor, 2026-10-20). Lo
    * de encima no cae: los bloques no tienen gravedad, y los objetos se quedan
    * donde estaban (`objectBaseAt`). Lo suelto que reposaba ahi si cae: es un

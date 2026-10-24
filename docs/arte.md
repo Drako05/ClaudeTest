@@ -165,9 +165,13 @@ una sombra que cabe en su casilla sigue siendo uno solo. Por eso dejo de ser un
 `InstancedMesh`: ya no es la misma geometria repetida. `tests/shadow-patches.test.ts`
 lo afirma, con el cuadrado plano de antes para verlo fallar.
 
-Lo siguiente por aqui, que ya estaba en la lista de la migracion: **agrupar las
-aspas por (chunk, especie) en `InstancedMesh`**, que es lo que bajaria de verdad
-las draw calls.
+**Y las aspas y las rocas de cada chunk van agrupadas por especie** en un
+`InstancedMesh` (`prop-batch.ts`, tanda movil 1, 2026-10-24): una llamada de
+dibujo por (chunk, especie) en vez de una por objeto. En los 49 chunks del humo,
+6.694 objetos en 682 piezas de escena; en el telefono del autor, la media de 42
+a 48 fps. Se puede porque el material es opaco con `alphaTest`: el orden entre
+instancias no importa. **Siguen sueltas** las estaciones, que se animan una a
+una, y las menas, que llevan cada una su malla y su textura.
 
 ## Proporciones
 

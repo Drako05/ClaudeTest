@@ -57,14 +57,33 @@ publicaba. Y **el movil va peor tanda a tanda**, sin nada que lo vigile.
   TypeScript, y el servidor del multijugador en Node puede importar el mismo
   `packages/sim`, que es lo que promete la regla 1. Rust queda como la salida ya
   prevista (el umbral de 8 ms), modulo a modulo detras de la misma interfaz.
-- **Medir el movil en un telefono de verdad** antes de optimizar: que lo frena
-  (las ~700 draw calls de `docs/arte.md`, el relleno, la geometria, el hilo
-  principal).
+- **Medir el movil en un telefono de verdad** antes de optimizar: hecho el
+  2026-10-24 en la tanda movil 1 (`docs/historia.md`). Lo frenaban la
+  construccion de chunks al cruzar y las llamadas de dibujo, no el relleno; lo
+  que queda, en «Movil: lo que queda».
 - **Que la CI no corra en las ramas `claude/…`**: hecho el 2026-10-24, con
   la CI completa y la auditoria programada dos veces por semana
   (`docs/historia.md`).
 - **El empaquetado**: Tauri o Electron para Steam y Capacitor para movil. Se
   decide cerca del lanzamiento.
+
+---
+
+## Movil: lo que queda (2026-10-24)
+
+La tanda movil 1 (tirones al cruzar de chunk, el chunk en dos frames, el
+selector de resolucion y los objetos agrupados) esta cerrada en
+`docs/historia.md`. En el telefono del autor: sin tirones al cruzar, y la media
+de 42 a 48 fps. **Lo que queda, para tandas futuras** (las decide el autor):
+- **Mas llamadas que agrupar**: las menas van una a una, cada una con su
+  textura; un atlas comun las dejaria agruparse. Y las estaciones.
+- **El nucleo al cambiar de chunk**: repartir su carga cambia **cuando**
+  existen los chunks y sus cuentas (`ensureRecord`, ley del observador), asi
+  que no se toca sin el autor. En el PC generar un chunk cuesta ~1,7 ms.
+- **Lo que cambia lo que se ve**: radio de vista, terreno lejano simplificado.
+  La resolucion no: a 1x el movil va igual que a 2x.
+- **En ortografica** se ve aparecer el anillo de fuera; «no es problema de
+  momento».
 
 ---
 

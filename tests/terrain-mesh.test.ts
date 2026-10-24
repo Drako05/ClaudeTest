@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BufferAttribute, BufferGeometry } from 'three';
 import { CHUNK_SIZE, Feature, Terrain } from '@verdant/shared';
 import { CHUNK_COLUMNS, VOXEL, VOXELS_PER_TILE, World } from '@verdant/sim';
 import { oreSite } from './ground.js';
@@ -189,6 +190,24 @@ describe('Lo roto se ve (el autor, 2026-10-20)', () => {
       return;
     }
     throw new Error('sin borde a la misma altura');
+  });
+});
+
+describe('Las normales van escritas con la malla (tanda movil 1, 2026-10-24)', () => {
+  it('son las que calcularia three.js, tambien bajo lo que quedo en el aire', () => {
+    const world = new World(12345);
+    const chunk = chunkWithRelief(world);
+    const { vx, vy, h } = flatColumn(world, chunk);
+    world.breakVoxel(vx + 1, vy, h - 1);
+    world.breakVoxel(vx + 1, vy, h - 2);
+    world.breakVoxel(vx, vy, h - 2);
+    const mesh = chunkMesh(world, chunk, flat);
+    expect(litBy(mesh, UNDER_LIGHT)).toBe(1);
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(mesh.positions, 3));
+    geometry.setIndex(new BufferAttribute(mesh.indices, 1));
+    geometry.computeVertexNormals();
+    expect(Array.from(mesh.normals)).toEqual(Array.from(geometry.getAttribute('normal').array));
   });
 });
 

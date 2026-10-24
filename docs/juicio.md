@@ -18,6 +18,12 @@ razonamiento entero. Ninguno bloquea nada: si no dices nada, se quedan.
 
 | Qué | Dónde está contado | Cuesta cambiarlo |
 |---|---|---|
+| Movil, objetos: **las estaciones y las menas siguen sueltas** al agrupar los objetos por especie (las estaciones se animan una a una; cada mena lleva su textura) | `docs/arte.md`, sombras | `finishChunk` en `main.ts` |
+| Movil, chunks: **se construyen enteros en el acto los del anillo 1** (los que se pisan) y **los que entran al cruzar un borde, con 4 ms por frame** y siempre uno como poco, del mas cercano al mas lejano | `docs/historia.md`, tanda movil 1 | `NEAR_RADIUS`, `BUILD_BUDGET_MS` en `main.ts` |
+| Movil, chunks: **cada chunk lejano en dos frames**: primero el terreno **con sus menas** (sin ellas se veria el hueco que les deja el terreno) y en otro frame los objetos y las sombras; un frame, el suelo sin arboles | `docs/historia.md`, tanda movil 1 | `buildTerrain`, `finishChunk` en `main.ts` |
+| Movil, panel: **la resolucion elegida se recuerda y no vuelve a 2x al cerrar el panel** | `docs/devtools.md` | `DevTools.resolution` |
+| Movil, chunks: **lo que sale se guarda oculto hasta el anillo 4** antes de tirarlo (como el nucleo con 3 y 5): hasta 81 chunks en memoria, 49 dibujados | `docs/historia.md`, tanda movil 1 | `KEEP_RADIUS` en `main.ts` |
+| Movil, chunks: **que el anillo de fuera tarde unos frames en aparecer no se nota**: en perspectiva cae detras de la niebla; **en ortografica no hay niebla** y podria verse aparecer | `docs/historia.md`, tanda movil 1 | `BUILD_BUDGET_MS`, o un fundido |
 | Pixelart del mundo: **cuatro tonos por material** (luz, base, sombra y hondo), **repartidos por proporciones fijas** (en el follaje, ~15 % de luz, ~28 de base, ~27 de sombra y ~30 de hondo antes de las hojas) y con la luz del noroeste | `docs/guia-de-arte.md`, directriz 7 | `foliage` en `pixel-paint.ts` |
 | Pixelart del mundo: **los colores de lo vivo salen de `palette.ts` con algo mas de saturacion, la luz hacia el amarillo y la sombra hacia el azul** (`ramp`); el roble y la mata de la pradera, de tus referencias; el suelo, con su color de siempre como base | `docs/guia-de-arte.md`, directriz 7 | `ramp` en `tools/pixel-mundo.ts` |
 | Pixelart del mundo: **los minerales son la piedra de la roca con vetas** de carbon, hierro o cobre, no una roca entera de su color | `docs/arte.md`, el pixelart | `stone` en `tools/pixel-mundo.ts` |

@@ -11,17 +11,23 @@
  * - `slash:<parte>`: una parte del barrido (`tools/slash-partes.mjs`);
  * - `test:<fichero>`: un fichero de vitest.
  *
- * Ronda: la auditoria al cerrar la tanda de la pala y las menas (2026-10-20).
+ * Ronda: tanda movil 1, los tirones al cruzar de chunk (2026-10-24).
  */
 export default [
-  // La camara solo mira la caja de su propia casilla: atraviesa media estacion corrida.
-  { nombre: 'camara: sin las vecinas', fichero: 'packages/client/src/camera-collision.ts', de: '= [[0, 0], [1, 0], [0, 1], [1, 1]];', a: '= [[0, 0]];', prueba: 'test:tests/camera-collision.test.ts' },
-  // El golpe no cuenta sus rayos: el cliente vuelve a medir el barrido despues del paso.
-  { nombre: 'barrido: sin los rayos del golpe', fichero: 'packages/sim/src/systems/gathering.ts', de: '    swing.rays = swept.rays;\n', a: '', prueba: 'test:tests/voxel-edit.test.ts' },
-  // Se pone una estacion sobre una casilla que cubre otra.
-  { nombre: 'colocar: sobre lo cubierto', fichero: 'packages/sim/src/systems/gathering.ts', de: '    if (world.featureAt(tx, ty) !== Feature.None || world.isCovered(tx, ty)) return null;', a: '    if (world.featureAt(tx, ty) !== Feature.None) return null;', prueba: 'test:tests/stations.test.ts' },
-  // Picar una mena con pico no suelta su mineral.
-  { nombre: 'leyes: la mena sin botin', fichero: 'packages/sim/src/systems/gathering.ts', de: '    if (count > 0) scatterLoot(', a: '    if (count < 0) scatterLoot(', prueba: 'test:tests/world-laws.test.ts' },
-  // Los cristales salen tambien de las caras que tapa el terreno.
-  { nombre: 'menas: cristales bajo tierra', fichero: 'packages/client/src/ore-mesh.ts', de: 'voxels.some(([a, b, c]) => a === x && b === y && c === z) || covered(x, y, z);', a: 'voxels.some(([a, b, c]) => a === x && b === y && c === z);', prueba: 'test:tests/ore-mesh.test.ts' },
+  // Todo lo que entra al cruzar un borde se construye en el mismo frame, como antes.
+  { nombre: 'chunks: sin presupuesto', fichero: 'packages/client/src/main.ts', de: '    if (far > 0 && performance.now() - start >= BUILD_BUDGET_MS) {', a: '    if (false) {', prueba: 'smoke:devTools' },
+  // Lo que sale se tira en el acto: volver a la frontera lo rehace.
+  { nombre: 'chunks: sin histeresis', fichero: 'packages/client/src/main.ts', de: 'const KEEP_RADIUS = RADIUS + 1;', a: 'const KEEP_RADIUS = RADIUS;', prueba: 'smoke:devTools' },
+  // Un chunk lejano se construye entero en un frame, sin partir en dos.
+  { nombre: 'chunks: de una vez', fichero: 'packages/client/src/main.ts', de: '      const view = buildTerrain(s.cx, s.cy);', a: '      const view = buildChunk(s.cx, s.cy);', prueba: 'smoke:devTools' },
+  // El selector de resolucion no cambia nada.
+  { nombre: 'resolucion: no se aplica', fichero: 'packages/client/src/main.ts', de: '  onResolution: (ratio) => renderer.setPixelRatio(Math.min(window.devicePixelRatio, ratio)),', a: '  onResolution: () => {},', prueba: 'smoke:mobile' },
+  // Cada objeto va solo a la escena, como antes de agruparlos.
+  { nombre: 'objetos: sin agrupar', fichero: 'packages/client/src/main.ts', de: '  for (const batch of batchProps(loose)) {', a: '  for (const batch of loose.flatMap((m) => batchProps([m]))) {', prueba: 'smoke:devTools' },
+  // Las instancias no llevan la posicion ni el giro de su objeto.
+  { nombre: 'objetos: giro perdido', fichero: 'packages/client/src/prop-batch.ts', de: '        mesh.updateMatrix();\n', a: '', prueba: 'test:tests/prop-batch.test.ts' },
+  // La cara de abajo mira hacia arriba.
+  { nombre: 'malla: normal de abajo', fichero: 'packages/client/src/terrain-mesh.ts', de: '[Face.Bottom]: [0, -1, 0],', a: '[Face.Bottom]: [0, 1, 0],', prueba: 'test:tests/terrain-mesh.test.ts' },
+  // La malla no mira lo roto de la vecina del oeste: el hoyo del borde se queda sin pared.
+  { nombre: 'malla: lo roto de la vecina', fichero: 'packages/client/src/terrain-mesh.ts', de: '    world.hasBroken(chunk.cx - 1, chunk.cy) ||\n', a: '', prueba: 'test:tests/terrain-mesh.test.ts' },
 ];

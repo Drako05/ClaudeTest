@@ -11,6 +11,73 @@ Lo que aqui dice «arriba», «abajo» o «Esperando tu juicio» se escribio cua
 todo era un solo fichero: lo vivo esta en `docs/pendiente.md` y las
 deducciones en `docs/juicio.md`.
 
+## Tanda movil 1: los tirones al cruzar de chunk (2026-10-24) — HECHA
+
+**Lo que vio el autor**, en su telefono (MediaTek Dimensity 7020): ~42 fps de
+media, que caen a ~32 justo al cruzar la frontera de un chunk y a ~20 en la
+esquina de cuatro.
+
+**La causa**: `syncChunks` construia de golpe, en un frame, todo lo que entra
+al cambiar de chunk: 7 chunks en un borde recto y 13 en una esquina (la ventana
+es de 7 × 7). Y tiraba en el acto lo que salia, asi que ir y volver por la
+frontera los rehacia una y otra vez. El contador de FPS es la media de un
+segundo, asi que esas caidas son un frame de varios cientos de ms diluido.
+
+**Medido en el PC** (humo, Chromium sin GPU, los 49 chunks del arranque):
+construir un chunk costaba **~9 ms**, y el 74 % era la malla del terreno
+(`chunkMesh`). Del desglose (`frame-probe.ts`) y un perfil salio que la malla
+creaba cierres y arrays por cada columna y cada cara, preguntaba lo roto con
+claves de texto en cada consulta y calculaba las normales despues.
+
+**Hecho (sin cambiar nada de lo que se ve):**
+- **El peor frame, por partes, en el panel de desarrollo** (`docs/devtools.md`).
+- **La malla, 3,2 veces mas rapida** en el navegador (325 → 102 ms los 49
+  chunks): escribe en arrays que se reusan, no crea nada por columna, escribe
+  las normales (identicas a las de three.js, con su test) y solo pregunta lo
+  roto si el chunk o sus vecinos tienen algo roto (`World.hasBroken`). Un chunk
+  entero cuesta ahora **~4,4 ms** en el PC.
+- **Lo que entra se reparte en varios frames**: el anillo 1 se construye en el
+  acto; el resto, del mas cercano al mas lejano, con **4 ms por frame** y
+  siempre uno como poco. Y **lo que sale se guarda oculto hasta el anillo 4**.
+  Las cifras son deduccion (`docs/juicio.md`).
+- El humo (pasada `devTools`) cruza un borde, comprueba que lo lejano no entra
+  todo en un frame y que la cola se vacia, y vuelve: sin rehacer nada.
+
+**Medido por el autor en su telefono** (el mismo dia, «Peor frame», varios
+cruces): **borde recto, 30-60 ms; esquina de cuatro chunks, 50-90 ms**. Y en
+sus palabras, **«no fue perceptible ningun tiron»**. Antes, esos cruces bajaban
+la media de un segundo a 32 y a 20 fps.
+
+**Segunda parte, en la misma subida** (decision del autor: «los fps siguen
+bajando al cruzar» y quiere subir la media):
+- **Cada chunk lejano en dos frames**: el terreno con sus menas, y en otro
+  frame los objetos y las sombras (`buildTerrain` / `finishChunk`). La cola es
+  de pasos, con el mismo presupuesto. **Medido por el autor: 30-40 ms en un
+  borde y ~60 en una esquina** (eran 30-60 y 50-90).
+- **Selector de resolucion** en el panel (2x · 1,5x · 1x) con las llamadas de
+  dibujo, triangulos y pixeles (`docs/devtools.md`). **Medido por el autor: los
+  FPS, practicamente iguales a 2x que a 1x**: al movil no le pesan los pixeles
+  sino las llamadas.
+- En ortografica el autor ve aparecer el anillo de fuera; «no es problema de
+  momento».
+
+**Tercera parte, tambien en la misma subida: los objetos agrupados.** Las
+aspas y las rocas de cada chunk van en un `InstancedMesh` por especie
+(`prop-batch.ts`): en los 49 chunks del humo, **6.694 objetos en 682 piezas de
+escena**, que antes eran una por objeto. Las estaciones y las menas siguen
+sueltas. Una captura del nacimiento antes y despues, con el reloj manual,
+difiere en 211 de 921.600 pixeles, todos en el canto de abajo de las rocas,
+donde su cara inferior empata en profundidad con el suelo y el orden de dibujo
+decide: antes salian alli unas rayitas claras y ahora no. **Medido por el
+autor: la media sube de 42 a 48 fps**; «no es una mejoria tan dramatica, pero
+es considerable», y se seguira optimizando en tandas futuras.
+
+**Verificado en local**: typecheck, 655 tests, las 8 mutaciones de la ronda
+(a mano: `mutar.mjs` no arranca `npm` en Windows) y el humo entero, con los dos
+fallos de `escritorio` que ya habia antes de la tanda («el anillo del hambre no
+bajo», «no hay una pila de bayas») y una vez el destello de una pestana en la
+pasada del movil, que sola paso tres veces de tres.
+
 ## Auditoria al cerrar la pala y las menas de voxeles (2026-10-20)
 
 **El alcance**: de `4151766` a `8e9269e`: el boceto de los minerales, las
